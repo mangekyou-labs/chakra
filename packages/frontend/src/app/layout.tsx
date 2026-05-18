@@ -32,7 +32,10 @@ export default function RootLayout({
               </div>
               <div className="flex items-center gap-4">
                 <nav className="hidden sm:flex items-center gap-6 text-sm text-gray-400">
-                  <a href="https://github.com/Arc-dex-aggregator" target="_blank" rel="noopener" className="hover:text-white transition-colors">
+                  <a href="/docs" className="hover:text-white transition-colors">
+                    API Docs
+                  </a>
+                  <a href="https://github.com/ligulfzhou/Arc-dex-agg" target="_blank" rel="noopener" className="hover:text-white transition-colors">
                     GitHub
                   </a>
                 </nav>
@@ -47,7 +50,7 @@ export default function RootLayout({
 
           <footer className="relative border-t border-white/5 mt-20">
             <div className="max-w-5xl mx-auto px-6 py-6 text-center text-xs text-gray-500">
-              Aggregating liquidity across Arc venue, Arc venue, Arc venue & Arc Classic DEX
+              Aggregating liquidity across Arc venue, Arc venue, Arc venue, Sushi V3, Arc venue & Arc Classic DEX
             </div>
           </footer>
         </Providers>
