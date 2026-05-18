@@ -35,9 +35,6 @@ export default function RootLayout({
                   <a href="/docs" className="hover:text-white transition-colors">
                     API Docs
                   </a>
-                  <a href="https://github.com/ligulfzhou/Arc-dex-agg" target="_blank" rel="noopener" className="hover:text-white transition-colors">
-                    GitHub
-                  </a>
                 </nav>
                 <HeaderWallet />
               </div>
