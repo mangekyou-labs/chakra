@@ -32,6 +32,7 @@ pub mod sushi;
 pub mod Arc venue;
 pub mod Arc venue_math;
 pub mod clmm_math;
+pub mod stable_math;
 pub mod classic_dex;
 pub mod utils;
 
