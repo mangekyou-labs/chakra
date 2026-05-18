@@ -79,11 +79,12 @@ impl AppState {
             let adapters: Vec<Arc<dyn DexAdapter>> = vec![
                 Arc::new(Arc venueAdapter::new(rpc_clone.clone())),
                 Arc::new(Arc venueAdapter::new(rpc_clone.clone())),
-                Arc::new(Arc venueClmmAdapter::new(rpc_clone.clone())),
                 Arc::new(Arc venueAdapter::new(rpc_clone.clone())),
                 Arc::new(SushiAdapter::new(rpc_clone.clone())),
                 Arc::new(Arc venueAdapter::new(rpc_clone.clone())),
                 Arc::new(ClassicDexAdapter::new(None)), // Uses public Horizon API
+                // Arc venueClmmAdapter loaded last (slow: needs to discover concentrated pools)
+                Arc::new(Arc venueClmmAdapter::new(rpc_clone.clone())),
             ];
 
             // Initial registration (fetches from chain)
