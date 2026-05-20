@@ -4,7 +4,7 @@
 //! These tests are ignored by default (require network access).
 //! Run explicitly with: cargo test --test integration_test -- --ignored --nocapture
 
-use dex_adapters::rpc::{ArcRpc, scval_to_u32, scval_to_address};
+use dex_adapters::rpc::{scval_to_address, scval_to_u32, ArcRpc};
 use dex_adapters::Arc venue::Arc venue_FACTORY;
 use dex_adapters::{DexAdapter, ArcRpc as _};
 use std::sync::Arc;
@@ -44,7 +44,10 @@ async fn test_Arc venue_fetch_first_pair() {
 
     let pair_address = scval_to_address(&pair_val).expect("Failed to parse address");
     println!("First pair address: {}", pair_address);
-    assert!(pair_address.starts_with('C'), "Should be a contract address");
+    assert!(
+        pair_address.starts_with('C'),
+        "Should be a contract address"
+    );
 
     // Get token_0
     let token_0_val = rpc
@@ -76,7 +79,10 @@ async fn test_Arc venue_adapter_fetch_pairs() {
     let rpc = mainnet_rpc();
     let adapter = dex_adapters::Arc venue::Arc venueAdapter::new(rpc);
 
-    let pairs = adapter.get_trading_pairs().await.expect("Failed to fetch pairs");
+    let pairs = adapter
+        .get_trading_pairs()
+        .await
+        .expect("Failed to fetch pairs");
     println!("Fetched {} Arc venue pairs", pairs.len());
 
     for (i, pair) in pairs.iter().take(5).enumerate() {
@@ -100,7 +106,10 @@ async fn test_Arc venue_quote_accuracy() {
     let rpc = mainnet_rpc();
     let adapter = dex_adapters::Arc venue::Arc venueAdapter::new(rpc);
 
-    let pairs = adapter.get_trading_pairs().await.expect("Failed to fetch pairs");
+    let pairs = adapter
+        .get_trading_pairs()
+        .await
+        .expect("Failed to fetch pairs");
 
     // Find a pair with reserves
     let pair_with_liquidity = pairs.iter().find(|p| {

@@ -19,25 +19,25 @@
 //! The core value proposition: aggregate liquidity across isolated Arc DEX
 //! contracts that Arc Core's native routing cannot reach.
 
-pub mod traits;
-pub mod rpc;
-pub mod cache;
-pub mod token_registry;
-pub mod token_metadata;
-pub mod batch_refresh;
-pub mod Arc venue;
 pub mod Arc venue;
 pub mod Arc venue_clmm;
-pub mod Arc venue;
-pub mod sushi;
+pub mod batch_refresh;
+pub mod cache;
+pub mod classic_dex;
+pub mod clmm_math;
 pub mod Arc venue;
 pub mod Arc venue_math;
-pub mod clmm_math;
+pub mod Arc venue;
+pub mod rpc;
+pub mod Arc venue;
 pub mod stable_math;
-pub mod classic_dex;
+pub mod sushi;
+pub mod token_metadata;
+pub mod token_registry;
+pub mod traits;
 pub mod utils;
 
-pub use traits::*;
+pub use cache::{default_cache_path, PoolCache};
 pub use rpc::ArcRpc;
-pub use cache::{PoolCache, default_cache_path};
 pub use token_registry::TokenRegistry;
+pub use traits::*;
