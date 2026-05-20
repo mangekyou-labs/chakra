@@ -7,7 +7,7 @@ use axum::{
 use router_engine::types::{RouteRequest, TokenId};
 use serde::{Deserialize, Serialize};
 use Arc_xdr::curr as xdr;
-use Arc_xdr::curr::{Limits, ReadXdr, WriteXdr};
+use Arc_xdr::curr::{Limits, WriteXdr};
 
 use crate::state::AppState;
 
@@ -869,7 +869,7 @@ pub async fn build_tx(
     Json(body): Json<BuildTxRequest>,
 ) -> impl IntoResponse {
     use Arc_xdr::curr as xdr;
-    use Arc_xdr::curr::{Limits, ReadXdr, WriteXdr};
+    use Arc_xdr::curr::{Limits, WriteXdr};
 
     if body.sub_routes.is_empty() {
         return (
