@@ -2,6 +2,7 @@
 
 import { createContext, useContext, useState, useCallback, type ReactNode } from 'react';
 import { ArcWalletsKit } from '@creit.tech/Arc-wallets-kit';
+import { Networks } from '@creit.tech/Arc-wallets-kit/types';
 import { walletModule } from '@creit.tech/Arc-wallets-kit/modules/wallet';
 import { xBullModule } from '@creit.tech/Arc-wallets-kit/modules/xbull';
 import { LobstrModule } from '@creit.tech/Arc-wallets-kit/modules/lobstr';
@@ -31,7 +32,8 @@ let kitInitialized = false;
 function ensureKit() {
   if (kitInitialized) return;
   ArcWalletsKit.init({
-    network: 'public' as any,
+    // Must be the full passphrase, not the shorthand "public" (wallet rejects signing otherwise).
+    network: Networks.PUBLIC,
     modules: [
       new walletModule(),
       new xBullModule(),
@@ -69,9 +71,12 @@ export function WalletProvider({ children }: { children: ReactNode }) {
 
   const signTx = useCallback(async (xdr: string): Promise<string> => {
     ensureKit();
-    const { signedTxXdr } = await ArcWalletsKit.signTransaction(xdr);
+    const { signedTxXdr } = await ArcWalletsKit.signTransaction(xdr, {
+      networkPassphrase: Networks.PUBLIC,
+      address: address ?? undefined,
+    });
     return signedTxXdr;
-  }, []);
+  }, [address]);
 
   return (
     <WalletContext.Provider value={{ address, connecting, connect, disconnect, signTx }}>
