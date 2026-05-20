@@ -14,7 +14,7 @@ use crate::rpc::ArcRpc;
 use anyhow::{anyhow, Result};
 use serde_json::json;
 use Arc_xdr::curr::{self as xdr, Limits, ReadXdr, WriteXdr};
-use tracing::{debug, info, warn};
+use tracing::debug;
 
 /// Maximum keys per getLedgerEntries call (Arc RPC limit)
 const MAX_KEYS_PER_CALL: usize = 200;
