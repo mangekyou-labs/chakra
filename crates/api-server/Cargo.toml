@@ -13,6 +13,7 @@ dex-adapters = { path = "../dex-adapters" }
 
 Arc-xdr.workspace = true
 Arc-strkey.workspace = true
+Arc-client.workspace = true
 
 tokio.workspace = true
 async-trait.workspace = true
