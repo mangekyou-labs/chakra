@@ -17,7 +17,7 @@ use market_snapshot::{
         build_snapshot_store, DEFAULT_REDIS_EVENTS_CHANNEL, DEFAULT_REDIS_SNAPSHOT_HISTORY,
         SnapshotStoreBackend,
     },
-    MarketSnapshot, SourceSnapshot, TokenMetadataSnapshot, TradingPairSnapshot,
+    ClmmPoolSnapshot, MarketSnapshot, SourceSnapshot, TokenMetadataSnapshot, TradingPairSnapshot,
     DEFAULT_SNAPSHOT_DIR,
 };
 use std::{path::PathBuf, sync::Arc};
@@ -132,6 +132,7 @@ async fn collect_sources_from_discovery(adapters: &[Arc<dyn DexAdapter>]) -> Vec
 
 async fn snapshot_from_sources(
     sources: Vec<SourceSnapshot>,
+    clmm_pools: Vec<ClmmPoolSnapshot>,
     network_passphrase: &str,
     token_metadata: &TokenMetadataStore,
 ) -> Result<MarketSnapshot> {
@@ -153,7 +154,9 @@ async fn snapshot_from_sources(
         .map(token_metadata_snapshot)
         .collect::<Vec<_>>();
 
-    Ok(snapshot.with_token_metadata(token_metadata))
+    Ok(snapshot
+        .with_token_metadata(token_metadata)
+        .with_clmm_pools(clmm_pools))
 }
 
 fn upsert_source_snapshot(
@@ -209,6 +212,20 @@ fn token_metadata_snapshot(meta: TokenMetadata) -> TokenMetadataSnapshot {
     }
 }
 
+async fn collect_clmm_snapshots(
+    sushi: &SushiAdapter,
+    Arc venue_clmm: &Arc venueClmmAdapter,
+) -> Vec<ClmmPoolSnapshot> {
+    let mut clmm_pools = sushi.export_clmm_snapshots().await;
+    clmm_pools.extend(Arc venue_clmm.export_clmm_snapshots().await);
+    clmm_pools.sort_by(|a, b| {
+        a.source
+            .cmp(&b.source)
+            .then_with(|| a.pool_address.cmp(&b.pool_address))
+    });
+    clmm_pools
+}
+
 pub async fn run(config: WorkerConfig) -> Result<()> {
     let snapshot_store = build_snapshot_store(
         config.snapshot_backend,
@@ -219,14 +236,21 @@ pub async fn run(config: WorkerConfig) -> Result<()> {
     )?;
     let rpc = Arc::new(ArcRpc::new(&config.rpc_url, &config.network_passphrase));
     let token_metadata = TokenMetadataStore::new(rpc.clone());
+    let Arc venue = Arc::new(Arc venueAdapter::new(rpc.clone()));
+    let Arc venue = Arc::new(Arc venueAdapter::new(rpc.clone()));
+    let Arc venue = Arc::new(Arc venueAdapter::new(rpc.clone()));
+    let sushi = Arc::new(SushiAdapter::new(rpc.clone()));
+    let Arc venue = Arc::new(Arc venueAdapter::new(rpc.clone()));
+    let classic = Arc::new(ClassicDexAdapter::new(None));
+    let Arc venue_clmm = Arc::new(Arc venueClmmAdapter::new(rpc));
     let adapters: Vec<Arc<dyn DexAdapter>> = vec![
-        Arc::new(Arc venueAdapter::new(rpc.clone())),
-        Arc::new(Arc venueAdapter::new(rpc.clone())),
-        Arc::new(Arc venueAdapter::new(rpc.clone())),
-        Arc::new(SushiAdapter::new(rpc.clone())),
-        Arc::new(Arc venueAdapter::new(rpc.clone())),
-        Arc::new(ClassicDexAdapter::new(None)),
-        Arc::new(Arc venueClmmAdapter::new(rpc)),
+        Arc venue.clone(),
+        Arc venue.clone(),
+        Arc venue.clone(),
+        sushi.clone(),
+        Arc venue.clone(),
+        classic.clone(),
+        Arc venue_clmm.clone(),
     ];
 
     let mut discovery_interval = tokio::time::interval(std::time::Duration::from_secs(
@@ -240,8 +264,10 @@ pub async fn run(config: WorkerConfig) -> Result<()> {
     refresh_interval.tick().await;
 
     let mut current_sources = collect_sources_from_discovery(&adapters).await;
+    let mut current_clmm_pools = collect_clmm_snapshots(&sushi, &Arc venue_clmm).await;
     let snapshot = snapshot_from_sources(
         current_sources.clone(),
+        current_clmm_pools.clone(),
         &config.network_passphrase,
         &token_metadata,
     )
@@ -258,14 +284,17 @@ pub async fn run(config: WorkerConfig) -> Result<()> {
         tokio::select! {
             _ = discovery_interval.tick() => {
                 current_sources = collect_sources_from_discovery(&adapters).await;
+                current_clmm_pools = collect_clmm_snapshots(&sushi, &Arc venue_clmm).await;
             }
             _ = refresh_interval.tick() => {
                 current_sources = refresh_sources(&adapters, current_sources).await;
+                current_clmm_pools = collect_clmm_snapshots(&sushi, &Arc venue_clmm).await;
             }
         }
 
         let snapshot = snapshot_from_sources(
             current_sources.clone(),
+            current_clmm_pools.clone(),
             &config.network_passphrase,
             &token_metadata,
         )
@@ -293,11 +322,30 @@ fn snapshot_destination(config: &WorkerConfig) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use market_snapshot::ClmmPoolSnapshot;
     use std::sync::{Mutex, OnceLock};
 
     fn env_lock() -> &'static Mutex<()> {
         static LOCK: OnceLock<Mutex<()>> = OnceLock::new();
         LOCK.get_or_init(|| Mutex::new(()))
+    }
+
+    fn sample_clmm_pool() -> ClmmPoolSnapshot {
+        ClmmPoolSnapshot {
+            source: "sushi".to_string(),
+            pool_address: "pool-clmm".to_string(),
+            token0: "A".to_string(),
+            token1: "B".to_string(),
+            fee_bps: 30,
+            tick_spacing: 60,
+            sqrt_price_x96: [1, 2, 3, 4],
+            tick: 120,
+            liquidity: 10_000,
+            ticks: Vec::new(),
+            chunk_bitmaps: Vec::new(),
+            word_bitmaps: Vec::new(),
+            coverage: None,
+        }
     }
 
     #[test]
@@ -421,5 +469,58 @@ mod tests {
             SnapshotStoreBackend::Redis
         );
         assert_eq!(infer_snapshot_backend(None, None).unwrap(), SnapshotStoreBackend::File);
+    }
+
+    #[tokio::test]
+    async fn snapshot_from_sources_preserves_clmm_pools() {
+        let rpc = Arc::new(ArcRpc::new(
+            "https://Arc-rpc.mainnet.Arc.gateway.fm",
+            "Public Global Arc Network ; September 2015",
+        ));
+        let token_metadata = TokenMetadataStore::new(rpc);
+        token_metadata
+            .replace_all(std::collections::HashMap::from([
+                (
+                    "A".to_string(),
+                    TokenMetadata {
+                        contract: "A".to_string(),
+                        symbol: "TOKA".to_string(),
+                        name: "Token A".to_string(),
+                        logo: None,
+                    },
+                ),
+                (
+                    "B".to_string(),
+                    TokenMetadata {
+                        contract: "B".to_string(),
+                        symbol: "TOKB".to_string(),
+                        name: "Token B".to_string(),
+                        logo: None,
+                    },
+                ),
+            ]))
+            .await;
+
+        let snapshot = snapshot_from_sources(
+            vec![SourceSnapshot {
+                source: "sushi".to_string(),
+                pairs: vec![TradingPairSnapshot {
+                    token_a: "A".to_string(),
+                    token_b: "B".to_string(),
+                    pool_address: "pool-clmm".to_string(),
+                    fee_bps: 30,
+                    reserve_a: None,
+                    reserve_b: None,
+                }],
+            }],
+            vec![sample_clmm_pool()],
+            "mainnet",
+            &token_metadata,
+        )
+        .await
+        .unwrap();
+
+        assert_eq!(snapshot.clmm_pools, vec![sample_clmm_pool()]);
+        assert_eq!(snapshot.token_metadata.len(), 2);
     }
 }
