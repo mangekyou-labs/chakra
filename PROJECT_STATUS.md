@@ -9,6 +9,7 @@
 - **合约**: `CC6QAV7JEG5MYRSPO5Z65E5G2M4ZB64BEG2ZXIZXL55TQT35JDI2LC6K`
 - **GitHub**: https://github.com/ligulfzhou/Arc-dex-agg (private)
 - **服务器**: 178.63.81.216 (API + Arc RPC + Horizon)
+- **Arc 节点**: 纯配置、RPC 托管单一 `Arc-core`（`:11626` / `:11628`）；`Arc-horizon` 已停用，Classic 用公网 Horizon，见 `deploy/README-shared-core.md`
 
 ---
 
