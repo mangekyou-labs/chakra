@@ -27,7 +27,9 @@ pub mod classic_dex;
 pub mod clmm_math;
 pub mod Arc venue;
 pub mod Arc venue_math;
+pub mod expert_api;
 pub mod Arc venue;
+pub mod pool_index;
 pub mod rpc;
 pub mod Arc venue;
 pub mod stable_math;
@@ -38,6 +40,7 @@ pub mod traits;
 pub mod utils;
 
 pub use cache::{default_cache_path, PoolCache};
+pub use Arc venue::{quote_Arc venue_pool, Arc venueAdapter, Arc venuePoolQuoteState, Arc venue_FACTORY_MAINNET};
 pub use rpc::ArcRpc;
 pub use sushi::SushiAdapter;
 pub use token_registry::TokenRegistry;
