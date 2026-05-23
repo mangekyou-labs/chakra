@@ -14,7 +14,7 @@ resolver = "2"
 version = "0.1.0"
 edition = "2021"
 license = "MIT"
-repository = "https://github.com/Arc-dex-aggregator/Arc-dex-aggregator"
+repository = "https://github.com/ligulfzhou/Arc-dex-agg"
 
 [workspace.dependencies]
 # Arc

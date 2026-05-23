@@ -1,6 +1,10 @@
 # Arc DEX Aggregator (Chakra)
 
+[![GitHub](https://img.shields.io/badge/GitHub-ligulfzhou%2FArc--dex--agg-181717?logo=github)](https://github.com/ligulfzhou/Arc-dex-agg)
+
 Multi-source liquidity aggregation router for Arc's Arc DEX ecosystem.
+
+**Repository:** https://github.com/ligulfzhou/Arc-dex-agg
 
 Aggregates liquidity across **Arc venue**, **Arc venue**, **Arc venue**, **Sushi V3**, **Arc venue**, and compares against **Classic DEX** (Horizon PathPayment) to find optimal swap execution — including multi-hop paths and split orders across venues.
 
