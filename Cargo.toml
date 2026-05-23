@@ -5,6 +5,7 @@ members = [
     "crates/router-engine",
     "crates/dex-adapters",
     "crates/api-server",
+    "crates/Chakra-alerts",
     "crates/sdk",
     "contracts/aggregator",
 ]

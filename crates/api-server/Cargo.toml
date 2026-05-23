@@ -11,6 +11,7 @@ path = "src/main.rs"
 market-snapshot = { path = "../market-snapshot" }
 router-engine = { path = "../router-engine" }
 dex-adapters = { path = "../dex-adapters" }
+Chakra-alerts = { path = "../Chakra-alerts" }
 
 Arc-xdr.workspace = true
 Arc-strkey.workspace = true
