@@ -359,6 +359,7 @@ impl AppState {
             Arc_paths = Arc_path_count,
             xyk_hydrated = hydration.xyk_pools.len(),
             clmm_hydrated = hydration.clmm_pools.len(),
+            Arc venue_hydrated = hydration.Arc venue_pools.len(),
             paths_ms,
             hydrate_ms,
             redis_miss_xyk,

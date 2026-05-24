@@ -40,6 +40,7 @@ pub mod traits;
 pub mod utils;
 
 pub use cache::{default_cache_path, PoolCache};
+pub use Arc venue::{quote_Arc venue_pool, Arc venueAdapter, Arc venuePoolQuoteState};
 pub use Arc venue::{quote_Arc venue_pool, Arc venueAdapter, Arc venuePoolQuoteState, Arc venue_FACTORY_MAINNET};
 pub use rpc::ArcRpc;
 pub use sushi::SushiAdapter;

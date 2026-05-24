@@ -2,11 +2,11 @@
 
 use std::collections::HashSet;
 
-use dex_adapters::DexAdapter;
-use market_snapshot::pool_state_store::XykPoolStateValue;
+use dex_adapters::{Arc venueAdapter, DexAdapter};
+use market_snapshot::pool_state_store::{Arc venuePoolStateValue, XykPoolStateValue};
 use std::sync::Arc;
 
-const XYK_REDIS_SOURCES: &[&str] = &["Arc venue", "Arc venue", "Arc venue", "Arc venue"];
+const XYK_REDIS_SOURCES: &[&str] = &["Arc venue", "Arc venue", "Arc venue"];
 
 /// xy=k reserves from adapter caches (not written into topology snapshot).
 pub async fn collect_xyk_pool_state(adapters: &[Arc<dyn DexAdapter>]) -> Vec<XykPoolStateValue> {
@@ -47,4 +47,21 @@ pub async fn collect_xyk_pool_state(adapters: &[Arc<dyn DexAdapter>]) -> Vec<Xyk
             .then_with(|| a.pool_address.cmp(&b.pool_address))
     });
     out
+}
+
+/// Arc venue pools: token-ordered reserves + stable params (one key per pool contract).
+pub async fn collect_Arc venue_pool_state(Arc venue: &Arc venueAdapter) -> Vec<Arc venuePoolStateValue> {
+    Arc venue
+        .export_pool_quote_states()
+        .await
+        .into_iter()
+        .map(|state| Arc venuePoolStateValue {
+            pool_address: state.pool_address,
+            tokens: state.tokens,
+            reserves: state.reserves,
+            fee_bps: state.fee_bps,
+            is_stable: state.is_stable,
+            amp: state.amp,
+        })
+        .collect()
 }
