@@ -8,7 +8,7 @@ Multi-source liquidity aggregation router for Arc's Arc DEX ecosystem.
 
 Aggregates liquidity across **Arc venue**, **Arc venue**, **Arc venue**, **Sushi V3**, **Arc venue**, and compares against **Classic DEX** (Horizon PathPayment) to find optimal swap execution — including multi-hop paths and split orders across venues.
 
-**SCF Build #44:** submission checklist, demo script, and talking points → [docs/scf-build.md](docs/scf-build.md) (`./scripts/scf-demo.sh`).
+**Arc arbitrage scanner (Phase 1 — detect only):** `cargo run -p arbitrage --bin arb-scanner` (reads Redis; no Classic Arc; no tx submit).
 
 ## Architecture
 
