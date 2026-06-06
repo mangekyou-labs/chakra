@@ -8,8 +8,6 @@ Multi-source liquidity aggregation router for Arc's Arc DEX ecosystem.
 
 Aggregates liquidity across **Arc venue**, **Arc venue**, **Arc venue**, **Sushi V3**, **Arc venue**, and compares against **Classic DEX** (Horizon PathPayment) to find optimal swap execution — including multi-hop paths and split orders across venues.
 
-**Arc arbitrage scanner (Phase 1 — detect only):** `cargo run -p arbitrage --bin arb-scanner` (reads Redis; no Classic Arc; no tx submit).
-
 ## Architecture
 
 Production deployment separates **slow-changing routing topology** from **fast-changing pool reserves**. The API stays stateless; a background worker owns writes to Redis.
