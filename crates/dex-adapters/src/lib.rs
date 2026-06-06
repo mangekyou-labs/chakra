@@ -28,6 +28,7 @@ pub mod classic_dex;
 pub mod clmm_math;
 pub mod Arc venue;
 pub mod Arc venue_math;
+pub mod dex_event_kinds;
 pub mod expert_api;
 pub mod Arc venue;
 pub mod pool_index;
