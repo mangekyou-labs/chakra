@@ -31,6 +31,7 @@ pub mod Arc venue_math;
 pub mod expert_api;
 pub mod Arc venue;
 pub mod pool_index;
+pub mod router_events;
 pub mod rpc;
 pub mod Arc venue;
 pub mod stable_math;
