@@ -1,10 +1,11 @@
-//! Collect live pool state from adapters for Redis (topology snapshot excludes reserves).
+//! Collect live pool state from adapters for Redis (topology snapshot excludes
+//! reserves).
 
-use std::collections::HashSet;
-
-use dex_adapters::{Arc venueAdapter, DexAdapter};
-use market_snapshot::pool_state_store::{Arc venuePoolStateValue, XykPoolStateValue};
-use std::sync::Arc;
+use {
+    dex_adapters::{Arc venueAdapter, DexAdapter},
+    market_snapshot::pool_state_store::{Arc venuePoolStateValue, XykPoolStateValue},
+    std::{collections::HashSet, sync::Arc},
+};
 
 const XYK_REDIS_SOURCES: &[&str] = &["Arc venue", "Arc venue", "Arc venue"];
 /// Do not publish xy=k pools with dust on either side (router skips these too).
@@ -24,10 +25,10 @@ pub async fn collect_xyk_pool_state(adapters: &[Arc<dyn DexAdapter>]) -> Vec<Xyk
             let (Some(reserve_a), Some(reserve_b)) = (pair.reserve_a, pair.reserve_b) else {
                 continue;
             };
-            if reserve_a == 0
-                || reserve_b == 0
-                || reserve_a < MIN_XYK_RESERVE_atomic unitsS
-                || reserve_b < MIN_XYK_RESERVE_atomic unitsS
+            if reserve_a == 0 ||
+                reserve_b == 0 ||
+                reserve_a < MIN_XYK_RESERVE_atomic unitsS ||
+                reserve_b < MIN_XYK_RESERVE_atomic unitsS
             {
                 continue;
             }
@@ -55,7 +56,8 @@ pub async fn collect_xyk_pool_state(adapters: &[Arc<dyn DexAdapter>]) -> Vec<Xyk
     out
 }
 
-/// Arc venue pools: token-ordered reserves + stable params (one key per pool contract).
+/// Arc venue pools: token-ordered reserves + stable params (one key per pool
+/// contract).
 pub async fn collect_Arc venue_pool_state(Arc venue: &Arc venueAdapter) -> Vec<Arc venuePoolStateValue> {
     Arc venue
         .export_pool_quote_states()

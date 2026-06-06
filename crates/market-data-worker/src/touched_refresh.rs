@@ -1,21 +1,20 @@
 //! Refresh only ledger-touched pools and push updates to Redis.
 
-use std::collections::{HashMap, HashSet};
-
-use anyhow::Result;
-use dex_adapters::{
-    Arc venue::Arc venueAdapter, Arc venue_clmm::Arc venueClmmAdapter,
-    batch_refresh::batch_refresh_Arc venue_reserves, Arc venue::Arc venueAdapter, Arc venue::Arc venueAdapter,
-    pool_index::PoolRef, rpc::ArcRpc, Arc venue::Arc venueAdapter, sushi::SushiAdapter,
-    DexAdapter,
+use {
+    crate::ledger_watcher::ledger_max_touched_refresh_from_env,
+    anyhow::Result,
+    dex_adapters::{
+        Arc venue::Arc venueAdapter, Arc venue_clmm::Arc venueClmmAdapter, batch_refresh::batch_refresh_Arc venue_reserves,
+        Arc venue::Arc venueAdapter, Arc venue::Arc venueAdapter, pool_index::PoolRef, rpc::ArcRpc, Arc venue::Arc venueAdapter,
+        sushi::SushiAdapter, DexAdapter,
+    },
+    market_snapshot::{
+        pool_state_store::{should_publish_clmm_to_redis, RedisPoolStateStore, XykPoolStateValue},
+        ClmmPoolSnapshot, SourceSnapshot,
+    },
+    std::collections::{HashMap, HashSet},
+    tracing::{debug, warn},
 };
-use market_snapshot::{
-    pool_state_store::{should_publish_clmm_to_redis, RedisPoolStateStore, XykPoolStateValue},
-    ClmmPoolSnapshot, SourceSnapshot,
-};
-use tracing::{debug, warn};
-
-use crate::ledger_watcher::ledger_max_touched_refresh_from_env;
 
 const BATCH_XYK_SOURCES: &[&str] = &["Arc venue", "Arc venue"];
 const CLMM_SOURCES: &[&str] = &["sushi", "Arc venue_clmm"];
@@ -35,10 +34,7 @@ pub struct TouchedRefreshContext<'a> {
     pub clmm_pools: &'a mut Vec<ClmmPoolSnapshot>,
 }
 
-pub async fn refresh_touched_pools(
-    ctx: TouchedRefreshContext<'_>,
-    touched: HashSet<PoolRef>,
-) -> Result<usize> {
+pub async fn refresh_touched_pools(ctx: TouchedRefreshContext<'_>, touched: HashSet<PoolRef>) -> Result<usize> {
     if touched.is_empty() {
         return Ok(0);
     }
@@ -66,53 +62,29 @@ pub async fn refresh_touched_pools(
 
     for (source, addresses) in &by_source {
         if BATCH_XYK_SOURCES.contains(&source.as_str()) {
-            if let Some((n, values)) =
-                refresh_xyk_batch(ctx.rpc, ctx.sources, source, addresses).await?
-            {
+            if let Some((n, values)) = refresh_xyk_batch(ctx.rpc, ctx.sources, source, addresses).await? {
                 updated += n;
                 xyk_writeback.extend(values);
             }
         } else if source == Arc venue_SOURCE {
             let n = ctx.Arc venue.refresh_touched_pools(addresses).await?;
             if n > 0 {
-                merge_xyk_topology_from_adapter(
-                    ctx.sources,
-                    Arc venue_SOURCE,
-                    ctx.Arc venue as &dyn DexAdapter,
-                )
-                .await;
+                merge_xyk_topology_from_adapter(ctx.sources, Arc venue_SOURCE, ctx.Arc venue as &dyn DexAdapter).await;
                 updated += n;
                 xyk_writeback.extend(
-                    collect_xyk_from_adapter(
-                        ctx.sources,
-                        Arc venue_SOURCE,
-                        addresses,
-                        ctx.Arc venue as &dyn DexAdapter,
-                    )
-                    .await,
+                    collect_xyk_from_adapter(ctx.sources, Arc venue_SOURCE, addresses, ctx.Arc venue as &dyn DexAdapter)
+                        .await,
                 );
             }
         } else if source == Arc venue_SOURCE {
             let n = refresh_Arc venue_touched(ctx.Arc venue, ctx.sources, addresses).await?;
             updated += n;
             xyk_writeback.extend(
-                collect_xyk_from_adapter(
-                    ctx.sources,
-                    Arc venue_SOURCE,
-                    addresses,
-                    ctx.Arc venue as &dyn DexAdapter,
-                )
-                .await,
+                collect_xyk_from_adapter(ctx.sources, Arc venue_SOURCE, addresses, ctx.Arc venue as &dyn DexAdapter).await,
             );
         } else if CLMM_SOURCES.contains(&source.as_str()) {
-            let (n, snaps) = refresh_clmm_pools(
-                source,
-                addresses,
-                ctx.sushi,
-                ctx.Arc venue_clmm,
-                ctx.clmm_pools,
-            )
-            .await?;
+            let (n, snaps) =
+                refresh_clmm_pools(source, addresses, ctx.sushi, ctx.Arc venue_clmm, ctx.clmm_pools).await?;
             updated += n;
             clmm_writeback.extend(snaps);
         } else {
@@ -155,11 +127,7 @@ async fn refresh_xyk_batch(
         let Some((r0, r1)) = reserves else {
             continue;
         };
-        let Some(pair) = source_snapshot
-            .pairs
-            .iter()
-            .find(|p| p.pool_address == addr)
-        else {
+        let Some(pair) = source_snapshot.pairs.iter().find(|p| p.pool_address == addr) else {
             continue;
         };
         values.push(XykPoolStateValue::new(
@@ -176,21 +144,13 @@ async fn refresh_xyk_batch(
     Ok(Some((updated, values)))
 }
 
-async fn merge_xyk_topology_from_adapter(
-    sources: &mut [SourceSnapshot],
-    source: &str,
-    adapter: &dyn DexAdapter,
-) {
+async fn merge_xyk_topology_from_adapter(sources: &mut [SourceSnapshot], source: &str, adapter: &dyn DexAdapter) {
     let cached = adapter.get_cached_pairs().await;
     let Some(existing) = sources.iter_mut().find(|s| s.source == source) else {
         return;
     };
     for pair in cached {
-        if let Some(snap) = existing
-            .pairs
-            .iter_mut()
-            .find(|p| p.pool_address == pair.pool_address)
-        {
+        if let Some(snap) = existing.pairs.iter_mut().find(|p| p.pool_address == pair.pool_address) {
             snap.fee_bps = pair.fee_bps;
         }
     }
@@ -255,9 +215,9 @@ async fn refresh_Arc venue_touched(
         if let Some(existing) = sources.iter_mut().find(|s| s.source == Arc venue_SOURCE) {
             for pair in refreshed {
                 if let Some(snap) = existing.pairs.iter_mut().find(|p| {
-                    p.pool_address == pair.pool_address
-                        && p.token_a == pair.token_a.canonical()
-                        && p.token_b == pair.token_b.canonical()
+                    p.pool_address == pair.pool_address &&
+                        p.token_a == pair.token_a.canonical() &&
+                        p.token_b == pair.token_b.canonical()
                 }) {
                     snap.fee_bps = pair.fee_bps;
                 }

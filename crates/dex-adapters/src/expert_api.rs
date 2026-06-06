@@ -1,7 +1,9 @@
 //! Shared helpers for Arc Expert HTTP API (contract storage indexing).
 
-use anyhow::{anyhow, Result};
-use reqwest::Client;
+use {
+    anyhow::{anyhow, Result},
+    reqwest::Client,
+};
 
 pub const Arc_EXPERT_API: &str = "https://api.Arc.expert/explorer/public";
 const USER_AGENT: &str = "Chakra-dex-aggregator/1.0";
