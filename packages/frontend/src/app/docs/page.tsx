@@ -27,7 +27,7 @@ export default function DocsPage() {
         </p>
         <p className="docs-meta">
           <a href={GITHUB_REPO_URL} target="_blank" rel="noopener noreferrer">
-            github.com/ligulfzhou/Arc-dex-agg
+            github.com/Chakra/Arc-dex-agg
           </a>
         </p>
         <dl className="docs-ref">

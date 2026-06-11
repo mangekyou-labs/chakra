@@ -1,7 +1,7 @@
 //! Refresh only ledger-touched pools and push updates to Redis.
 
 use {
-    crate::ledger_watcher::ledger_max_touched_refresh_from_env,
+    crate::{clmm_metrics::ClmmCoverageMetrics, ledger_watcher::ledger_max_touched_refresh_from_env},
     anyhow::Result,
     dex_adapters::{
         Arc venue::Arc venueAdapter, Arc venue_clmm::Arc venueClmmAdapter, batch_refresh::batch_refresh_Arc venue_reserves,
@@ -32,6 +32,7 @@ pub struct TouchedRefreshContext<'a> {
     pub Arc venue_clmm: &'a Arc venueClmmAdapter,
     pub sources: &'a mut Vec<SourceSnapshot>,
     pub clmm_pools: &'a mut Vec<ClmmPoolSnapshot>,
+    pub clmm_metrics: Option<&'a ClmmCoverageMetrics>,
 }
 
 pub async fn refresh_touched_pools(ctx: TouchedRefreshContext<'_>, touched: HashSet<PoolRef>) -> Result<usize> {
@@ -83,8 +84,15 @@ pub async fn refresh_touched_pools(ctx: TouchedRefreshContext<'_>, touched: Hash
                 collect_xyk_from_adapter(ctx.sources, Arc venue_SOURCE, addresses, ctx.Arc venue as &dyn DexAdapter).await,
             );
         } else if CLMM_SOURCES.contains(&source.as_str()) {
-            let (n, snaps) =
-                refresh_clmm_pools(source, addresses, ctx.sushi, ctx.Arc venue_clmm, ctx.clmm_pools).await?;
+            let (n, snaps) = refresh_clmm_pools(
+                source,
+                addresses,
+                ctx.sushi,
+                ctx.Arc venue_clmm,
+                ctx.clmm_pools,
+                ctx.clmm_metrics,
+            )
+            .await?;
             updated += n;
             clmm_writeback.extend(snaps);
         } else {
@@ -233,6 +241,7 @@ async fn refresh_clmm_pools(
     sushi: &SushiAdapter,
     Arc venue_clmm: &Arc venueClmmAdapter,
     clmm_pools: &mut Vec<ClmmPoolSnapshot>,
+    clmm_metrics: Option<&ClmmCoverageMetrics>,
 ) -> Result<(usize, Vec<ClmmPoolSnapshot>)> {
     let mut updated = 0usize;
     let mut snapshots = Vec::new();
@@ -261,7 +270,15 @@ async fn refresh_clmm_pools(
         if !wanted.contains(snap.pool_address.as_str()) {
             continue;
         }
+        if let Some(metrics) = clmm_metrics {
+            metrics.record_snapshot(&snap);
+        }
         if !should_publish_clmm_to_redis(&snap) {
+            debug!(
+                source,
+                pool = %snap.pool_address,
+                "CLMM touched refresh: skipped Redis publish (incomplete coverage)"
+            );
             continue;
         }
         if let Some(existing) = clmm_pools

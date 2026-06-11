@@ -1,11 +1,11 @@
 # Arc DEX Aggregator (Chakra)
 
-[![GitHub](https://img.shields.io/badge/GitHub-ligulfzhou%2FArc--dex--agg-181717?logo=github)](https://github.com/ligulfzhou/Arc-dex-agg)
+[![GitHub](https://img.shields.io/badge/GitHub-ligulfzhou%2FArc--dex--agg-181717?logo=github)](https://github.com/Chakra/Arc-dex-agg)
 [![License](https://img.shields.io/badge/License-Apache--2.0-blue.svg)](LICENSE)
 
 Multi-source liquidity aggregation for Arc's Arc DEX ecosystem.
 
-**Repository:** https://github.com/ligulfzhou/Arc-dex-agg
+**Repository:** https://github.com/Chakra/Arc-dex-agg
 
 Chakra routes swaps across **Arc venue**, **Arc venue** (xy=k, stable, CLMM), **Arc venue**, **Sushi V3**, and **Arc venue**, with optional comparison against **Classic DEX** (Horizon PathPayment). It supports multi-hop paths, split orders across venues, and atomic on-chain execution via an optional aggregator contract.
 
