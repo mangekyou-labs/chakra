@@ -107,6 +107,7 @@ After path discovery and Redis hydration, **QuoteEngine** quotes each candidate 
 | `Chakra:snapshot:*` | Versioned graph + CLMM metadata (no reserves) |
 | `Chakra:pool:xyk:{source}:{pool}` | xy=k reserves |
 | `Chakra:pool:Arc venue:{pool}` | Arc venue N-token / stable reserves |
+| `Chakra:pool:Arc venue:{pool}` | Arc venue weighted pool (token balances + weights + fee) |
 | `Chakra:pool:clmm:{source}:{pool}` | CLMM slot0, liquidity, ticks |
 | `Chakra:snapshot:events` | Pub/Sub channel for snapshot hot-reload |
 
@@ -115,7 +116,7 @@ After path discovery and Redis hydration, **QuoteEngine** quotes each candidate 
 | Layer | Contents | Storage | Update cadence |
 |-------|----------|---------|----------------|
 | **Graph** | Token pairs, pool addresses, fee tiers; CLMM refs (no ticks) | `Chakra:snapshot:*` | Bootstrap; discovery ~600s |
-| **Pool state** | xy=k reserves; Arc venue multi-token; CLMM slot0 + ticks + coverage | `Chakra:pool:*` | Ledger poll 0.1s for touched pools; bootstrap + discovery full publish |
+| **Pool state** | xy=k reserves; Arc venue multi-token; Arc venue weighted; CLMM slot0 + ticks + coverage | `Chakra:pool:*` | Ledger poll 0.1s for touched pools; bootstrap + discovery full publish |
 
 The API does **not** keep a long-lived in-process pool cache. Each `/quote` reloads the graph from the last snapshot, then overlays pool state from Redis (`QUOTE_RPC_HYDRATE_ENABLED=false` by default).
 
@@ -133,9 +134,9 @@ sequenceDiagram
   C->>API: GET /api/v1/quote
   API->>PF: find_candidate_paths (in-memory graph)
   PF-->>API: candidate paths
-  API->>R: MGET pool keys (xyk + Arc venue + clmm)
+  API->>R: MGET pool keys (xyk + Arc venue + clmm + Arc venue)
   R-->>API: cached pool states
-  Note over API: Arc venue: RPC weighted state<br/>(not Redis; if rpc_hydrate on)
+  Note over API: Arc venue: Redis weighted state<br/>(RPC fallback on miss)
   API->>QE: quote each path at full amount
   QE-->>API: QuotedPath list
   API->>SO: optimize (Brent if split warranted)
@@ -148,7 +149,7 @@ Steps in code:
 
 1. **Path discovery** — BFS on the routing graph; all candidate paths (no liquidity prune).
 2. **Collect pool keys** — unique `(source, pool_address)` across paths.
-3. **Hydrate pool state** (`pool_hydrate::hydrate_paths`) — Redis MGET for xy=k, Arc venue, and CLMM (written by worker). Arc venue pools need full weighted `Arc venuePoolQuoteState` and are fetched via RPC per request when `QUOTE_RPC_HYDRATE_ENABLED=true` (not read from Redis). Optional Arc venue xy=k RPC fallback for Redis misses.
+3. **Hydrate pool state** (`pool_hydrate::hydrate_paths`) — Redis MGET for xy=k, Arc venue, CLMM, and Arc venue weighted state (written by worker). Optional Arc venue xy=k / Arc venue RPC fallback for Redis misses when `QUOTE_RPC_HYDRATE_ENABLED=true`.
 4. **Per-path quote** — local AMM / CLMM / Arc venue math at full `amount_in`; skip CLMM hops when `coverage.is_complete` is false.
 5. **Split optimization** — `SplitOptimizer`: skip if impact below threshold; else Brent's method (2-path) or pairwise merge (N-path) to maximize total output.
 6. **Classic compare** — optional Horizon PathPayment benchmark vs best Arc route.
@@ -179,10 +180,8 @@ Active pools typically refresh within **~0.1–2s** after a swap / add / remove 
 | **Arc venue** | xy=k | Yes | Discovery + ledger | Fee-on-output |
 | **sushi** | CLMM V3 | Yes | Discovery + ledger | Local `clmm_math` |
 | **Arc venue_clmm** | CLMM | Yes | Discovery + ledger | Local `clmm_math` |
-| **Arc venue** | Weighted | **No*** | Worker writes pair reserves as xy=k (unused for quote); quote hydrates weighted state via RPC | Balancer math |
+| **Arc venue** | Weighted | Yes | Discovery + ledger (`Chakra:pool:Arc venue:*`) | Balancer math |
 | **classic_dex** | Native orderbook | **No** | **Per quote** (Horizon) | Benchmark only |
-
-\*Arc venue is excluded from PathFinder until on-chain Arc venue execution is deployed; hydrate + quote math exist for tests.
 
 ## Key features
 

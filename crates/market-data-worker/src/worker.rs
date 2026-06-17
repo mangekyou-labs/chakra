@@ -316,6 +316,7 @@ fn spawn_fast_pool_publish(
     shared: Arc<RwLock<WorkerShared>>,
     adapters: Vec<Arc<dyn DexAdapter>>,
     Arc venue: Arc<Arc venueAdapter>,
+    Arc venue: Arc<Arc venueAdapter>,
     pool_state_store: Option<Arc<market_snapshot::pool_state_store::RedisPoolStateStore>>,
     metrics: Option<Arc<crate::monitor::WorkerMonitorMetrics>>,
     telegram: Option<Arc<Chakra_alerts::TelegramAlerter>>,
@@ -328,6 +329,7 @@ fn spawn_fast_pool_publish(
         if let Err(error) = publish_pool_state_only(
             pool_state_store.as_ref(),
             &adapters,
+            Arc venue.as_ref(),
             Arc venue.as_ref(),
             &clmm_pools,
             metrics.as_ref(),
@@ -453,6 +455,7 @@ async fn publish_pool_state_only(
     pool_state_store: Option<&Arc<market_snapshot::pool_state_store::RedisPoolStateStore>>,
     adapters: &[Arc<dyn DexAdapter>],
     Arc venue: &Arc venueAdapter,
+    Arc venue: &Arc venueAdapter,
     clmm_states: &[ClmmPoolSnapshot],
     metrics: Option<&Arc<crate::monitor::WorkerMonitorMetrics>>,
 ) -> Result<()> {
@@ -461,18 +464,23 @@ async fn publish_pool_state_only(
     };
     let xyk_values = crate::pool_state_publish::collect_xyk_pool_state(adapters).await;
     let Arc venue_values = crate::pool_state_publish::collect_Arc venue_pool_state(Arc venue).await;
+    let Arc venue_values = crate::pool_state_publish::collect_Arc venue_pool_state(Arc venue).await;
     let clmm_complete = clmm_states
         .iter()
         .filter(|p| market_snapshot::pool_state_store::should_publish_clmm_to_redis(p))
         .count();
     pool_store
-        .publish_pool_state(&xyk_values, clmm_states, &Arc venue_values)
+        .publish_pool_state(&xyk_values, clmm_states, &Arc venue_values, &Arc venue_values)
         .await?;
     if let Some(m) = metrics {
-        m.record_publish(xyk_values.len() + Arc venue_values.len(), clmm_complete);
+        m.record_publish(
+            xyk_values.len() + Arc venue_values.len() + Arc venue_values.len(),
+            clmm_complete,
+        );
     }
     info!(
         xyk_pools = xyk_values.len(),
+        Arc venue_pools = Arc venue_values.len(),
         Arc venue_pools = Arc venue_values.len(),
         clmm_pools = clmm_complete,
         ttl_secs = pool_store.ttl_secs(),
@@ -486,10 +494,11 @@ async fn publish_snapshot_and_pool_state(
     pool_state_store: Option<&Arc<market_snapshot::pool_state_store::RedisPoolStateStore>>,
     adapters: &[Arc<dyn DexAdapter>],
     Arc venue: &Arc venueAdapter,
+    Arc venue: &Arc venueAdapter,
     topology: &MarketSnapshot,
     clmm_states: &[ClmmPoolSnapshot],
 ) -> Result<()> {
-    publish_pool_state_only(pool_state_store, adapters, Arc venue, clmm_states, None).await?;
+    publish_pool_state_only(pool_state_store, adapters, Arc venue, Arc venue, clmm_states, None).await?;
     snapshot_store.publish_snapshot(topology).await?;
     Ok(())
 }
@@ -585,6 +594,7 @@ pub async fn run(config: WorkerConfig) -> Result<()> {
     let network_passphrase = config.network_passphrase.clone();
     let destination = snapshot_destination(&config);
     let Arc venue_boot = Arc venue.clone();
+    let Arc venue_boot = Arc venue.clone();
     let clmm_metrics_boot = clmm_metrics.clone();
     tokio::spawn(async move {
         info!("Background bootstrap: parallel adapter discovery");
@@ -608,6 +618,7 @@ pub async fn run(config: WorkerConfig) -> Result<()> {
             snapshot_store_boot.as_ref(),
             pool_state_boot.as_ref(),
             &adapters_boot,
+            Arc venue_boot.as_ref(),
             Arc venue_boot.as_ref(),
             &snapshot,
             &clmm_pools,
@@ -772,6 +783,7 @@ pub async fn run(config: WorkerConfig) -> Result<()> {
                     shared.clone(),
                     adapters.clone(),
                     Arc venue.clone(),
+                    Arc venue.clone(),
                     pool_state_store.clone(),
                     Some(monitor_metrics.clone()),
                     telegram.clone(),
@@ -805,6 +817,7 @@ pub async fn run(config: WorkerConfig) -> Result<()> {
                 let snapshot_store_disc = snapshot_store.clone();
                 let token_metadata_disc = token_metadata.clone();
                 let pool_state_disc = pool_state_store.clone();
+                let Arc venue_disc = Arc venue.clone();
                 let Arc venue_disc = Arc venue.clone();
                 let network_passphrase_disc = config.network_passphrase.clone();
                 let destination_disc = snapshot_destination(&config);
@@ -843,6 +856,7 @@ pub async fn run(config: WorkerConfig) -> Result<()> {
                         snapshot_store_disc.as_ref(),
                         pool_state_disc.as_ref(),
                         &adapters_disc,
+                        Arc venue_disc.as_ref(),
                         Arc venue_disc.as_ref(),
                         &snapshot,
                         &clmm_pools,

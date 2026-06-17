@@ -6,7 +6,7 @@
 //! ledger-touched pools (Jupiter-style event-driven updates).
 
 use {
-    crate::{clmm_metrics::ClmmCoverageMetrics, worker::WorkerShared},
+    crate::{clmm_metrics::ClmmCoverageMetrics, pool_state_publish::Arc venue_state_to_value, worker::WorkerShared},
     anyhow::Result,
     dex_adapters::{
         Arc venue::Arc venueAdapter, Arc venue_clmm::Arc venueClmmAdapter,
@@ -15,7 +15,8 @@ use {
     },
     market_snapshot::{
         pool_state_store::{
-            should_publish_clmm_to_redis, Arc venuePoolStateValue, RedisPoolStateStore, XykPoolStateValue,
+            should_publish_clmm_to_redis, Arc venuePoolStateValue, Arc venuePoolStateValue, RedisPoolStateStore,
+            XykPoolStateValue,
         },
         ClmmPoolSnapshot, SourceSnapshot, TradingPairSnapshot,
     },
@@ -83,6 +84,7 @@ impl FetchPipelineMetrics {
 #[derive(Debug)]
 enum PoolStateUpdate {
     Xyk(Vec<XykPoolStateValue>),
+    Arc venue(Vec<Arc venuePoolStateValue>),
     Arc venue(Vec<Arc venuePoolStateValue>),
     Clmm(ClmmPoolSnapshot),
 }
@@ -254,6 +256,7 @@ pub fn spawn_fetch_pipeline(
                 PoolStateUpdate::Arc venue(values) if !values.is_empty() => {
                     pool_store_sink.set_Arc venue_batch(&values).await
                 }
+                PoolStateUpdate::Arc venue(values) if !values.is_empty() => pool_store_sink.set_Arc venue_batch(&values).await,
                 PoolStateUpdate::Clmm(snapshot) => pool_store_sink.set_clmm_batch(&[snapshot]).await,
                 _ => Ok(()),
             };
@@ -340,18 +343,18 @@ async fn execute_fetch_task(ctx: &FetchWorkerContext, task: FetchTask) -> Result
             if !ctx.Arc venue.refresh_pool(&pool_address).await? {
                 return Ok(vec![]);
             }
-            let sources = ctx.shared.read().await.sources.clone();
-            let values = collect_xyk_from_adapter_cache(
-                &sources,
-                "Arc venue",
-                std::slice::from_ref(&pool_address),
-                ctx.Arc venue.as_ref(),
-            )
-            .await;
+            let values: Vec<Arc venuePoolStateValue> = ctx
+                .Arc venue
+                .export_pool_quote_states_for(std::slice::from_ref(&pool_address))
+                .await
+                .into_iter()
+                .filter(|(_, state)| state.records.len() >= 2)
+                .map(|(addr, state)| Arc venue_state_to_value(&addr, &state))
+                .collect();
             Ok(if values.is_empty() {
                 vec![]
             } else {
-                vec![PoolStateUpdate::Xyk(values)]
+                vec![PoolStateUpdate::Arc venue(values)]
             })
         }
         FetchTask::ClmmPool { source, pool_address } => {

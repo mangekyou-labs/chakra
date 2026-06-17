@@ -107,6 +107,7 @@ flowchart LR
 | `Chakra:snapshot:*` | 版本化路由图 + CLMM 元数据（无 reserves） |
 | `Chakra:pool:xyk:{source}:{pool}` | xy=k reserves |
 | `Chakra:pool:Arc venue:{pool}` | Arc venue 多币 / 稳定币 reserves |
+| `Chakra:pool:Arc venue:{pool}` | Arc venue 加权池（各 token balance + weight + fee） |
 | `Chakra:pool:clmm:{source}:{pool}` | CLMM slot0、流动性、ticks |
 | `Chakra:snapshot:events` | Snapshot 热加载 Pub/Sub 频道 |
 
@@ -115,7 +116,7 @@ flowchart LR
 | 层 | 内容 | 存储 | 更新频率 |
 |----|------|------|----------|
 | **图** | 交易对、池地址、费率；CLMM 引用（无 tick） | `Chakra:snapshot:*` | Bootstrap；discovery ~600s |
-| **池状态** | xy=k reserves；Arc venue 多币；CLMM slot0 + ticks + coverage | `Chakra:pool:*` | Ledger 0.1s 轮询 touched 池；bootstrap + discovery 全量发布 |
+| **池状态** | xy=k reserves；Arc venue 多币；Arc venue 加权；CLMM slot0 + ticks + coverage | `Chakra:pool:*` | Ledger 0.1s 轮询 touched 池；bootstrap + discovery 全量发布 |
 
 API **不**在进程内长期缓存池状态。每次 `/quote` 从最新 snapshot 重载路由图，再从 Redis 覆盖池状态（默认 `QUOTE_RPC_HYDRATE_ENABLED=false`）。
 
@@ -133,9 +134,9 @@ sequenceDiagram
   C->>API: GET /api/v1/quote
   API->>PF: find_candidate_paths（内存图）
   PF-->>API: 候选路径
-  API->>R: MGET 池键（xyk + Arc venue + clmm）
+  API->>R: MGET 池键（xyk + Arc venue + clmm + Arc venue）
   R-->>API: 缓存的池状态
-  Note over API: Arc venue：RPC 拉加权状态<br/>（非 Redis；需 rpc_hydrate）
+  Note over API: Arc venue：Redis 加权状态<br/>（miss 时 RPC 兜底）
   API->>QE: 按全额 amount_in 逐路径报价
   QE-->>API: QuotedPath 列表
   API->>SO: optimize（满足条件时 Brent 拆单）
@@ -148,7 +149,7 @@ sequenceDiagram
 
 1. **路径发现** — 在路由图上 BFS；返回全部候选路径（不按流动性剪枝）。
 2. **收集池键** — 路径上唯一的 `(source, pool_address)`。
-3. **Hydrate 池状态**（`pool_hydrate::hydrate_paths`）— Redis MGET 拉 xy=k、Arc venue、CLMM（由 worker 写入）。Arc venue 需完整加权 `Arc venuePoolQuoteState`，在 `QUOTE_RPC_HYDRATE_ENABLED=true` 时按请求 RPC 拉取（不读 Redis）。Arc venue xy=k Redis miss 时可选用 RPC 兜底。
+3. **Hydrate 池状态**（`pool_hydrate::hydrate_paths`）— Redis MGET 拉 xy=k、Arc venue、CLMM、Arc venue 加权状态（由 worker 写入）。`QUOTE_RPC_HYDRATE_ENABLED=true` 时 Arc venue xy=k / Arc venue Redis miss 可 RPC 兜底。
 4. **逐路径报价** — 以全额 `amount_in` 做本地 AMM / CLMM / Arc venue 计算；`coverage.is_complete` 为 false 的 CLMM 跳跳过。
 5. **拆单优化** — `SplitOptimizer`：冲击低于阈值则跳过；否则 Brent 法（2 路径）或两两合并（N 路径）最大化总输出。
 6. **Classic 对比** — 可选 Horizon PathPayment 与最优 Arc 路由比较。
@@ -179,10 +180,8 @@ getLatestLedger
 | **Arc venue** | xy=k | 是 | Discovery + ledger | 输出扣费 |
 | **sushi** | CLMM V3 | 是 | Discovery + ledger | 本地 `clmm_math` |
 | **Arc venue_clmm** | CLMM | 是 | Discovery + ledger | 本地 `clmm_math` |
-| **Arc venue** | 加权 | **否*** | Worker 写 pair reserves 为 xy=k（报价不用）；报价经 RPC hydrate 加权状态 | Balancer 数学 |
+| **Arc venue** | 加权 | 是 | Discovery + ledger（`Chakra:pool:Arc venue:*`） | Balancer 数学 |
 | **classic_dex** | 原生订单簿 | **否** | **按报价**（Horizon） | 仅基准 |
-
-\*Arc venue 在链上 Arc venue 执行未部署前被 PathFinder 排除；hydrate 与报价数学已实现，供测试使用。
 
 ## 核心特性
 

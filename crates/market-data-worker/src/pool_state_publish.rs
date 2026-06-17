@@ -2,14 +2,35 @@
 //! reserves).
 
 use {
-    dex_adapters::{Arc venueAdapter, DexAdapter},
-    market_snapshot::pool_state_store::{Arc venuePoolStateValue, XykPoolStateValue},
+    dex_adapters::{Arc venue::Arc venueAdapter, Arc venueAdapter, Arc venuePoolQuoteState, DexAdapter},
+    market_snapshot::pool_state_store::{Arc venuePoolStateValue, Arc venuePoolStateValue, Arc venueTokenRecordValue, XykPoolStateValue},
     std::{collections::HashSet, sync::Arc},
 };
 
-const XYK_REDIS_SOURCES: &[&str] = &["Arc venue", "Arc venue", "Arc venue"];
+const XYK_REDIS_SOURCES: &[&str] = &["Arc venue", "Arc venue"];
 /// Do not publish xy=k pools with dust on either side (router skips these too).
 const MIN_XYK_RESERVE_atomic unitsS: u128 = 100_000_000;
+
+pub fn Arc venue_state_to_value(pool_address: &str, state: &Arc venuePoolQuoteState) -> Arc venuePoolStateValue {
+    Arc venuePoolStateValue {
+        pool_address: pool_address.to_string(),
+        records: state
+            .records
+            .iter()
+            .map(|(token, record)| {
+                (
+                    token.clone(),
+                    Arc venueTokenRecordValue {
+                        balance: record.balance,
+                        weight: record.weight,
+                        scalar: record.scalar,
+                    },
+                )
+            })
+            .collect(),
+        swap_fee: state.swap_fee,
+    }
+}
 
 /// xy=k reserves from adapter caches (not written into topology snapshot).
 pub async fn collect_xyk_pool_state(adapters: &[Arc<dyn DexAdapter>]) -> Vec<XykPoolStateValue> {
@@ -53,6 +74,19 @@ pub async fn collect_xyk_pool_state(adapters: &[Arc<dyn DexAdapter>]) -> Vec<Xyk
             .cmp(&b.source)
             .then_with(|| a.pool_address.cmp(&b.pool_address))
     });
+    out
+}
+
+/// Arc venue weighted pool state (one Redis key per pool contract).
+pub async fn collect_Arc venue_pool_state(Arc venue: &Arc venueAdapter) -> Vec<Arc venuePoolStateValue> {
+    let mut out = Vec::new();
+    for (pool_address, state) in Arc venue.export_pool_quote_states().await {
+        if state.records.len() < 2 {
+            continue;
+        }
+        out.push(Arc venue_state_to_value(&pool_address, &state));
+    }
+    out.sort_by(|a, b| a.pool_address.cmp(&b.pool_address));
     out
 }
 

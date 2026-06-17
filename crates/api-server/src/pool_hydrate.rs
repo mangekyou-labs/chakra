@@ -4,11 +4,12 @@
 use {
     dex_adapters::{
         batch_refresh::batch_refresh_Arc venue_reserves, clmm_math::clmm_pool_from_snapshot, Arc venue::Arc venueAdapter,
-        rpc::ArcRpc, Arc venuePoolQuoteState,
+        Arc venue_math::Arc venueRecord, rpc::ArcRpc, Arc venuePoolQuoteState, Arc venuePoolQuoteState,
     },
     market_snapshot::{
         pool_state_store::{
-            parse_quote_hydrate_max_pools_from_env, Arc venuePoolStateValue, RedisPoolStateStore, XykPoolStateValue,
+            parse_quote_hydrate_max_pools_from_env, Arc venuePoolStateValue, Arc venuePoolStateValue,
+            RedisPoolStateStore, XykPoolStateValue,
         },
         ClmmPoolSnapshot,
     },
@@ -95,6 +96,48 @@ fn Arc venue_quote_state(value: &Arc venuePoolStateValue) -> Arc venuePoolQuoteS
     }
 }
 
+fn Arc venue_quote_state(value: &Arc venuePoolStateValue) -> Arc venuePoolQuoteState {
+    Arc venuePoolQuoteState {
+        records: value
+            .records
+            .iter()
+            .map(|(token, record)| {
+                (
+                    token.clone(),
+                    Arc venueRecord {
+                        balance: record.balance,
+                        weight: record.weight,
+                        scalar: record.scalar,
+                    },
+                )
+            })
+            .collect(),
+        swap_fee: value.swap_fee,
+    }
+}
+
+fn Arc venue_state_to_value(pool_address: &str, state: &Arc venuePoolQuoteState) -> Arc venuePoolStateValue {
+    use market_snapshot::pool_state_store::Arc venueTokenRecordValue;
+    Arc venuePoolStateValue {
+        pool_address: pool_address.to_string(),
+        records: state
+            .records
+            .iter()
+            .map(|(token, record)| {
+                (
+                    token.clone(),
+                    Arc venueTokenRecordValue {
+                        balance: record.balance,
+                        weight: record.weight,
+                        scalar: record.scalar,
+                    },
+                )
+            })
+            .collect(),
+        swap_fee: state.swap_fee,
+    }
+}
+
 /// Load per-pool state for candidate paths from Redis; optional batched xy=k
 /// RPC for misses.
 pub async fn hydrate_paths(
@@ -113,6 +156,7 @@ pub async fn hydrate_paths(
     let mut xyk_pools = store.fetch_xyk(&xyk_refs).await.unwrap_or_default();
     let clmm_snapshots = store.fetch_clmm(&clmm_refs).await.unwrap_or_default();
     let Arc venue_raw = store.fetch_Arc venue(&Arc venue_refs).await.unwrap_or_default();
+    let Arc venue_raw = store.fetch_Arc venue(&Arc venue_pools).await.unwrap_or_default();
 
     let clmm_pools: HashMap<String, SnapshotClmmQuoteState> = clmm_snapshots
         .into_iter()
@@ -191,17 +235,48 @@ pub async fn hydrate_paths(
         );
     }
 
-    let mut Arc venue_states = HashMap::new();
-    if config.rpc_hydrate_enabled && !Arc venue_pools.is_empty() {
+    let mut Arc venue_states: HashMap<String, Arc venuePoolQuoteState> = Arc venue_raw
+        .into_iter()
+        .map(|(pool, value)| (pool, Arc venue_quote_state(&value)))
+        .collect();
+
+    let mut redis_miss_Arc venue = 0usize;
+    for pool_address in &Arc venue_pools {
+        if !Arc venue_states.contains_key(pool_address) {
+            redis_miss_Arc venue += 1;
+        }
+    }
+    if redis_miss_Arc venue > 0 {
+        warn!(
+            redis_miss_Arc venue,
+            paths = paths.len(),
+            "quote hydration: Arc venue Redis misses (worker should publish weighted pool state)"
+        );
+    }
+
+    if config.rpc_hydrate_enabled && redis_miss_Arc venue > 0 {
         let Arc venue = Arc venueAdapter::new(Arc::new(ArcRpc::new(rpc.url(), rpc.network_passphrase())));
-        for pool_address in Arc venue_pools {
+        let mut rpc_candidates: Vec<String> = Arc venue_pools
+            .iter()
+            .filter(|pool| !Arc venue_states.contains_key(*pool))
+            .cloned()
+            .collect();
+        rpc_candidates.truncate(config.max_rpc_pools);
+        let mut writeback = Vec::new();
+        for pool_address in rpc_candidates {
             match Arc venue.fetch_pool_quote_state(&pool_address).await {
                 Ok(state) => {
-                    Arc venue_states.insert(pool_address, state);
+                    Arc venue_states.insert(pool_address.clone(), state.clone());
+                    writeback.push(Arc venue_state_to_value(&pool_address, &state));
                 }
                 Err(error) => {
                     debug!("Arc venue hydrate failed for {}: {}", pool_address, error);
                 }
+            }
+        }
+        if !writeback.is_empty() {
+            if let Err(error) = store.set_Arc venue_batch(&writeback).await {
+                debug!("Arc venue hydrate writeback failed: {}", error);
             }
         }
     }
@@ -221,6 +296,7 @@ pub async fn hydrate_paths(
         Arc venue = Arc venue_states.len(),
         Arc venue = Arc venue_pools.len(),
         redis_miss_xyk,
+        redis_miss_Arc venue,
         redis_miss_Arc venue,
         "hydrated pools for quote"
     );
