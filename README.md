@@ -135,6 +135,7 @@ sequenceDiagram
   PF-->>API: candidate paths
   API->>R: MGET pool keys (xyk + Arc venue + clmm)
   R-->>API: cached pool states
+  Note over API: Arc venue: RPC weighted state<br/>(not Redis; if rpc_hydrate on)
   API->>QE: quote each path at full amount
   QE-->>API: QuotedPath list
   API->>SO: optimize (Brent if split warranted)
@@ -147,12 +148,10 @@ Steps in code:
 
 1. **Path discovery** — BFS on the routing graph; all candidate paths (no liquidity prune).
 2. **Collect pool keys** — unique `(source, pool_address)` across paths.
-3. **Redis MGET** — xy=k, Arc venue, CLMM state (written by worker).
-4. **Per-path quote** — local AMM / CLMM math at full `amount_in`.
+3. **Hydrate pool state** (`pool_hydrate::hydrate_paths`) — Redis MGET for xy=k, Arc venue, and CLMM (written by worker). Arc venue pools need full weighted `Arc venuePoolQuoteState` and are fetched via RPC per request when `QUOTE_RPC_HYDRATE_ENABLED=true` (not read from Redis). Optional Arc venue xy=k RPC fallback for Redis misses.
+4. **Per-path quote** — local AMM / CLMM / Arc venue math at full `amount_in`; skip CLMM hops when `coverage.is_complete` is false.
 5. **Split optimization** — `SplitOptimizer`: skip if impact below threshold; else Brent's method (2-path) or pairwise merge (N-path) to maximize total output.
 6. **Classic compare** — optional Horizon PathPayment benchmark vs best Arc route.
-7. **Arc venue** — per-request hydrate (not stored in Redis).
-8. **CLMM guard** — skip hops when tick coverage is incomplete.
 
 ### Ledger watcher (hot path)
 
@@ -180,8 +179,10 @@ Active pools typically refresh within **~0.1–2s** after a swap / add / remove 
 | **Arc venue** | xy=k | Yes | Discovery + ledger | Fee-on-output |
 | **sushi** | CLMM V3 | Yes | Discovery + ledger | Local `clmm_math` |
 | **Arc venue_clmm** | CLMM | Yes | Discovery + ledger | Local `clmm_math` |
-| **Arc venue** | Weighted | Yes | Discovery + ledger | Balancer math (quote-time) |
+| **Arc venue** | Weighted | **No*** | Worker writes pair reserves as xy=k (unused for quote); quote hydrates weighted state via RPC | Balancer math |
 | **classic_dex** | Native orderbook | **No** | **Per quote** (Horizon) | Benchmark only |
+
+\*Arc venue is excluded from PathFinder until on-chain Arc venue execution is deployed; hydrate + quote math exist for tests.
 
 ## Key features
 
