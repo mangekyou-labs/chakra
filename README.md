@@ -209,10 +209,12 @@ This aggregator targets **Arc DEXes** where each hop is a deterministic contract
 │   ├── router-engine/          # PathFinder, QuoteEngine, split optimizer
 │   ├── api-server/             # REST API (/quote, /build_tx, /tokens)
 │   ├── arbitrage/              # Round-trip arb scanner (aggregator.round_trip_swap)
+│   ├── analytics-indexer/      # On-chain aggregator tx indexer (SCF analytics v0)
 │   ├── Chakra-alerts/          # Telegram / monitoring alerts
 │   └── sdk/                    # Client SDK
 ├── docs/
-│   └── pool-state-architecture.md
+│   ├── pool-state-architecture.md
+│   └── analytics-indexer.md    # Volume attribution spec + indexer ops
 ├── thirdparty/                 # Optional local upstream clones (not tracked; see README there)
 ├── deploy/                     # systemd units (Chakra-api@, Chakra-worker)
 ├── deploy_server.sh            # rsync + build + restart on remote host
@@ -355,6 +357,7 @@ Brent tolerance defaults to `0.0001` (0.01%) with up to 18 iterations — simila
 
 | Doc | Topic |
 |-----|-------|
+| [`docs/analytics-indexer.md`](docs/analytics-indexer.md) | On-chain analytics indexer v0 — attribution spec, env, export |
 | [`docs/pool-state-architecture.md`](docs/pool-state-architecture.md) | Pool state design, env tables, code pointers |
 | [`docs/scf-venue-comparison.md`](docs/scf-venue-comparison.md) | Chakra vs Arc venue / Arc Broker — venue coverage & SCF differentiation evidence |
 | [`docs/scf-resubmission-budget.md`](docs/scf-resubmission-budget.md) | SCF #44 resubmission — $80k tranche deliverables (copy-paste) |
