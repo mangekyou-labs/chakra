@@ -400,9 +400,6 @@ mod tests {
             ClmmPoolSnapshot::redis_key("sushi", "POOL"),
             "Chakra:pool:clmm:sushi:POOL"
         );
-        assert_eq!(
-            Arc venuePoolStateValue::redis_key("POOL"),
-            "Chakra:pool:Arc venue:POOL"
-        );
+        assert_eq!(Arc venuePoolStateValue::redis_key("POOL"), "Chakra:pool:Arc venue:POOL");
     }
 }

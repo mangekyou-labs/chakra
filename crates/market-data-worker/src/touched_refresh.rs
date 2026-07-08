@@ -1,7 +1,10 @@
 //! Refresh only ledger-touched pools and push updates to Redis.
 
 use {
-    crate::{clmm_metrics::ClmmCoverageMetrics, ledger_watcher::ledger_max_touched_refresh_from_env, pool_state_publish::Arc venue_state_to_value},
+    crate::{
+        clmm_metrics::ClmmCoverageMetrics, ledger_watcher::ledger_max_touched_refresh_from_env,
+        pool_state_publish::Arc venue_state_to_value,
+    },
     anyhow::Result,
     dex_adapters::{
         Arc venue::Arc venueAdapter, Arc venue_clmm::Arc venueClmmAdapter, batch_refresh::batch_refresh_Arc venue_reserves,

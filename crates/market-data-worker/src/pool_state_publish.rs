@@ -3,13 +3,13 @@
 
 use {
     dex_adapters::{Arc venue::Arc venueAdapter, Arc venueAdapter, Arc venuePoolQuoteState, DexAdapter},
-    market_snapshot::pool_state_store::{Arc venuePoolStateValue, Arc venuePoolStateValue, Arc venueTokenRecordValue, XykPoolStateValue},
+    market_snapshot::pool_state_store::{
+        Arc venuePoolStateValue, Arc venuePoolStateValue, Arc venueTokenRecordValue, XykPoolStateValue,
+    },
     std::{collections::HashSet, sync::Arc},
 };
 
 const XYK_REDIS_SOURCES: &[&str] = &["Arc venue", "Arc venue"];
-/// Do not publish xy=k pools with dust on either side (router skips these too).
-const MIN_XYK_RESERVE_atomic unitsS: u128 = 100_000_000;
 
 pub fn Arc venue_state_to_value(pool_address: &str, state: &Arc venuePoolQuoteState) -> Arc venuePoolStateValue {
     Arc venuePoolStateValue {
@@ -33,6 +33,8 @@ pub fn Arc venue_state_to_value(pool_address: &str, state: &Arc venuePoolQuoteSt
 }
 
 /// xy=k reserves from adapter caches (not written into topology snapshot).
+/// Publishes pools with known reserves (including zero); quote_engine skips
+/// unusable pools.
 pub async fn collect_xyk_pool_state(adapters: &[Arc<dyn DexAdapter>]) -> Vec<XykPoolStateValue> {
     let mut out = Vec::new();
     let mut seen = HashSet::new();
@@ -46,13 +48,6 @@ pub async fn collect_xyk_pool_state(adapters: &[Arc<dyn DexAdapter>]) -> Vec<Xyk
             let (Some(reserve_a), Some(reserve_b)) = (pair.reserve_a, pair.reserve_b) else {
                 continue;
             };
-            if reserve_a == 0 ||
-                reserve_b == 0 ||
-                reserve_a < MIN_XYK_RESERVE_atomic unitsS ||
-                reserve_b < MIN_XYK_RESERVE_atomic unitsS
-            {
-                continue;
-            }
             let pool_key = XykPoolStateValue::pool_key(source, &pair.pool_address);
             if !seen.insert(pool_key) {
                 continue;
