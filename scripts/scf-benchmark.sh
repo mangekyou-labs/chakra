@@ -8,8 +8,10 @@
 #
 # Env:
 #   Chakra_API          default https://api.Chakra.xyz
+#   Chakra_PREFER_Arc  set to 1 for Arc-only Chakra quotes
 #   Arc venue_API_URL    default https://api.Arc venue.finance
 #   Arc venue_API_KEY    optional (register at https://api.Arc venue.finance/register)
+#   Arc venue_PROTOCOLS  comma-separated, default Arc venue,Arc venue,aqua (add Arc for full compare)
 #   OUTPUT              if set, write markdown to this path (also printed to stdout)
 set -euo pipefail
 

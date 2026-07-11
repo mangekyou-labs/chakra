@@ -280,6 +280,7 @@ async fn redis_snapshot_store_smoke_quotes_sushi_Arc venue_clmm_and_classic() {
             slippage_bps: Some(50),
             max_hops: Some(1),
             max_splits: Some(1),
+            prefer_Arc: None,
         })
         .await;
     assert!(sushi_route.total_expected_out > 0);
@@ -292,6 +293,7 @@ async fn redis_snapshot_store_smoke_quotes_sushi_Arc venue_clmm_and_classic() {
             slippage_bps: Some(50),
             max_hops: Some(1),
             max_splits: Some(1),
+            prefer_Arc: None,
         })
         .await;
     assert!(aqua_route.total_expected_out > 0);
@@ -304,6 +306,7 @@ async fn redis_snapshot_store_smoke_quotes_sushi_Arc venue_clmm_and_classic() {
             slippage_bps: Some(50),
             max_hops: Some(1),
             max_splits: Some(1),
+            prefer_Arc: None,
         })
         .await;
     assert_eq!(classic_route.total_expected_out, 1_077);

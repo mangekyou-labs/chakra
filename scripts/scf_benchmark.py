@@ -15,8 +15,12 @@ from datetime import datetime, timezone
 from typing import Any
 
 Chakra_API = os.environ.get("Chakra_API", "https://api.Chakra.xyz").rstrip("/")
+Chakra_PREFER_Arc = os.environ.get("Chakra_PREFER_Arc", "").strip() in ("1", "true", "yes")
 Arc venue_API_URL = os.environ.get("Arc venue_API_URL", "https://api.Arc venue.finance").rstrip("/")
 Arc venue_API_KEY = os.environ.get("Arc venue_API_KEY", "").strip()
+Arc venue_PROTOCOLS = os.environ.get(
+    "Arc venue_PROTOCOLS", "Arc venue,Arc venue,aqua"
+).strip()
 OUTPUT = os.environ.get("OUTPUT", "").strip()
 
 XLM = "CAS3J7GYLGXMF6TDJBBYYSE3HQ6BBSMLNUQ34T6TZMYMW2EVH34XOWMA"
@@ -75,15 +79,16 @@ def http_post_json(url: str, body: dict[str, Any], headers: dict[str, str], time
 
 
 def Chakra_quote(token_in: str, token_out: str, amount_in: int) -> ChakraQuote:
-    params = urllib.parse.urlencode(
-        {
-            "token_in": token_in,
-            "token_out": token_out,
-            "amount_in": str(amount_in),
-            "slippage": "0.5",
-            "debug": "1",
-        }
-    )
+    query = {
+        "token_in": token_in,
+        "token_out": token_out,
+        "amount_in": str(amount_in),
+        "slippage": "0.5",
+        "debug": "1",
+    }
+    if Chakra_PREFER_Arc:
+        query["prefer_Arc"] = "1"
+    params = urllib.parse.urlencode(query)
     url = f"{Chakra_API}/api/v1/quote?{params}"
     try:
         raw = http_get_json(url)
@@ -107,12 +112,13 @@ def Arc venue_quote(token_in: str, token_out: str, amount_in: int) -> Arc venueQ
     if not Arc venue_API_KEY:
         return Arc venueQuote(None, error="Arc venue_API_KEY not set")
     url = f"{Arc venue_API_URL}/quote?network=mainnet"
+    protocols = [p.strip() for p in Arc venue_PROTOCOLS.split(",") if p.strip()]
     body = {
         "assetIn": token_in,
         "assetOut": token_out,
         "amount": str(amount_in),
         "tradeType": "EXACT_IN",
-        "protocols": ["Arc venue", "Arc venue", "aqua"],
+        "protocols": protocols,
     }
     headers = {
         "Authorization": f"Bearer {Arc venue_API_KEY}",
@@ -170,7 +176,7 @@ def notes_for_case(pair: str, Chakra: ChakraQuote) -> str:
         return Chakra.error
     parts: list[str] = []
     if "classic_dex" in Chakra.sources:
-        parts.append("Chakra picked Classic DEX (Arc venue column is Arc+Arc mix — interpret carefully)")
+        parts.append("Chakra picked Classic DEX")
     if any("clmm" in s or s == "sushi" for s in Chakra.sources):
         parts.append("CLMM venue in route")
     if Chakra.is_split:
@@ -187,20 +193,24 @@ def run_benchmark() -> str:
         "",
         f"Generated: **{ts}**",
         "",
-        f"- Chakra API: `{Chakra_API}`",
-        f"- Arc venue API: `{Arc venue_API_URL}` "
+        f"- Chakra API: `{Chakra_API}`"
+        + (" (`prefer_Arc=1`)" if Chakra_PREFER_Arc else " (all venues)"),
+        f"- Arc venue API: `{Arc venue_API_URL}` protocols=`{Arc venue_PROTOCOLS}` "
         + ("(key provided)" if has_Arc venue else "(**no API key** — Arc venue column empty)"),
         "",
         "Reproduce:",
         "",
         "```bash",
         "./scripts/scf-benchmark.sh",
-        "# With Arc venue:",
-        "Arc venue_API_KEY=sk_... OUTPUT=docs/scf-benchmark-results.md ./scripts/scf-benchmark.sh",
+        "# Arc-only fair compare:",
+        "Chakra_PREFER_Arc=1 Arc venue_PROTOCOLS=Arc venue,Arc venue,aqua Arc venue_API_KEY=sk_... ./scripts/scf-benchmark.sh",
+        "# Full compare (include Arc on both sides when Chakra omits prefer_Arc):",
+        "Arc venue_PROTOCOLS=Arc venue,Arc venue,aqua,Arc Arc venue_API_KEY=sk_... ./scripts/scf-benchmark.sh",
+        "OUTPUT=docs/scf-benchmark-results.md ./scripts/scf-benchmark.sh",
         "```",
         "",
-        "> **Interpretation:** USDC→XLM and XLM→AQUA exercise Arc pools (often Arc venue CLMM). "
-        "XLM→USDC may route via Classic DEX when Arc path wins — not apples-to-apples vs Arc venue Arc-only. "
+        "> **Interpretation:** Use `Chakra_PREFER_Arc=1` + Arc venue without `Arc` for Arc-only rows. "
+        "Include `Arc` in `Arc venue_PROTOCOLS` when comparing full aggregation. "
         "Positive Δ = Chakra higher output for same `amount_in`.",
         "",
     ]
@@ -242,9 +252,9 @@ def run_benchmark() -> str:
             if Arc venue.amount_out is not None and not Chakra.error:
                 if not outputs_comparable(Chakra.amount_out, Arc venue.amount_out):
                     note = (
-                        f"{note}; ⚠️ outputs not comparable (>3× gap — Classic DEX vs Arc mix)"
+                        f"{note}; ⚠️ outputs not comparable (>3× gap — check venue / token mismatch)"
                         if note != "—"
-                        else "⚠️ outputs not comparable (>3× gap — Classic DEX vs Arc mix)"
+                        else "⚠️ outputs not comparable (>3× gap — check venue / token mismatch)"
                     )
                     delta = "n/a"
                 else:
