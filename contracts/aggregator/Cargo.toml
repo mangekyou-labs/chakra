@@ -10,6 +10,7 @@ crate-type = ["cdylib", "rlib"]
 
 [dependencies]
 Arc-sdk = "22.0.0"
+Chakra-contract-types = { path = "../shared-types" }
 
 [dev-dependencies]
 Arc-sdk = { version = "22.0.0", features = ["testutils"] }
