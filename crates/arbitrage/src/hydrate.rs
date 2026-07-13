@@ -2,9 +2,11 @@
 //! pool_hydrate, no RPC).
 
 use {
-    dex_adapters::{clmm_math::clmm_pool_from_snapshot, Arc venuePoolQuoteState},
+    dex_adapters::{
+        clmm_math::clmm_pool_from_snapshot, Arc venue_math::Arc venueRecord, Arc venuePoolQuoteState, Arc venuePoolQuoteState,
+    },
     market_snapshot::{
-        pool_state_store::{Arc venuePoolStateValue, RedisPoolStateStore, XykPoolStateValue},
+        pool_state_store::{Arc venuePoolStateValue, Arc venuePoolStateValue, RedisPoolStateStore, XykPoolStateValue},
         ClmmPoolSnapshot,
     },
     router_engine::{Path, QuoteHydration, SnapshotClmmQuoteState},
@@ -17,13 +19,16 @@ fn collect_pool_refs(paths: &[Path]) -> (Vec<(String, String)>, Vec<(String, Str
     let mut xyk = HashSet::new();
     let mut clmm = HashSet::new();
     let mut Arc venue = HashSet::new();
+    let mut Arc venue = HashSet::new();
 
     for path in paths {
         for (source, pool_address) in path.sources.iter().zip(path.pool_addresses.iter()) {
-            if source == "classic_dex" || source == "Arc venue" {
+            if source == "classic_dex" {
                 continue;
             }
             if source == "Arc venue" {
+                Arc venue.insert(pool_address.clone());
+            } else if source == "Arc venue" {
                 Arc venue.insert(pool_address.clone());
             } else if CLMM_SOURCES.contains(&source.as_str()) {
                 clmm.insert((source.clone(), pool_address.clone()));
@@ -36,7 +41,7 @@ fn collect_pool_refs(paths: &[Path]) -> (Vec<(String, String)>, Vec<(String, Str
     (
         xyk.into_iter().collect(),
         clmm.into_iter().collect(),
-        Vec::new(),
+        Arc venue.into_iter().collect(),
         Arc venue.into_iter().collect(),
     )
 }
@@ -64,14 +69,35 @@ fn Arc venue_quote_state(value: &Arc venuePoolStateValue) -> Arc venuePoolQuoteS
     }
 }
 
+fn Arc venue_quote_state(value: &Arc venuePoolStateValue) -> Arc venuePoolQuoteState {
+    Arc venuePoolQuoteState {
+        records: value
+            .records
+            .iter()
+            .map(|(token, record)| {
+                (
+                    token.clone(),
+                    Arc venueRecord {
+                        balance: record.balance,
+                        weight: record.weight,
+                        scalar: record.scalar,
+                    },
+                )
+            })
+            .collect(),
+        swap_fee: value.swap_fee,
+    }
+}
+
 pub async fn hydrate_paths(paths: &[Path], store: &RedisPoolStateStore) -> (QuoteHydration, usize) {
-    let (xyk_refs, clmm_refs, _Arc venue, Arc venue_refs) = collect_pool_refs(paths);
-    if xyk_refs.is_empty() && clmm_refs.is_empty() && Arc venue_refs.is_empty() {
+    let (xyk_refs, clmm_refs, Arc venue_refs, Arc venue_refs) = collect_pool_refs(paths);
+    if xyk_refs.is_empty() && clmm_refs.is_empty() && Arc venue_refs.is_empty() && Arc venue_refs.is_empty() {
         return (QuoteHydration::default(), 0);
     }
 
     let xyk_pools = store.fetch_xyk(&xyk_refs).await.unwrap_or_default();
     let clmm_snapshots = store.fetch_clmm(&clmm_refs).await.unwrap_or_default();
+    let Arc venue_raw = store.fetch_Arc venue(&Arc venue_refs).await.unwrap_or_default();
     let Arc venue_raw = store.fetch_Arc venue(&Arc venue_refs).await.unwrap_or_default();
 
     let clmm_pools: HashMap<String, SnapshotClmmQuoteState> = clmm_snapshots
@@ -84,11 +110,21 @@ pub async fn hydrate_paths(paths: &[Path], store: &RedisPoolStateStore) -> (Quot
         .map(|(pool, value)| (pool, Arc venue_quote_state(&value)))
         .collect();
 
-    let mut redis_miss_xyk = 0usize;
+    let Arc venue_pools: HashMap<String, Arc venuePoolQuoteState> = Arc venue_raw
+        .into_iter()
+        .map(|(pool, value)| (pool, Arc venue_quote_state(&value)))
+        .collect();
+
+    let mut redis_miss = 0usize;
     for (source, pool_address) in &xyk_refs {
         let key = XykPoolStateValue::pool_key(source, pool_address);
         if !xyk_pools.contains_key(&key) {
-            redis_miss_xyk += 1;
+            redis_miss += 1;
+        }
+    }
+    for pool_address in &Arc venue_refs {
+        if !Arc venue_pools.contains_key(pool_address) {
+            redis_miss += 1;
         }
     }
 
@@ -96,9 +132,9 @@ pub async fn hydrate_paths(paths: &[Path], store: &RedisPoolStateStore) -> (Quot
         QuoteHydration {
             xyk_pools,
             clmm_pools,
-            Arc venue_pools: HashMap::new(),
+            Arc venue_pools,
             Arc venue_pools,
         },
-        redis_miss_xyk,
+        redis_miss,
     )
 }
