@@ -1,9 +1,7 @@
-//! Chakra round-trip arbitrage bot (aggregator.round_trip_swap + split
-//! routing).
+//! Chakra round-trip arbitrage bot (quote-api + aggregator.round_trip_swap).
 //!
-//!   ARB_BRIDGE_TOKENS=... ARB_AGGREGATOR_CONTRACT=C... \
-//!   ARB_BUILD_TX=1 ARB_SUBMIT_TX=1 SNAPSHOT_REDIS_URL=... \
-//!   cargo run -p arbitrage --bin arb-scanner
+//!   ARB_BRIDGE_TOKENS=... ARB_AGGREGATOR_CONTRACT=C... ARB_QUOTE_API_URL=http://127.0.0.1:8080 \
+//!   ARB_BUILD_TX=1 ARB_SUBMIT_TX=1 cargo run -p arbitrage --bin arb-scanner
 
 use {
     anyhow::Result,
