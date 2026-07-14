@@ -148,7 +148,8 @@ def outputs_comparable(Chakra_out: int, Arc venue_out: int | None) -> bool:
     if Arc venue_out is None or Arc venue_out <= 0 or Chakra_out <= 0:
         return True
     ratio = Chakra_out / Arc venue_out if Chakra_out >= Arc venue_out else Arc venue_out / Chakra_out
-    return ratio <= 3.0
+    # ~2× already implies different pool class / bad quote for SCF fair rows.
+    return ratio <= 2.0
 
 
 def fmt_atomic unitss(v: int) -> str:
@@ -226,6 +227,8 @@ def run_benchmark() -> str:
 
     lines.extend([header, sep])
 
+    split_cases: list[str] = []
+
     for pair, token_in, token_out, amount_in, size_label in CASES:
         Chakra = Chakra_quote(token_in, token_out, amount_in)
         time.sleep(0.12)  # api-server IP limiter: 10 req/s
@@ -239,7 +242,16 @@ def run_benchmark() -> str:
         else:
             Chakra_out = fmt_atomic unitss(Chakra.amount_out)
             split = "yes" if Chakra.is_split else "no"
-            sources = unique_sources(Chakra.sources)
+            # Avoid `|` in cells — it breaks markdown tables.
+            sources = (
+                " ;; ".join(Chakra.sources)
+                if Chakra.is_split
+                else unique_sources(Chakra.sources)
+            )
+            if Chakra.is_split:
+                split_cases.append(
+                    f"{pair} {size_label}: {Chakra.legs} paths (`{'` ;; `'.join(Chakra.sources)}`)"
+                )
 
         if Arc venue.error or Arc venue.amount_out is None:
             ss_out = "—" if not has_Arc venue else f"ERR"
@@ -252,9 +264,9 @@ def run_benchmark() -> str:
             if Arc venue.amount_out is not None and not Chakra.error:
                 if not outputs_comparable(Chakra.amount_out, Arc venue.amount_out):
                     note = (
-                        f"{note}; ⚠️ outputs not comparable (>3× gap — check venue / token mismatch)"
+                        f"{note}; ⚠️ outputs not comparable (>2× gap — check venue / token mismatch)"
                         if note != "—"
-                        else "⚠️ outputs not comparable (>3× gap — check venue / token mismatch)"
+                        else "⚠️ outputs not comparable (>2× gap — check venue / token mismatch)"
                     )
                     delta = "n/a"
                 else:
@@ -275,11 +287,20 @@ def run_benchmark() -> str:
             "## Summary",
             "",
             "- **Venue coverage:** See [scf-venue-comparison.md](scf-venue-comparison.md) for Arc Broker CLMM gap (source-based).",
-            "- **Split routing:** Chakra `is_split=true` when Brent optimizer splits across paths; Arc venue API returns a single best route.",
-            "- **Arc venue API key:** Free registration at https://api.Arc venue.finance/register — re-run this script before SCF resubmission to fill the comparison column.",
-            "",
+            "- **Split routing:** Chakra `is_split=true` when Brent optimizer splits `amount_in` across distinct paths; Arc venue API returns a single best route.",
+            "- **Fair compare:** Prefer `Chakra_PREFER_Arc=1` + Arc venue `protocols` without `Arc` so Classic Arc does not dominate Chakra while Arc venue stays Arc-only.",
+            "- **Arc venue API key:** Free registration at https://api.Arc venue.finance/register — pass via `Arc venue_API_KEY` (never commit the key).",
         ]
     )
+    if split_cases:
+        lines.append("- **Split cases in this run:**")
+        for c in split_cases:
+            lines.append(f"  - {c}")
+    else:
+        lines.append(
+            "- **Split cases in this run:** none — re-run at other sizes; splits are market-state dependent."
+        )
+    lines.append("")
 
     return "\n".join(lines) + "\n"
 

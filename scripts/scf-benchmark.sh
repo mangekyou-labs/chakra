@@ -7,18 +7,20 @@
 #   OUTPUT=docs/scf-benchmark-results.md ./scripts/scf-benchmark.sh
 #
 # Env:
-#   Chakra_API          default https://api.Chakra.xyz
-#   Chakra_PREFER_Arc  set to 1 for Arc-only Chakra quotes
-#   Arc venue_API_URL    default https://api.Arc venue.finance
-#   Arc venue_API_KEY    optional (register at https://api.Arc venue.finance/register)
-#   Arc venue_PROTOCOLS  comma-separated, default Arc venue,Arc venue,aqua (add Arc for full compare)
-#   OUTPUT              if set, write markdown to this path (also printed to stdout)
+#   Chakra_API             default https://api.Chakra.xyz
+#   Chakra_PREFER_Arc  set to 1 for Arc-only Chakra quotes (recommended fair vs Arc venue)
+#   Arc venue_API_URL       default https://api.Arc venue.finance
+#   Arc venue_API_KEY       optional (register at https://api.Arc venue.finance/register)
+#   Arc venue_PROTOCOLS     comma-separated, default Arc venue,Arc venue,aqua (add Arc for full compare)
+#   OUTPUT                 if set, write markdown to this path (also printed to stdout)
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 export Chakra_API="${Chakra_API:-https://api.Chakra.xyz}"
+export Chakra_PREFER_Arc="${Chakra_PREFER_Arc:-}"
 export Arc venue_API_URL="${Arc venue_API_URL:-https://api.Arc venue.finance}"
 export Arc venue_API_KEY="${Arc venue_API_KEY:-}"
+export Arc venue_PROTOCOLS="${Arc venue_PROTOCOLS:-Arc venue,Arc venue,aqua}"
 export OUTPUT="${OUTPUT:-}"
 
 python3 "$ROOT/scripts/scf_benchmark.py"
