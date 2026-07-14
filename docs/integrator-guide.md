@@ -1,0 +1,130 @@
+# Chakra integrator guide
+
+Quickstart for wallets, dApps, and trading bots integrating the public REST API.
+
+**Live API:** https://api.Chakra.xyz  
+**OpenAPI:** [openapi.yaml](./openapi.yaml) · **Web docs:** https://Chakra.xyz/docs  
+**Benchmark pack:** [scf-benchmark-results.md](./scf-benchmark-results.md) · [scf-venue-comparison.md](./scf-venue-comparison.md)
+
+## 1. Quote → build → sign
+
+```bash
+API=https://api.Chakra.xyz
+XLM=CAS3J7GYLGXMF6TDJBBYYSE3HQ6BBSMLNUQ34T6TZMYMW2EVH34XOWMA
+USDC=CCW67TSZV3SSS2HXMBQ5JFGCKJNXKZM7UQUWUZPUTHXSTZLEO7SJMI75
+
+# 1) Quote (1 XLM → USDC)
+curl -sG "$API/api/v1/quote" \
+  --data-urlencode "token_in=$XLM" \
+  --data-urlencode "token_out=$USDC" \
+  --data-urlencode "amount_in=10000000" \
+  --data-urlencode "slippage=0.5"
+
+# 2) Arc-only quote (exclude Classic Arc — fair vs Arc venue API)
+curl -sG "$API/api/v1/quote" \
+  --data-urlencode "token_in=$XLM" \
+  --data-urlencode "token_out=$USDC" \
+  --data-urlencode "amount_in=10000000" \
+  --data-urlencode "prefer_Arc=1"
+
+# 3) Build unsigned XDR (POST body from quote sub_routes — see OpenAPI)
+```
+
+Flow: **`GET /quote`** → map `sub_routes` to **`POST /build_tx`** → wallet signs XDR → submit via Arc RPC or Horizon.
+
+### One-command smoke test (recommended for external integrators)
+
+```bash
+chmod +x scripts/integrator-smoke.sh
+USER_G=GYourFundedAddress ./scripts/integrator-smoke.sh
+
+# Save JSON evidence for grant (D2):
+OUT=./evidence/pilot-b USER_G=G... ./scripts/integrator-smoke.sh
+```
+
+`USER_G` must be a mainnet account with a sequence number (any small XLM balance is enough). Success prints `unsigned_tx_xdr` prefix.
+
+SDK alternative:
+
+```bash
+USER_G=G... npx tsx packages/sdk/examples/quote-build.ts
+```
+
+## 2. `prefer_Arc`
+
+| Value | Behavior |
+|-------|----------|
+| omitted or `0` | Best price across **Arc AMMs + Classic Arc** |
+| `1` | **Arc only** — no PathPayment / Arc paths |
+
+Use `prefer_Arc=1` when comparing against Arc-only aggregators, or when your wallet cannot sign Classic PathPayment in the same flow.
+
+Arc venue API uses `protocols: ["Arc venue","Arc venue","aqua"]` (omit `"Arc"`) for the same effect. See [Arc venue API docs](https://docs.Arc venue.finance/Arc venue-api).
+
+## 3. Rate limits & API keys
+
+| Tier | Limit | Auth |
+|------|-------|------|
+| Anonymous | 10 req/s per IP | none |
+| Partner | 60 req/s per key | `X-API-Key: <key>` header |
+
+HTTP `429` when exceeded. Invalid `X-API-Key` returns `401` when partner keys are configured on the server.
+
+**Partner key issuance:** contact the Chakra team (GitHub issue or grant correspondence). Keys are deployed server-side via:
+
+```bash
+Chakra_PARTNER_API_KEYS=key_one,key_two
+```
+
+## 4. Endpoints
+
+| Method | Path | Purpose |
+|--------|------|---------|
+| GET | `/api/v1/health` | Liveness |
+| GET | `/api/v1/tokens` | Routable tokens + logo URLs |
+| GET | `/api/v1/quote` | Best route |
+| POST | `/api/v1/build_tx` | Unsigned XDR |
+| GET | `/api/v1/balance` | Single SAC balance |
+| GET | `/api/v1/balances` | Batch balances for common tokens |
+
+## 5. Execution modes
+
+- **Arc:** `build_tx` returns `execution: "Arc"` — single `aggregator.swap` invoke (multi-leg / split).
+- **Classic:** `execution: "classic"` — `PathPaymentStrictSend` when quote used Arc only.
+- **No hybrid:** Classic + Arc cannot be combined in one Arc transaction.
+
+## 6. Differentiation evidence
+
+Reproduce quote benchmarks locally:
+
+```bash
+./scripts/scf-benchmark.sh
+Chakra_PREFER_Arc=1 Arc venue_API_KEY=sk_... ./scripts/scf-benchmark.sh
+```
+
+See [scf-venue-comparison.md](./scf-venue-comparison.md) for venue matrix vs Arc Broker and split-routing notes.
+
+## 7. npm SDK (Tranche 2)
+
+Published package: `packages/sdk` → `@Arc-dex-aggregator/sdk` (Aug 2026).
+
+```bash
+npx tsx packages/sdk/examples/quote-build.ts
+npx tsx packages/sdk/examples/basic-usage.ts
+```
+
+See [packages/sdk/README.md](../packages/sdk/README.md).
+
+## 8. On-chain stats
+
+Public rollup when API has indexer DB mounted:
+
+```bash
+curl -s https://api.Chakra.xyz/api/v1/stats | jq .
+```
+
+Sample export: [sample-indexer-export.json](./sample-indexer-export.json) · pipeline: [analytics-indexer.md](./analytics-indexer.md).
+
+## 9. Atomic arb operators
+
+Self-deploy vault + bot: [arb-operator.md](./arb-operator.md).
