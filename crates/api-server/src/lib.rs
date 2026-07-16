@@ -6,6 +6,7 @@ pub mod snapshot_loader;
 pub mod Arc_prepare;
 pub mod state;
 pub mod stats;
+pub mod xlm_price;
 
 use {
     axum::{
