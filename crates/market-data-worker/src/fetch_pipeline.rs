@@ -15,7 +15,7 @@ use {
     },
     market_snapshot::{
         pool_state_store::{
-            should_publish_clmm_to_redis, Arc venuePoolStateValue, Arc venuePoolStateValue, RedisPoolStateStore,
+            should_publish_clmm_to_redis, Arc venuePoolStateValue, Arc venuePoolStateValue, PoolStateStore,
             XykPoolStateValue,
         },
         ClmmPoolSnapshot, SourceSnapshot, TradingPairSnapshot,
@@ -179,7 +179,7 @@ struct FetchWorkerContext {
 
 pub fn spawn_fetch_pipeline(
     config: FetchPipelineConfig,
-    pool_store: Arc<RedisPoolStateStore>,
+    pool_store: Arc<dyn PoolStateStore>,
     rpc: Arc<ArcRpc>,
     shared: Arc<RwLock<WorkerShared>>,
     Arc venue: Arc<Arc venueAdapter>,
@@ -317,6 +317,7 @@ async fn execute_fetch_task(ctx: &FetchWorkerContext, task: FetchTask) -> Result
                     fee_bps: state.fee_bps,
                     is_stable: state.is_stable,
                     amp: state.amp,
+                    updated_at_ms: 0,
                 })
                 .collect();
             Ok(if values.is_empty() {

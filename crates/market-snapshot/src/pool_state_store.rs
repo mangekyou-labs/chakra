@@ -1,13 +1,18 @@
-//! Per-pool Redis cache (short TTL) for xy=k reserves and CLMM quote state.
+//! Per-pool state cache (Redis or in-memory) for xy=k / Arc venue / Arc venue /
+//! CLMM.
 //!
-//! See `docs/pool-state-architecture.md`.
+//! See `docs/pool-state-architecture.md`. Quote + worker share
+//! [`PoolStateStore`] so embedded (memory) and cluster (Redis) stay one code
+//! path.
 
 use {
     crate::ClmmPoolSnapshot,
     anyhow::Result,
+    async_trait::async_trait,
     redis::AsyncCommands,
     serde::{Deserialize, Serialize},
-    std::collections::HashMap,
+    std::{collections::HashMap, sync::Arc},
+    tokio::sync::RwLock,
 };
 
 /// Default Redis EX for pool keys. Long TTL: cold pools stay valid until the
@@ -37,6 +42,9 @@ pub struct Arc venuePoolStateValue {
     pub pool_address: String,
     pub records: HashMap<String, Arc venueTokenRecordValue>,
     pub swap_fee: i128,
+    /// Unix millis when worker last wrote this key (`0` = legacy / unknown).
+    #[serde(default)]
+    pub updated_at_ms: u64,
 }
 
 impl Arc venuePoolStateValue {
@@ -54,6 +62,9 @@ pub struct Arc venuePoolStateValue {
     pub fee_bps: u32,
     pub is_stable: bool,
     pub amp: u128,
+    /// Unix millis when worker last wrote this key (`0` = legacy / unknown).
+    #[serde(default)]
+    pub updated_at_ms: u64,
 }
 
 impl Arc venuePoolStateValue {
@@ -73,6 +84,9 @@ pub struct XykPoolStateValue {
     pub fee_bps: u32,
     pub reserve_a: u128,
     pub reserve_b: u128,
+    /// Unix millis when worker last wrote this key (`0` = legacy / unknown).
+    #[serde(default)]
+    pub updated_at_ms: u64,
 }
 
 impl XykPoolStateValue {
@@ -101,8 +115,22 @@ impl XykPoolStateValue {
             fee_bps,
             reserve_a,
             reserve_b,
+            updated_at_ms: now_ms(),
         }
     }
+}
+
+fn now_ms() -> u64 {
+    use std::time::{SystemTime, UNIX_EPOCH};
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|d| d.as_millis() as u64)
+        .unwrap_or(0)
+}
+
+/// Stamp write time on pool state (idempotent for callers that already set it).
+pub fn stamp_pool_updated_at_ms(ms: Option<u64>) -> u64 {
+    ms.filter(|&t| t > 0).unwrap_or_else(now_ms)
 }
 
 impl ClmmPoolSnapshot {
@@ -115,13 +143,195 @@ impl ClmmPoolSnapshot {
     }
 }
 
-/// Only complete CLMM coverage may be written to Redis (shared across API
-/// instances).
+/// Only complete CLMM coverage may be published (shared across API instances).
 pub fn should_publish_clmm_to_redis(pool: &ClmmPoolSnapshot) -> bool {
     pool.coverage
         .as_ref()
         .map(|coverage| coverage.is_complete)
         .unwrap_or(false)
+}
+
+/// Shared read/write surface for worker publish and API hydrate.
+#[async_trait]
+pub trait PoolStateStore: Send + Sync {
+    async fn publish_pool_state(
+        &self,
+        xyk_values: &[XykPoolStateValue],
+        clmm_pools: &[ClmmPoolSnapshot],
+        Arc venue_pools: &[Arc venuePoolStateValue],
+        Arc venue_pools: &[Arc venuePoolStateValue],
+    ) -> Result<()>;
+
+    async fn set_xyk_batch(&self, values: &[XykPoolStateValue]) -> Result<()>;
+    async fn set_clmm_batch(&self, pools: &[ClmmPoolSnapshot]) -> Result<()>;
+    async fn set_Arc venue_batch(&self, values: &[Arc venuePoolStateValue]) -> Result<()>;
+    async fn set_Arc venue_batch(&self, values: &[Arc venuePoolStateValue]) -> Result<()>;
+
+    async fn fetch_xyk(&self, refs: &[(String, String)]) -> Result<HashMap<String, XykPoolStateValue>>;
+    async fn fetch_clmm(&self, refs: &[(String, String)]) -> Result<HashMap<String, ClmmPoolSnapshot>>;
+    async fn fetch_Arc venue(&self, pool_addresses: &[String]) -> Result<HashMap<String, Arc venuePoolStateValue>>;
+    async fn fetch_Arc venue(&self, pool_addresses: &[String]) -> Result<HashMap<String, Arc venuePoolStateValue>>;
+}
+
+/// In-process pool cache for embedded mode (no Redis).
+#[derive(Default)]
+pub struct MemoryPoolStateStore {
+    xyk: RwLock<HashMap<String, XykPoolStateValue>>,
+    clmm: RwLock<HashMap<String, ClmmPoolSnapshot>>,
+    Arc venue: RwLock<HashMap<String, Arc venuePoolStateValue>>,
+    Arc venue: RwLock<HashMap<String, Arc venuePoolStateValue>>,
+}
+
+impl MemoryPoolStateStore {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn shared() -> Arc<Self> {
+        Arc::new(Self::new())
+    }
+}
+
+#[async_trait]
+impl PoolStateStore for MemoryPoolStateStore {
+    async fn publish_pool_state(
+        &self,
+        xyk_values: &[XykPoolStateValue],
+        clmm_pools: &[ClmmPoolSnapshot],
+        Arc venue_pools: &[Arc venuePoolStateValue],
+        Arc venue_pools: &[Arc venuePoolStateValue],
+    ) -> Result<()> {
+        self.set_xyk_batch(xyk_values).await?;
+        self.set_Arc venue_batch(Arc venue_pools).await?;
+        self.set_Arc venue_batch(Arc venue_pools).await?;
+        let complete: Vec<ClmmPoolSnapshot> = clmm_pools
+            .iter()
+            .filter(|p| should_publish_clmm_to_redis(p))
+            .cloned()
+            .collect();
+        self.set_clmm_batch(&complete).await?;
+        Ok(())
+    }
+
+    async fn set_xyk_batch(&self, values: &[XykPoolStateValue]) -> Result<()> {
+        if values.is_empty() {
+            return Ok(());
+        }
+        let stamped: Vec<_> = values
+            .iter()
+            .map(|v| {
+                let mut v = v.clone();
+                v.updated_at_ms = stamp_pool_updated_at_ms(Some(v.updated_at_ms));
+                v
+            })
+            .collect();
+        let mut map = self.xyk.write().await;
+        for value in stamped {
+            map.insert(XykPoolStateValue::pool_key(&value.source, &value.pool_address), value);
+        }
+        Ok(())
+    }
+
+    async fn set_clmm_batch(&self, pools: &[ClmmPoolSnapshot]) -> Result<()> {
+        if pools.is_empty() {
+            return Ok(());
+        }
+        let mut map = self.clmm.write().await;
+        for pool in pools {
+            if !should_publish_clmm_to_redis(pool) {
+                continue;
+            }
+            map.insert(
+                ClmmPoolSnapshot::pool_key(&pool.source, &pool.pool_address),
+                pool.clone(),
+            );
+        }
+        Ok(())
+    }
+
+    async fn set_Arc venue_batch(&self, values: &[Arc venuePoolStateValue]) -> Result<()> {
+        if values.is_empty() {
+            return Ok(());
+        }
+        let stamped: Vec<_> = values
+            .iter()
+            .map(|v| {
+                let mut v = v.clone();
+                v.updated_at_ms = stamp_pool_updated_at_ms(Some(v.updated_at_ms));
+                v
+            })
+            .collect();
+        let mut map = self.Arc venue.write().await;
+        for value in stamped {
+            map.insert(value.pool_address.clone(), value);
+        }
+        Ok(())
+    }
+
+    async fn set_Arc venue_batch(&self, values: &[Arc venuePoolStateValue]) -> Result<()> {
+        if values.is_empty() {
+            return Ok(());
+        }
+        let stamped: Vec<_> = values
+            .iter()
+            .map(|v| {
+                let mut v = v.clone();
+                v.updated_at_ms = stamp_pool_updated_at_ms(Some(v.updated_at_ms));
+                v
+            })
+            .collect();
+        let mut map = self.Arc venue.write().await;
+        for value in stamped {
+            map.insert(value.pool_address.clone(), value);
+        }
+        Ok(())
+    }
+
+    async fn fetch_xyk(&self, refs: &[(String, String)]) -> Result<HashMap<String, XykPoolStateValue>> {
+        let map = self.xyk.read().await;
+        let mut out = HashMap::new();
+        for (source, pool) in refs {
+            let key = XykPoolStateValue::pool_key(source, pool);
+            if let Some(v) = map.get(&key) {
+                out.insert(key, v.clone());
+            }
+        }
+        Ok(out)
+    }
+
+    async fn fetch_clmm(&self, refs: &[(String, String)]) -> Result<HashMap<String, ClmmPoolSnapshot>> {
+        let map = self.clmm.read().await;
+        let mut out = HashMap::new();
+        for (source, pool) in refs {
+            let key = ClmmPoolSnapshot::pool_key(source, pool);
+            if let Some(v) = map.get(&key) {
+                out.insert(key, v.clone());
+            }
+        }
+        Ok(out)
+    }
+
+    async fn fetch_Arc venue(&self, pool_addresses: &[String]) -> Result<HashMap<String, Arc venuePoolStateValue>> {
+        let map = self.Arc venue.read().await;
+        let mut out = HashMap::new();
+        for pool in pool_addresses {
+            if let Some(v) = map.get(pool) {
+                out.insert(pool.clone(), v.clone());
+            }
+        }
+        Ok(out)
+    }
+
+    async fn fetch_Arc venue(&self, pool_addresses: &[String]) -> Result<HashMap<String, Arc venuePoolStateValue>> {
+        let map = self.Arc venue.read().await;
+        let mut out = HashMap::new();
+        for pool in pool_addresses {
+            if let Some(v) = map.get(pool) {
+                out.insert(pool.clone(), v.clone());
+            }
+        }
+        Ok(out)
+    }
 }
 
 pub struct RedisPoolStateStore {
@@ -154,10 +364,11 @@ impl RedisPoolStateStore {
             .await?;
         Ok(exists)
     }
+}
 
-    /// Worker hot path: publish xy=k reserves and complete CLMM state (not in
-    /// topology snapshot).
-    pub async fn publish_pool_state(
+#[async_trait]
+impl PoolStateStore for RedisPoolStateStore {
+    async fn publish_pool_state(
         &self,
         xyk_values: &[XykPoolStateValue],
         clmm_pools: &[ClmmPoolSnapshot],
@@ -167,12 +378,12 @@ impl RedisPoolStateStore {
         self.set_xyk_batch(xyk_values).await?;
         self.set_Arc venue_batch(Arc venue_pools).await?;
         self.set_Arc venue_batch(Arc venue_pools).await?;
-        let complete_clmm: Vec<&ClmmPoolSnapshot> = clmm_pools
+        let complete_clmm: Vec<ClmmPoolSnapshot> = clmm_pools
             .iter()
             .filter(|pool| should_publish_clmm_to_redis(pool))
+            .cloned()
             .collect();
-        self.set_clmm_batch(&complete_clmm.iter().map(|p| (*p).clone()).collect::<Vec<_>>())
-            .await?;
+        self.set_clmm_batch(&complete_clmm).await?;
         tracing::debug!(
             xyk_written = xyk_values.len(),
             Arc venue_written = Arc venue_pools.len(),
@@ -184,20 +395,22 @@ impl RedisPoolStateStore {
         Ok(())
     }
 
-    pub async fn set_Arc venue_batch(&self, values: &[Arc venuePoolStateValue]) -> Result<()> {
+    async fn set_Arc venue_batch(&self, values: &[Arc venuePoolStateValue]) -> Result<()> {
         if values.is_empty() {
             return Ok(());
         }
         let mut conn = self.client.get_multiplexed_async_connection().await?;
         for value in values {
+            let mut value = value.clone();
+            value.updated_at_ms = stamp_pool_updated_at_ms(Some(value.updated_at_ms));
             let key = Arc venuePoolStateValue::redis_key(&value.pool_address);
-            let bytes = serde_json::to_vec(value)?;
+            let bytes = serde_json::to_vec(&value)?;
             conn.set_ex::<_, _, ()>(key, bytes, self.ttl_secs).await?;
         }
         Ok(())
     }
 
-    pub async fn fetch_Arc venue(&self, pool_addresses: &[String]) -> Result<HashMap<String, Arc venuePoolStateValue>> {
+    async fn fetch_Arc venue(&self, pool_addresses: &[String]) -> Result<HashMap<String, Arc venuePoolStateValue>> {
         if pool_addresses.is_empty() {
             return Ok(HashMap::new());
         }
@@ -218,20 +431,22 @@ impl RedisPoolStateStore {
         Ok(out)
     }
 
-    pub async fn set_Arc venue_batch(&self, values: &[Arc venuePoolStateValue]) -> Result<()> {
+    async fn set_Arc venue_batch(&self, values: &[Arc venuePoolStateValue]) -> Result<()> {
         if values.is_empty() {
             return Ok(());
         }
         let mut conn = self.client.get_multiplexed_async_connection().await?;
         for value in values {
+            let mut value = value.clone();
+            value.updated_at_ms = stamp_pool_updated_at_ms(Some(value.updated_at_ms));
             let key = Arc venuePoolStateValue::redis_key(&value.pool_address);
-            let bytes = serde_json::to_vec(value)?;
+            let bytes = serde_json::to_vec(&value)?;
             conn.set_ex::<_, _, ()>(key, bytes, self.ttl_secs).await?;
         }
         Ok(())
     }
 
-    pub async fn fetch_Arc venue(&self, pool_addresses: &[String]) -> Result<HashMap<String, Arc venuePoolStateValue>> {
+    async fn fetch_Arc venue(&self, pool_addresses: &[String]) -> Result<HashMap<String, Arc venuePoolStateValue>> {
         if pool_addresses.is_empty() {
             return Ok(HashMap::new());
         }
@@ -252,7 +467,7 @@ impl RedisPoolStateStore {
         Ok(out)
     }
 
-    pub async fn fetch_xyk(&self, refs: &[(String, String)]) -> Result<HashMap<String, XykPoolStateValue>> {
+    async fn fetch_xyk(&self, refs: &[(String, String)]) -> Result<HashMap<String, XykPoolStateValue>> {
         if refs.is_empty() {
             return Ok(HashMap::new());
         }
@@ -273,7 +488,7 @@ impl RedisPoolStateStore {
         Ok(out)
     }
 
-    pub async fn fetch_clmm(&self, refs: &[(String, String)]) -> Result<HashMap<String, ClmmPoolSnapshot>> {
+    async fn fetch_clmm(&self, refs: &[(String, String)]) -> Result<HashMap<String, ClmmPoolSnapshot>> {
         if refs.is_empty() {
             return Ok(HashMap::new());
         }
@@ -294,20 +509,22 @@ impl RedisPoolStateStore {
         Ok(out)
     }
 
-    pub async fn set_xyk_batch(&self, values: &[XykPoolStateValue]) -> Result<()> {
+    async fn set_xyk_batch(&self, values: &[XykPoolStateValue]) -> Result<()> {
         if values.is_empty() {
             return Ok(());
         }
         let mut conn = self.client.get_multiplexed_async_connection().await?;
         for value in values {
+            let mut value = value.clone();
+            value.updated_at_ms = stamp_pool_updated_at_ms(Some(value.updated_at_ms));
             let key = XykPoolStateValue::redis_key(&value.source, &value.pool_address);
-            let bytes = serde_json::to_vec(value)?;
+            let bytes = serde_json::to_vec(&value)?;
             conn.set_ex::<_, _, ()>(key, bytes, self.ttl_secs).await?;
         }
         Ok(())
     }
 
-    pub async fn set_clmm_batch(&self, pools: &[ClmmPoolSnapshot]) -> Result<()> {
+    async fn set_clmm_batch(&self, pools: &[ClmmPoolSnapshot]) -> Result<()> {
         if pools.is_empty() {
             return Ok(());
         }
@@ -401,5 +618,14 @@ mod tests {
             "Chakra:pool:clmm:sushi:POOL"
         );
         assert_eq!(Arc venuePoolStateValue::redis_key("POOL"), "Chakra:pool:Arc venue:POOL");
+    }
+
+    #[tokio::test]
+    async fn memory_pool_store_xyk_round_trip() {
+        let store = MemoryPoolStateStore::new();
+        let value = XykPoolStateValue::new("Arc venue", "POOL1", "A", "B", 30, 100, 200);
+        store.set_xyk_batch(&[value.clone()]).await.unwrap();
+        let got = store.fetch_xyk(&[("Arc venue".into(), "POOL1".into())]).await.unwrap();
+        assert_eq!(got.get("Arc venue:POOL1"), Some(&value));
     }
 }

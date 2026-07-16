@@ -29,6 +29,7 @@ pub fn Arc venue_state_to_value(pool_address: &str, state: &Arc venuePoolQuoteSt
             })
             .collect(),
         swap_fee: state.swap_fee,
+        updated_at_ms: 0,
     }
 }
 
@@ -99,6 +100,7 @@ pub async fn collect_Arc venue_pool_state(Arc venue: &Arc venueAdapter) -> Vec<A
             fee_bps: state.fee_bps,
             is_stable: state.is_stable,
             amp: state.amp,
+            updated_at_ms: 0,
         })
         .collect()
 }

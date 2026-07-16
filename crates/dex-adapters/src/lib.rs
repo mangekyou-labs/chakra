@@ -30,6 +30,7 @@ pub mod Arc venue;
 pub mod Arc venue_math;
 pub mod common_balance_tokens;
 pub mod dex_event_kinds;
+pub mod on_chain_quote;
 pub mod Arc venue;
 pub mod pool_index;
 pub mod router_events;

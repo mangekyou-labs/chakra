@@ -12,23 +12,27 @@ use {
         sushi::SushiAdapter, DexAdapter,
     },
     market_snapshot::{
-        pool_state_store::{should_publish_clmm_to_redis, Arc venuePoolStateValue, RedisPoolStateStore, XykPoolStateValue},
+        pool_state_store::{
+            should_publish_clmm_to_redis, Arc venuePoolStateValue, Arc venuePoolStateValue, PoolStateStore,
+            XykPoolStateValue,
+        },
         ClmmPoolSnapshot, SourceSnapshot,
     },
     std::collections::{HashMap, HashSet},
     tracing::{debug, warn},
 };
 
-const BATCH_XYK_SOURCES: &[&str] = &["Arc venue", "Arc venue"];
+const BATCH_XYK_SOURCES: &[&str] = &["Arc venue"];
+const Arc venue_SOURCE: &str = "Arc venue";
 const CLMM_SOURCES: &[&str] = &["sushi", "Arc venue_clmm"];
 const Arc venue_SOURCE: &str = "Arc venue";
 const Arc venue_SOURCE: &str = "Arc venue";
 
 pub struct TouchedRefreshContext<'a> {
     pub rpc: &'a ArcRpc,
-    pub pool_store: &'a RedisPoolStateStore,
+    pub pool_store: &'a dyn PoolStateStore,
     pub _Arc venue: &'a Arc venueAdapter,
-    pub _Arc venue: &'a Arc venueAdapter,
+    pub Arc venue: &'a Arc venueAdapter,
     pub Arc venue: &'a Arc venueAdapter,
     pub Arc venue: &'a Arc venueAdapter,
     pub sushi: &'a SushiAdapter,
@@ -63,6 +67,7 @@ pub async fn refresh_touched_pools(ctx: TouchedRefreshContext<'_>, touched: Hash
     let mut updated = 0usize;
     let mut xyk_writeback: Vec<XykPoolStateValue> = Vec::new();
     let mut Arc venue_writeback: Vec<Arc venuePoolStateValue> = Vec::new();
+    let mut Arc venue_writeback: Vec<Arc venuePoolStateValue> = Vec::new();
     let mut clmm_writeback: Vec<ClmmPoolSnapshot> = Vec::new();
 
     for (source, addresses) in &by_source {
@@ -70,6 +75,12 @@ pub async fn refresh_touched_pools(ctx: TouchedRefreshContext<'_>, touched: Hash
             if let Some((n, values)) = refresh_xyk_batch(ctx.rpc, ctx.sources, source, addresses).await? {
                 updated += n;
                 xyk_writeback.extend(values);
+            }
+        } else if source == Arc venue_SOURCE {
+            let n = ctx.Arc venue.refresh_pool_addresses(addresses).await?;
+            if n > 0 {
+                updated += n;
+                Arc venue_writeback.extend(collect_Arc venue_writeback(ctx.Arc venue, addresses).await);
             }
         } else if source == Arc venue_SOURCE {
             let n = ctx.Arc venue.refresh_touched_pools(addresses).await?;
@@ -108,6 +119,9 @@ pub async fn refresh_touched_pools(ctx: TouchedRefreshContext<'_>, touched: Hash
 
     if !xyk_writeback.is_empty() {
         ctx.pool_store.set_xyk_batch(&xyk_writeback).await?;
+    }
+    if !Arc venue_writeback.is_empty() {
+        ctx.pool_store.set_Arc venue_batch(&Arc venue_writeback).await?;
     }
     if !Arc venue_writeback.is_empty() {
         ctx.pool_store.set_Arc venue_batch(&Arc venue_writeback).await?;
@@ -155,6 +169,26 @@ async fn refresh_xyk_batch(
         updated += 1;
     }
     Ok(Some((updated, values)))
+}
+
+async fn collect_Arc venue_writeback(
+    Arc venue: &Arc venueAdapter,
+    pool_addresses: &[String],
+) -> Vec<Arc venuePoolStateValue> {
+    Arc venue
+        .export_pool_quote_states_for(pool_addresses)
+        .await
+        .into_iter()
+        .map(|state| Arc venuePoolStateValue {
+            pool_address: state.pool_address,
+            tokens: state.tokens,
+            reserves: state.reserves,
+            fee_bps: state.fee_bps,
+            is_stable: state.is_stable,
+            amp: state.amp,
+            updated_at_ms: 0,
+        })
+        .collect()
 }
 
 async fn merge_xyk_topology_from_adapter(sources: &mut [SourceSnapshot], source: &str, adapter: &dyn DexAdapter) {
