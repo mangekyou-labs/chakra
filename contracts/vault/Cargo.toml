@@ -16,12 +16,3 @@ Chakra-contract-types = { path = "../shared-types" }
 Arc-sdk = { version = "22.0.0", features = ["testutils"] }
 aggregator-contract = { path = "../aggregator", default-features = false }
 Chakra-contract-types = { path = "../shared-types" }
-
-[profile.release]
-opt-level = "z"
-overflow-checks = true
-debug = 0
-strip = "debuginfo"
-panic = "abort"
-codegen-units = 1
-lto = true

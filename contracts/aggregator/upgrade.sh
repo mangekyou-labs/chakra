@@ -102,9 +102,11 @@ run_Arc_tx() {
 echo "=== Building aggregator WASM (release) ==="
 Arc contract build --optimize 2>/dev/null || {
   echo "Arc contract build --optimize failed, trying cargo + Arc optimize..."
-  cargo build -p aggregator-contract --target wasm32v1-none --release
+  cargo build -p aggregator-contract --target wasm32v1-none --profile contract-release
   WASM=""
   for CANDIDATE in \
+    "$ROOT/target/wasm32v1-none/contract-release/aggregator_contract.wasm" \
+    "$ROOT/contracts/aggregator/target/wasm32v1-none/contract-release/aggregator_contract.wasm" \
     "$ROOT/target/wasm32v1-none/release/aggregator_contract.wasm" \
     "$ROOT/contracts/aggregator/target/wasm32v1-none/release/aggregator_contract.wasm" \
     "$ROOT/target/wasm32-unknown-unknown/release/aggregator_contract.wasm" \
@@ -124,6 +126,8 @@ Arc contract build --optimize 2>/dev/null || {
 
 WASM=""
 for CANDIDATE in \
+  "$ROOT/target/wasm32v1-none/contract-release/aggregator_contract.wasm" \
+  "$ROOT/contracts/aggregator/target/wasm32v1-none/contract-release/aggregator_contract.wasm" \
   "$ROOT/target/wasm32v1-none/release/aggregator_contract.wasm" \
   "$ROOT/contracts/aggregator/target/wasm32v1-none/release/aggregator_contract.wasm" \
   "$ROOT/target/wasm32-unknown-unknown/release/aggregator_contract.wasm" \
