@@ -94,6 +94,10 @@ Chakra_PARTNER_API_KEYS=key_one,key_two
 https://api.Chakra.xyz/logos/
 ```
 
+Optional `logo_kind`:
+- `"official"` — downloaded from SEP-42 lists (Arc venue / LOBSTR / ArcExpert Top50) and self-hosted as-is (PNG/JPEG/WebP/GIF/SVG)
+- `"fallback"` — locally generated letter avatar when no curated icon is available
+
 Do not rely on third-party image hosts for token icons.
 
 ## 5. Execution modes
