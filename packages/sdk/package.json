@@ -1,5 +1,5 @@
 {
-  "name": "@Arc-dex-aggregator/sdk",
+  "name": "@Chakra/sdk",
   "version": "0.1.0",
   "description": "TypeScript SDK for Chakra Arc DEX Aggregator API",
   "license": "Apache-2.0",

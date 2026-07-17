@@ -20,7 +20,7 @@ Chakra delivers a production Arc DEX aggregator with split routing across Arc AM
 | D2 | Integrator guide + OpenAPI | [integrator-guide.md](./integrator-guide.md), [openapi.yaml](./openapi.yaml) | ✅ code · ☐ external pilot |
 | D3 | Swap UI | https://Chakra.xyz | ✅ |
 | D4 | Analytics indexer v0 | [analytics-indexer.md](./analytics-indexer.md), [sample-indexer-export.json](./sample-indexer-export.json) | ✅ |
-| D5 | npm SDK | [packages/sdk](../packages/sdk), npm: `@Arc-dex-aggregator/sdk` | ☐ publish |
+| D5 | npm SDK | [packages/sdk](../packages/sdk), npm: `@Chakra/sdk` | ☐ publish |
 | D6 | Vault + arb mainnet | [arb-operator.md](./arb-operator.md), [arb-evidence-snapshot.md](./arb-evidence-snapshot.md) | ✅ |
 | D7 | ≥2 integrator pilots | [integrator-pilots.md](./integrator-pilots.md) | ☐ |
 | D8 | Public stats API | https://Chakra.xyz/stats, `/api/v1/stats` | ✅ · ☐ 30d data |

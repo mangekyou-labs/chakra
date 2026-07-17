@@ -1,11 +1,11 @@
-# @Arc-dex-aggregator/sdk
+# @Chakra/sdk
 
 TypeScript client for the [Chakra](https://Chakra.xyz) REST API — quote, build unsigned XDR, tokens.
 
 ## Install
 
 ```bash
-npm install @Arc-dex-aggregator/sdk
+npm install @Chakra/sdk
 # or link locally during development:
 cd packages/sdk && npm run build
 ```
@@ -13,7 +13,7 @@ cd packages/sdk && npm run build
 ## Quick start (&lt; 30 min)
 
 ```typescript
-import { ChakraClient } from '@Arc-dex-aggregator/sdk';
+import { ChakraClient } from '@Chakra/sdk';
 
 const client = new ChakraClient({ apiUrl: 'https://api.Chakra.xyz' });
 

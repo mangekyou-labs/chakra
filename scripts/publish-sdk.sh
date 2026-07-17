@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Publish @Arc-dex-aggregator/sdk to npm (Tranche 2).
+# Publish @Chakra/sdk to npm (Tranche 2).
 #
 # Prereqs: npm login, version bump in packages/sdk/package.json
 #

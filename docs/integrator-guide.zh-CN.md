@@ -136,7 +136,7 @@ Chakra_PREFER_Arc=1 Arc venue_API_KEY=sk_... ./scripts/scf-benchmark.sh
 ## 7. npm SDK（Tranche 2）
 
 代码目录：`packages/sdk`  
-计划发布包名：`@Arc-dex-aggregator/sdk`
+计划发布包名：`@Chakra/sdk`
 
 ```bash
 npx tsx packages/sdk/examples/quote-build.ts
