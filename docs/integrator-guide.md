@@ -119,7 +119,7 @@ See [scf-venue-comparison.md](./scf-venue-comparison.md) for venue matrix vs Arc
 
 ## 7. npm SDK (Tranche 2)
 
-Published package: `packages/sdk` → `@Chakra/sdk` (Aug 2026).
+Published: [`@Chakra/sdk`](https://www.npmjs.com/package/@Chakra/sdk) `0.1.0` (`packages/sdk`).
 
 ```bash
 npx tsx packages/sdk/examples/quote-build.ts
