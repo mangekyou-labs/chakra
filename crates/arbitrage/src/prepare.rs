@@ -25,8 +25,10 @@ use {
 pub struct PreparedSimulation {
     pub unsigned_tx_xdr: String,
     pub amount_out: u128,
-    /// Inclusion fee + simulated Arc resource fee (atomic unitss).
+    /// Declared inclusion + `min_resource_fee` (atomic unitss).
     pub estimated_fee_atomic unitss: u128,
+    /// Simulated Arc `min_resource_fee` only (atomic unitss).
+    pub resource_fee_atomic unitss: u128,
 }
 
 fn scval_i128_to_u128(val: &xdr::ScVal) -> Option<u128> {
@@ -286,6 +288,7 @@ pub async fn prepare_transaction_xdr(
         unsigned_tx_xdr,
         amount_out,
         estimated_fee_atomic unitss,
+        resource_fee_atomic unitss: resource_fee,
     })
 }
 
