@@ -27,7 +27,7 @@ function horizonBalanceToatomic unitss(balance: string, decimals: number): bigin
 /** Single SAC balance (any token — used for uncommon assets). */
 export async function fetchTokenBalanceatomic unitss(
   accountId: string,
-  tokenContractId: string
+  tokenContractId: string,
 ): Promise<bigint | null> {
   try {
     const params = new URLSearchParams({ account: accountId, token: tokenContractId });
@@ -43,7 +43,7 @@ export async function fetchTokenBalanceatomic unitss(
 
 async function fetchNativeHorizonBalance(
   accountId: string,
-  decimals: number
+  decimals: number,
 ): Promise<bigint | null> {
   try {
     const resp = await fetch(`${HORIZON}/accounts/${accountId}`);
@@ -99,7 +99,7 @@ export async function fetchSpendableBalanceatomic unitss(
   accountId: string,
   tokenContractId: string,
   decimals: number,
-  cached?: BalanceMap | null
+  cached?: BalanceMap | null,
 ): Promise<bigint | null> {
   if (cached && cached[tokenContractId] !== undefined) {
     return cached[tokenContractId];
@@ -135,13 +135,14 @@ export function formatBalanceDisplay(atomic unitss: bigint, decimals: number): s
 export function spendableForPercent(
   balanceatomic unitss: bigint,
   percent: number,
-  tokenContractId: string
+  tokenContractId: string,
 ): bigint {
   let available = balanceatomic unitss;
   if (tokenContractId === NATIVE_SAC && percent >= 100) {
-    available = balanceatomic unitss > NATIVE_FEE_RESERVE_atomic unitsS
-      ? balanceatomic unitss - NATIVE_FEE_RESERVE_atomic unitsS
-      : BigInt(0);
+    available =
+      balanceatomic unitss > NATIVE_FEE_RESERVE_atomic unitsS
+        ? balanceatomic unitss - NATIVE_FEE_RESERVE_atomic unitsS
+        : BigInt(0);
   } else if (percent >= 100) {
     available = balanceatomic unitss;
   } else {
@@ -154,7 +155,7 @@ export function percentToAmountInput(
   balanceatomic unitss: bigint,
   percent: number,
   decimals: number,
-  tokenContractId: string
+  tokenContractId: string,
 ): string {
   const atomic unitss = spendableForPercent(balanceatomic unitss, percent, tokenContractId);
   if (atomic unitss === BigInt(0)) return '';

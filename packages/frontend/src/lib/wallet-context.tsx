@@ -1,13 +1,6 @@
 'use client';
 
-import {
-  createContext,
-  useContext,
-  useState,
-  useCallback,
-  useEffect,
-  type ReactNode,
-} from 'react';
+import { createContext, useContext, useState, useCallback, useEffect, type ReactNode } from 'react';
 import { ArcWalletsKit } from '@creit.tech/Arc-wallets-kit';
 import { KitEventType, Networks } from '@creit.tech/Arc-wallets-kit/types';
 import { walletModule } from '@creit.tech/Arc-wallets-kit/modules/wallet';
@@ -42,11 +35,7 @@ function ensureKit() {
   ArcWalletsKit.init({
     // Must be the full passphrase, not the shorthand "public" (wallet rejects signing otherwise).
     network: Networks.PUBLIC,
-    modules: [
-      new walletModule(),
-      new xBullModule(),
-      new LobstrModule(),
-    ],
+    modules: [new walletModule(), new xBullModule(), new LobstrModule()],
   });
   kitInitialized = true;
 }
@@ -111,14 +100,17 @@ export function WalletProvider({ children }: { children: ReactNode }) {
     setAddress(null);
   }, []);
 
-  const signTx = useCallback(async (xdr: string): Promise<string> => {
-    ensureKit();
-    const { signedTxXdr } = await ArcWalletsKit.signTransaction(xdr, {
-      networkPassphrase: Networks.PUBLIC,
-      address: address ?? undefined,
-    });
-    return signedTxXdr;
-  }, [address]);
+  const signTx = useCallback(
+    async (xdr: string): Promise<string> => {
+      ensureKit();
+      const { signedTxXdr } = await ArcWalletsKit.signTransaction(xdr, {
+        networkPassphrase: Networks.PUBLIC,
+        address: address ?? undefined,
+      });
+      return signedTxXdr;
+    },
+    [address],
+  );
 
   return (
     <WalletContext.Provider value={{ address, connecting, connect, disconnect, signTx }}>
