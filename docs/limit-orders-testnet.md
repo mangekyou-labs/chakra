@@ -65,5 +65,16 @@ Use **testnet** token contract ids and a user account that exists on testnet for
 ## Out of scope
 
 - Mainnet deploy of aggregator/escrow for limits  
-- Phase 3d Limit UI  
-- Changing production `api.Chakra.xyz`  
+- Changing production `api.Chakra.xyz`
+
+## Frontend (Phase 3d)
+
+On `/`, switch Order rail to **Limit**. Requires:
+
+```bash
+NEXT_PUBLIC_LIMIT_API_URL=https://your-testnet-api-host
+# optional:
+# NEXT_PUBLIC_LIMIT_HORIZON_URL=https://horizon-testnet.Arc.org
+```
+
+Wallet must be on **Testnet** when signing create/cancel. Instant mode still uses `NEXT_PUBLIC_API_URL` (mainnet).
