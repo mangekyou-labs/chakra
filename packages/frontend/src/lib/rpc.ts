@@ -1,6 +1,6 @@
 /**
  * Frontend helpers that proxy Arc RPC calls through api-server by default.
- * Optional advanced path: submit via Arc official mainnet RPC (whitelist only).
+ * Optional advanced path: submit via Arc official RPC (whitelist only).
  */
 
 import { Networks, TransactionBuilder, rpc } from '@Arc/Arc-sdk';
@@ -8,17 +8,21 @@ import { Networks, TransactionBuilder, rpc } from '@Arc/Arc-sdk';
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://api.Chakra.xyz';
 const LIMIT_API_URL = process.env.NEXT_PUBLIC_LIMIT_API_URL?.trim() || '';
 
-/** Arc Foundation public mainnet Arc RPC (whitelist — not user-editable). */
+/** Whitelisted official RPCs (not user-editable). */
 export const OFFICIAL_MAINNET_RPC_URL = 'https://mainnet.Arcrpc.com';
+export const OFFICIAL_TESTNET_RPC_URL = 'https://Arc-testnet.Arc.org';
 
 const SUBMIT_VIA_STORAGE_KEY = 'Chakra.submitViaOfficialRpc';
 
 export type SubmitVia = 'Chakra' | 'official';
+export type SubmitNetwork = 'public' | 'testnet';
 
 export interface SubmitTxOptions {
   apiUrl?: string;
   /** Default: preference from localStorage, else Chakra api-server. */
   via?: SubmitVia;
+  /** Used when via=official. Default: public (mainnet). */
+  network?: SubmitNetwork;
 }
 
 export function getSubmitViaPreference(): SubmitVia {
@@ -66,9 +70,13 @@ async function sleep(ms: number): Promise<void> {
 
 async function submitViaOfficialRpc(
   signedXdr: string,
+  network: SubmitNetwork,
 ): Promise<{ hash: string; success: boolean; error?: string }> {
-  const tx = TransactionBuilder.fromXDR(signedXdr, Networks.PUBLIC);
-  const server = new rpc.Server(OFFICIAL_MAINNET_RPC_URL);
+  const isTestnet = network === 'testnet';
+  const networkPassphrase = isTestnet ? Networks.TESTNET : Networks.PUBLIC;
+  const rpcUrl = isTestnet ? OFFICIAL_TESTNET_RPC_URL : OFFICIAL_MAINNET_RPC_URL;
+  const tx = TransactionBuilder.fromXDR(signedXdr, networkPassphrase);
+  const server = new rpc.Server(rpcUrl);
 
   let response = await server.sendTransaction(tx);
   let attempts = 0;
@@ -126,7 +134,7 @@ export async function submitSignedTransaction(
 ): Promise<{ hash: string; success: boolean; error?: string }> {
   const via = opts?.via ?? getSubmitViaPreference();
   if (via === 'official') {
-    return submitViaOfficialRpc(signedXdr);
+    return submitViaOfficialRpc(signedXdr, opts?.network ?? 'public');
   }
   return submitViaApiServer(signedXdr, opts?.apiUrl);
 }
