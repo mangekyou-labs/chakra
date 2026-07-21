@@ -77,18 +77,20 @@ rm -f /etc/systemd/system/Chakra-api.service
 systemctl disable --now Chakra-api >/dev/null 2>&1 || true
 
 deploy_worker() {
-  systemctl stop Chakra-worker >/dev/null 2>&1 || true
+  # Unlink first — overwriting a running/mapped ELF hits "Text file busy".
+  rm -f "${REMOTE_WORKER_BIN}"
   cp "${REMOTE_SRC}/target/release/market-data-worker" "${REMOTE_WORKER_BIN}"
-  systemctl enable --now Chakra-worker
+  systemctl enable Chakra-worker
+  systemctl restart Chakra-worker
 }
 
 deploy_api() {
-  for port in ${API_PORTS_STR}; do
-    systemctl stop "Chakra-api@${port}" >/dev/null 2>&1 || true
-  done
+  # Unlink first — overwriting a running/mapped ELF hits "Text file busy".
+  rm -f "${REMOTE_API_BIN}"
   cp "${REMOTE_SRC}/target/release/api-server" "${REMOTE_API_BIN}"
   for port in ${API_PORTS_STR}; do
-    systemctl enable --now "Chakra-api@${port}"
+    systemctl enable "Chakra-api@${port}"
+    systemctl restart "Chakra-api@${port}"
   done
 }
 
