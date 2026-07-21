@@ -69,12 +69,15 @@ Use **testnet** token contract ids and a user account that exists on testnet for
 
 ## Frontend (Phase 3d)
 
-On `/`, switch Order rail to **Limit**. Requires:
+On `/`, switch Order rail to **Limit**.
 
-```bash
-NEXT_PUBLIC_LIMIT_API_URL=https://your-testnet-api-host
-# optional:
-# NEXT_PUBLIC_LIMIT_HORIZON_URL=https://horizon-testnet.Arc.org
-```
+| Piece | Value |
+|-------|--------|
+| Frontend env | `NEXT_PUBLIC_LIMIT_API_URL=https://api.Chakra.xyz/limit-testnet` |
+| Nginx | `api.Chakra.xyz/limit-testnet/` → `127.0.0.1:3200` |
+| systemd | `Chakra-api-testnet`, `Chakra-indexer-testnet` |
+| Escrow | `CAQUTWXDHMSZK62NRE6XA3PSBRYEQZNBEGEEK3T2XWQVYJ5TBXEXEUHY` |
 
-Wallet must be on **Testnet** when signing create/cancel. Instant mode still uses `NEXT_PUBLIC_API_URL` (mainnet).
+Wallet must be on **Testnet** when signing create/cancel. Instant still uses `NEXT_PUBLIC_API_URL` (mainnet).
+
+Local: `packages/frontend/.env.local`. Deploy UI: `./deploy_site.sh`.
