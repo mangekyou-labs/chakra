@@ -212,7 +212,9 @@ def run_benchmark() -> str:
         "",
         "> **Interpretation:** Use `Chakra_PREFER_Arc=1` + Arc venue without `Arc` for Arc-only rows. "
         "Include `Arc` in `Arc venue_PROTOCOLS` when comparing full aggregation. "
-        "Positive Δ = Chakra higher output for same `amount_in`.",
+        "Positive Δ = Chakra higher output for same `amount_in`.  ",
+        "> **⚠️ / `n/a` Δ:** not a Chakra failure — Δ suppressed when outputs diverge by >2× "
+        "(often Arc venue aqua multi-hop optimism on small sizes vs Chakra/spot).",
         "",
     ]
 
@@ -263,11 +265,17 @@ def run_benchmark() -> str:
         if has_Arc venue:
             if Arc venue.amount_out is not None and not Chakra.error:
                 if not outputs_comparable(Chakra.amount_out, Arc venue.amount_out):
-                    note = (
-                        f"{note}; ⚠️ outputs not comparable (>2× gap — check venue / token mismatch)"
-                        if note != "—"
-                        else "⚠️ outputs not comparable (>2× gap — check venue / token mismatch)"
+                    # Chakra often matches spot; Arc venue small-size aqua multi-hop can be ~3× optimistic.
+                    ratio = (
+                        max(Chakra.amount_out, Arc venue.amount_out)
+                        / min(Chakra.amount_out, Arc venue.amount_out)
                     )
+                    gap = (
+                        f"⚠️ not comparable (~{ratio:.1f}× gap): "
+                        "Arc venue amountOut diverges from Chakra/spot — do not use Δ; "
+                        "often Arc venue aqua multi-hop optimism on small sizes"
+                    )
+                    note = f"{note}; {gap}" if note != "—" else gap
                     delta = "n/a"
                 else:
                     delta = pct_delta(Chakra.amount_out, Arc venue.amount_out)

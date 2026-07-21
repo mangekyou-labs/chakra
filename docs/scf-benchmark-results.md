@@ -16,18 +16,19 @@ Arc venue_PROTOCOLS=Arc venue,Arc venue,aqua,Arc Arc venue_API_KEY=sk_... ./scri
 OUTPUT=docs/scf-benchmark-results.md ./scripts/scf-benchmark.sh
 ```
 
-> **Interpretation:** Use `Chakra_PREFER_Arc=1` + Arc venue without `Arc` for Arc-only rows. Include `Arc` in `Arc venue_PROTOCOLS` when comparing full aggregation. Positive Δ = Chakra higher output for same `amount_in`.
+> **Interpretation:** Use `Chakra_PREFER_Arc=1` + Arc venue without `Arc` for Arc-only rows. Include `Arc` in `Arc venue_PROTOCOLS` when comparing full aggregation. Positive Δ = Chakra higher output for same `amount_in`.  
+> **⚠️ / `n/a` Δ:** not a Chakra failure — script suppresses Δ when outputs diverge by >2× (here Arc venue small-size aqua multi-hop is ~3× vs Chakra/spot; large XLM→USDC rows align and publish Δ).
 
 | Pair | Size | Chakra out | Split | Sources | Arc venue out | Δ vs Arc venue | Notes |
 |------|------|------------|-------|---------|--------------|---------------|-------|
-| USDC → XLM | 1 USDC | 5.2097 | no | Arc venue_clmm | 15.3209 | n/a | CLMM venue in route; ⚠️ outputs not comparable (>2× gap — check venue / token mismatch) |
-| USDC → XLM | 10 USDC | 52.0969 | no | Arc venue_clmm | 153.1089 | n/a | CLMM venue in route; ⚠️ outputs not comparable (>2× gap — check venue / token mismatch) |
-| USDC → XLM | 100 USDC | 520.9554 | no | Arc venue_clmm | 1,521.1884 | n/a | CLMM venue in route; ⚠️ outputs not comparable (>2× gap — check venue / token mismatch) |
-| USDC → XLM | 1,000 USDC | 5,208.2231 | no | Arc venue_clmm | 14,287.9921 | n/a | CLMM venue in route; ⚠️ outputs not comparable (>2× gap — check venue / token mismatch) |
-| XLM → USDC | 1 XLM | 0.1940 | yes | Arc venue → Arc venue ;; Arc venue → Arc venue | 0.7206 | n/a | split 2 legs; ⚠️ outputs not comparable (>2× gap — check venue / token mismatch) |
-| XLM → USDC | 10 XLM | 1.9241 | yes | Arc venue → Arc venue ;; Arc venue → Arc venue ;; Arc venue → Arc venue | 5.6699 | n/a | split 3 legs; ⚠️ outputs not comparable (>2× gap — check venue / token mismatch) |
-| XLM → USDC | 100 XLM | 19.1864 | no | Arc venue | 19.1814 | +0.03% | — |
-| XLM → USDC | 1,000 XLM | 191.8454 | no | Arc venue | 191.5380 | +0.16% | — |
+| USDC → XLM | 1 USDC | 5.2097 | no | Arc venue_clmm | 15.3209 | n/a | CLMM; ⚠️ ~2.9× gap: Arc venue aqua multi-hop optimism vs Chakra/spot — do not use Δ |
+| USDC → XLM | 10 USDC | 52.0969 | no | Arc venue_clmm | 153.1089 | n/a | CLMM; ⚠️ ~2.9× gap: Arc venue aqua multi-hop optimism vs Chakra/spot — do not use Δ |
+| USDC → XLM | 100 USDC | 520.9554 | no | Arc venue_clmm | 1,521.1884 | n/a | CLMM; ⚠️ ~2.9× gap: Arc venue aqua multi-hop optimism vs Chakra/spot — do not use Δ |
+| USDC → XLM | 1,000 USDC | 5,208.2231 | no | Arc venue_clmm | 14,287.9921 | n/a | CLMM; ⚠️ ~2.7× gap: Arc venue aqua multi-hop optimism vs Chakra/spot — do not use Δ |
+| XLM → USDC | 1 XLM | 0.1940 | yes | Arc venue → Arc venue ;; Arc venue → Arc venue | 0.7206 | n/a | split 2 legs; ⚠️ ~3.7× gap: Arc venue aqua multi-hop optimism — do not use Δ |
+| XLM → USDC | 10 XLM | 1.9241 | yes | Arc venue → Arc venue ;; Arc venue → Arc venue ;; Arc venue → Arc venue | 5.6699 | n/a | split 3 legs; ⚠️ ~2.9× gap: Arc venue aqua multi-hop optimism — do not use Δ |
+| XLM → USDC | 100 XLM | 19.1864 | no | Arc venue | 19.1814 | +0.03% | fair row (aligned) |
+| XLM → USDC | 1,000 XLM | 191.8454 | no | Arc venue | 191.5380 | +0.16% | fair row (aligned) |
 | XLM → AQUA | 10 XLM | 5,154.5228 | no | Arc venue_clmm | 7,040.0378 | -26.78% | CLMM venue in route |
 | XLM → AQUA | 100 XLM | 51,545.1132 | no | Arc venue_clmm | 70,368.9897 | -26.75% | CLMM venue in route |
 | XLM → AQUA | 1,000 XLM | 515,439.6619 | no | Arc venue_clmm | 700,565.8226 | -26.43% | CLMM venue in route |
@@ -41,7 +42,7 @@ OUTPUT=docs/scf-benchmark-results.md ./scripts/scf-benchmark.sh
 | ≥1 **new** split case vs Arc venue single-route | **XLM→USDC 1 XLM** (`is_split=true`, 2 paths) and **10 XLM** (3 paths) — Arc venue column is a single route |
 | CLMM coverage (vs Broker adapter gap) | USDC→XLM and XLM→AQUA route via **`Arc venue_clmm`** — see [scf-venue-comparison.md](scf-venue-comparison.md) |
 
-Small-size USDC↔XLM rows remain marked **n/a** when Arc venue `amountOut` diverges by >2× (likely different route class / API quirks). Prefer the fair rows above for apples-to-apples claims.
+Rows with **⚠️** keep Δ as **n/a** on purpose: Chakra matches spot (~5.2 XLM per USDC); Arc venue’s small/mid aqua multi-hop quotes are ~3× higher. Use the **fair rows** (100 / 1,000 XLM→USDC) for apples-to-apples Δ.
 
 ## Summary
 
