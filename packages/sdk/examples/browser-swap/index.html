@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Chakra wallet swap example</title>
+  </head>
+  <body>
+    <main>
+      <h1>Chakra · wallet swap</h1>
+      <p class="lead">
+        Minimal integrator demo: quote → build → wallet sign → submit → confirm (mainnet).
+      </p>
+      <div class="row">
+        <button id="connect" type="button">Connect wallet</button>
+        <span id="address" class="mono"></span>
+      </div>
+      <label>
+        Amount (atomic unitss, XLM)
+        <input id="amount" type="text" value="10000000" />
+      </label>
+      <label class="check">
+        <input id="dryRun" type="checkbox" checked />
+        Dry-run (stop after wallet sign — no submit)
+      </label>
+      <button id="swap" type="button" disabled>Swap XLM → USDC</button>
+      <pre id="log"></pre>
+    </main>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
