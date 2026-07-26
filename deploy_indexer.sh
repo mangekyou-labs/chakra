@@ -6,7 +6,7 @@
 #   INDEXER_START_LEDGER=63200000 ./deploy_indexer.sh   # optional backfill after deploy
 set -euo pipefail
 
-SERVER="root@178.63.81.216"
+SERVER="root@88.198.16.144"
 REMOTE_SRC="/opt/Arc-dex-aggregator-src"
 REMOTE_APP_DIR="/opt/Arc-dex-aggregator"
 INDEXER_START_LEDGER="${INDEXER_START_LEDGER:-}"
