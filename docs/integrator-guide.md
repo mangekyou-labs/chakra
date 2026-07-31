@@ -3,8 +3,8 @@
 Quickstart for wallets, dApps, and trading bots integrating the public REST API.
 
 **Live API:** https://api.Chakra.xyz  
-**OpenAPI:** [openapi.yaml](./openapi.yaml) · **Web docs:** https://Chakra.xyz/docs  
-**Benchmark pack:** [scf-benchmark-results.md](./scf-benchmark-results.md) · [scf-venue-comparison.md](./scf-venue-comparison.md)
+**OpenAPI:** [openapi.yaml](./openapi.yaml) · **Docs:** https://Chakra.gitbook.io/  
+**API reference:** [api-reference.md](./api-reference.md)
 
 ## 1. Quote → build → sign
 
@@ -27,19 +27,31 @@ curl -sG "$API/api/v1/quote" \
   --data-urlencode "amount_in=10000000" \
   --data-urlencode "prefer_Arc=1"
 
-# 3) Build unsigned XDR (POST body from quote sub_routes — see OpenAPI)
+# 3) Build unsigned XDR — map quote.sub_routes into POST /api/v1/build_tx
+curl -sX POST "$API/api/v1/build_tx" \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "user": "GYourFundedAddress",
+    "token_in": "'"$XLM"'",
+    "token_out": "'"$USDC"'",
+    "amount_in": "10000000",
+    "slippage": 0.5,
+    "sub_routes": []
+  }'
 ```
 
-Flow: **`GET /quote`** → map `sub_routes` to **`POST /build_tx`** → wallet signs XDR → submit via **`POST /api/v1/submit_tx`** (Chakra proxies your Arc RPC) or any same-network Arc RPC.
+Replace `sub_routes` with the array returned by `/quote`. Full schemas: [OpenAPI](./openapi.yaml).
 
-### One-command smoke test (recommended for external integrators)
+Flow: **`GET /quote`** → map `sub_routes` to **`POST /build_tx`** → wallet signs XDR → submit via **`POST /api/v1/submit_tx`** (Chakra proxies Arc RPC) or any same-network Arc RPC.
+
+### One-command smoke test
 
 ```bash
 chmod +x scripts/integrator-smoke.sh
 USER_G=GYourFundedAddress ./scripts/integrator-smoke.sh
 
-# Save JSON evidence for grant (D2):
-OUT=./evidence/pilot-b USER_G=G... ./scripts/integrator-smoke.sh
+# Optional: save JSON output for your records
+OUT=./tmp/smoke USER_G=G... ./scripts/integrator-smoke.sh
 ```
 
 `USER_G` must be a mainnet account with a sequence number (any small XLM balance is enough). Success prints `unsigned_tx_xdr` prefix.
@@ -83,7 +95,7 @@ Arc venue API uses `protocols: ["Arc venue","Arc venue","aqua"]` (omit `"Arc"`) 
 
 HTTP `429` when exceeded. Invalid `X-API-Key` returns `401` when partner keys are configured on the server.
 
-**Partner key issuance:** contact the Chakra team (GitHub issue or grant correspondence). Keys are deployed server-side via:
+**Partner key issuance:** open a [GitHub issue](https://github.com/Chakra/Arc-dex-agg/issues) or contact the Chakra team. Keys are deployed server-side via:
 
 ```bash
 Chakra_PARTNER_API_KEYS=key_one,key_two
@@ -129,16 +141,16 @@ Do not rely on third-party image hosts for token icons.
 - **Classic:** `execution: "classic"` — `PathPaymentStrictSend` when quote used Arc only.
 - **No hybrid:** Classic + Arc cannot be combined in one Arc transaction.
 
-## 6. Differentiation evidence
+## 6. Reproducing quote benchmarks
 
-Reproduce quote benchmarks locally:
+Use these scripts when you want to compare routing quality (for example Arc-only vs multi-venue quotes), not as part of day-to-day integration.
 
 ```bash
 ./scripts/scf-benchmark.sh
 Chakra_PREFER_Arc=1 Arc venue_API_KEY=sk_... ./scripts/scf-benchmark.sh
 ```
 
-See [scf-venue-comparison.md](./scf-venue-comparison.md) for venue matrix vs Arc Broker and split-routing notes.
+Venue coverage notes: [Performance / venue comparison](./scf-venue-comparison.md). For production integrations, `prefer_Arc=1` on `/quote` is usually enough when you need a Arc-only scope.
 
 ## 7. npm SDK
 

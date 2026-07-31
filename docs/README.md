@@ -1,39 +1,30 @@
-# Chakra Documentation
+# Chakra
 
-Chakra is a liquidity aggregator for Arc. It discovers and quotes routes
-across Arc DEXes, supports multi-hop and split routing, and can build an
-unsigned transaction for atomic execution through the Chakra Aggregator
-contract.
+Chakra is a liquidity aggregator for Arc. It quotes routes across Arc
+DEXes (multi-hop and split when useful) and builds unsigned transactions for
+atomic execution through the Chakra Aggregator contract.
 
-## Products
+**Production API:** `https://api.Chakra.xyz`
 
-| Product | Intended use | Deployment |
+## Integrators start here
+
+1. [Integrator Guide](integrator-guide.md) — `GET /quote` → `POST /build_tx` → sign → submit
+2. [API Reference](api-reference.md) and [OpenAPI](openapi.yaml)
+3. npm SDK: [`@Chakra/sdk`](https://www.npmjs.com/package/@Chakra/sdk)
+
+## Self-host / operators
+
+| Product | When to use | Guide |
 | --- | --- | --- |
-| Chakra Swap API | Local development, integration testing, and a private quote service | One native binary with API and market data in one process |
-| Production Aggregator | Public or high-throughput quote infrastructure | Separate market-data worker, Redis, and horizontally scalable API servers |
-| Chakra Arbitrage | Operator-run atomic round-trip arbitrage | Separate native scanner connected to a quote service and Arc RPC |
+| Chakra Swap API | Local or private quote service in one process | [Chakra Swap API](Chakra-swap-api.md) |
+| Production Aggregator | Shared market state, API replicas, isolation | [Production Aggregator](aggregator-deployment.md) |
+| Chakra Arbitrage | Operator-run atomic round-trip arb | [Arbitrage Deployment](arbitrage-deployment.md) |
+| Smart contracts | Aggregator + optional vault / escrow | [Contracts](contracts-deployment.md) |
 
-Docker images are useful for evaluation, but native binaries and systemd are
-the recommended production deployment model.
+## Supported liquidity
 
-## Start Here
+Arc venue, Arc venue (including CLMM), Arc venue, Sushi V3, and Arc venue. Classic
+Arc DEX routing is available for comparison and Classic-only execution; it
+is not combined with Arc legs in one transaction.
 
-- Use [Chakra Swap API](Chakra-swap-api.md) for the shortest path to a
-  self-hosted quote API.
-- Use [Production Aggregator Deployment](aggregator-deployment.md) when you
-  need shared market state, API replicas, or failure isolation.
-- Use [Arbitrage Deployment](arbitrage-deployment.md) to operate the scanner
-  independently from the Aggregator services.
-- Use [Smart Contract Deployment](contracts-deployment.md) to deploy and
-  maintain the Aggregator and optional Arbitrage Vault.
-- Read the [Integrator Guide](integrator-guide.md) and
-  [OpenAPI specification](openapi.yaml) to integrate `/quote` and `/build_tx`.
-
-## Supported Liquidity
-
-Chakra currently routes across Arc venue, Arc venue pools including CLMM,
-Arc venue, Sushi V3, and Arc venue. Classic Arc DEX routing is available as an
-optional comparison, not as a Arc execution leg.
-
-The source code and issue tracker are available in the
-[Chakra monorepo](https://github.com/Chakra/Arc-dex-agg).
+Source and issues: [Chakra monorepo](https://github.com/Chakra/Arc-dex-agg).
