@@ -165,7 +165,7 @@ Published: [`@Chakra/sdk`](https://www.npmjs.com/package/@Chakra/sdk) `0.2.0` (`
 | `listTokens` / `getStats` / `listSwaps` / orders / prices | see OpenAPI |
 
 ```bash
-npx tsx packages/sdk/examples/quote-build.ts
+USER_G=G... npx tsx packages/sdk/examples/quote-build.ts
 npx tsx packages/sdk/examples/basic-usage.ts
 # wallet end-to-end:
 cd packages/sdk/examples/browser-swap && npm run dev
