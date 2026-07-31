@@ -6,20 +6,26 @@ atomic execution through the Chakra Aggregator contract.
 
 **Production API:** `https://api.Chakra.xyz`
 
-## Integrators start here
+## What do you want to do?
+
+### Integrate a wallet, dApp, or bot
 
 1. [Integrator Guide](integrator-guide.md) — `GET /quote` → `POST /build_tx` → sign → submit
 2. [API Reference](api-reference.md) and [OpenAPI](openapi.yaml)
 3. npm SDK: [`@Chakra/sdk`](https://www.npmjs.com/package/@Chakra/sdk)
 
-## Self-host / operators
+### Self-host a quote stack
 
-| Product | When to use | Guide |
-| --- | --- | --- |
-| Chakra Swap API | Local or private quote service in one process | [Chakra Swap API](Chakra-swap-api.md) |
-| Production Aggregator | Shared market state, API replicas, isolation | [Production Aggregator](aggregator-deployment.md) |
-| Chakra Arbitrage | Operator-run atomic round-trip arb | [Arbitrage Deployment](arbitrage-deployment.md) |
-| Smart contracts | Aggregator + optional vault / escrow | [Contracts](contracts-deployment.md) |
+| Need | Guide |
+| --- | --- |
+| Single-process quote API | [Chakra Swap API](Chakra-swap-api.md) |
+| Shared market state + API replicas | [Production Aggregator](aggregator-deployment.md) |
+| Aggregator / vault contracts | [Smart contracts](contracts-deployment.md) |
+
+### Run atomic round-trip arbitrage
+
+Start with [Arbitrage Deployment](arbitrage-deployment.md) and
+[Round-trip Arbitrage](round-trip-arb.md).
 
 ## Supported liquidity
 
