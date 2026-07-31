@@ -20,6 +20,11 @@ scripts/.env.limit-testnet.local
 PROJECT_STATUS.md
 agent/
 deploy/
+!deploy/
+deploy/*
+!deploy/Chakra-api-testnet.service
+!deploy/Chakra-indexer-testnet.service
+!deploy/Chakra-limit-keeper-testnet.service
 !scripts/scf-quote-regression.sh
 .DS_Store
 broker/
