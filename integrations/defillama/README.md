@@ -17,6 +17,8 @@ Chakra is listed as a **DEX Aggregator** (volume), not TVL.
 
 Ready-to-PR file: [`aggregators/Chakra/index.ts`](./aggregators/Chakra/index.ts)
 
+Imports like `../../adapters/types` only exist in [DefiLlama/dimension-adapters](https://github.com/DefiLlama/dimension-adapters). This folder mirrors those paths with **local IDE stubs** (`adapters/`, `helpers/`, `utils/`) so TypeScript in this repo resolves; **do not include the stubs in the upstream PR** — copy only `aggregators/Chakra/index.ts`.
+
 Local test against upstream tree (already verified):
 
 ```text
