@@ -1,4 +1,4 @@
-name: Release Chakra Swap API
+name: Release Chakra Binaries
 
 on:
   push:
@@ -21,8 +21,10 @@ jobs:
           rustup toolchain install stable --profile minimal
           rustup default stable
 
-      - name: Build release binary
-        run: cargo build --locked --release -p Chakra-swap-api
+      - name: Build release binaries
+        run: |
+          cargo build --locked --release -p Chakra-swap-api -p api-server -p market-data-worker
+          cargo build --locked --release -p arbitrage --bin Chakra-arbitrage-bot
 
       - name: Verify tag and binary version
         run: |
@@ -31,17 +33,38 @@ jobs:
           test "$tag_version" = "$binary_version"
 
       - name: Package release
-        env:
-          ARCHIVE_DIR: Chakra-swap-api-linux-x86_64
         run: |
-          mkdir "$ARCHIVE_DIR"
-          install -m 0755 target/release/Chakra-swap-api "$ARCHIVE_DIR/Chakra-swap-api"
-          install -m 0644 LICENSE "$ARCHIVE_DIR/LICENSE"
-          install -m 0644 docs/Chakra-swap-api.md "$ARCHIVE_DIR/README.md"
-          install -m 0644 scripts/Chakra-swap-api.env.example "$ARCHIVE_DIR/Chakra-swap-api.env.example"
-          install -m 0644 packaging/Chakra-swap-api.service "$ARCHIVE_DIR/Chakra-swap-api.service"
-          tar -czf "$ARCHIVE_DIR.tar.gz" "$ARCHIVE_DIR"
-          sha256sum "$ARCHIVE_DIR.tar.gz" > SHA256SUMS
+          swap_dir=Chakra-swap-api-linux-x86_64
+          cluster_dir=Chakra-aggregator-linux-x86_64
+          arb_dir=Chakra-arbitrage-bot-linux-x86_64
+
+          mkdir "$swap_dir" "$cluster_dir" "$cluster_dir/systemd" "$arb_dir"
+
+          install -m 0755 target/release/Chakra-swap-api "$swap_dir/Chakra-swap-api"
+          install -m 0644 LICENSE "$swap_dir/LICENSE"
+          install -m 0644 docs/Chakra-swap-api.md "$swap_dir/README.md"
+          install -m 0644 scripts/Chakra-swap-api.env.example "$swap_dir/Chakra-swap-api.env.example"
+          install -m 0644 packaging/Chakra-swap-api.service "$swap_dir/Chakra-swap-api.service"
+
+          install -m 0755 target/release/Chakra-api-server "$cluster_dir/Chakra-api-server"
+          install -m 0755 target/release/Chakra-market-data-worker "$cluster_dir/Chakra-market-data-worker"
+          install -m 0644 LICENSE "$cluster_dir/LICENSE"
+          install -m 0644 docs/aggregator-deployment.md "$cluster_dir/README.md"
+          install -m 0644 docs/aggregator-configuration.md "$cluster_dir/aggregator-configuration.md"
+          install -m 0644 packaging/aggregator.env.example "$cluster_dir/aggregator.env.example"
+          install -m 0644 packaging/Chakra-market-data-worker.service "$cluster_dir/systemd/"
+          install -m 0644 packaging/Chakra-api@.service "$cluster_dir/systemd/"
+
+          install -m 0755 target/release/Chakra-arbitrage-bot "$arb_dir/Chakra-arbitrage-bot"
+          install -m 0644 LICENSE "$arb_dir/LICENSE"
+          install -m 0644 docs/arbitrage-deployment.md "$arb_dir/README.md"
+          install -m 0644 packaging/arbitrage.env.example "$arb_dir/arbitrage.env.example"
+          install -m 0644 packaging/Chakra-arbitrage.service "$arb_dir/Chakra-arbitrage.service"
+
+          tar -czf "$swap_dir.tar.gz" "$swap_dir"
+          tar -czf "$cluster_dir.tar.gz" "$cluster_dir"
+          tar -czf "$arb_dir.tar.gz" "$arb_dir"
+          sha256sum "$swap_dir.tar.gz" "$cluster_dir.tar.gz" "$arb_dir.tar.gz" > SHA256SUMS
 
       - name: Publish GitHub release
         env:
@@ -50,5 +73,8 @@ jobs:
           gh release create "$GITHUB_REF_NAME" \
             --verify-tag \
             --generate-notes \
-            --title "Chakra Swap API ${GITHUB_REF_NAME#swap-api-v}" \
-            Chakra-swap-api-linux-x86_64.tar.gz SHA256SUMS
+            --title "Chakra ${GITHUB_REF_NAME#swap-api-v}" \
+            Chakra-swap-api-linux-x86_64.tar.gz \
+            Chakra-aggregator-linux-x86_64.tar.gz \
+            Chakra-arbitrage-bot-linux-x86_64.tar.gz \
+            SHA256SUMS

@@ -79,14 +79,14 @@ if [[ "$RESET_TESTNET_DB" == "1" ]]; then
   [[ ! -f "$cursor" ]] || mv "$cursor" "${cursor}.bak.${stamp}"
 fi
 
-install -m 755 "$REMOTE_SRC/target/release/api-server" \
-  "$REMOTE_APP_DIR/target/release/api-server-testnet"
+install -m 755 "$REMOTE_SRC/target/release/Chakra-api-server" \
+  "$REMOTE_APP_DIR/target/release/Chakra-api-server-testnet"
 install -m 755 "$REMOTE_SRC/target/release/analytics-indexer" \
   "$REMOTE_APP_DIR/target/release/analytics-indexer-testnet"
 install -m 755 "$REMOTE_SRC/target/release/limit-keeper" \
   "$REMOTE_APP_DIR/target/release/limit-keeper-testnet"
-install -m 755 "$REMOTE_SRC/target/release/market-data-worker" \
-  "$REMOTE_APP_DIR/target/release/market-data-worker-testnet"
+install -m 755 "$REMOTE_SRC/target/release/Chakra-market-data-worker" \
+  "$REMOTE_APP_DIR/target/release/Chakra-market-data-worker-testnet"
 
 install -m 644 "$REMOTE_SRC/deploy/Chakra-api-testnet.service" /etc/systemd/system/
 install -m 644 "$REMOTE_SRC/deploy/Chakra-indexer-testnet.service" /etc/systemd/system/

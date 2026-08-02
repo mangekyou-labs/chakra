@@ -13,7 +13,7 @@ cargo build -p api-server --release
 
 echo "=== Uploading binary ==="
 ssh -i $SSH_KEY $SERVER "mkdir -p $REMOTE_DIR/data"
-scp -i $SSH_KEY target/release/api-server $SERVER:$REMOTE_DIR/api-server
+scp -i $SSH_KEY target/release/Chakra-api-server $SERVER:$REMOTE_DIR/Chakra-api-server
 
 echo "=== Uploading pool cache ==="
 if [ -f data/pool_cache.json ]; then
@@ -35,7 +35,7 @@ Environment=HORIZON_URL=http://144.76.79.46:8000
 Environment=LISTEN_ADDR=0.0.0.0:3100
 Environment=REFRESH_INTERVAL_SECS=5
 Environment=RUST_LOG=info
-ExecStart=/opt/Arc-dex-aggregator/api-server
+ExecStart=/opt/Arc-dex-aggregator/Chakra-api-server
 Restart=on-failure
 RestartSec=5
 
