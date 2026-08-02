@@ -48,7 +48,7 @@ jobs:
 
           install -m 0755 target/release/Chakra-api-server "$cluster_dir/Chakra-api-server"
           install -m 0755 target/release/Chakra-market-data-worker "$cluster_dir/Chakra-market-data-worker"
-          install -m 0755 target/release/analytics-indexer "$cluster_dir/analytics-indexer"
+          install -m 0755 target/release/Chakra-analytics-indexer "$cluster_dir/Chakra-analytics-indexer"
           install -m 0644 LICENSE "$cluster_dir/LICENSE"
           install -m 0644 docs/aggregator-deployment.md "$cluster_dir/README.md"
           install -m 0644 docs/aggregator-configuration.md "$cluster_dir/aggregator-configuration.md"
@@ -56,6 +56,7 @@ jobs:
           install -m 0644 packaging/Chakra-aggregator.toml "$cluster_dir/Chakra-aggregator.toml"
           install -m 0644 packaging/Chakra-market-data-worker.service "$cluster_dir/systemd/"
           install -m 0644 packaging/Chakra-api@.service "$cluster_dir/systemd/"
+          install -m 0644 packaging/Chakra-analytics-indexer.service "$cluster_dir/systemd/"
 
           install -m 0755 target/release/Chakra-arbitrage-bot "$arb_dir/Chakra-arbitrage-bot"
           install -m 0644 LICENSE "$arb_dir/LICENSE"

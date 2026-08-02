@@ -19,7 +19,7 @@ Grant close-out deliverable — Oct 2026 baseline.
 
 - **Telegram** (`deploy/telegram.env`): worker/API alerts + hourly arb P&amp;L
 - **Logs**: `journalctl -u Chakra-{arb,worker,indexer,api@3100}`
-- **Stats**: `/api/v1/stats` and `analytics-indexer status`
+- **Stats**: `/api/v1/stats` and `Chakra-analytics-indexer --config aggregator.toml status`
 
 ## Protocol 27+
 

@@ -106,7 +106,7 @@ systemctl status Chakra-arb
 | SUCCESS / FAILED txs               | `journalctl -u Chakra-arb`                   |
 | Hourly gross/fees/net + funnel     | Telegram (`deploy/telegram.env`)             |
 | Quiet window (opps but 0 prepares) | Telegram alert `arb_quiet_window`            |
-| On-chain volume                    | `analytics-indexer status` / `/api/v1/stats` |
+| On-chain volume                    | `Chakra-analytics-indexer --config aggregator.toml status` / `/api/v1/stats` |
 | Caller XLM                         | Horizon account balance (fee float only)     |
 
 
