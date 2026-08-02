@@ -12,6 +12,7 @@ path = "src/main.rs"
 market-snapshot = { path = "../market-snapshot" }
 dex-adapters = { path = "../dex-adapters" }
 Chakra-alerts = { path = "../Chakra-alerts" }
+Chakra-config = { path = "../Chakra-config" }
 
 tokio.workspace = true
 reqwest.workspace = true

@@ -43,7 +43,7 @@ jobs:
           install -m 0755 target/release/Chakra-swap-api "$swap_dir/Chakra-swap-api"
           install -m 0644 LICENSE "$swap_dir/LICENSE"
           install -m 0644 docs/Chakra-swap-api.md "$swap_dir/README.md"
-          install -m 0644 scripts/Chakra-swap-api.env.example "$swap_dir/Chakra-swap-api.env.example"
+          install -m 0644 packaging/Chakra-swap-api.toml "$swap_dir/Chakra-swap-api.toml"
           install -m 0644 packaging/Chakra-swap-api.service "$swap_dir/Chakra-swap-api.service"
 
           install -m 0755 target/release/Chakra-api-server "$cluster_dir/Chakra-api-server"
@@ -51,14 +51,14 @@ jobs:
           install -m 0644 LICENSE "$cluster_dir/LICENSE"
           install -m 0644 docs/aggregator-deployment.md "$cluster_dir/README.md"
           install -m 0644 docs/aggregator-configuration.md "$cluster_dir/aggregator-configuration.md"
-          install -m 0644 packaging/aggregator.env.example "$cluster_dir/aggregator.env.example"
+          install -m 0644 packaging/Chakra-aggregator.toml "$cluster_dir/Chakra-aggregator.toml"
           install -m 0644 packaging/Chakra-market-data-worker.service "$cluster_dir/systemd/"
           install -m 0644 packaging/Chakra-api@.service "$cluster_dir/systemd/"
 
           install -m 0755 target/release/Chakra-arbitrage-bot "$arb_dir/Chakra-arbitrage-bot"
           install -m 0644 LICENSE "$arb_dir/LICENSE"
           install -m 0644 docs/arbitrage-deployment.md "$arb_dir/README.md"
-          install -m 0644 packaging/arbitrage.env.example "$arb_dir/arbitrage.env.example"
+          install -m 0644 packaging/Chakra-arbitrage.toml "$arb_dir/Chakra-arbitrage.toml"
           install -m 0644 packaging/Chakra-arbitrage.service "$arb_dir/Chakra-arbitrage.service"
 
           tar -czf "$swap_dir.tar.gz" "$swap_dir"

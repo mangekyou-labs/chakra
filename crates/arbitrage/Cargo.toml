@@ -26,6 +26,7 @@ market-snapshot = { path = "../market-snapshot" }
 router-engine = { path = "../router-engine" }
 dex-adapters = { path = "../dex-adapters" }
 Chakra-alerts = { path = "../Chakra-alerts" }
+Chakra-config = { path = "../Chakra-config" }
 
 tokio.workspace = true
 anyhow.workspace = true
