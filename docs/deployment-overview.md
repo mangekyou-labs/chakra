@@ -1,0 +1,94 @@
+# Deployment Overview
+
+Chakra releases native Linux binaries from the monorepo. Docker can still be
+used for local testing, but the production path is to run the binaries directly
+under your preferred process manager.
+
+## Which binary should I run?
+
+| Goal | Binary or binaries | Notes |
+| --- | --- | --- |
+| Private quote API or integration testing | `Chakra-swap-api` | One process runs the API and market-data worker with in-memory state. Redis is not required. |
+| Public or horizontally scaled aggregator | `Chakra-market-data-worker` + `Chakra-api-server` | The worker publishes market state to Redis; one or more API processes read from Redis. |
+| Public analytics, swap history, and arbitrage history | `Chakra-analytics-indexer` | Reads chain events into SQLite; API serves `/stats`, `/swaps`, and `/arbitrage` from that DB. |
+| Atomic round-trip arbitrage | `Chakra-arbitrage-bot` | Runs separately from the quote stack and should use low-latency quote API and RPC endpoints. |
+
+## Recommended topologies
+
+### Self-hosted quote API
+
+```text
+Chakra-swap-api
+  -> Arc RPC
+  -> Aggregator contract for /build_tx
+```
+
+Use this when you want the smallest deployable quote service. It is the easiest
+way for wallets, bots, and integrators to test Chakra routing without operating
+Redis.
+
+Guide: [Chakra Swap API](Chakra-swap-api.md)
+
+### Production aggregator
+
+```text
+Chakra-market-data-worker -> Redis -> Chakra-api-server x N
+Chakra-analytics-indexer -> SQLite -> Chakra-api-server x N
+```
+
+Use this when API replicas need shared market state, when a public endpoint must
+scale, or when an arbitrage operator needs a stable local quote plane.
+
+Guide: [Production Aggregator Deployment](aggregator-deployment.md)
+
+### Arbitrage operator
+
+```text
+Chakra quote API -> Chakra-arbitrage-bot -> Arc RPC -> Vault / Aggregator
+```
+
+Run the arbitrage bot as its own process. It scans, simulates, and optionally
+submits atomic round-trip transactions. Keep it close to both the quote API and
+RPC; latency directly affects opportunity validity.
+
+Guide: [Arbitrage Deployment](arbitrage-deployment.md)
+
+## Configuration files
+
+Chakra uses TOML files rather than requiring environment variables:
+
+| Config | Used by |
+| --- | --- |
+| `Chakra-swap-api.toml` | `Chakra-swap-api` |
+| `Chakra-aggregator.toml` | `Chakra-market-data-worker`, `Chakra-api-server`, `Chakra-analytics-indexer` |
+| `Chakra-arbitrage.toml` | `Chakra-arbitrage-bot` |
+
+Release archives include complete templates. Store edited configs outside the
+repository, restrict file permissions, and keep private RPC URLs, Redis
+passwords, partner API keys, Telegram credentials, and caller secrets out of
+Git.
+
+Reference: [Aggregator Configuration](aggregator-configuration.md)
+
+## Validation checklist
+
+After deployment:
+
+```bash
+./Chakra-market-data-worker --config ./aggregator.toml --check-config
+./Chakra-api-server --config ./aggregator.toml --check-config
+./Chakra-analytics-indexer --config ./aggregator.toml --check-config
+./Chakra-arbitrage-bot --config ./arbitrage.toml --check-config
+```
+
+Then verify the public API surface:
+
+```bash
+curl -fsS http://127.0.0.1:3100/api/v1/health
+curl -fsS http://127.0.0.1:3100/api/v1/ready
+curl -fsS http://127.0.0.1:3100/api/v1/tokens | jq
+curl -fsS http://127.0.0.1:3100/api/v1/stats | jq
+```
+
+`/health` means the process is alive. `/ready` means route data has loaded and
+the API can quote.

@@ -12,6 +12,7 @@
 
 ## Deploy
 
+- [Deployment Overview](deployment-overview.md)
 - [Chakra Swap API](Chakra-swap-api.md)
 - [Production Aggregator](aggregator-deployment.md)
   - [Configuration Reference](aggregator-configuration.md)
