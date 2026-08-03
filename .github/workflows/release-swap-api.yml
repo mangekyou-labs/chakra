@@ -61,6 +61,7 @@ jobs:
           install -m 0755 target/release/Chakra-arbitrage-bot "$arb_dir/Chakra-arbitrage-bot"
           install -m 0644 LICENSE "$arb_dir/LICENSE"
           install -m 0644 docs/arbitrage-deployment.md "$arb_dir/README.md"
+          install -m 0644 docs/arbitrage-configuration.md "$arb_dir/arbitrage-configuration.md"
           install -m 0644 packaging/Chakra-arbitrage.toml "$arb_dir/Chakra-arbitrage.toml"
           install -m 0644 packaging/Chakra-arbitrage.service "$arb_dir/Chakra-arbitrage.service"
 
