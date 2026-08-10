@@ -43,6 +43,12 @@ test -f "$cluster/openapi.yaml"
 test -f "$cluster/systemd/Chakra-api@.service"
 test -f "$cluster/systemd/Chakra-market-data-worker.service"
 test -f "$cluster/systemd/Chakra-analytics-indexer.service"
+for unit in \
+  "$cluster/systemd/Chakra-api@.service" \
+  "$cluster/systemd/Chakra-market-data-worker.service" \
+  "$cluster/systemd/Chakra-analytics-indexer.service"; do
+  grep -F -- '--config /etc/Chakra/Chakra-aggregator.toml' "$unit" >/dev/null
+done
 
 test -x "$arb/Chakra-arbitrage-bot"
 test -f "$arb/README.md"

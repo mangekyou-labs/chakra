@@ -84,6 +84,21 @@ Open the Vite URL, connect wallet (Public), leave **Dry-run** checked to stop af
 
 Use `prefer_Arc=1` when comparing against Arc-only aggregators, or when your wallet cannot sign Classic PathPayment in the same flow.
 
+The route search can also be bounded with `max_hops` and `max_splits`:
+
+```bash
+curl -sG "$API/api/v1/quote" \
+  --data-urlencode "token_in=$XLM" \
+  --data-urlencode "token_out=$USDC" \
+  --data-urlencode "amount_in=10000000" \
+  --data-urlencode "max_hops=3" \
+  --data-urlencode "max_splits=2"
+```
+
+Both parameters are optional. Lower values can reduce quote latency and route
+complexity, while higher values may discover better execution at the cost of
+more search work. The SDK exposes them as `maxHops` and `maxSplits`.
+
 Arc venue API uses `protocols: ["Arc venue","Arc venue","aqua"]` (omit `"Arc"`) for the same effect. See [Arc venue API docs](https://docs.Arc venue.finance/Arc venue-api).
 
 ## 3. Rate limits & API keys

@@ -78,6 +78,9 @@ chmod 600 aggregator.toml
 Replace at least:
 
 - `network.rpc_url` with the production Arc RPC.
+- `dex.horizon_url` with the Horizon endpoint used for Classic DEX access and
+  optional historical envelope fallback. Horizon and Arc RPC may run on
+  different machines or be supplied by different providers.
 - `redis.url` with the private Redis URL.
 - `api.aggregator_contract` with the deployed Chakra Aggregator contract. Omit it
   only when the API should quote but never build transactions.
@@ -150,7 +153,7 @@ those units:
 sudo useradd --system --home /var/lib/Chakra --shell /usr/sbin/nologin Chakra
 sudo install -d -o root -g Chakra -m 0750 /etc/Chakra
 sudo install -m 0755 Chakra-market-data-worker Chakra-api-server Chakra-analytics-indexer /usr/local/bin/
-sudo install -m 0640 -o root -g Chakra aggregator.toml /etc/Chakra/aggregator.toml
+sudo install -m 0640 -o root -g Chakra aggregator.toml /etc/Chakra/Chakra-aggregator.toml
 sudo install -m 0644 systemd/*.service /etc/systemd/system/
 sudo systemctl daemon-reload
 sudo systemctl enable --now Chakra-market-data-worker
@@ -160,6 +163,11 @@ sudo systemctl enable --now Chakra-analytics-indexer
 
 Inspect startup with `journalctl -u Chakra-market-data-worker -f` and
 `journalctl -u 'Chakra-api@*' -f`.
+
+The analytics indexer is the only SQLite writer. Run one indexer process for a
+database file, and keep that file on local storage rather than a network
+filesystem. API replicas may read the same database, but should not run an
+additional indexer against it.
 
 ## Scale and upgrade
 
