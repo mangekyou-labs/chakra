@@ -143,6 +143,91 @@ The wallet must not expose a secret key to the application or Chakra. For swaps
 into classic-backed assets such as USDC, the user may need an asset trustline
 before signing the swap.
 
+## Signing with Arc Wallets Kit
+
+`@creit.tech/Arc-wallets-kit` provides one interface for multiple Arc
+wallets. It is independent from `@Chakra/sdk`; the REST example above can be
+used with it directly.
+
+```bash
+npm install @creit.tech/Arc-wallets-kit
+```
+
+```ts
+import { ArcWalletsKit } from '@creit.tech/Arc-wallets-kit';
+import { walletModule } from '@creit.tech/Arc-wallets-kit/modules/wallet';
+import { LobstrModule } from '@creit.tech/Arc-wallets-kit/modules/lobstr';
+import { xBullModule } from '@creit.tech/Arc-wallets-kit/modules/xbull';
+import { Networks } from '@creit.tech/Arc-wallets-kit/types';
+
+ArcWalletsKit.init({
+  network: Networks.PUBLIC,
+  modules: [new walletModule(), new LobstrModule(), new xBullModule()],
+});
+
+export async function signWithWalletsKit(unsignedTxXdr: string) {
+  const { address } = await ArcWalletsKit.authModal();
+  if (!address) throw new Error('Wallet did not return a public address');
+
+  const { signedTxXdr } = await ArcWalletsKit.signTransaction(unsignedTxXdr, {
+    networkPassphrase: Networks.PUBLIC,
+    address,
+  });
+
+  return { address, signedTxXdr };
+}
+```
+
+After signing, submit `signedTxXdr` with the REST endpoint:
+
+```ts
+const response = await fetch('https://api.Chakra.xyz/api/v1/submit_tx', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({ signed_tx_xdr: signedTxXdr }),
+});
+
+const submitted = await response.json();
+if (!submitted.success) throw new Error(submitted.error || 'Submit failed');
+```
+
+## Signing with wallet directly
+
+If the app only supports wallet, it can use wallet's API without
+Wallets Kit:
+
+```bash
+npm install @Arc/wallet-api
+```
+
+```ts
+import { requestAccess, signTransaction } from '@Arc/wallet-api';
+
+export async function signWithwallet(unsignedTxXdr: string) {
+  const access = await requestAccess();
+  if (access.error || !access.address) {
+    throw new Error(String(access.error || 'wallet did not return an address'));
+  }
+
+  const result = await signTransaction(unsignedTxXdr, {
+    network: 'PUBLIC',
+    address: access.address,
+  });
+  if (typeof result === 'string') {
+    return { address: access.address, signedTxXdr: result };
+  }
+  if (result.error || !result.signedTxXdr) {
+    throw new Error(String(result.error || 'wallet signing failed'));
+  }
+
+  return { address: access.address, signedTxXdr: result.signedTxXdr };
+}
+```
+
+Other wallets can be integrated by implementing the same two responsibilities:
+return the user's public address and sign the unsigned transaction XDR. The
+Chakra quote and build API does not change.
+
 ## Quote and build separately
 
 If the application needs to inspect or modify the quote before building, call
