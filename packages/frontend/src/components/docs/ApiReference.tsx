@@ -248,7 +248,7 @@ export function ApiReference() {
               name: 'prefer_Arc',
               type: '0 | 1',
               required: false,
-              desc: '1 = Arc AMMs only (exclude Classic Arc)',
+              desc: '1 = Arc AMMs only (no Classic / no Horizon). Default may return pure classic or pure Arc; never mixed hops',
             },
           ]}
           tryIt={<QuoteTryIt />}

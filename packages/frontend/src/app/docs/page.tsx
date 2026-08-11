@@ -135,8 +135,8 @@ export default function DocsOverviewPage() {
           </table>
         </div>
         <p className="docs-hint">
-          Use <code>prefer_Arc=1</code> on <code>/quote</code> to exclude Classic Arc when
-          comparing against Arc-only routers.
+          Use <code>prefer_Arc=1</code> on <code>/quote</code> for Arc AMMs only (no
+          Classic Arc). Default may return pure classic or pure Arc; never mixed hops.
         </p>
       </section>
 

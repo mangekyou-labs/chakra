@@ -126,7 +126,8 @@ pub struct RouteRequest {
     pub max_hops: Option<usize>,
     /// Maximum number of splits (default: 5)
     pub max_splits: Option<usize>,
-    /// When true, exclude Arc Classic DEX (Arc) paths — Arc AMMs only.
+    /// When true, Arc AMMs only (no Classic Arc / no Horizon).
+    /// Default may still return a pure classic route; mixed hops are never returned.
     pub prefer_Arc: Option<bool>,
 }
 
