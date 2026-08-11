@@ -125,29 +125,7 @@ pub struct FetchPipelineHandle {
 
 impl FetchPipelineHandle {
     pub fn enqueue_touched(&self, touched: HashSet<PoolRef>) {
-        for pool in touched {
-            let task = match pool.source.as_str() {
-                "Arc venue" => FetchTask::Arc venueBatch {
-                    pool_addresses: vec![pool.pool_address],
-                },
-                "Arc venue" => FetchTask::Arc venueBatch {
-                    pool_addresses: vec![pool.pool_address],
-                },
-                "Arc venue" => FetchTask::Arc venueBatch {
-                    pool_addresses: vec![pool.pool_address],
-                },
-                "Arc venue" => FetchTask::Arc venuePool {
-                    pool_address: pool.pool_address,
-                },
-                "sushi" | "Arc venue_clmm" => FetchTask::ClmmPool {
-                    source: pool.source,
-                    pool_address: pool.pool_address,
-                },
-                other => {
-                    debug!(source = other, pool = %pool.pool_address, "ledger touch: no fetch handler");
-                    continue;
-                }
-            };
+        for task in coalesce_touched_into_tasks(touched) {
             match self.high_tx.try_send(task) {
                 Ok(()) => {
                     self.metrics.high_depth.fetch_add(1, Ordering::Relaxed);
@@ -162,6 +140,57 @@ impl FetchPipelineHandle {
             }
         }
     }
+}
+
+/// One batched task per xy=k/Arc venue/Arc venue source per poll; CLMM/Arc venue stay
+/// one-task-per-pool (heavier RPC).
+pub(crate) fn coalesce_touched_into_tasks(touched: HashSet<PoolRef>) -> Vec<FetchTask> {
+    let mut Arc venue = Vec::new();
+    let mut Arc venue = Vec::new();
+    let mut Arc venue = Vec::new();
+    let mut tasks = Vec::new();
+
+    for pool in touched {
+        match pool.source.as_str() {
+            "Arc venue" => Arc venue.push(pool.pool_address),
+            "Arc venue" => Arc venue.push(pool.pool_address),
+            "Arc venue" => Arc venue.push(pool.pool_address),
+            "Arc venue" => tasks.push(FetchTask::Arc venuePool {
+                pool_address: pool.pool_address,
+            }),
+            "sushi" | "Arc venue_clmm" => tasks.push(FetchTask::ClmmPool {
+                source: pool.source,
+                pool_address: pool.pool_address,
+            }),
+            other => {
+                debug!(source = other, pool = %pool.pool_address, "ledger touch: no fetch handler");
+            }
+        }
+    }
+
+    let mut push_batch = |source: &str, mut addrs: Vec<String>| {
+        if addrs.is_empty() {
+            return;
+        }
+        addrs.sort();
+        addrs.dedup();
+        match source {
+            "Arc venue" => tasks.push(FetchTask::Arc venueBatch {
+                pool_addresses: addrs,
+            }),
+            "Arc venue" => tasks.push(FetchTask::Arc venueBatch {
+                pool_addresses: addrs,
+            }),
+            "Arc venue" => tasks.push(FetchTask::Arc venueBatch {
+                pool_addresses: addrs,
+            }),
+            _ => {}
+        }
+    };
+    push_batch("Arc venue", Arc venue);
+    push_batch("Arc venue", Arc venue);
+    push_batch("Arc venue", Arc venue);
+    tasks
 }
 
 struct FetchWorkerContext {
@@ -472,4 +501,47 @@ async fn collect_xyk_from_adapter_cache(
         ));
     }
     out
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn pref(source: &str, pool: &str) -> PoolRef {
+        PoolRef {
+            source: source.to_string(),
+            pool_address: pool.to_string(),
+        }
+    }
+
+    #[test]
+    fn coalesce_batches_Arc venue_and_Arc venue_per_poll() {
+        let touched = HashSet::from([
+            pref("Arc venue", "A2"),
+            pref("Arc venue", "A1"),
+            pref("Arc venue", "A1"),
+            pref("Arc venue", "S1"),
+            pref("sushi", "CLMM1"),
+            pref("Arc venue", "C1"),
+        ]);
+        let tasks = coalesce_touched_into_tasks(touched);
+        let Arc venue = tasks.iter().find_map(|t| match t {
+            FetchTask::Arc venueBatch { pool_addresses } => Some(pool_addresses.clone()),
+            _ => None,
+        });
+        assert_eq!(Arc venue.as_deref(), Some(["A1".to_string(), "A2".to_string()].as_slice()));
+        let Arc venue = tasks.iter().find_map(|t| match t {
+            FetchTask::Arc venueBatch { pool_addresses } => Some(pool_addresses.clone()),
+            _ => None,
+        });
+        assert_eq!(Arc venue.as_deref(), Some(["S1".to_string()].as_slice()));
+        assert_eq!(
+            tasks
+                .iter()
+                .filter(|t| matches!(t, FetchTask::ClmmPool { .. } | FetchTask::Arc venuePool { .. }))
+                .count(),
+            2
+        );
+        assert_eq!(tasks.len(), 4);
+    }
 }
