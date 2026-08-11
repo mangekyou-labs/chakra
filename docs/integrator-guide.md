@@ -20,7 +20,7 @@ curl -sG "$API/api/v1/quote" \
   --data-urlencode "amount_in=10000000" \
   --data-urlencode "slippage=0.5"
 
-# 2) Arc-only quote (exclude Classic Arc — fair vs Arc venue API)
+# 2) Optional Arc-only quote (mainly for arbitrage / Arc-only integrations)
 curl -sG "$API/api/v1/quote" \
   --data-urlencode "token_in=$XLM" \
   --data-urlencode "token_out=$USDC" \
@@ -31,7 +31,7 @@ curl -sG "$API/api/v1/quote" \
 curl -sX POST "$API/api/v1/build_tx" \
   -H 'Content-Type: application/json' \
   -d '{
-    "user": "GYourFundedAddress",
+    "user_public_key": "GYourFundedAddress",
     "token_in": "'"$XLM"'",
     "token_out": "'"$USDC"'",
     "amount_in": "10000000",
@@ -82,7 +82,10 @@ Open the Vite URL, connect wallet (Public), leave **Dry-run** checked to stop af
 | omitted or `0` | Best price across **Arc AMMs + Classic Arc** |
 | `1` | **Arc only** — no PathPayment / Arc paths |
 
-Use `prefer_Arc=1` when comparing against Arc-only aggregators, or when your wallet cannot sign Classic PathPayment in the same flow.
+`prefer_Arc` defaults to `false`. Ordinary frontend integrations should
+usually omit it and use the best route across supported venues. Set
+`prefer_Arc=1` mainly for the Chakra arbitrage bot or when the integration
+explicitly requires Arc-only routes.
 
 The route search can also be bounded with `max_hops` and `max_splits`:
 
