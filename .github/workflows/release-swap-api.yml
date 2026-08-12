@@ -23,7 +23,7 @@ jobs:
 
       - name: Build release binaries
         run: |
-          cargo build --locked --release -p Chakra-swap-api -p api-server -p market-data-worker -p analytics-indexer
+          cargo build --locked --release -p Chakra-swap-api -p api-server -p market-data-worker -p analytics-indexer -p limit-keeper
           cargo build --locked --release -p arbitrage --bin Chakra-arbitrage-bot
 
       - name: Verify tag and binary version
@@ -37,8 +37,9 @@ jobs:
           swap_dir=Chakra-swap-api-linux-x86_64
           cluster_dir=Chakra-aggregator-linux-x86_64
           arb_dir=Chakra-arbitrage-bot-linux-x86_64
+          keeper_dir=Chakra-limit-keeper-linux-x86_64
 
-          mkdir "$swap_dir" "$cluster_dir" "$cluster_dir/systemd" "$arb_dir"
+          mkdir "$swap_dir" "$cluster_dir" "$cluster_dir/systemd" "$arb_dir" "$keeper_dir"
 
           install -m 0755 target/release/Chakra-swap-api "$swap_dir/Chakra-swap-api"
           install -m 0644 LICENSE "$swap_dir/LICENSE"
@@ -92,10 +93,18 @@ jobs:
           install -m 0644 packaging/Chakra-arbitrage.toml "$arb_dir/Chakra-arbitrage.toml"
           install -m 0644 packaging/Chakra-arbitrage.service "$arb_dir/Chakra-arbitrage.service"
 
+          install -m 0755 target/release/limit-keeper "$keeper_dir/Chakra-limit-keeper"
+          install -m 0644 LICENSE "$keeper_dir/LICENSE"
+          install -m 0644 docs/limit-dca-keeper.md "$keeper_dir/README.md"
+          install -m 0644 crates/limit-keeper/README.md "$keeper_dir/limit-keeper-reference.md"
+          install -m 0644 packaging/Chakra-limit-keeper.toml "$keeper_dir/Chakra-limit-keeper.toml"
+          install -m 0644 packaging/Chakra-limit-keeper.service "$keeper_dir/Chakra-limit-keeper.service"
+
           tar -czf "$swap_dir.tar.gz" "$swap_dir"
           tar -czf "$cluster_dir.tar.gz" "$cluster_dir"
           tar -czf "$arb_dir.tar.gz" "$arb_dir"
-          sha256sum "$swap_dir.tar.gz" "$cluster_dir.tar.gz" "$arb_dir.tar.gz" > SHA256SUMS
+          tar -czf "$keeper_dir.tar.gz" "$keeper_dir"
+          sha256sum "$swap_dir.tar.gz" "$cluster_dir.tar.gz" "$arb_dir.tar.gz" "$keeper_dir.tar.gz" > SHA256SUMS
 
       - name: Smoke packaged archives
         run: ./scripts/smoke-release-archives.sh
@@ -111,4 +120,5 @@ jobs:
             Chakra-swap-api-linux-x86_64.tar.gz \
             Chakra-aggregator-linux-x86_64.tar.gz \
             Chakra-arbitrage-bot-linux-x86_64.tar.gz \
+            Chakra-limit-keeper-linux-x86_64.tar.gz \
             SHA256SUMS
