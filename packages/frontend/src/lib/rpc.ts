@@ -1,6 +1,6 @@
 /**
- * Frontend helpers that proxy Arc RPC calls through api-server by default.
- * Optional advanced path: submit via Arc official RPC (whitelist only).
+ * Frontend helpers for signing and submitting through Arc Arc RPC.
+ * Chakra's submit endpoint remains available as an optional fallback.
  */
 
 import { Networks, TransactionBuilder, rpc } from '@Arc/Arc-sdk';
@@ -20,25 +20,25 @@ export type SubmitNetwork = 'public' | 'testnet';
 
 export interface SubmitTxOptions {
   apiUrl?: string;
-  /** Default: preference from localStorage, else Chakra api-server. */
+  /** Default: preference from localStorage, else official Arc RPC. */
   via?: SubmitVia;
   /** Used when via=official. Default: public (mainnet). */
   network?: SubmitNetwork;
 }
 
 export function getSubmitViaPreference(): SubmitVia {
-  if (typeof window === 'undefined') return 'Chakra';
+  if (typeof window === 'undefined') return 'official';
   try {
-    return localStorage.getItem(SUBMIT_VIA_STORAGE_KEY) === '1' ? 'official' : 'Chakra';
+    return localStorage.getItem(SUBMIT_VIA_STORAGE_KEY) === 'Chakra' ? 'Chakra' : 'official';
   } catch {
-    return 'Chakra';
+    return 'official';
   }
 }
 
 export function setSubmitViaPreference(via: SubmitVia): void {
   if (typeof window === 'undefined') return;
   try {
-    if (via === 'official') localStorage.setItem(SUBMIT_VIA_STORAGE_KEY, '1');
+    if (via === 'Chakra') localStorage.setItem(SUBMIT_VIA_STORAGE_KEY, 'Chakra');
     else localStorage.removeItem(SUBMIT_VIA_STORAGE_KEY);
   } catch {
     /* ignore quota / private mode */
@@ -212,7 +212,7 @@ async function fetchTxStatusViaApi(hash: string, apiUrl?: string): Promise<TxSta
   };
 }
 
-/** One-shot status check — Chakra API or official RPC (matches Advanced submit). */
+/** One-shot status check — official RPC or Chakra API (matches submit path). */
 export async function fetchTxStatus(
   hash: string,
   opts?: FetchTxStatusOptions | string,
