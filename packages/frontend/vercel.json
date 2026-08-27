@@ -1,8 +1,8 @@
 {
   "buildCommand": "npm run build",
   "outputDirectory": "out",
-  "framework": "nextjs",
   "installCommand": "npm install",
+  "framework": null,
   "headers": [
     {
       "source": "/(.*)",
