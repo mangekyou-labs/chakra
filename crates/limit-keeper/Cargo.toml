@@ -1,0 +1,27 @@
+[package]
+name = "limit-keeper"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Event-driven keeper for Chakra limit orders"
+
+[[bin]]
+name = "limit-keeper"
+path = "src/main.rs"
+
+[dependencies]
+anyhow.workspace = true
+tokio.workspace = true
+tracing.workspace = true
+tracing-subscriber.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+toml.workspace = true
+reqwest.workspace = true
+base64.workspace = true
+Arc-xdr.workspace = true
+Arc-strkey.workspace = true
+Arc-client.workspace = true
+Arc-baselib.workspace = true
+dex-adapters = { path = "../dex-adapters" }
+router-engine = { path = "../router-engine" }

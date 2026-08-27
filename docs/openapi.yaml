@@ -1,0 +1,516 @@
+openapi: 3.0.3
+info:
+  title: Chakra API
+  description: |
+    Chakra — Arc testnet DEX aggregator. Quotes and unsigned `splitSwap`
+    calldata across the frozen catalog (ERC-20 USDC, EURC, mBTC) over
+    allowlisted venues (xy=k, stableswap, CLMM).
+
+    **Rate limits:** 10 req/s per IP. `/health` and `/ready` are exempt.
+
+    **Errors:** every response uses the envelope
+    `{success, data, error: {code, message}}`; `error` is `null` on success.
+  version: 0.2.1
+  license:
+    name: Apache-2.0
+    url: https://www.apache.org/licenses/LICENSE-2.0
+servers:
+  - url: http://127.0.0.1:8080
+    description: Local dev
+tags:
+  - name: routing
+  - name: tokens
+  - name: wallet
+  - name: health
+paths:
+  /api/v1/health:
+    get:
+      tags: [health]
+      summary: Process liveness
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EnvelopeHealth'
+  /api/v1/ready:
+    get:
+      tags: [health]
+      summary: Market-data readiness
+      description: |
+        Ready only when `chakra:snapshot:current` exists **and** at least one
+        `chakra:pool:*` key is present. Returns 503 otherwise.
+      responses:
+        '200':
+          description: Snapshot + pool state present
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EnvelopeReady'
+        '503':
+          description: Warming up (no snapshot or no pool keys)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EnvelopeReady'
+  /api/v1/tokens:
+    get:
+      tags: [tokens]
+      summary: Frozen catalog
+      description: |
+        Exactly USDC (6 dp), EURC (6 dp), mBTC (8 dp). Native USDC is never a
+        swap token (SC-12) and is absent.
+      responses:
+        '200':
+          description: Catalog
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EnvelopeTokens'
+  /api/v1/quote:
+    get:
+      tags: [routing]
+      summary: Best swap route
+      description: |
+        Quotes never hit RPC: they hydrate from Redis `chakra:pool:*` keys
+        (or the in-memory store). `price_impact_bps` is an integer; there is no
+        float `price_impact`. `protocol_fee_bps` is always 0 (SC-13).
+      parameters:
+        - $ref: '#/components/parameters/token_in'
+        - $ref: '#/components/parameters/token_out'
+        - $ref: '#/components/parameters/amount_in'
+        - name: slippage_bps
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 0
+            example: 50
+          description: Slippage tolerance in bps (default 50)
+        - name: max_hops
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            example: 3
+          description: Path-finder hop limit. Omit = server default
+        - name: max_splits
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            example: 5
+          description: Max parallel sub-routes in a split quote, clamped to server max (5)
+      responses:
+        '200':
+          description: Quote (or `NO_ROUTE` when the pair has no route)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EnvelopeQuote'
+        '400':
+          description: Envelope error (INVALID_PARAMS / ZERO_AMOUNT / SAME_TOKEN / UNKNOWN_TOKEN)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EnvelopeError'
+        '429':
+          description: Rate limited (10 req/s per IP)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EnvelopeError'
+  /api/v1/balances:
+    get:
+      tags: [wallet]
+      summary: Account balances
+      description: |
+        Catalog ERC-20 balances via Multicall3 `aggregate3` (`balanceOf`), plus
+        a separate `native_usdc` (18 dp gas via `eth_getBalance`). The two USDC
+        encodings are **never summed**: the swap USDC figure is the ERC-20
+        balance only (SC-12).
+      parameters:
+        - name: account
+          in: query
+          required: true
+          schema:
+            type: string
+            example: '0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'
+      responses:
+        '200':
+          description: Balances
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EnvelopeBalances'
+        '400':
+          description: Invalid account
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EnvelopeError'
+  /api/v1/build_tx:
+    post:
+      tags: [routing]
+      summary: Build splitSwap calldata
+      description: |
+        Encodes the quoted sub-routes into `splitSwap` calldata for the
+        aggregator (T4.4). The encoder validates continuity, amount sum, and
+        snapshot/factory membership — it never re-quotes. `value` is always
+        `"0"`. Permit2 `typedData` is omitted when the allowance is already
+        sufficient.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BuildTxRequest'
+      responses:
+        '200':
+          description: Encoded transaction
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EnvelopeBuildTx'
+        '400':
+          description: ROUTE_INVALID / INVALID_PARAMS / UNKNOWN_TOKEN
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EnvelopeError'
+        '503':
+          description: PAUSED or NOT_READY (aggregator not configured)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EnvelopeError'
+components:
+  parameters:
+    token_in:
+      name: token_in
+      in: query
+      required: true
+      schema:
+        type: string
+        example: '0x3600000000000000000000000000000000000000'
+      description: ERC-20 address (lowercase). Native encodings rejected.
+    token_out:
+      name: token_out
+      in: query
+      required: true
+      schema:
+        type: string
+        example: '0x89b50855aa3be2f677cd6303cec089b5f319d72a'
+      description: ERC-20 address (lowercase). Native encodings rejected.
+    amount_in:
+      name: amount_in
+      in: query
+      required: true
+      schema:
+        type: string
+        example: '1000000'
+      description: Atomic amount (unsigned decimal integer). USDC/EURC 6 dp; mBTC 8 dp.
+  schemas:
+    ApiError:
+      type: object
+      properties:
+        code:
+          type: string
+          enum: [INVALID_PARAMS, ZERO_AMOUNT, SAME_TOKEN, UNKNOWN_TOKEN, NO_ROUTE, RATE_LIMITED, ROUTE_INVALID, PAUSED, NOT_READY, RPC_ERROR]
+          example: UNKNOWN_TOKEN
+        message:
+          type: string
+    EnvelopeError:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: false
+        data:
+          nullable: true
+        error:
+          $ref: '#/components/schemas/ApiError'
+    EnvelopeHealth:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          type: object
+          properties:
+            status:
+              type: string
+              example: ok
+        error:
+          nullable: true
+    EnvelopeReady:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          type: object
+          properties:
+            status:
+              type: string
+              example: ready
+            ready:
+              type: boolean
+            snapshot_id:
+              type: string
+              example: chakra-1
+            pool_keys:
+              type: array
+              items:
+                type: string
+        error:
+          nullable: true
+    EnvelopeTokens:
+      type: object
+      properties:
+        success:
+          type: boolean
+        data:
+          type: object
+          properties:
+            tokens:
+              type: array
+              items:
+                $ref: '#/components/schemas/Token'
+        error:
+          nullable: true
+    Token:
+      type: object
+      properties:
+        symbol:
+          type: string
+          example: USDC
+        address:
+          type: string
+          example: '0x3600000000000000000000000000000000000000'
+        decimals:
+          type: integer
+          example: 6
+    EnvelopeQuote:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          $ref: '#/components/schemas/QuoteData'
+        error:
+          nullable: true
+    QuoteData:
+      type: object
+      properties:
+        amount_in:
+          type: string
+          example: '1000000'
+        expected_output:
+          type: string
+          example: '999550535'
+        minimum_output:
+          type: string
+        price_impact_bps:
+          type: integer
+          example: 4
+        protocol_fee_bps:
+          type: integer
+          example: 0
+        is_split:
+          type: boolean
+          example: false
+        max_splits:
+          type: integer
+          example: 5
+        sub_routes:
+          type: array
+          items:
+            $ref: '#/components/schemas/SubRoute'
+        compute_time_ms:
+          type: integer
+    SubRoute:
+      type: object
+      properties:
+        source:
+          type: string
+          example: chakra-stable
+        path:
+          type: array
+          items:
+            type: string
+        pool_addresses:
+          type: array
+          items:
+            type: string
+        amount_in:
+          type: string
+        amount_out:
+          type: string
+        fraction_bps:
+          type: integer
+    EnvelopeBalances:
+      type: object
+      properties:
+        success:
+          type: boolean
+        data:
+          type: object
+          additionalProperties:
+            type: string
+          description: '`usdc`/`eurc`/`mbtc` are ERC-20 6/6/8 dp; `native_usdc` is 18 dp gas — never summed'
+          example:
+            usdc: '1234567890'
+            eurc: '0'
+            native_usdc: '99000000000000000000'
+        error:
+          nullable: true
+    BuildTxRequest:
+      type: object
+      required: [user, token_in, token_out, amount_in, min_amount_out, sub_routes]
+      properties:
+        user:
+          type: string
+          description: 0x EOA address (the `from` of the built transaction)
+        token_in:
+          type: string
+        token_out:
+          type: string
+        amount_in:
+          type: string
+        min_amount_out:
+          type: string
+        sub_routes:
+          type: array
+          items:
+            $ref: '#/components/schemas/BuildTxSubRoute'
+    BuildTxSubRoute:
+      type: object
+      properties:
+        amount_in:
+          type: string
+        steps:
+          type: array
+          items:
+            $ref: '#/components/schemas/BuildTxStep'
+    BuildTxStep:
+      type: object
+      properties:
+        dex_type:
+          type: string
+          enum: [xyk, stable, clmm]
+        pool_address:
+          type: string
+        token_in:
+          type: string
+        token_out:
+          type: string
+    EnvelopeBuildTx:
+      type: object
+      properties:
+        success:
+          type: boolean
+        data:
+          type: object
+          properties:
+            to:
+              type: string
+              example: '0x00000000000000000000000000000000000000aa'
+            data:
+              type: string
+              example: '0xcc03a3bc…'
+            chain_id:
+              type: integer
+              example: 5042002
+            value:
+              type: string
+              example: '0'
+            deadline:
+              type: integer
+              example: 1780000000
+            typed_data:
+              nullable: true
+              description: |
+                Permit2 `PermitSingle` EIP-712 payload (AllowanceTransfer).
+                Omitted (`null`) when the Permit2 allowance is already
+                sufficient and unexpired.
+            required_approvals:
+              type: array
+              items: {}
+              description: Empty when the ERC-20 allowance to Permit2 is sufficient
+        error:
+          nullable: true
+  examples:
+    QuoteHonest100Usdc:
+      summary: 100 USDC → EURC (honest engine output)
+      description: |
+        Single `chakra-stable` sub-route. This is the actual engine output on
+        the T2.3 seeds (deep stable 200k vs thin xy=k 10k).
+      value:
+        success: true
+        data:
+          amount_in: '100000000'
+          expected_output: '99955053'
+          minimum_output: '99455277'
+          price_impact_bps: 4
+          protocol_fee_bps: 0
+          is_split: false
+          max_splits: 5
+          sub_routes:
+            - source: chakra-stable
+              path:
+                - '0x3600000000000000000000000000000000000000'
+                - '0x89b50855aa3be2f677cd6303cec089b5f319d72a'
+              pool_addresses:
+                - '0x0000000000000000000000000000000000000002'
+              amount_in: '100000000'
+              amount_out: '99955053'
+              fraction_bps: 10000
+          compute_time_ms: 2
+        error: null
+    QuoteSplitIllustrative:
+      summary: 100 USDC → EURC 70/30 split (illustrative — not current engine output)
+      description: |
+        **Documented deviation.** The plan-era OpenAPI sketch showed a 70/30
+        xy=k/stable split at 100 USDC. On the T2.3 seeds the honest engine
+        returns the single `chakra-stable` route (the thin xy=k leg fails the
+        locked rate-deviation filter). This example is retained as an
+        illustration of the split response shape only; it does **not** match
+        current engine output.
+      value:
+        success: true
+        data:
+          amount_in: '100000000'
+          expected_output: '99955117'
+          minimum_output: '99455341'
+          price_impact_bps: 4
+          protocol_fee_bps: 0
+          is_split: true
+          max_splits: 5
+          sub_routes:
+            - source: chakra-xyk
+              path:
+                - '0x3600000000000000000000000000000000000000'
+                - '0x89b50855aa3be2f677cd6303cec089b5f319d72a'
+              pool_addresses:
+                - '0x0000000000000000000000000000000000000001'
+              amount_in: '70000000'
+              amount_out: '69950917'
+              fraction_bps: 7000
+            - source: chakra-stable
+              path:
+                - '0x3600000000000000000000000000000000000000'
+                - '0x89b50855aa3be2f677cd6303cec089b5f319d72a'
+              pool_addresses:
+                - '0x0000000000000000000000000000000000000002'
+              amount_in: '30000000'
+              amount_out: '30004200'
+              fraction_bps: 3000
+          compute_time_ms: 2
+        error: null
