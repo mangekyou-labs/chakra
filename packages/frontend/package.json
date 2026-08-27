@@ -1,0 +1,50 @@
+{
+  "name": "@stellar-dex-aggregator/frontend",
+  "version": "0.1.0",
+  "private": true,
+  "license": "Apache-2.0",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit",
+    "qa:wallet:validate": "node ../scripts/qa-wallet-validate.mjs",
+    "qa:wallet:setup": "node ../scripts/qa-wallet-setup.mjs",
+    "qa:wallet": "npx playwright test --config=qa.wallet.config.ts",
+    "qa:wallet:cleanup": "rm -rf output/playwright"
+  },
+  "dependencies": {
+    "@tanstack/react-query": "^5.102.3",
+    "next": "^16.3.3",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "viem": "^2.55.19",
+    "wagmi": "^3.7.6"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4.0.0",
+    "@testing-library/react": "^16.3.2",
+    "@testing-library/dom": "^10.4.1",
+    "@testing-library/user-event": "^14.6.6",
+    "@types/node": "20.17.6",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "es-object-atoms": "^1.1.2",
+    "eslint": "^9.39.5",
+    "eslint-config-next": "^16.3.3",
+    "eslint-config-prettier": "^10.1.8",
+    "jsdom": "^29.1.1",
+    "postcss": "^8.0.0",
+    "prettier": "^3.9.5",
+    "tailwindcss": "^4.0.0",
+    "typescript": "^5.4.0",
+    "vitest": "^4.1.11",
+    "@playwright/test": "^1.52.0",
+    "@tenkeylabs/dappwright": "^2.13.0"
+  }
+}

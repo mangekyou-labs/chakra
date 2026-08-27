@@ -1,0 +1,63 @@
+# Render Blueprint — Chakra Arc Testnet DEX Aggregator
+# Free-tier: web service spins down after inactivity; Key Value is non-persistent.
+# Upgrade path: move web service to paid plan, split worker into paid background worker.
+# Docs: https://render.com/docs/free
+
+services:
+  # ── Key Value (Redis-compatible, free) ──────────────────────────────────────
+  - type: kv
+    name: chakra-redis
+    plan: free
+    # Internal connection string injected as CHAKRA_REDIS_URL via envFromKeyValues.
+
+  # ── Web Service (API + market-data-worker, free) ────────────────────────────
+  - type: web
+    name: chakra-api
+    plan: free
+    runtime: image
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    healthCheckPath: /api/v1/health
+    envVars:
+      - key: CHAKRA_REDIS_URL
+        fromKeyValue:
+          name: chakra-redis
+          property: connectionString
+      - key: CHAKRA_RPC_HTTP
+        value: https://rpc.testnet.arc.io
+      - key: CHAKRA_RPC_WS
+        value: wss://rpc.testnet.arc.io
+      - key: CHAKRA_RPC_HTTP_FAILOVERS
+        value: https://rpc.blockdaemon.testnet.arc.io,https://rpc.drpc.testnet.arc.io,https://rpc.quicknode.testnet.arc.io
+      - key: CHAKRA_RPC_WS_FAILOVERS
+        value: wss://rpc.drpc.testnet.arc.io,wss://rpc.quicknode.testnet.arc.io
+      - key: CHAKRA_CHAIN_ID
+        value: "5042002"
+      - key: CHAKRA_CORS_ORIGINS
+        value: "https://chakra-arc-dex.vercel.app,http://localhost:3000"
+      - key: CHAKRA_LISTEN_ADDR
+        value: "0.0.0.0:10000"
+      # Populated after Deploy.s.sol broadcast:
+      - key: CHAKRA_AGGREGATOR
+        value: ""
+      - key: CHAKRA_MBTC_ADDRESS
+        value: ""
+      - key: CHAKRA_USDC_ADDRESS
+        value: "0x3600000000000000000000000000000000000000"
+      - key: CHAKRA_EURC_ADDRESS
+        value: "0x89B50855Aa3bE2F677cD6303Cec089B5F319D72a"
+      - key: CHAKRA_PERMIT2
+        value: "0x000000000022D473030F116dDEE9F6B43aC78BA3"
+      # Market-data worker settings
+      - key: CHAKRA_SEED_FACTORIES
+        value: ""
+      - key: CHAKRA_DISCOVERY_FACTORIES
+        value: ""
+      - key: CHAKRA_EVM_WS_ENABLED
+        value: "true"
+      - key: CHAKRA_EVM_POLL_INTERVAL_MS
+        value: "500"
+      - key: CHAKRA_EVM_MAX_CATCHUP_BLOCKS
+        value: "64"
+      - key: CHAKRA_DISCOVERY_INTERVAL_SECS
+        value: "600"

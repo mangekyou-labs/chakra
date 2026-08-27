@@ -1,0 +1,27 @@
+{
+  "name": "@lumagg/sdk",
+  "version": "0.2.0",
+  "description": "TypeScript SDK for the Chakra Arc Testnet DEX Aggregator API",
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Lum-Agg/stellar-dex-agg.git",
+    "directory": "packages/sdk"
+  },
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "test": "vitest run"
+  },
+  "dependencies": {},
+  "devDependencies": {
+    "typescript": "^5.4.0",
+    "vitest": "^4.1.11"
+  }
+}

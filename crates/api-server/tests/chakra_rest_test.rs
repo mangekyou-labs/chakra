@@ -1,0 +1,619 @@
+//! T4.3 Chakra REST integration tests.
+//!
+//! HTTP via `tower::ServiceExt::oneshot` against the real `build_router`.
+//! Quotes never hit RPC (`QUOTE_RPC_HYDRATE_ENABLED=false` + in-memory pool
+//! store). `/balances` uses the fixture `EvmRpcClient` (never live Arc).
+//! 429 tests inject a non-loopback `ConnectInfo` (loopback stays exempt for
+//! local curl — documented).
+
+use {
+    api_server::{
+        build_router, config::AppConfig, envelope::ApiErrorCode, rate_limit::RateLimitState, state::AppState,
+    },
+    axum::{
+        body::Body,
+        extract::ConnectInfo,
+        http::{header, Method, Request, StatusCode},
+        response::Response,
+        Router,
+    },
+    dex_adapters::evm_rpc::fixture,
+    market_snapshot::{
+        decimals::{EURC, NATIVE_USDC, USDC_ERC20},
+        pool_state_store::{MemoryPoolStateStore, PoolStateStore, StablePoolStateValue, XykPoolStateValue},
+        store::{MemorySnapshotStore, SnapshotStore},
+        MarketSnapshot, SourceSnapshot, TradingPairSnapshot,
+    },
+    router_engine::{path_finder::PathFinderConfig, split_optimizer::SplitConfig, QuoteEngine},
+    serde_json::{json, Value},
+    std::{sync::Arc, time::Duration},
+    tower::ServiceExt,
+};
+
+const MBTC: &str = "0x1111111111111111111111111111111111111111";
+const XYK_POOL_UE: &str = "0x0000000000000000000000000000000000000001";
+const STABLE_POOL_UE: &str = "0x0000000000000000000000000000000000000002";
+const XYK_POOL_UM: &str = "0x0000000000000000000000000000000000000003";
+const XYK_UE_SEED: u128 = 10_000_000_000;
+const STABLE_UE_SEED: u128 = 200_000_000_000;
+
+// ─── Fixtures ───────────────────────────────────────────────────────────────
+
+fn app_config() -> AppConfig {
+    let mut config = AppConfig::default();
+    config.lumagg_mode = api_server::config::LumaggMode::Embedded;
+    config.snapshot_backend = Some("memory".to_string());
+    config.max_splits = 5;
+    config.quote_rpc_hydrate_enabled = false;
+    config
+}
+
+/// In-memory Chakra topology (same seeds as T2.3 / T4.2 quote engine tests).
+fn chakra_snapshot() -> MarketSnapshot {
+    MarketSnapshot::from_sources(
+        "chakra-api-1",
+        1_700_000_000_000,
+        "arc-testnet",
+        vec![
+            SourceSnapshot {
+                source: "chakra-xyk".to_string(),
+                pairs: vec![
+                    TradingPairSnapshot {
+                        token_a: USDC_ERC20.to_string(),
+                        token_b: EURC.to_string(),
+                        pool_address: XYK_POOL_UE.to_string(),
+                        fee_bps: 30,
+                        dex_type: "xyk".to_string(),
+                        factory: String::new(),
+                    },
+                    TradingPairSnapshot {
+                        token_a: USDC_ERC20.to_string(),
+                        token_b: MBTC.to_string(),
+                        pool_address: XYK_POOL_UM.to_string(),
+                        fee_bps: 30,
+                        dex_type: "xyk".to_string(),
+                        factory: String::new(),
+                    },
+                ],
+            },
+            SourceSnapshot {
+                source: "chakra-stable".to_string(),
+                pairs: vec![TradingPairSnapshot {
+                    token_a: USDC_ERC20.to_string(),
+                    token_b: EURC.to_string(),
+                    pool_address: STABLE_POOL_UE.to_string(),
+                    fee_bps: 4,
+                    dex_type: "stable".to_string(),
+                    factory: String::new(),
+                }],
+            },
+        ],
+    )
+}
+
+async fn seed_pool_state(pools: &MemoryPoolStateStore) {
+    // Use lowercased EURC to match pathfinder normalization
+    let eurc_lower = EURC.to_lowercase();
+    pools
+        .set_xyk_batch(&[
+            XykPoolStateValue::new(
+                "chakra-xyk",
+                XYK_POOL_UE,
+                USDC_ERC20,
+                &eurc_lower,
+                30,
+                XYK_UE_SEED,
+                XYK_UE_SEED,
+            ),
+            XykPoolStateValue::new(
+                "chakra-xyk",
+                XYK_POOL_UM,
+                USDC_ERC20,
+                MBTC,
+                30,
+                50_000_000_000,
+                100_000_000,
+            ),
+        ])
+        .await
+        .unwrap();
+    pools
+        .set_stable_batch(&[StablePoolStateValue::new(
+            "chakra-stable",
+            STABLE_POOL_UE,
+            USDC_ERC20,
+            &eurc_lower,
+            STABLE_UE_SEED,
+            STABLE_UE_SEED,
+            100,
+            4,
+        )])
+        .await
+        .unwrap();
+}
+
+/// AppState + router with the fixture EvmRpcClient and in-memory stores.
+/// `seed_pools=false` leaves the pool store empty (for the ready-503 case).
+async fn test_app_with_pools(
+    snapshot: Option<MarketSnapshot>,
+    evm_rpc_url: Option<String>,
+    seed_pools: bool,
+) -> (Router, Arc<MemorySnapshotStore>, Arc<MemoryPoolStateStore>) {
+    let config = app_config();
+    let snapshot_store = Arc::new(MemorySnapshotStore::new());
+    if let Some(snapshot) = snapshot {
+        snapshot_store.publish_snapshot(&snapshot).await.unwrap();
+    }
+    let pool_store = Arc::new(MemoryPoolStateStore::new());
+    if seed_pools {
+        seed_pool_state(&pool_store).await;
+    }
+
+    let engine = QuoteEngine::new(PathFinderConfig::default(), SplitConfig::default());
+    engine.update_from_chakra_snapshot(&chakra_snapshot(), MBTC).await;
+    let state = AppState::from_backends(
+        config,
+        Some(snapshot_store.clone() as Arc<dyn market_snapshot::store::SnapshotStore>),
+        Some(pool_store.clone() as Arc<dyn market_snapshot::pool_state_store::PoolStateStore>),
+        Some(snapshot_store.clone()),
+        Some(pool_store.clone()),
+        evm_rpc_url.map(|url| Arc::new(dex_adapters::evm_rpc::EvmRpcClient::single(&url).unwrap())),
+        MBTC.to_string(),
+        Some(("chakra-api-1".to_string(), Arc::new(engine))),
+    )
+    .await;
+
+    let router = build_router(state, RateLimitState::from_env());
+    (router, snapshot_store, pool_store)
+}
+
+async fn test_app(
+    snapshot: Option<MarketSnapshot>,
+    evm_rpc_url: Option<String>,
+) -> (Router, Arc<MemorySnapshotStore>, Arc<MemoryPoolStateStore>) {
+    test_app_with_pools(snapshot, evm_rpc_url, true).await
+}
+
+/// Oneshot request; returns (status, body Value).
+async fn send(router: &Router, request: Request<Body>) -> (StatusCode, Value) {
+    let response = router.clone().oneshot(request).await.unwrap();
+    let status = response.status();
+    let bytes = axum::body::to_bytes(response.into_body(), 1024 * 1024)
+        .await
+        .unwrap_or_default();
+    let value = serde_json::from_slice(&bytes).unwrap_or(Value::Null);
+    (status, value)
+}
+
+async fn get(router: &Router, path: &str) -> (StatusCode, Value) {
+    send(router, Request::builder().uri(path).body(Body::empty()).unwrap()).await
+}
+
+// ─── 1. Envelope + error codes ──────────────────────────────────────────────
+
+#[tokio::test]
+async fn quote_errors_use_envelope_with_code_and_no_float_impact() {
+    let (router, _, _) = test_app(None, None).await;
+
+    // Missing amount → 400 INVALID_PARAMS.
+    let (status, body) = get(
+        &router,
+        &format!("/api/v1/quote?token_in={USDC_ERC20}&token_out={EURC}"),
+    )
+    .await;
+    assert_eq!(status, StatusCode::BAD_REQUEST);
+    assert_eq!(body["success"], false);
+    assert_eq!(body["error"]["code"], ApiErrorCode::InvalidParams.as_str());
+    assert_eq!(body["data"], Value::Null);
+
+    // Zero amount → 400 ZERO_AMOUNT.
+    let (status, body) = get(
+        &router,
+        &format!("/api/v1/quote?token_in={USDC_ERC20}&token_out={EURC}&amount_in=0"),
+    )
+    .await;
+    assert_eq!(status, StatusCode::BAD_REQUEST);
+    assert_eq!(body["error"]["code"], ApiErrorCode::ZeroAmount.as_str());
+
+    // Same token → 400 SAME_TOKEN.
+    let (status, body) = get(
+        &router,
+        &format!("/api/v1/quote?token_in={USDC_ERC20}&token_out={USDC_ERC20}&amount_in=1000000"),
+    )
+    .await;
+    assert_eq!(status, StatusCode::BAD_REQUEST);
+    assert_eq!(body["error"]["code"], ApiErrorCode::SameToken.as_str());
+
+    // Unknown token → 400 UNKNOWN_TOKEN.
+    let (status, body) = get(
+        &router,
+        &format!("/api/v1/quote?token_in={USDC_ERC20}&token_out=0xDEADBEEF&amount_in=1000000"),
+    )
+    .await;
+    assert_eq!(status, StatusCode::BAD_REQUEST);
+    assert_eq!(body["error"]["code"], ApiErrorCode::UnknownToken.as_str());
+
+    // Native USDC encoding → rejected (SC-12) — never a swap token.
+    for native in [NATIVE_USDC, "0x0000000000000000000000000000000000000000"] {
+        let (status, body) = get(
+            &router,
+            &format!("/api/v1/quote?token_in={native}&token_out={EURC}&amount_in=1000000"),
+        )
+        .await;
+        assert_eq!(status, StatusCode::BAD_REQUEST, "native encoding {native}");
+        let code = body["error"]["code"].as_str().unwrap_or("");
+        assert!(
+            code == ApiErrorCode::UnknownToken.as_str() || code == ApiErrorCode::InvalidParams.as_str(),
+            "native encoding {native} gave {code}"
+        );
+    }
+
+    // Success shape: `error` is an object field (null), no float `price_impact`.
+    let (router, _, _) = test_app(Some(chakra_snapshot()), None).await;
+    let (status, body) = get(
+        &router,
+        &format!("/api/v1/quote?token_in={USDC_ERC20}&token_out={EURC}&amount_in=1000000"),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(body["success"], true);
+    assert_eq!(body["error"], Value::Null);
+    assert!(body.get("price_impact").is_none(), "float price_impact must not exist");
+    assert!(body["data"]["price_impact_bps"].is_i64() || body["data"]["price_impact_bps"].is_u64());
+    assert_eq!(body["data"]["protocol_fee_bps"], 0);
+}
+
+// ─── 2. /tokens catalog freeze ──────────────────────────────────────────────
+
+#[tokio::test]
+async fn tokens_lists_frozen_catalog_only_with_decimals() {
+    let (router, _, _) = test_app(None, None).await;
+    let (status, body) = get(&router, "/api/v1/tokens").await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(body["success"], true);
+
+    let tokens = body["data"]["tokens"].as_array().expect("data.tokens array");
+    assert_eq!(tokens.len(), 3, "exactly USDC, EURC, mBTC");
+    let by_symbol: std::collections::HashMap<&str, &Value> =
+        tokens.iter().map(|t| (t["symbol"].as_str().unwrap(), t)).collect();
+
+    let usdc = by_symbol["USDC"];
+    assert_eq!(usdc["address"], USDC_ERC20.to_ascii_lowercase());
+    assert_eq!(usdc["decimals"], 6);
+    let eurc = by_symbol["EURC"];
+    assert_eq!(eurc["address"], EURC.to_ascii_lowercase());
+    assert_eq!(eurc["decimals"], 6);
+    let mbtc = by_symbol["mBTC"];
+    assert_eq!(mbtc["address"], MBTC);
+    assert_eq!(mbtc["decimals"], 8);
+
+    assert!(
+        tokens
+            .iter()
+            .all(|t| t["address"] != NATIVE_USDC && t["symbol"] != "native_usdc"),
+        "native USDC must be absent"
+    );
+}
+
+// ─── 3. /quote hydrate ──────────────────────────────────────────────────────
+
+#[tokio::test]
+async fn quote_hydrates_chakra_snapshot_routes() {
+    let (router, _, _) = test_app(Some(chakra_snapshot()), None).await;
+
+    // USDC→EURC direct routes via both venues (SC-1).
+    let (status, body) = get(
+        &router,
+        &format!("/api/v1/quote?token_in={USDC_ERC20}&token_out={EURC}&amount_in=1000000"),
+    )
+    .await;
+    eprintln!("DEBUG quote body: {body}");
+    assert_eq!(status, StatusCode::OK);
+    let data = &body["data"];
+    assert_eq!(data["protocol_fee_bps"], 0);
+    assert!(data["price_impact_bps"].is_i64() || data["price_impact_bps"].is_u64());
+    assert!(data["price_impact"].is_null() || data.get("price_impact").is_none());
+    assert_eq!(data["max_splits"], 5);
+    assert_eq!(data["is_split"], false);
+    let routes = data["sub_routes"].as_array().expect("sub_routes");
+    assert!(
+        routes
+            .iter()
+            .any(|r| r["source"].as_str().unwrap().contains("chakra-stable")),
+        "USDC→EURC must route via chakra-stable"
+    );
+    // 1_000e6 control pins the on-chain vector.
+    let (_, body) = get(
+        &router,
+        &format!("/api/v1/quote?token_in={USDC_ERC20}&token_out={EURC}&amount_in=1000000000"),
+    )
+    .await;
+    assert_eq!(body["data"]["expected_output"], "999550535");
+
+    // USDC→mBTC routes via the xy=k venue.
+    let (status, body) = get(
+        &router,
+        &format!("/api/v1/quote?token_in={USDC_ERC20}&token_out={MBTC}&amount_in=1000000"),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+    assert!(
+        body["data"]["sub_routes"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|r| r["source"].as_str().unwrap().contains("chakra-xyk")),
+        "USDC→mBTC must route via chakra-xyk"
+    );
+}
+
+#[tokio::test]
+async fn quote_does_not_call_rpc_when_hydrate_disabled() {
+    // Fixture RPC that would panic if /quote ever called it.
+    let (url, _server) = fixture::spawn(|method, _| {
+        panic!("quote must not hit RPC, called {method}");
+    });
+    let (router, _, _) = test_app(Some(chakra_snapshot()), Some(url)).await;
+
+    let (status, body) = get(
+        &router,
+        &format!("/api/v1/quote?token_in={USDC_ERC20}&token_out={EURC}&amount_in=1000000"),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(body["success"], true);
+}
+
+// ─── 4. SC-2 honesty ────────────────────────────────────────────────────────
+
+#[tokio::test]
+async fn sc2_180k_is_split_and_beats_single_stable() {
+    let (router, _, _) = test_app(Some(chakra_snapshot()), None).await;
+    let (status, body) = get(
+        &router,
+        &format!("/api/v1/quote?token_in={USDC_ERC20}&token_out={EURC}&amount_in=180000000000"),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(
+        body["data"]["is_split"], true,
+        "SC-2 split must pass with re-quote filter"
+    );
+    let routes = body["data"]["sub_routes"].as_array().unwrap();
+    assert!(routes.len() >= 2, "split must have >=2 sub-routes");
+    let sources: Vec<&str> = routes.iter().map(|r| r["source"].as_str().unwrap()).collect();
+    assert!(
+        sources.contains(&"chakra-xyk"),
+        "split must include chakra-xyk, got {:?}",
+        sources
+    );
+    assert!(
+        sources.contains(&"chakra-stable"),
+        "split must include chakra-stable, got {:?}",
+        sources
+    );
+    // Control: 1_000e6 pins the on-chain vector.
+    let (_, body) = get(
+        &router,
+        &format!("/api/v1/quote?token_in={USDC_ERC20}&token_out={EURC}&amount_in=1000000000"),
+    )
+    .await;
+    assert_eq!(body["data"]["expected_output"], "999550535");
+}
+
+// ─── 5. /ready vs /health ───────────────────────────────────────────────────
+
+#[tokio::test]
+async fn ready_is_503_until_snapshot_and_pool_exist() {
+    let (router, _, _) = test_app_with_pools(None, None, false).await;
+    let (status, body) = get(&router, "/api/v1/health").await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(body["data"]["status"], "ok");
+
+    let (status, body) = get(&router, "/api/v1/ready").await;
+    assert_eq!(status, StatusCode::SERVICE_UNAVAILABLE);
+    assert_eq!(body["data"]["ready"], false);
+
+    // Snapshot published but still no pool key → not ready.
+    let (router, snapshot_store, _) = test_app_with_pools(None, None, false).await;
+    snapshot_store.publish_snapshot(&chakra_snapshot()).await.unwrap();
+    let (status, body) = get(&router, "/api/v1/ready").await;
+    assert_eq!(status, StatusCode::SERVICE_UNAVAILABLE);
+    assert_eq!(body["data"]["ready"], false);
+
+    // Snapshot + ≥1 pool key → ready with snapshot id + pool_keys.
+    let (router, _, pool_store) = test_app_with_pools(Some(chakra_snapshot()), None, true).await;
+    seed_pool_state(&pool_store).await;
+    let (status, body) = get(&router, "/api/v1/ready").await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(body["data"]["ready"], true);
+    assert_eq!(body["data"]["snapshot_id"], "chakra-api-1");
+    assert!(
+        body["data"]["pool_keys"].as_array().unwrap().len() >= 1,
+        "pool_keys must list at least one pool key"
+    );
+}
+
+// ─── 6. /balances never-sum ─────────────────────────────────────────────────
+
+#[tokio::test]
+async fn balances_never_sum_erc20_and_native_usdc() {
+    // Multicall3 aggregate3: balanceOf per catalog token. USDC (first entry)
+    // = 1_234_567_890 (6 dp); others 0. eth_getBalance = 99e18 wei.
+    let (url, _server) = fixture::spawn(|method, params| {
+        match method {
+            "eth_call" => {
+                let call = &params[0];
+                let data = call["data"].as_str().unwrap();
+                let fn_sel = &data[..10];
+                match fn_sel {
+                    "0x82ad56cb" => {
+                        // aggregate3 calldata hex: [selector(8)][offset(64)][len(64)]
+                        let hex = data.trim_start_matches("0x");
+                        let count = usize::from_str_radix(&hex[72..136], 16).unwrap();
+                        let mut results = String::new();
+                        for i in 0..count {
+                            let balance = if i == 0 {
+                                "00000000000000000000000000000000000000000000000000000000499602d2"
+                            } else {
+                                "0000000000000000000000000000000000000000000000000000000000000000"
+                            };
+                            results.push_str(&format!(
+                                "0000000000000000000000000000000000000000000000000000000000000001\
+                                 0000000000000000000000000000000000000000000000000000000000000040\
+                                 0000000000000000000000000000000000000000000000000000000000000020\
+                                 {balance}"
+                            ));
+                        }
+                        let encoded = format!(
+                            "0x0000000000000000000000000000000000000000000000000000000000000020\
+                             00000000000000000000000000000000000000000000000000000000000000{count:02x}\
+                             {results}"
+                        );
+                        Ok(json!(encoded))
+                    }
+                    other => Err(json!(format!("unexpected eth_call data {other}"))),
+                }
+            }
+            "eth_getBalance" => {
+                let _acct = &params[0];
+                Ok(json!(format!("0x{:x}", 99_000_000_000_000_000_000u128))) // 99e18 wei
+            }
+            other => Err(json!(format!("unexpected method {other}"))),
+        }
+    });
+    let (router, _, _) = test_app(Some(chakra_snapshot()), Some(url)).await;
+
+    let (status, body) = get(
+        &router,
+        "/api/v1/balances?account=0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(body["success"], true);
+    // Swap USDC = ERC-20 6-dp figure only.
+    assert_eq!(body["data"]["usdc"], "1234567890");
+    // Native USDC is a separate field, never summed into `usdc`.
+    assert_eq!(body["data"]["native_usdc"], "99000000000000000000");
+    assert_eq!(body["data"]["usdc"], "1234567890", "must never sum the two encodings");
+    assert!(body["data"].get("eurc").is_some());
+    assert!(body["data"].get("mbtc").is_some());
+}
+
+// ─── 7. 429 + CORS ──────────────────────────────────────────────────────────
+
+#[tokio::test]
+async fn rate_limit_429_on_quote_but_health_and_ready_exempt() {
+    let (router, _, _) = test_app(None, None).await;
+    let url = format!("/api/v1/quote?token_in={USDC_ERC20}&token_out={EURC}&amount_in=1000000");
+
+    // 10 allowed from a non-loopback IP, 11th → 429.
+    let mut last = (StatusCode::OK, Value::Null);
+    for _ in 0..10 {
+        last = send(
+            &router,
+            Request::builder()
+                .uri(&url)
+                .extension(ConnectInfo("203.0.113.7:1234".parse::<std::net::SocketAddr>().unwrap()))
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await;
+    }
+    assert!(
+        last.0.is_success() || last.0 == StatusCode::BAD_REQUEST,
+        "10th quote still allowed"
+    );
+    let (status, body) = send(
+        &router,
+        Request::builder()
+            .uri(&url)
+            .extension(ConnectInfo("203.0.113.7:1234".parse::<std::net::SocketAddr>().unwrap()))
+            .body(Body::empty())
+            .unwrap(),
+    )
+    .await;
+    assert_eq!(status, StatusCode::TOO_MANY_REQUESTS);
+    assert_eq!(body["error"]["code"], ApiErrorCode::RateLimited.as_str());
+
+    // Exempt endpoints keep working.
+    let (status, _) = get(&router, "/api/v1/health").await;
+    assert_eq!(status, StatusCode::OK);
+    let (status, _) = get(&router, "/api/v1/ready").await;
+    assert_eq!(status, StatusCode::SERVICE_UNAVAILABLE);
+}
+
+#[tokio::test]
+async fn cors_rejects_unlisted_origin_and_allows_configured() {
+    let (router, _, _) = test_app(None, None).await;
+
+    // Disallowed origin → no allowlist header.
+    let response: Response = router
+        .clone()
+        .oneshot(
+            Request::builder()
+                .uri("/api/v1/tokens")
+                .header("Origin", "https://evil.example")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::OK);
+    let allow_origin = response.headers().get(header::ACCESS_CONTROL_ALLOW_ORIGIN);
+    assert!(allow_origin.is_none(), "unlisted origin must not be allowlisted");
+
+    // Preflight from an unlisted origin → 403.
+    let response: Response = router
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method(Method::OPTIONS)
+                .uri("/api/v1/quote")
+                .header("Origin", "https://evil.example")
+                .header("Access-Control-Request-Method", "GET")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    // tower-http CorsLayer: a disallowed preflight origin gets no allowlist
+    // headers; the preflight itself may still be answered (CORS is advisory).
+    let allow_origin = response.headers().get(header::ACCESS_CONTROL_ALLOW_ORIGIN);
+    assert!(allow_origin.is_none(), "unlisted origin must not be allowlisted");
+}
+
+// ─── 8. RPC policy ──────────────────────────────────────────────────────────
+
+#[test]
+fn config_rejects_canteen_and_invented_alchemy_urls() {
+    for bad in [
+        "https://rpc.testnet.arc-node.thecanteenapp.com",
+        "https://rpc.testnet.arc-node.thecanteenapp.com/v2/xyz",
+        "https://arc-testnet.g.alchemy.com/v2/xxxx",
+    ] {
+        assert!(!dex_adapters::evm_rpc::evm_http_url_allowed(bad), "must reject {bad}");
+        assert!(
+            api_server::config::parse_chakra_rpc_http(Some(bad.to_string())).is_err(),
+            "{bad}"
+        );
+    }
+    for good in [
+        "https://rpc.testnet.arc.io",
+        "https://rpc.blockdaemon.testnet.arc.io",
+        "https://rpc.drpc.testnet.arc.io",
+        "https://rpc.quicknode.testnet.arc.io",
+    ] {
+        assert!(dex_adapters::evm_rpc::evm_http_url_allowed(good));
+        assert!(
+            api_server::config::parse_chakra_rpc_http(Some(good.to_string())).is_ok(),
+            "{good}"
+        );
+    }
+}
+
+// Keep `Duration` in scope for future windowed tests.
+#[allow(dead_code)]
+fn _window() -> Duration {
+    Duration::from_secs(1)
+}

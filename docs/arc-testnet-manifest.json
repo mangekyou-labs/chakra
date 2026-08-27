@@ -1,0 +1,52 @@
+{
+  "$schema": "arc-testnet-manifest",
+  "version": 1,
+  "chain_id": 5042002,
+  "network": "Arc Testnet",
+  "rpc": {
+    "http": "https://rpc.testnet.arc.io",
+    "ws": "wss://rpc.testnet.arc.io",
+    "failovers_http": [
+      "https://rpc.blockdaemon.testnet.arc.io",
+      "https://rpc.drpc.testnet.arc.io",
+      "https://rpc.quicknode.testnet.arc.io"
+    ],
+    "failovers_ws": [
+      "wss://rpc.drpc.testnet.arc.io",
+      "wss://rpc.quicknode.testnet.arc.io"
+    ]
+  },
+  "explorer": "https://testnet.arcscan.app",
+  "faucet": "https://faucet.circle.com",
+  "catalog": {
+    "permit2": "0x000000000022D473030F116dDEE9F6B43aC78BA3",
+    "usdc": "0x3600000000000000000000000000000000000000",
+    "eurc": "0x89B50855Aa3bE2F677cD6303Cec089B5F319D72a",
+    "mbtc": null,
+    "usdc_decimals": 6,
+    "eurc_decimals": 6,
+    "mbtc_decimals": 8
+  },
+  "deployer": null,
+  "contracts": {
+    "aggregator": null,
+    "xyk_factory": null,
+    "stable_factory": null,
+    "clmm_factory": null,
+    "mbtc": null
+  },
+  "pools": {
+    "stable_usdc_eurc": null,
+    "v2_usdc_eurc": null,
+    "v2_usdc_mbtc": null,
+    "v2_eurc_mbtc": null,
+    "v3_usdc_mbtc": null
+  },
+  "timestamps": {
+    "manifest_created": "2026-08-27T00:00:00Z",
+    "contracts_deployed": null,
+    "liquidity_seeded": null
+  },
+  "transaction_hashes": [],
+  "secrets_note": "This manifest contains only public on-chain data. No private keys, mnemonics, or API secrets are stored here."
+}
