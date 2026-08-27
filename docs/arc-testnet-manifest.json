@@ -22,31 +22,35 @@
     "permit2": "0x000000000022D473030F116dDEE9F6B43aC78BA3",
     "usdc": "0x3600000000000000000000000000000000000000",
     "eurc": "0x89B50855Aa3bE2F677cD6303Cec089B5F319D72a",
-    "mbtc": null,
+    "mbtc": "0xbf5a25D7070FaACAe309D66D05372a6b212ECbdF",
     "usdc_decimals": 6,
     "eurc_decimals": 6,
     "mbtc_decimals": 8
   },
-  "deployer": null,
+  "deployer": "0x12E266744f6d25D372000e066eCc0DF5a752276d",
   "contracts": {
-    "aggregator": null,
-    "xyk_factory": null,
-    "stable_factory": null,
-    "clmm_factory": null,
-    "mbtc": null
+    "aggregator": "0xA59ad3E82d251c3489582e1aA5Bee494d0d2a569",
+    "xyk_factory": "0x0c812E5D55D767533c8E4783D33b28EA825b4D8e",
+    "stable_factory": "0x77Ce21FDAAea40Fd94aCf65fF3220A0A7Db7D690",
+    "clmm_factory": "0xf6dEa9e6dfE392aaBE366240db4839709572fa69",
+    "mbtc": "0xbf5a25D7070FaACAe309D66D05372a6b212ECbdF",
+    "liquidity_seeder": "0xD32711Efc8492cBC55665a3c4C536A6e3d2B913a"
   },
   "pools": {
-    "stable_usdc_eurc": null,
-    "v2_usdc_eurc": null,
-    "v2_usdc_mbtc": null,
-    "v2_eurc_mbtc": null,
-    "v3_usdc_mbtc": null
+    "stable_usdc_eurc": "0xE4A881F4211b5cC11d8298032136A0d72e93CB02",
+    "v2_usdc_eurc": "0x201cd935c4b206beeec47269fe26bd041050a590",
+    "v2_usdc_mbtc": "0x36b7abd56018c33f2117c599ad1c7d0efedf36d7",
+    "v2_eurc_mbtc": "0x1ac3c4d188bd3bfe7a6e3a8e9d65467cd4f08af1",
+    "v3_usdc_mbtc": "0xe431ff3b4ddc062af084d26785045abbab984cb5"
   },
   "timestamps": {
     "manifest_created": "2026-08-27T00:00:00Z",
-    "contracts_deployed": null,
-    "liquidity_seeded": null
+    "contracts_deployed": "2026-08-28T00:00:00Z",
+    "liquidity_seeded": "2026-08-28T00:00:00Z"
   },
-  "transaction_hashes": [],
+  "transaction_hashes": [
+    "0xf393992dd6a4ac11b9672249d54f8103bfe7db25b0a3912281aca6c192b4e74c",
+    "0xeb77c000e67a4c01a22fffaaa2e5d0122822c32dd92f31cdbb8d69c0e326f748"
+  ],
   "secrets_note": "This manifest contains only public on-chain data. No private keys, mnemonics, or API secrets are stored here."
 }
