@@ -1,0 +1,58 @@
+[package]
+name = "api-server"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[[bin]]
+name = "chakra-api-server"
+path = "src/main.rs"
+
+[dependencies]
+market-snapshot = { path = "../market-snapshot" }
+market-data-worker = { path = "../market-data-worker" }
+router-engine = { path = "../router-engine" }
+dex-adapters = { path = "../dex-adapters" }
+Chakra-alerts = { path = "../Chakra-alerts" }
+Chakra-config = { path = "../Chakra-config" }
+
+Arc-xdr.workspace = true
+Arc-strkey.workspace = true
+Arc-client.workspace = true
+
+tokio.workspace = true
+async-trait.workspace = true
+
+axum.workspace = true
+tower.workspace = true
+tower-http.workspace = true
+
+serde.workspace = true
+serde_json.workspace = true
+
+futures.workspace = true
+
+anyhow.workspace = true
+tracing.workspace = true
+tracing-subscriber.workspace = true
+reqwest.workspace = true
+hex.workspace = true
+tiny-keccak.workspace = true
+
+rusqlite = { version = "0.32", features = ["bundled"] }
+
+[dev-dependencies]
+tempfile = "3"
+# Enable the test-fixture so `cargo test --workspace` can compile integration
+# tests that use the fixture JSON-RPC server.  The feature propagates to
+# dex-adapters/test-fixture which gates `evm_rpc::fixture`.
+dex-adapters = { path = "../dex-adapters", features = ["test-fixture"] }
+
+[features]
+default = []
+# Enable `dex_adapters::evm_rpc::fixture` for integration tests.
+test-fixture = ["dex-adapters/test-fixture"]
+
+[[example]]
+name = "local_harness"
+required-features = ["test-fixture"]

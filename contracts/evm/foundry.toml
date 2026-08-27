@@ -1,0 +1,42 @@
+[profile.default]
+src = "src"
+out = "out"
+libs = ["lib", "venues"]
+auto_detect_solc = true
+evm_version = "prague"
+optimizer = true
+optimizer_runs = 200
+
+[profile.default.fmt]
+line_length = 100
+
+[[profile.default.fs_permissions]]
+access = "read"
+path = "./bytecodes"
+
+# --- Compilation restrictions: different solc per directory ---
+
+[[profile.default.compilation_restrictions]]
+paths = "src/**"
+version = "=0.8.30"
+evm_version = "prague"
+
+[[profile.default.compilation_restrictions]]
+paths = "test/**"
+version = "=0.8.30"
+evm_version = "prague"
+
+[[profile.default.compilation_restrictions]]
+paths = "script/**"
+version = "=0.8.30"
+evm_version = "prague"
+
+[[profile.default.compilation_restrictions]]
+paths = "venues/uniswap-v2/**"
+version = "=0.5.16"
+evm_version = "istanbul"
+
+[[profile.default.compilation_restrictions]]
+paths = "venues/uniswap-v3/**"
+version = "=0.7.6"
+evm_version = "istanbul"

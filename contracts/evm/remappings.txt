@@ -1,0 +1,4 @@
+forge-std/=lib/forge-std/src/
+@openzeppelin/=lib/openzeppelin-contracts/
+uniswap-v2/=venues/uniswap-v2/contracts/
+uniswap-v3/=venues/uniswap-v3/contracts/
