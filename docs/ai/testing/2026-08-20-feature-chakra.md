@@ -44,7 +44,7 @@ cd packages/frontend && npm test
 - [x] Created-pool log (`PairCreated`) upserts topology; later `Swap` on the new pool resolves through the refreshed index — `created_pool_log_upserts_topology_and_later_swap_touches` (2026-08-25)
 - [x] Discovery probes catalog pairs only (`getPair`/`getPool`), skips mBTC until `CHAKRA_MBTC_ADDRESS`, and never sweeps the market — `discovery_finds_catalog_xyk_pair_from_fixture_factory` / `discovery_without_mbtc_only_probes_usdc_eurc` (2026-08-25)
 - [x] Never-call addresses are never in the WS watch list — `watch_addresses_filter_never_call_and_keep_0x` (2026-08-25)
-- [x] Fetch pipeline coalesces `chakra-*` / `discovered:*` sources into EVM tasks — `fetch_pipeline::tests::coalesce_maps_evm_chakra_sources_to_evm_tasks` (2026-08-25)
+- [x] Fetch pipeline coalesces `chakra-*` / `discovered:*` / `xylo` sources into EVM tasks — `fetch_pipeline::tests::coalesce_maps_evm_chakra_sources_to_evm_tasks` + `evm_watcher::tests::factory_tuple_parse_accepts_seed_and_discovery` (pins `source == "xylo"` for xylo seed and discovery) (2026-08-28)
 
 ### PathFinder (`crates/router-engine`)
 
@@ -68,6 +68,8 @@ cd packages/frontend && npm test
 - [x] CLMM hop skipped when `coverage.is_complete=false` — enforced at Redis publish (`should_publish_clmm_to_redis`) + bootstrap incomplete-CLMM test + **QuoteEngine `chakra-clmm` skip** (same test, 2026-08-25, T3.1/T4.2)
 - [x] Token decimals 6 vs 8 applied correctly (USDC vs mBTC) — `usdc_to_mbtc_output_is_in_mbtc_8dp_atomic_units`: 1_000e6 USDC → `xyk_quote(50_000e6, 1e8, 1_000e6)` exact atomic mBTC output (~1.95e6, 8 dp range, never 18 dp wei) (2026-08-25, T4.2)
 - [x] Mixing native 18 dp into `amount_in` is rejected (SC-12) — `native_usdc_encoding_is_rejected_as_swap_amount`: `native_usdc` / `0x000…0` as token_in **or** token_out → empty route, zero output, `protocol_fee_bps=0` (2026-08-25, T4.2)
+- [x] XyloNet stableswap (`A=200`, 4 bps fee-on-output) quote matches live RPC `calculateSwap` vectors — `evm_quote_math::tests::xylo_matches_live_rpc_calculate_swap_vectors` (pins `1e6 USDC→EURC = 865542` and `1e6 EURC→USDC = 1154419`) + `xylo_quote_guards_bad_inputs_and_fee_is_on_output` (2026-08-28, T-XYLO)
+- [x] QuoteEngine routes small size to `chakra-stable` and capacity size to `xylo` — `quote_engine::tests::{xylo_loses_to_chakra_stable_at_small_size,xylo_wins_at_chakra_capacity_sizes}` (2026-08-28, T-XYLO)
 
 ### SplitOptimizer
 
@@ -121,8 +123,9 @@ cd packages/frontend && npm test
 
 **Local seeded-venue suite (2026-08-24, worktree):** `forge test -vv` → 29 passed / 0 failed (Placeholder 1, MockBtc 5, XykFactory 8, StableSwap 10, ClmmPool 5). Live Arc seed (readable on-chain reserves) remains **blocked** — no operator key in this environment; same reason as T2.1.
 
-**Local aggregator suite added (2026-08-25, worktree, T5.1):** `forge test -vv` → **73 passed / 0 failed, exit 0** (Aggregator 39 + MockBtc 5 + XykFactory 8 + StableSwap 16 + ClmmPool 5; Placeholder removed). `forge build` exit 0 (incl. `DeployAggregator.s.sol`). `grep -R prevrandao src venues test script` → no hits.
+**Local aggregator suite added (2026-08-25, worktree, T5.1; updated 2026-08-28 for T-XYLO):** `forge test -vv` → **81 passed / 0 failed, exit 0** (Aggregator 45 incl. 5 Xylo tests: approve+`swap` happy path, unknown factory revert, USYC pair block, not usable as stable hop, `removeFactory` gating + MockBtc 5 + XykFactory 8 + StableSwap 16 + ClmmPool 5 + LiquiditySeeder 2). `forge build` exit 0 (incl. `DeployAggregator.s.sol`). `grep -R prevrandao src venues test script` → no hits.
 
+**Aggregator redeployment (2026-08-28, Arc testnet, T5.2):** broadcast via `scripts/arc-operator.sh` to `0xEa1b2C24bd41163590960F8e40afe6cb4CC92006` (tx `0x4cef6ba6e6d7132a7517666b2ce6c1ab7f5ae882ca9c80bb82ad9658ab71a22d`). Codesize 22258 hex chars, `paused=false`, owner `0x12E266744f6d25D372000e066eCc0DF5a752276d`, `factoryDexType` allowlists: Xyk=0, Stable=1, Clmm=2, Xylo=3.
 **T3.1 snapshot/Redis suite added (2026-08-25, worktree):** `cargo test -p market-snapshot` → **36 passed / 0 failed** — new `ready::tests` (2 cluster against a spawned local `redis-server`, 2 memory: false with snapshot-only, true with snapshot+pool, stable pools counted), `bootstrap::tests` (3: memory publish reads snapshot/pools/factories + ready, incomplete CLMM skipped, Redis publish writes keys + events + `cluster_ready`), key-shape + legacy-default + stable/factory round-trip unit tests. `cargo test --workspace` → all suites 0 failed; `cargo check --workspace` exit 0. Redis tests skip gracefully when `redis-server` is unavailable.
 
 **T3.2 EVM venue quote math suite added (2026-08-25, worktree):** `cargo test -p dex-adapters evm_quote_math` → **6 passed / 0 failed** — `xyk_quote` pins the exact `Aggregator._xykFormula` 997/1000 expression; `stable_quote` matches **on-chain `StableSwap.sol` vectors** captured this session via a temporary `forge script` probe (200_000e6 seed, 3× 1_000e6 USDC→EURC: `999550535 / 999451582 / 999352602`, reproduced exactly including inter-swap reserve drift); stable-deeper-than-xyk at 1_000e6 (SC-2 analog); integer `price_impact_bps`; zero/same-index/range guards. CLMM skip-if-incomplete re-verified (T3.1 bootstrap test). `cargo test --workspace` → all suites 0 failed; lint clean.
@@ -207,7 +210,13 @@ Network: **Arc testnet** `chainId` 5042002 (`0x4CEF52`). Disposable persistent C
 
 ### Public / on-chain evidence (manual + scripted)
 
-- [ ] Public `/health`, `/ready`, and `/quote` succeed (SC-5)
+- [x] Public `/health`, `/ready`, `/quote`, and `/build_tx` succeed (SC-5, verified 2026-08-28 on `https://chakra-api-0a5i.onrender.com`):
+  - `/health` → 200 `{"status":"ok"}`
+  - `/ready` → 200 `{"status":"ready","ready":true,"snapshot_id":"snapshot-…"}`
+  - `/quote` (1e6 USDC→EURC) → 200 `expected_output: 996915` via `chakra-stable` (`dex_types: ["stable"]`)
+  - `/quote` (5e6 USDC→EURC) → 200 `expected_output: 4680042` routing `xylo` (`dex_types: ["xylo"]`)
+  - `/quote` (1e6 USDC→mBTC) → 200 honest `NO_ROUTE` error
+  - `/build_tx` (1e6 & 5e6) → 200 with `to: "0xea1b2c24bd41163590960f8e40afe6cb4cc92006"` targeting new aggregator
 - [ ] On-chain **split** (≥2 sub-routes in one tx) on `testnet.arcscan.app`; multi-hop single-path is extra, not a substitute (SC-4)
 - [ ] Venue matrix ≥3 pairs × ≥3 sizes checked in (SC-8)
 - [ ] Split vs single-path benchmark checked in (SC-2, SC-8)
