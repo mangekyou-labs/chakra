@@ -12,7 +12,7 @@ date: 2026-08-20
 **Feature key:** `chakra`  
 **Branch:** `feature-chakra`  
 **Worktree:** `.worktrees/feature-chakra`  
-**Status:** Phase 6 reconciled 2026-08-28 after hosted smoke. T-GIT-CHAKRA (Arc compile strip), T8.1 (Render API+worker+Redis), and T8.2 (Vercel UI `chakra-arc-dex`) are done with public smoke URLs. **T4.7 is REOPENED**: quote still emits `SubRouteData.source = sources.join(" → ")` and the UI/SDK still `split(" → ")` — no `dex_types[]`/fee/factory fields on quote output yet. T4.6 remainder (omit-fee encoding from snapshot fee, 5 bps encode test) and T2.5 (organic Arc factory scan) remain out of batch. Historical reconciliations remain below as the audit trail.  
+**Status:** Phase 5 execute batch (2026-08-28): T4.7 (explicit quote hop metadata), T4.6 remainder (omit-fee → snapshot CLMM fee, 5 bps encode test), T6.3 local release gates (test env fix, base+priority fee suggestion, approve-spender coverage), T7.2 local harness (fixture `0xdd62ed3e` + full SDK quote→build walkthrough), and T-XYLO (scoped XyloNet hop — Solidity `DexType.Xylo`, Foundry suite, `xylo_quote` pinned to live same-block vectors, worker hydrator, engine dispatch, API/build_tx) are done **locally**. Aggregator redeploy on Arc (bytecode change), Xylo factory allowlist, and live liquidity re-seed remain **operator-gated**. T2.1–T2.5/T5.2 planning boxes below are reconciled to deployed-but-under-seeded (2026-08-28 hosted smoke).  
 **Sources:** requirements (reviewed), design (reviewed), testing docs dated 2026-08-20.
 
 Task tracing via `ai-devkit task` was unavailable in Phase 1 (`unknown command 'task'`). Track progress in this file.
@@ -71,33 +71,38 @@ Each task: **outcome**, **deps**, **validation**, **tests**. Status: not started
   **Deps:** T1.1.  
   **Validation:** Arcscan token page; `decimals()==8`.  
   **Tests:** Foundry ERC-20; seeded venues list.  
-  **Progress 2026-08-20:** `MockBtc.sol` + `MockBtc.t.sol` — 5 tests pass (`decimals==8`, name/symbol, owner mint, non-owner revert, no public faucet). `DeployMockBtc.s.sol` + `CHAKRA_MBTC_ADDRESS` in `.env.example`. **Blocked:** broadcast to Arc — no `PRIVATE_KEY` / `.env` in this session. Do not pass `--private-key` on the CLI.
+  **Progress 2026-08-20:** `MockBtc.sol` + `MockBtc.t.sol` — 5 tests pass (`decimals==8`, name/symbol, owner mint, non-owner revert, no public faucet). `DeployMockBtc.s.sol` + `CHAKRA_MBTC_ADDRESS` in `.env.example`. **Blocked:** broadcast to Arc — no `PRIVATE_KEY` / `.env` in this session. Do not pass `--private-key` on the CLI.  
+  **Reconcile 2026-08-28:** **deployed** (live mBTC at `0xbf5a25…ECbdF` in `docs/arc-testnet-manifest.json`), **under-seeded** — live V2 mBTC pools hold dust-class reserves (~1.96e6/1962). Seed to documented sizes is operator-gated.
 
 - [ ] **T2.2** Deploy xy=k factory/pairs and seed USDC/EURC, USDC/mBTC, EURC/mBTC (30 bps)  
   **Deps:** T2.1.  
   **Validation:** Reserves readable on-chain.  
   **Tests:** V2 swap/mint/burn unit tests.  
-  **Progress 2026-08-24:** **local complete / live blocked.** Vendored v2-core `v1.0.1` → `contracts/evm/venues/uniswap-v2/` (GPL-3.0-or-later); V2 factory deployed in Foundry tests via `VendorDeployer` hex (`bytecodes/v2-factory.hex`) + `IUniswapV2Factory` 0.8.30 interface. `XykFactory.t.sol` 8/8 green. `DeployXyk.s.sol` compile-only. Live broadcast + `CHAKRA_XYK_FACTORY` blocked (no key).
+  **Progress 2026-08-24:** **local complete / live blocked.** Vendored v2-core `v1.0.1` → `contracts/evm/venues/uniswap-v2/` (GPL-3.0-or-later); V2 factory deployed in Foundry tests via `VendorDeployer` hex (`bytecodes/v2-factory.hex`) + `IUniswapV2Factory` 0.8.30 interface. `XykFactory.t.sol` 8/8 green. `DeployXyk.s.sol` compile-only. Live broadcast + `CHAKRA_XYK_FACTORY` blocked (no key).  
+  **Reconcile 2026-08-28:** **deployed, under-seeded** — USDC/EURC pair `0x201cd9…a590` holds ~1.96e6 each (**below** `MIN_XYK_RESERVE_atomic unitsS` → never quotes); USDC/mBTC `0x36b7ab…36d7` and EURC/mBTC `0x1ac3c4…8af1` hold dust. Re-seed to 10_000e6 (UE) / 50_000e6+1e8 (mBTC pairs) is operator-gated.
 
 - [ ] **T2.3** Deploy stableswap USDC/EURC (`A=100`, 4 bps), deeper than xy=k  
   **Deps:** T2.1.  
   **Validation:** Documented depth vs xy=k (feeds SC-2).  
   **Tests:** Stableswap exchange unit tests.  
   **Progress 2026-08-24:** **local complete / live blocked.** Original Apache-2.0 `src/stable/StableSwap.sol` + `StableSwapFactory.sol` (not vendored); invariant/Newton ported from `crates/dex-adapters/src/stable_math.rs`, fee **4 bps on input**, `exchange` has **no `transferFrom`** (aggregator pre-transfers). `StableSwap.t.sol` 10/10 green incl. depth test (1_000e6 on 200k stable > same swap on 10k xy=k, 20× depth). `DeployStable.s.sol` compile-only. Live broadcast + `CHAKRA_STABLE_FACTORY` blocked.
-  **Custody fix 2026-08-26 (T5.1/T2.3):** `StableSwap.t.sol` 16/16 green (10 original + 6 custody). `exchange` now uses stored reserves (`reserve0`/`reserve1`) instead of live balances; reverts `IndexOutOfRange` (i/j > 1), `InsufficientInput` (actualIn < amount), `ZeroAmount` (no deposit). `seedLiquidity` stores reserves; `removeLiquidity` decrements. `forge test -vv` 73/73. **Local complete; live blocked** — no operator key for broadcast.
+  **Custody fix 2026-08-26 (T5.1/T2.3):** `StableSwap.t.sol` 16/16 green (10 original + 6 custody). `exchange` now uses stored reserves (`reserve0`/`reserve1`) instead of live balances; reverts `IndexOutOfRange` (i/j > 1), `InsufficientInput` (actualIn < amount), `ZeroAmount` (no deposit). `seedLiquidity` stores reserves; `removeLiquidity` decrements. `forge test -vv` 73/73. **Local complete; live blocked** — no operator key for broadcast.  
+  **Reconcile 2026-08-28:** **deployed, under-seeded** — stable USDC/EURC `0xE4A881…CB02` holds ~3.92e6 each (documented target 200_000e6); 180k USDC drains the pool (`price_impact_bps: 9999`, no split). Re-seed to 200_000e6 per side is operator-gated.
 
 - [ ] **T2.4** Deploy CLMM factory/pool USDC/mBTC **30 bps required** (5 bps optional extra venue) and seed in-range liquidity  
   **Deps:** T2.1.  
   **Validation:** slot0 + liquidity on-chain for 30 bps.  
   **Tests:** CLMM in-range swap unit tests.  
-  **Progress 2026-08-24:** **local complete / live blocked.** Vendored v3-core `v1.0.0` → `contracts/evm/venues/uniswap-v3/` (**BSL 1.1**, upstream true license — plan draft's "GPL-2.0-or-later" applies to later tags); V3 pool via `VendorDeployer` hex + `IUniswapV3Pool`. `ClmmPool.t.sol` 5/5 green after two fixes: V3 `swap` interface must use **`int256 amountSpecified`** (selectors differ; all swaps reverted in opaque bytecode), and full-range position must use **L=1e12** (L=1 made oneForZero output round to 0 USDC). `createPool(USDC,mBTC,3000)` exact-in swap both directions via callback; 5 bps pool absent. `DeployClmm.s.sol` compile-only. Tight-in-range + live broadcast + `CHAKRA_CLMM_FACTORY` blocked.
+  **Progress 2026-08-24:** **local complete / live blocked.** Vendored v3-core `v1.0.0` → `contracts/evm/venues/uniswap-v3/` (**BSL 1.1**, upstream true license — plan draft's "GPL-2.0-or-later" applies to later tags); V3 pool via `VendorDeployer` hex + `IUniswapV3Pool`. `ClmmPool.t.sol` 5/5 green after two fixes: V3 `swap` interface must use **`int256 amountSpecified`** (selectors differ; all swaps reverted in opaque bytecode), and full-range position must use **L=1e12** (L=1 made oneForZero output round to 0 USDC). `createPool(USDC,mBTC,3000)` exact-in swap both directions via callback; 5 bps pool absent. `DeployClmm.s.sol` compile-only. Tight-in-range + live broadcast + `CHAKRA_CLMM_FACTORY` blocked.  
+  **Reconcile 2026-08-28:** **deployed, under-seeded / incomplete** — 30 bps pool `0xe431ff…4cb5` has tiny/incomplete ticks (skip-if-incomplete → no `chakra-clmm` edge → USDC↔mBTC `NO_ROUTE`). Tight in-range re-seed + complete tick/bitmap so Redis publish is not skipped: operator-gated.
 
 - [ ] **T2.5** Factory discovery scan  
   **Outcome:** Worker reads `CHAKRA_SEED_FACTORIES` + optional `CHAKRA_DISCOVERY_FACTORIES`. Script/adapter probes those factories for `PairCreated`/`PoolCreated`; record none-or-addresses in docs. **Do not auto-allowlist** discovered factories on the aggregator. Owner `addFactory` is required before quotes use them. Seeded venues remain canonical. Extra tokens stay out of the v1 catalog.  
   **Deps:** T2.2–T2.4.  
   **Validation:** Written scan result.  
   **Tests:** discovery parser unit tests with fixture logs.  
-  **Progress 2026-08-26 (local complete):** `scripts/discovery_scan.sh` rewritten with correct topic0s (`0x0d36...` V2 PairCreated, `0x783c...` V3 PoolCreated, `0x9c5d...` Stable PoolCreated — pinned via `cast keccak`). Type-specific topic selection per factory type (xyk/v2 → V2, clmm/v3 → V3, stable → Stable, unknown → all). Decoded output shows pool/token0/token1/fee/tickSpacing per log. RPC errors propagate (nonzero exit, no `|| echo` fallback). 8 tests in `scripts/test_discovery_scan.py` (topic correctness, type selection, RPC error exit, fixture log structure). Live scan blocked on T2.1–T2.4 addresses.
+  **Progress 2026-08-26 (local complete):** `scripts/discovery_scan.sh` rewritten with correct topic0s (`0x0d36...` V2 PairCreated, `0x783c...` V3 PoolCreated, `0x9c5d...` Stable PoolCreated — pinned via `cast keccak`). Type-specific topic selection per factory type (xyk/v2 → V2, clmm/v3 → V3, stable → Stable, unknown → all). Decoded output shows pool/token0/token1/fee/tickSpacing per log. RPC errors propagate (nonzero exit, no `|| echo` fallback). 8 tests in `scripts/test_discovery_scan.py` (topic correctness, type selection, RPC error exit, fixture log structure). Live scan blocked on T2.1–T2.4 addresses.  
+  **Scan result 2026-08-28 (live RPC probes):** **XyloNet** stableswap — real USDC/EURC pool (`0x3DF3966F…BB1`, factory `0x60EDeFB0…9e2`), ~9.2M USDC / 0.61M EURC, A=200, 4 bps fee-on-output, but **ABI-incompatible** with the Chakra stable hop (`swap` pulls via `transferFrom`; no `exchange`) → routed as **T-XYLO** (new `DexType.Xylo`), not T2.5. **REARC** Uni V2 USDC/EURC pair `0xf1075e89…17F1` (~231/162) — **optional** same-`DexType.Xyk` allowlist (owner `addFactory`); not auto-added. **AchSwap V2** below `MIN_XYK`; **UnitFlow V3** empty + callback renamed `unitFlowV3SwapCallback`; **Lunex** drained; **official Uniswap** absent on testnet; **no organic mBTC pool** anywhere. Full table in the execute plan (2026-08-28).
 
 ### M3 — Worker + Redis
 
@@ -167,14 +172,22 @@ Each task: **outcome**, **deps**, **validation**, **tests**. Status: not started
   **Validation:** Load a worker-shaped production snapshot in which CLMM exists only in `clmm_pool_refs`; quote the CLMM venue, enforce exact factory membership, then build with the preserved fee.  
   **Tests:** Production snapshot-loader regression; 30/5 bps fee propagation; same-source allowed/denied factories; no quote-to-build topology loss.  
   **Done 2026-08-28 (local):** `BuildTxStep.fee_bps: Option<u32>`; `validate_hop` checks submitted fee vs snapshot `ClmmPoolRefSnapshot.fee_bps`; encoder uses step fee, falls back to `step_fee_bps()`. 3 CLMM fee tests: wrong fee rejected, correct fee accepted, encoded fee matches step.  
-  **Remainder (out of batch):** omit-fee encoding should take the snapshot fee (currently venue default); 5 bps encode test.
+  **Remainder (out of batch):** omit-fee encoding should take the snapshot fee (currently venue default); 5 bps encode test.  
+  **Done 2026-08-28 (remainder):** omitted `fee_bps` now encodes the **snapshot** CLMM fee (not the venue default) via `encode_sub_route(snapshot)`; 5 bps tier is representable end-to-end — `build_tx_omit_fee_encodes_snapshot_clmm_fee_not_default` (omitted fee → 5) and `build_tx_encodes_and_validates_5bps_clmm_tier` (explicit 5 accepted/encoded; 30 rejected). Production `build_engine_from_snapshot` consumes `clmm_pool_refs` (T4.3 reconciliation) so the live CLMM venue survives worker → snapshot → engine.
 
 - [ ] **T4.7** Make route metadata explicit and validate exact hop identity (REOPENED 2026-08-28)  
   **Outcome:** Quote output carries per-hop DEX type and fee metadata rather than requiring UI/SDK source-string heuristics. `/build_tx` verifies that every submitted hop's token pair, DEX type, factory, and fee match the referenced snapshot pool before producing calldata.  
   **Deps:** T4.4, T4.6, T7.1.  
   **Validation:** UI and SDK pass through server-owned route metadata without reconstructing it; invalid token/type/factory/fee combinations return `ROUTE_INVALID`.  
   **Tests:** Mismatched pool tokens, wrong DEX type, wrong fee tier, same-source/different-factory, and valid xyk/stable/CLMM routes.  
-  **Status:** **REOPENED (out of batch).** `/build_tx` validates dex_type/tokens/factory/fee against the snapshot (T4.4/T4.6 work), but the quote response still emits `SubRouteData.source = sources.join(" → ")` with no `dex_types[]`/fee/factory fields, and the UI/SDK still `split(" → ")`. The 2026-08-28 "done" claim in earlier headers was false and has been reverted.
+  **Status:** **DONE 2026-08-28 (local).** `Path` carries per-hop `dex_types[]`/`fee_bps[]`/`factories[]` (graph edges → path finder → quote); `SubRouteData` emits `dex_types`, `hop_fees`, `hop_factories` (length == `pool_addresses`); SDK + UI `quoteSubRoutesToSteps` consume server fields with a short joined-source deprecation path; `BuildTxCodeSample` + `qa.wallet` spec use `dex_types`; OpenAPI + `docs/api-reference.md` document the shape (extensible — `xylo` allowed without reopening). `/build_tx` exact hop identity (tokens/dex type/factory/fee) was already in place (T4.4/T4.6). Tests: API integration `quote_emits_explicit_per_hop_dex_type_fee_factory`, engine `test_paths_carry_per_hop_dex_type_fee_factory`, SDK mapper (server-precedence + legacy fallback + fee passthrough).
+
+- [ ] **T-XYLO** Scoped XyloNet hop (local code done 2026-08-28; live redeploy operator-gated)  
+  **Outcome:** XyloNet USDC/EURC (`0x3DF3966F…BB1`, factory `0x60EDeFB0…9e2`, A=200, 4 bps fee-on-output, `swap` pulls via `transferFrom`) as a scoped v1 hop. New `DexType.Xylo` (enum value 3, appended). Aggregator redeploy (bytecode change) + owner `addFactory(xylo)` required before on-chain execution.  
+  **Deps:** T4.7 (done), T5.1.  
+  **Validation:** Live `/api/v1/quote` 1e6 USDC→EURC still prefers `chakra-stable`; a Chakra-capacity size routes `dex_types: ["xylo"]`; no USDC→mBTC via Xylo.  
+  **Tests:** Foundry 5 new Aggregator tests (approve+`swap` happy path with allowance reset, unknown factory reverts, USYC pool never matches, not usable as Stable hop, `removeFactory` gates); `xylo_quote` pinned to live **same-block** `calculateSwap` vectors (865542/1154419); engine small-size prefers chakra-stable (999599), capacity-size routes xylo.  
+  **Progress 2026-08-28 (local complete):** `IXyloNet.sol` interface; `Aggregator.sol` `DexType.Xylo` + `_xyloOut` (forceApprove → `swap(..., address(this), block.timestamp)` → allowance reset) + `_assertPool` Xylo arm (`getPool(address,address)`); `MockXylo.sol` test double (constructor-pull gotcha: the pool's `msg.sender` during CREATE is itself — the factory forwards seed balances); Foundry 81/81. Rust: `evm_quote_math::xylo_quote` (exact `_getD`/`_getY` port incl. raw-amp ann=40000 and `A_PRECISION` c/b terms) pinned to same-block RPC vectors; worker `EvmXylo` task + `fetch_xylo_state` (stored reserves, A=200) + factory parse `xylo`; QuoteEngine `local_xylo_quote` dispatch + hydrate stable-bucket collection; `build_tx` `DexType::Xylo` (u8 3, fee 4); SDK/UI mapper `venueToDexType` handles `xylo`. **Live:** aggregator redeploy, Xylo factory allowlist, worker factory config, and hosted smoke — operator-gated.
 
 ### M5 — Aggregator
 
@@ -190,7 +203,8 @@ Each task: **outcome**, **deps**, **validation**, **tests**. Status: not started
   **Outcome:** Broadcast via Foundry script + env/keystore on **public** `CHAKRA_RPC_HTTP`. Do **not** pass `--private-key` as a CLI flag in CI or hosted deploy (`use-arc` security rule). Do **not** use Canteen `$RPC`. Operator may use `~/.arc-canteen/wallet.yaml` locally only.  
   **Deps:** T5.1.  
   **Validation:** Arcscan contract; owner pause.  
-  **Tests:** Manual pause/unpause.
+  **Tests:** Manual pause/unpause.  
+  **Status 2026-08-28:** aggregator `0xA59ad3…a569` is deployed and used by the hosted API (T8.1). **T-XYLO changed the bytecode** (new `DexType.Xylo` + `_xyloOut`): the aggregator must be **redeployed** and the Xylo factory allowlisted (`addFactory(xylo, DexType.Xylo)`) before `xylo` hops can execute on-chain — operator-gated. `DeployAggregator.s.sol` gained `CHAKRA_XYLO_FACTORY`.
 
 ### M6 — Swap UI
 
@@ -213,7 +227,8 @@ Each task: **outcome**, **deps**, **validation**, **tests**. Status: not started
   **Validation:** Live testnet swap.  
   **Tests:** Feeds SC-3; MetaMask harness T9.4.
   **Progress 2026-08-26:** Recent swaps, unaudited acknowledgement, paused-envelope handling, fee helpers, and `waitForTransactionReceipt(1)` are implemented; the frontend suite is 53/53 green. Keep T6.3 open for correctness as well as the live test. `SwapCard` builds ERC-20 approval calldata with the token address in the spender word instead of `required_approvals[].spender` (Permit2). Signature splicing is coupled to the invalid `0xcc03a3bc`/zero-PermitSingle layout described in T4.4. Correct the approval/send path and add a transaction-level integration test before the T5.2-dependent live swap.
-  **Reconciliation 2026-08-27:** The approval spender, selector, and six-word PermitSingle splice are fixed, but T6.3 remains in progress. Frontend `typecheck`/`build` fail because `qa.wallet.config.ts` uses unsupported `use.screenshotDir` and `SwapCard` treats an unresolved `gasPriceWei` (`undefined`) as usable; the MAX path can multiply `undefined * bigint` at runtime. `fetchSuggestedFee` also treats the priority reward alone as `maxFeePerGas`, omitting the base fee. Restore the release build, use a valid base-plus-priority (or gas-price) total with the 20 gwei floor, and add transaction-level coverage after T4.4/T4.6/T4.7.
+  **Reconciliation 2026-08-27:** The approval spender, selector, and six-word PermitSingle splice are fixed, but T6.3 remains in progress. Frontend `typecheck`/`build` fail because `qa.wallet.config.ts` uses unsupported `use.screenshotDir` and `SwapCard` treats an unresolved `gasPriceWei` (`undefined`) as usable; the MAX path can multiply `undefined * bigint` at runtime. `fetchSuggestedFee` also treats the priority reward alone as `maxFeePerGas`, omitting the base fee. Restore the release build, use a valid base-plus-priority (or gas-price) total with the 20 gwei floor, and add transaction-level coverage after T4.4/T4.6/T4.7.  
+  **Reconcile 2026-08-28:** **local release gates green.** `npm test` now pins `NODE_ENV=development` (the session shell exports `NODE_ENV=production`, which loads react's production build where `React.act` is absent — testing-library's `renderHook` crashed). `fetchSuggestedFee` returns **base + priority** (was priority-only) with `eth_gasPrice` fallback and the 20 gwei floor — 3 new tests. `encodeApproveCalldata` transaction-level test pins the spender = Permit2 (not the token). Frontend 66/66, `tsc` clean, `npm run build` exit 0, lint 0 problems. Live Arc send remains T5.2/operator-gated.
 
 ### M7 — SDK + docs
 
@@ -228,7 +243,8 @@ Each task: **outcome**, **deps**, **validation**, **tests**. Status: not started
   **Validation:** Walkthrough followed from a clean clone.  
   **Tests:** SC-9.  
   **Progress 2026-08-26:** The rewritten guide and `local_harness` provide a reproducible SDK/API smoke: quote and build requests complete locally. This is not yet SC-6/SC-9 acceptance evidence because the harness intentionally mirrors the invalid T4.4 selector and two-argument Permit2 allowance mock, the guide's earlier code sample contains an EURC address that differs from the frozen catalog, and no clean-clone timed walkthrough is recorded. Correct those items, rerun from a clean clone, and later repeat against T8.1 for the public requirement.
-  **Reconciliation 2026-08-27:** EURC, selector, and Permit2 fixture drift are corrected, but the local harness is not green: `local_harness.rs` still constructs the removed `AppState.engine` field and fails under `cargo run -p api-server --example local_harness --features test-fixture`. Repair the example against the current state constructor, prove local quote + canonical build, then record the clean-clone timed walkthrough.
+  **Reconciliation 2026-08-27:** EURC, selector, and Permit2 fixture drift are corrected, but the local harness is not green: `local_harness.rs` still constructs the removed `AppState.engine` field and fails under `cargo run -p api-server --example local_harness --features test-fixture`. Repair the example against the current state constructor, prove local quote + canonical build, then record the clean-clone timed walkthrough.  
+  **Reconcile 2026-08-28:** **local harness green.** `local_harness.rs` builds and serves against the current `AppState::from_backends` (fixture RPC now answers the real `0xdd62ed3e` ERC-20 allowance selector — the missing arm broke `/build_tx`). Full SDK walkthrough against the harness completes: quote with T4.7 `dexTypes`/`hopFees` → `buildTx` → calldata (`0x2e3be0c1`), Permit2 typed data, `required_approvals`. Clean-clone timed walkthrough (SC-6/SC-9) and the hosted repeat stay open.
 
 ### M8 — Public deploy
 

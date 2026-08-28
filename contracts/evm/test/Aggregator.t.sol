@@ -15,6 +15,7 @@ import {IUniswapV3Factory} from "../src/interfaces/IUniswapV3Factory.sol";
 import {IUniswapV3Pool} from "../src/interfaces/IUniswapV3Pool.sol";
 import {StableSwapFactory} from "../src/stable/StableSwapFactory.sol";
 import {StableSwap} from "../src/stable/StableSwap.sol";
+import {MockXyloFactory, MockXyloPool} from "../src/MockXylo.sol";
 import {IAllowanceTransfer} from "../src/interfaces/IAllowanceTransfer.sol";
 
 /// @notice T5.1 — Aggregator splitSwap: pause, validation, ETH, factory allowlist,
@@ -33,6 +34,7 @@ contract AggregatorTest is Test, VendorDeployer {
     IUniswapV2Factory internal xykFactory;
     StableSwapFactory internal stableFactory;
     IUniswapV3Factory internal clmmFactory;
+    MockXyloFactory internal xyloFactory;
 
     uint256 internal constant XYK_SEED = 10_000e6;
     uint256 internal constant STABLE_SEED = 200_000e6;
@@ -70,6 +72,7 @@ contract AggregatorTest is Test, VendorDeployer {
         stableFactory = new StableSwapFactory();
         address clmmAddr = _deployFromHexFile("bytecodes/v3-factory.hex");
         clmmFactory = IUniswapV3Factory(clmmAddr);
+        xyloFactory = new MockXyloFactory();
     }
 
     /// @dev V3 pool calls back the minter with the owed amounts (T2.4 fixture).
@@ -624,6 +627,148 @@ contract AggregatorTest is Test, VendorDeployer {
         vm.prank(user);
         vm.expectRevert(abi.encodeWithSelector(Ownable.OwnableUnauthorizedAccount.selector, user));
         agg.rescueTokens(address(usdc), alice, 100e6);
+    }
+
+    // ─── 10b. Xylo hop (T-XYLO) ────────────────────────────────
+
+    /// @dev Seed a catalog USDC/EURC Xylo pool (deep, off-peg reserves like
+    ///      the live venue), allowlist the Xylo factory, fund the user, and
+    ///      return the pool + the venue-only output (fee on output, 4 bps).
+    function _prepareXyloSwap(uint256 amountIn)
+        internal
+        returns (MockXyloPool pool, uint256 expectedOut)
+    {
+        // Live XyloNet shape: ~9.3M USDC / ~0.6M EURC stored reserves.
+        uint256 r0 = 9_323_185e6;
+        uint256 r1 = 613_516e6;
+        // Mint the seed to this test (the factory pulls it into the pool).
+        usdc.mint(address(this), r0);
+        eurc.mint(address(this), r1);
+        usdc.approve(address(xyloFactory), type(uint256).max);
+        eurc.approve(address(xyloFactory), type(uint256).max);
+        address poolAddr = xyloFactory.createPool(address(usdc), address(eurc), r0, r1);
+        agg.addFactory(address(xyloFactory), Aggregator.DexType.Xylo);
+
+        pool = MockXyloPool(poolAddr);
+        uint256 reserveIn = pool.token0() == address(usdc) ? r0 : r1;
+        uint256 reserveOut = pool.token0() == address(usdc) ? r1 : r0;
+        uint256 gross = (amountIn * reserveOut) / (reserveIn + amountIn);
+        expectedOut = gross - (gross * 4) / 10_000;
+
+        _fundUser(address(usdc), amountIn);
+        _userApproveMockPermit2(address(usdc), type(uint256).max);
+        _grantMockAllowance(address(usdc), uint160(amountIn));
+    }
+
+    /// @dev T-XYLO happy path: approve + `swap(...)` with `to = aggregator`.
+    function test_xylo_hop_succeeds_via_transferfrom_swap() public {
+        (MockXyloPool pool, uint256 expectedOut) = _prepareXyloSwap(1000e6);
+
+        Aggregator.Hop memory h =
+            _hop(address(pool), Aggregator.DexType.Xylo, address(usdc), address(eurc));
+        Aggregator.SubRoute[] memory routes = _singleHopRoute(h, 1000e6);
+
+        vm.prank(user);
+        uint256 amountOut = agg.splitSwap(
+            address(usdc), address(eurc), 1000e6, expectedOut, block.timestamp, routes, _emptyPermit()
+        );
+
+        assertEq(amountOut, expectedOut, "venue-only Xylo math violated");
+        assertEq(eurc.balanceOf(user), expectedOut, "user did not receive output");
+        assertEq(pool.swapCount(), 1, "Xylo swap must have executed");
+        // The aggregator's approval to the pool is reset to 0 (no dangling allowance).
+        assertEq(usdc.allowance(address(agg), address(pool)), 0, "allowance must reset to 0");
+        _assertCatalogZero();
+    }
+
+    /// @dev T-XYLO: an unknown Xylo factory (not allowlisted) reverts.
+    function test_xylo_hop_unknown_factory_reverts() public {
+        MockXyloFactory rogueFactory = new MockXyloFactory();
+        usdc.mint(address(this), 1e6);
+        eurc.mint(address(this), 1e6);
+        usdc.approve(address(rogueFactory), type(uint256).max);
+        eurc.approve(address(rogueFactory), type(uint256).max);
+        address roguePool = rogueFactory.createPool(address(usdc), address(eurc), 1e6, 1e6);
+        agg.addFactory(address(xyloFactory), Aggregator.DexType.Xylo);
+
+        Aggregator.Hop memory h =
+            _hop(roguePool, Aggregator.DexType.Xylo, address(usdc), address(eurc));
+        Aggregator.SubRoute[] memory routes = _singleHopRoute(h, 100e6);
+        vm.expectRevert(Aggregator.PoolNotFromFactory.selector);
+        agg.splitSwap(
+            address(usdc), address(eurc), 100e6, 0, block.timestamp, routes, _emptyPermit()
+        );
+    }
+
+    /// @dev T-XYLO: a pool created by the allowlisted factory but for the
+    ///      wrong pair (e.g. USDC/USYC — out of catalog) never matches a
+    ///      catalog hop.
+    function test_xylo_usyc_pool_never_matches_catalog_hop() public {
+        address usyc = address(0xCC205224862C7641930c87679E98999d23C26113);
+        MockErc20 usycToken = new MockErc20("USYC", "USYC");
+        usdc.mint(address(this), 1e6);
+        usycToken.mint(address(this), 1e6);
+        usdc.approve(address(xyloFactory), type(uint256).max);
+        usycToken.approve(address(xyloFactory), type(uint256).max);
+        address usycPool = xyloFactory.createPool(address(usdc), address(usycToken), 1e6, 1e6);
+        agg.addFactory(address(xyloFactory), Aggregator.DexType.Xylo);
+        // Clean up the 1 USDC seed so the catalog-zero invariant stays valid
+        // (the pool holds USDC out of the aggregator's reach, but the test
+        // contract's approval is spent — the pool balance is irrelevant to
+        // the aggregator).
+        vm.prank(address(this));
+        usdc.approve(address(xyloFactory), 0);
+        vm.prank(address(this));
+        usycToken.approve(address(xyloFactory), 0);
+
+        Aggregator.Hop memory h =
+            _hop(usycPool, Aggregator.DexType.Xylo, address(usdc), address(eurc));
+        Aggregator.SubRoute[] memory routes = _singleHopRoute(h, 100e6);
+        vm.expectRevert(Aggregator.PoolNotFromFactory.selector);
+        agg.splitSwap(
+            address(usdc), address(eurc), 100e6, 0, block.timestamp, routes, _emptyPermit()
+        );
+    }
+
+    /// @dev T-XYLO: the aggregator must NOT call `exchange(i,j)` on a Xylo
+    ///      pool (different ABI). Routing a Xylo pool as `DexType.Stable`
+    ///      fails the factory membership (Xylo factory is allowlisted as
+    ///      Xylo only) — `exchange` is never reached.
+    function test_xylo_pool_not_usable_as_stable_hop() public {
+        usdc.mint(address(this), 9_323_185e6);
+        eurc.mint(address(this), 613_516e6);
+        usdc.approve(address(xyloFactory), type(uint256).max);
+        eurc.approve(address(xyloFactory), type(uint256).max);
+        address poolAddr = xyloFactory.createPool(address(usdc), address(eurc), 9_323_185e6, 613_516e6);
+        agg.addFactory(address(xyloFactory), Aggregator.DexType.Xylo);
+
+        // Xylo factory is NOT allowlisted as Stable → PoolNotFromFactory.
+        Aggregator.Hop memory h =
+            _hop(poolAddr, Aggregator.DexType.Stable, address(usdc), address(eurc));
+        Aggregator.SubRoute[] memory routes = _singleHopRoute(h, 1000e6);
+        vm.expectRevert(Aggregator.PoolNotFromFactory.selector);
+        agg.splitSwap(
+            address(usdc), address(eurc), 1000e6, 0, block.timestamp, routes, _emptyPermit()
+        );
+    }
+
+    /// @dev T-XYLO: `removeFactory` gates Xylo hops like every other venue.
+    function test_removeFactory_gates_xylo_hops() public {
+        usdc.mint(address(this), 9_323_185e6);
+        eurc.mint(address(this), 613_516e6);
+        usdc.approve(address(xyloFactory), type(uint256).max);
+        eurc.approve(address(xyloFactory), type(uint256).max);
+        address poolAddr = xyloFactory.createPool(address(usdc), address(eurc), 9_323_185e6, 613_516e6);
+        agg.addFactory(address(xyloFactory), Aggregator.DexType.Xylo);
+        agg.removeFactory(address(xyloFactory));
+
+        Aggregator.Hop memory h =
+            _hop(poolAddr, Aggregator.DexType.Xylo, address(usdc), address(eurc));
+        Aggregator.SubRoute[] memory routes = _singleHopRoute(h, 1000e6);
+        vm.expectRevert(Aggregator.PoolNotFromFactory.selector);
+        agg.splitSwap(
+            address(usdc), address(eurc), 1000e6, 0, block.timestamp, routes, _emptyPermit()
+        );
     }
 
     // ─── 12. Never-call table ─────────────────────────────────

@@ -1,15 +1,66 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi, afterEach } from 'vitest';
 import {
   minFeePerGas,
   buildSendParams,
   isPausedEnvelope,
   isChainAllowed,
   spliceSignature,
+  fetchSuggestedFee,
+  encodeApproveCalldata,
   ARC_CHAIN_ID,
   MIN_FEE_PER_GAS_WEI,
 } from './swap-send';
 
+afterEach(() => {
+  vi.unstubAllGlobals();
+});
+
 describe('swap-send', () => {
+  describe('fetchSuggestedFee', () => {
+    it('returns base + priority from eth_feeHistory', async () => {
+      vi.stubGlobal(
+        'fetch',
+        vi.fn(async () => ({
+          ok: true,
+          status: 200,
+          json: async () => ({
+            jsonrpc: '2.0',
+            id: 1,
+            result: {
+              baseFeePerGas: ['0x0', '0x3b9aca00'], // 1 gwei
+              reward: [['0x77359400']], // 2 gwei tip
+            },
+          }),
+        })),
+      );
+      await expect(fetchSuggestedFee()).resolves.toBe(BigInt(3e9));
+    });
+
+    it('falls back to eth_gasPrice when feeHistory has no data', async () => {
+      const calls: string[] = [];
+      vi.stubGlobal(
+        'fetch',
+        vi.fn(async (_url: string, init?: RequestInit) => {
+          const body = JSON.parse(String(init?.body));
+          calls.push(body.method);
+          if (body.method === 'eth_feeHistory') {
+            return { ok: true, status: 200, json: async () => ({ jsonrpc: '2.0', result: null }) };
+          }
+          return { ok: true, status: 200, json: async () => ({ jsonrpc: '2.0', result: '0x4a817c800' }) }; // 20 gwei
+        }),
+      );
+      await expect(fetchSuggestedFee()).resolves.toBe(BigInt(20e9));
+      expect(calls).toEqual(['eth_feeHistory', 'eth_gasPrice']);
+    });
+
+    it('returns the 20 gwei floor when RPC is down', async () => {
+      vi.stubGlobal('fetch', vi.fn(async () => {
+        throw new Error('network down');
+      }));
+      await expect(fetchSuggestedFee()).resolves.toBe(MIN_FEE_PER_GAS_WEI);
+    });
+  });
+
   describe('minFeePerGas', () => {
     it('returns MIN_FEE_PER_GAS_WEI when suggested is lower', () => {
       expect(minFeePerGas(BigInt(1e9))).toBe(MIN_FEE_PER_GAS_WEI);
@@ -156,6 +207,23 @@ describe('swap-send', () => {
     it('returns original when selector is wrong', () => {
       const data = '0xdeadbeef' + '00'.repeat(200);
       expect(spliceSignature(data, '0x' + 'ab'.repeat(65))).toBe(data);
+    });
+  });
+
+  describe('approve spender (T6.3 transaction-level)', () => {
+    const PERMIT2 = '0x000000000022d473030f116ddee9f6b43ac78ba3';
+
+    it('encodes approve(Permit2, amount) — spender is Permit2, not the token', () => {
+      const calldata = encodeApproveCalldata('1000000');
+      // selector 095ea7b3 + spender word (Permit2, right-aligned) + amount.
+      expect(calldata.startsWith('0x095ea7b3')).toBe(true);
+      const body = calldata.slice(10);
+      const spenderWord = body.slice(24, 64);
+      expect(spenderWord).toBe(PERMIT2.slice(2).toLowerCase());
+      const amountWord = body.slice(64, 128);
+      expect(amountWord).toBe(BigInt(1000000).toString(16).padStart(64, '0'));
+      // The token address must NOT appear in the spender word.
+      expect(spenderWord).not.toBe('3600000000000000000000000000000000000000');
     });
   });
 });

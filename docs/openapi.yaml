@@ -340,6 +340,7 @@ components:
       properties:
         source:
           type: string
+          description: Joined per-hop source ids (legacy display; do not parse for DEX type)
           example: chakra-stable
         path:
           type: array
@@ -349,6 +350,25 @@ components:
           type: array
           items:
             type: string
+        dex_types:
+          type: array
+          description: 'Per-hop DEX type — server-owned hop identity (T4.7). Length == pool_addresses.'
+          items:
+            type: string
+            enum: [xyk, stable, clmm, xylo]
+          example: [stable]
+        hop_fees:
+          type: array
+          description: Per-hop venue fee in bps (T4.7). Length == pool_addresses.
+          items:
+            type: integer
+          example: [4]
+        hop_factories:
+          type: array
+          description: Per-hop allowlisted factory address; '' = legacy pool (T4.7).
+          items:
+            type: string
+          example: ['']
         amount_in:
           type: string
         amount_out:
@@ -404,13 +424,17 @@ components:
       properties:
         dex_type:
           type: string
-          enum: [xyk, stable, clmm]
+          enum: [xyk, stable, clmm, xylo]
         pool_address:
           type: string
         token_in:
           type: string
         token_out:
           type: string
+        fee_bps:
+          type: integer
+          description: Per-hop fee in bps from the quote snapshot (T4.6). Omit → venue default (xyk/clmm 30, stable 4).
+          example: 4
     EnvelopeBuildTx:
       type: object
       properties:
@@ -469,6 +493,9 @@ components:
                 - '0x89b50855aa3be2f677cd6303cec089b5f319d72a'
               pool_addresses:
                 - '0x0000000000000000000000000000000000000002'
+              dex_types: [stable]
+              hop_fees: [4]
+              hop_factories: ['']
               amount_in: '100000000'
               amount_out: '99955053'
               fraction_bps: 10000
@@ -500,6 +527,9 @@ components:
                 - '0x89b50855aa3be2f677cd6303cec089b5f319d72a'
               pool_addresses:
                 - '0x0000000000000000000000000000000000000001'
+              dex_types: [xyk]
+              hop_fees: [30]
+              hop_factories: ['']
               amount_in: '70000000'
               amount_out: '69950917'
               fraction_bps: 7000
@@ -509,6 +539,9 @@ components:
                 - '0x89b50855aa3be2f677cd6303cec089b5f319d72a'
               pool_addresses:
                 - '0x0000000000000000000000000000000000000002'
+              dex_types: [stable]
+              hop_fees: [4]
+              hop_factories: ['']
               amount_in: '30000000'
               amount_out: '30004200'
               fraction_bps: 3000

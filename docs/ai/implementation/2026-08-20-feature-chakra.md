@@ -416,6 +416,55 @@ Everything runs on fixture RPC/WS servers and a **memory store** in tests (SC-11
 4. Replace the API-only wallet spec with the locked MetaMask critical path; correct the total fee suggestion.
 5. Rerun Phase 7. Only after local alignment should Phase 8 and the live/evidence gates proceed.
 
+## Phase 5 execute batch (2026-08-28)
+
+### T4.7 — explicit quote hop metadata (done)
+
+- `router_engine::types::Path` gained per-hop `dex_types[]` / `fee_bps[]` / `factories[]` (serde-defaulted); `TokenGraph::Edge` carries `dex_type` + `factory`; `add_pair_meta` added (legacy `add_pair` keeps empty metadata). `TradingPair` gained `dex_type`.
+- `pairs_from_chakra_snapshot` stamps `dex_type` from the snapshot (source-derived fallback for legacy JSON); `snapshot_loader::snapshot_pair_to_trading` same; CLMM refs always `clmm`.
+- `SubRouteData` now emits `dex_types`, `hop_fees`, `hop_factories` (length == `pool_addresses`); `source` stays as a joined display string (deprecated for DEX inference).
+- SDK + UI `quoteSubRoutesToSteps`: server `dexTypes` takes precedence; joined-source fallback for in-flight clients; `fee_bps` carried into `BuildTxStep` so `/build_tx` encodes the snapshot fee. `venueToDexType` understands `xylo`.
+- `BuildTxCodeSample.tsx` and `qa/wallet/swap-critical-path.spec.ts` now consume `dex_types[]`/`hop_fees[]`.
+- OpenAPI `SubRoute`/`BuildTxStep` schemas + `docs/api-reference.md` "Quote hop metadata (T4.7)" section; `dex_types` enum includes `xylo` (schema extensible without reopening).
+- Tests: graph `test_paths_carry_per_hop_dex_type_fee_factory` / `test_legacy_edges_yield_empty_hop_metadata`; API `quote_emits_explicit_per_hop_dex_type_fee_factory` (stable/x yk/xyk legs, lengths, fees); SDK mapper tests (server-precedence, legacy fallback, fee passthrough).
+
+### T4.6 remainder — snapshot-fee encoding + 5 bps tier (done)
+
+- `encode_sub_route` now takes the snapshot: omitted `fee_bps` resolves **snapshot** fee first, then the venue default. `encode_split_swap` and `build_tx_data` thread the loaded snapshot through.
+- 5 bps CLMM tier is representable end-to-end: `build_tx_omit_fee_encodes_snapshot_clmm_fee_not_default` (omitted → encodes 5, not 30) and `build_tx_encodes_and_validates_5bps_clmm_tier` (explicit 5 accepted/encoded; 30 rejected vs the 5 bps snapshot).
+- Production `build_engine_from_snapshot` already consumes `clmm_pool_refs` (T4.3 reconciliation) — CLMM topology survives worker → snapshot → engine.
+
+### T6.3 local release gates (done)
+
+- `package.json` test script pins `NODE_ENV=development` — the session shell exports `NODE_ENV=production`, which loads react's production build (no `React.act`); testing-library `renderHook` crashed with `React.act is not a function` under production. With the pin: 66/66 tests.
+- `fetchSuggestedFee`: **base + priority** from `eth_feeHistory` (was priority-only), `eth_gasPrice` fallback, 20 gwei floor — 3 new tests.
+- Transaction-level `encodeApproveCalldata` test pins spender = Permit2 (not the token).
+- Frontend `tsc` clean, `npm run build` exit 0, lint 0 problems. `qa.wallet.config.ts` screenshotDir issue did not reproduce (no `use.screenshotDir` in the config — the earlier finding was resolved by the config rewrite).
+
+### T7.2 local harness (done)
+
+- `local_harness.rs` fixture RPC gained the real ERC-20 `0xdd62ed3e` allowance arm (and the 3-word zeroed Permit2 allowance) — `/build_tx` previously failed with `unexpected eth_call selector 0xdd62ed3e`.
+- Full SDK walkthrough against the harness: quote (T4.7 `dexTypes`/`hopFees`) → `buildTx` → calldata `0x2e3be0c1`, Permit2 typed data, `required_approvals`. Clean-clone timed walkthrough remains open (SC-6/SC-9).
+
+### T-XYLO — scoped XyloNet hop (local code done; live redeploy operator-gated)
+
+- **Solidity:** `interfaces/IXyloNet.sol` (`IXyloFactory.getPool(address,address)`, `IXyloPool.swap(tokenIn,tokenOut,amountIn,minOut,to,deadline)`); `Aggregator.sol` — `DexType.Xylo` appended (value 3), `_assertPool` Xylo arm, `_xyloOut` (forceApprove → `swap(..., address(this), block.timestamp)` → allowance reset to 0). `MockXylo.sol` test double; **gotcha**: during `createPool` the pool constructor's `msg.sender` is itself, so the factory forwards seed balances after CREATE.
+- **Foundry:** 5 new Aggregator tests (happy path + allowance reset, unknown factory, USYC pool never matches, not usable as Stable hop, removeFactory gates) — 81/81 total.
+- **Quote math:** `evm_quote_math::xylo_quote`/`xylo_gross` — exact `_getD`/`_getY` port from `Panchu11/xylonet-public` (raw amp ann=40000, `A_PRECISION=100` in the c/b terms, per-coin `dP` loop, `dy - 1`, 4 bps fee on output). Pinned to **same-block** live RPC vectors (getReserves + amp + both `calculateSwap` in one batch): 1e6 USDC→EURC 865542 (Rust 865543), 1e6 EURC→USDC 1154419 (Rust 1154420) — ±1 unit.
+- **Worker:** `FetchTask::EvmXylo` + `coalesce` (`xylo`/`discovered:xylo`) + `fetch_xylo_state` (getReserves → stored reserves, A=200, fee 4); `FactoryConfig::parse` accepts `xylo`; `discover_once` Xylo arm (catalog pairs only — USDC/USYC never discovered).
+- **Engine/API:** `local_xylo_quote` dispatch (`source == "xylo"`, stable bucket state); `hydrate.rs` collects `xylo` into the stable refs; `build_tx` `DexType::Xylo` (u8 3, fee 4, factory source `xylo`).
+- **Router behavior tests:** small size (1e6) prefers `chakra-stable` (999599); Chakra-capacity size (4.5e6 USDC) routes `xylo` (deeper A=200 curve).
+- **Operator-gated live steps:** aggregator redeploy (bytecode change), `addFactory(xylo)`, worker `CHAKRA_*` factory config, hosted smoke. `DeployAggregator.s.sol` gained `CHAKRA_XYLO_FACTORY`.
+
+### Fresh verification (2026-08-28, nested repo)
+
+- `cargo test -p market-snapshot -p market-data-worker -p router-engine -p api-server --lib --tests`: **153 tests, 0 failed** (17+12+14+11+10+17+36+48 across suites; api-server integration incl. build_tx 14).
+- `cargo test -p dex-adapters --lib evm_quote_math`: **8 passed** (xylo vector pins + guards).
+- `forge test` (contracts/evm): **81 passed / 0 failed** (Aggregator 45 incl. 5 Xylo, Stable 16, Xyk 8, Clmm 5, MockBtc 5, MockXylo 2).
+- `cargo fmt --all` clean; `npx ai-devkit@latest lint --feature chakra`: **passed** (only the pre-existing `feature-chakra` branch-name check misses — the nested repo tracks `main` per the worktree layout).
+- SDK: 14 tests + build. Frontend: **66 tests**, `tsc` clean, `npm run build` exit 0, lint 0 problems.
+- Full workspace `cargo test --workspace` still fails to compile the legacy Arc bins/tests (`dex-adapters/src/bin/*`, `tests/Arc venue_3token_stableswap.rs`) — pre-existing excluded targets (Arc compile strip; the documented gate is the kept-crate set above).
+
 ## Evidence
 
 ### Phase 7 fresh verification (2026-08-27)

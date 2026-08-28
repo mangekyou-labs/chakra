@@ -41,6 +41,9 @@ pub enum DexType {
     Xyk,
     Stable,
     Clmm,
+    /// XyloNet stableswap (T-XYLO) — appended, never inserted (on-chain enum
+    /// values must stay stable).
+    Xylo,
 }
 
 impl DexType {
@@ -49,6 +52,7 @@ impl DexType {
             "xyk" => Some(Self::Xyk),
             "stable" => Some(Self::Stable),
             "clmm" => Some(Self::Clmm),
+            "xylo" => Some(Self::Xylo),
             _ => None,
         }
     }
@@ -58,6 +62,7 @@ impl DexType {
             Self::Xyk => 0,
             Self::Stable => 1,
             Self::Clmm => 2,
+            Self::Xylo => 3,
         }
     }
 }
@@ -74,14 +79,18 @@ fn encode_hop(step: &BuildTxStep, dex_type: DexType, fee_bps: u32) -> Result<Vec
 }
 
 /// One `SubRoute { uint256 amountIn; Hop[] hops; }`.
-fn encode_sub_route(sub: &BuildTxSubRoute) -> Result<Vec<u8>> {
+fn encode_sub_route(sub: &BuildTxSubRoute, snapshot: &MarketSnapshot) -> Result<Vec<u8>> {
     let mut hops = Vec::new();
     hops.extend_from_slice(&abi::uint_word(sub.steps.len() as u128));
     for step in &sub.steps {
         let dex_type = DexType::parse(&step.dex_type).ok_or_else(|| anyhow!("unknown dex_type: {}", step.dex_type))?;
-        // T4.6: Use the per-hop fee from the client/quote when provided;
-        // fall back to the venue default (e.g., 30 bps for xyk/clmm).
-        let fee_bps = step.fee_bps.unwrap_or_else(|| step_fee_bps(dex_type));
+        // T4.6: Fee resolution order — the per-hop fee from the quote when
+        // provided, else the snapshot pool fee (so an omitted fee still
+        // encodes the exact CLMM tier, e.g. 5 bps), else the venue default.
+        let fee_bps = match step.fee_bps {
+            Some(fee) => fee,
+            None => snapshot_pool_fee(snapshot, &step.pool_address, dex_type).unwrap_or_else(|| step_fee_bps(dex_type)),
+        };
         // Hop is entirely static, so Hop[] stores tuples inline without an
         // element-offset table.
         hops.extend_from_slice(&encode_hop(step, dex_type, fee_bps)?);
@@ -94,11 +103,11 @@ fn encode_sub_route(sub: &BuildTxSubRoute) -> Result<Vec<u8>> {
     Ok(out)
 }
 
-/// Venue fee in bps: xy=k 30, stable 4, clmm 30 (frozen).
+/// Venue fee in bps: xy=k 30, stable 4, clmm 30, xylo 4 (frozen).
 fn step_fee_bps(dex_type: DexType) -> u32 {
     match dex_type {
         DexType::Xyk | DexType::Clmm => 30,
-        DexType::Stable => 4,
+        DexType::Stable | DexType::Xylo => 4,
     }
 }
 
@@ -179,12 +188,13 @@ pub fn encode_split_swap(
     sub_routes: &[BuildTxSubRoute],
     signature: &[u8],
     permit: Option<&PermitSingleFields>,
+    snapshot: &MarketSnapshot,
 ) -> Result<String> {
     let mut routes_head = Vec::new();
     let mut routes_tail = Vec::new();
     let routes_head_len = sub_routes.len() * 32;
     for sub in sub_routes {
-        let encoded = encode_sub_route(sub)?;
+        let encoded = encode_sub_route(sub, snapshot)?;
         // Element offsets are relative to the start of the element-offset list;
         // each element's data follows all N offset words.
         routes_head.extend_from_slice(&abi::uint_word((routes_head_len + routes_tail.len()) as u128));
@@ -285,9 +295,7 @@ async fn validate_hop(state: &AppState, snapshot: &MarketSnapshot, step: &BuildT
     if let Some(submitted_fee) = step.fee_bps {
         if let Some(snapshot_fee) = snapshot_pool_fee(snapshot, &pool, dex_type) {
             if submitted_fee != snapshot_fee {
-                bail!(
-                    "pool {pool} fee mismatch: submitted {submitted_fee} bps, snapshot {snapshot_fee} bps"
-                );
+                bail!("pool {pool} fee mismatch: submitted {submitted_fee} bps, snapshot {snapshot_fee} bps");
             }
         }
     }
@@ -334,6 +342,7 @@ fn step_factory_source(dex_type: &str) -> &'static str {
         "xyk" => "chakra-xyk",
         "stable" => "chakra-stable",
         "clmm" => "chakra-clmm",
+        "xylo" => "xylo",
         _ => "",
     }
 }
@@ -355,6 +364,7 @@ fn dex_type_name(dex_type: DexType) -> &'static str {
         DexType::Xyk => "xyk",
         DexType::Stable => "stable",
         DexType::Clmm => "clmm",
+        DexType::Xylo => "xylo",
     }
 }
 
@@ -533,6 +543,7 @@ pub async fn build_tx_data(
         .ok_or_else(|| anyhow!(ApiErrorCode::NotReady.as_str()))?;
 
     validate_routes(state, body).await?;
+    let snapshot = load_snapshot(state).await?;
 
     if aggregator_paused(rpc, &aggregator).await? {
         bail!(ApiErrorCode::Paused.as_str());
@@ -597,6 +608,7 @@ pub async fn build_tx_data(
         &body.sub_routes,
         &signature,
         permit_fields.as_ref(),
+        &snapshot,
     )?;
 
     Ok((data, deadline, typed_data, required_approvals))

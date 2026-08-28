@@ -40,6 +40,9 @@ fn split_swap_calldata_matches_solidity_abi_for_nested_routes() {
             fee_bps: None,
         }],
     }];
+    // Snapshot without the pool → omitted fee falls back to the venue default
+    // (30 for xyk), keeping the canonical fixture byte-identical.
+    let snapshot = MarketSnapshot::from_sources("chakra-encode-1", 1_700_000_000_000, "arc-testnet", vec![]);
 
     let encoded = api_server::build_tx::encode_split_swap(
         "0x0000000000000000000000000000000000000001",
@@ -50,6 +53,7 @@ fn split_swap_calldata_matches_solidity_abi_for_nested_routes() {
         &routes,
         &[],
         None,
+        &snapshot,
     )
     .unwrap();
 
@@ -943,4 +947,159 @@ async fn build_tx_encodes_step_fee_not_hardcoded_30() {
     let hop_data = hops_base + 32; // skip the length word
     let fee_encoded = u256_at(&bytes, hop_data + 4 * 32);
     assert_eq!(fee_encoded, 30, "fee must be 30 bps from the step, not hardcoded");
+}
+
+// ─── 10. T4.6 remainder: omitted fee encodes the snapshot fee; 5 bps tier ────
+
+const CLMM_POOL_5BPS: &str = "0x0000000000000000000000000000000000000011";
+
+/// Snapshot with a CLMM pool at 5 bps fee (optional discovered tier).
+fn clmm_5bps_snapshot() -> MarketSnapshot {
+    MarketSnapshot::from_sources(
+        "chakra-build-clmm5",
+        1_700_000_000_000,
+        "arc-testnet",
+        vec![SourceSnapshot {
+            source: "chakra-clmm".to_string(),
+            pairs: vec![],
+        }],
+    )
+    .with_clmm_pool_refs(vec![market_snapshot::ClmmPoolRefSnapshot {
+        source: "chakra-clmm".to_string(),
+        pool_address: CLMM_POOL_5BPS.to_string(),
+        token0: USDC_ERC20.to_string(),
+        token1: EURC.to_string(),
+        fee_bps: 5,
+        tick_spacing: 10,
+        factory: CLMM_FACTORY.to_string(),
+    }])
+}
+
+fn clmm_body_omit_fee(pool_address: &str) -> Value {
+    json!({
+        "user": USER,
+        "token_in": USDC_ERC20.to_ascii_lowercase(),
+        "token_out": EURC.to_ascii_lowercase(),
+        "amount_in": "1000000",
+        "min_amount_out": "990000",
+        "sub_routes": [{
+            "amount_in": "1000000",
+            "steps": [{
+                "dex_type": "clmm",
+                "pool_address": pool_address,
+                "token_in": USDC_ERC20.to_ascii_lowercase(),
+                "token_out": EURC.to_ascii_lowercase()
+            }]
+        }]
+    })
+}
+
+/// T4.6: an omitted `fee_bps` must encode the **snapshot** CLMM fee (5 bps),
+/// not the venue default 30 bps.
+#[tokio::test]
+async fn build_tx_omit_fee_encodes_snapshot_clmm_fee_not_default() {
+    use market_snapshot::pool_state_store::FactoryRecord;
+    let (url, _server) = permit_needed_fixture();
+    let mut config = app_config();
+    config.chakra_aggregator = AGGREGATOR.to_string();
+    let snapshot_store = Arc::new(MemorySnapshotStore::new());
+    snapshot_store.publish_snapshot(&clmm_5bps_snapshot()).await.unwrap();
+    let pool_store = Arc::new(MemoryPoolStateStore::new());
+    pool_store
+        .set_factories(&[FactoryRecord::new(CLMM_FACTORY, "clmm", "chakra-clmm")])
+        .await
+        .unwrap();
+
+    let engine = QuoteEngine::new(PathFinderConfig::default(), SplitConfig::default());
+    engine.update_from_chakra_snapshot(&clmm_5bps_snapshot(), MBTC).await;
+
+    let state = AppState::from_backends(
+        config,
+        Some(snapshot_store.clone() as Arc<dyn market_snapshot::store::SnapshotStore>),
+        Some(pool_store.clone() as Arc<dyn market_snapshot::pool_state_store::PoolStateStore>),
+        Some(snapshot_store),
+        Some(pool_store),
+        Some(Arc::new(dex_adapters::evm_rpc::EvmRpcClient::single(&url).unwrap())),
+        MBTC.to_string(),
+        None,
+    )
+    .await;
+    let router = build_router(state, RateLimitState::from_env());
+
+    // No fee_bps in the step — the snapshot says 5 bps.
+    let body = clmm_body_omit_fee(CLMM_POOL_5BPS);
+    let (status, body_resp) = post(&router, "/api/v1/build_tx", body).await;
+    assert_eq!(status, StatusCode::OK);
+    let data_hex = body_resp["data"]["data"].as_str().unwrap();
+    let bytes = decode_hex(data_hex);
+    let head = decode_head(&bytes);
+
+    let routes_base = head.routes_offset;
+    let sub0_offset = u256_at(&bytes, routes_base + 32) as usize;
+    let sub_base = routes_base + 32 + sub0_offset;
+    let hops_offset = u256_at(&bytes, sub_base + 32) as usize;
+    let hops_base = sub_base + hops_offset;
+    let hop_count = u256_at(&bytes, hops_base) as usize;
+    assert_eq!(hop_count, 1);
+    let hop_data = hops_base + 32;
+    let fee_encoded = u256_at(&bytes, hop_data + 4 * 32);
+    assert_eq!(
+        fee_encoded, 5,
+        "omitted fee must encode the snapshot CLMM fee tier (5 bps), not 30"
+    );
+}
+
+/// T4.6: the optional 5 bps tier is representable end-to-end — explicit
+/// `fee_bps: 5` encodes 5 and validates against the snapshot.
+#[tokio::test]
+async fn build_tx_encodes_and_validates_5bps_clmm_tier() {
+    use market_snapshot::pool_state_store::FactoryRecord;
+    let (url, _server) = permit_needed_fixture();
+    let mut config = app_config();
+    config.chakra_aggregator = AGGREGATOR.to_string();
+    let snapshot_store = Arc::new(MemorySnapshotStore::new());
+    snapshot_store.publish_snapshot(&clmm_5bps_snapshot()).await.unwrap();
+    let pool_store = Arc::new(MemoryPoolStateStore::new());
+    pool_store
+        .set_factories(&[FactoryRecord::new(CLMM_FACTORY, "clmm", "chakra-clmm")])
+        .await
+        .unwrap();
+
+    let engine = QuoteEngine::new(PathFinderConfig::default(), SplitConfig::default());
+    engine.update_from_chakra_snapshot(&clmm_5bps_snapshot(), MBTC).await;
+
+    let state = AppState::from_backends(
+        config,
+        Some(snapshot_store.clone() as Arc<dyn market_snapshot::store::SnapshotStore>),
+        Some(pool_store.clone() as Arc<dyn market_snapshot::pool_state_store::PoolStateStore>),
+        Some(snapshot_store),
+        Some(pool_store),
+        Some(Arc::new(dex_adapters::evm_rpc::EvmRpcClient::single(&url).unwrap())),
+        MBTC.to_string(),
+        None,
+    )
+    .await;
+    let router = build_router(state, RateLimitState::from_env());
+
+    // Explicit 5 bps matches the snapshot → accepted, encoded as 5.
+    let mut body = clmm_body_omit_fee(CLMM_POOL_5BPS);
+    body["sub_routes"][0]["steps"][0]["fee_bps"] = json!(5);
+    let (status, body_resp) = post(&router, "/api/v1/build_tx", body).await;
+    assert_eq!(status, StatusCode::OK);
+    let bytes = decode_hex(body_resp["data"]["data"].as_str().unwrap());
+    let head = decode_head(&bytes);
+    let routes_base = head.routes_offset;
+    let sub0_offset = u256_at(&bytes, routes_base + 32) as usize;
+    let sub_base = routes_base + 32 + sub0_offset;
+    let hops_offset = u256_at(&bytes, sub_base + 32) as usize;
+    let hops_base = sub_base + hops_offset;
+    let hop_data = hops_base + 32;
+    assert_eq!(u256_at(&bytes, hop_data + 4 * 32), 5, "fee must encode 5 bps");
+
+    // Wrong tier (30) against the 5 bps snapshot → rejected.
+    let mut body = clmm_body_omit_fee(CLMM_POOL_5BPS);
+    body["sub_routes"][0]["steps"][0]["fee_bps"] = json!(30);
+    let (status, resp) = post(&router, "/api/v1/build_tx", body).await;
+    assert_eq!(status, StatusCode::BAD_REQUEST);
+    assert_eq!(resp["error"]["code"], ApiErrorCode::RouteInvalid.as_str());
 }

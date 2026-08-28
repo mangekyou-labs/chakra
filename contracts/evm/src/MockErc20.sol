@@ -6,6 +6,7 @@ pragma solidity ^0.8.30;
 contract MockErc20 {
     error NotOwner();
     error InsufficientBalance();
+    error InsufficientAllowance();
     error ZeroAddress();
 
     string public name;
@@ -53,6 +54,7 @@ contract MockErc20 {
     function transferFrom(address from, address to, uint256 amount) external returns (bool) {
         uint256 allowed = allowance[from][msg.sender];
         if (allowed != type(uint256).max) {
+            if (allowed < amount) revert InsufficientAllowance();
             allowance[from][msg.sender] = allowed - amount;
         }
         _transfer(from, to, amount);

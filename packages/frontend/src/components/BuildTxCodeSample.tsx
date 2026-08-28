@@ -22,19 +22,15 @@ const quote = await quoteResp.json();
 if (!quote.success) throw new Error(quote.error?.message);
 
 // 2) Map quote → build_tx steps
-// source.split(" → ") → per-hop venue: chakra-xyk|chakra-stable|chakra-clmm
+// T4.7: use the server-owned per-hop dex_types[] (no source-string heuristics)
 function toSteps(subRoute) {
-  return subRoute.pool_addresses.map((pool, i) => {
-    const venue = subRoute.source.split(' → ')[i];
-    const dexType = venue === 'chakra-stable' ? 'stable'
-      : venue === 'chakra-clmm' ? 'clmm' : 'xyk';
-    return {
-      dex_type: dexType,
-      pool_address: pool,
-      token_in: subRoute.path[i],
-      token_out: subRoute.path[i + 1],
-    };
-  });
+  return subRoute.pool_addresses.map((pool, i) => ({
+    dex_type: subRoute.dex_types[i], // 'xyk' | 'stable' | 'clmm' | 'xylo'
+    pool_address: pool,
+    token_in: subRoute.path[i],
+    token_out: subRoute.path[i + 1],
+    fee_bps: subRoute.hop_fees[i], // snapshot fee, e.g. 4 (stable) / 30 (xyk)
+  }));
 }
 
 const sub_routes = quote.data.sub_routes.map((sr) => ({

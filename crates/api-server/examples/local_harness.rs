@@ -95,9 +95,13 @@ async fn main() {
                 "0x5c975abb" => Ok(json!(
                     "0x0000000000000000000000000000000000000000000000000000000000000000"
                 )),
-                // ERC-20 allowance → 0
-                "0x927da105" => Ok(json!(
+                // ERC-20 allowance(user → Permit2) → 0 (approval required)
+                "0xdd62ed3e" => Ok(json!(
                     "0x0000000000000000000000000000000000000000000000000000000000000000"
+                )),
+                // Permit2 allowance(user, tokenIn → aggregator) → 0 (typed data required)
+                "0x927da105" => Ok(json!(
+                    "0x000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"
                 )),
                 other => Err(json!(format!("unexpected eth_call selector {other}"))),
             }

@@ -163,8 +163,8 @@ mod tests {
     #[test]
     fn worker_config_reads_chakra_redis_and_defaults_to_redis_backend() {
         let _guard = env_lock().lock().unwrap();
-        let original_chakra = ["CHAKRA_REDIS_URL", "SNAPSHOT_REDIS_URL", "SNAPSHOT_BACKEND"]
-            .map(|name| (name, std::env::var(name).ok()));
+        let original_chakra =
+            ["CHAKRA_REDIS_URL", "SNAPSHOT_REDIS_URL", "SNAPSHOT_BACKEND"].map(|name| (name, std::env::var(name).ok()));
         for (name, _) in &original_chakra {
             std::env::remove_var(name);
         }

@@ -334,8 +334,8 @@ SubRoute
   amount_in, amount_out, percentage
   path[] (token addresses)
   pool_addresses[]
-  dex_types[]                    # xyk | stable | clmm
-  source                         # chakra-xyk | chakra-stable | chakra-clmm | discovered:*
+  dex_types[]                    # xyk | stable | clmm | xylo (T-XYLO)
+  source                         # chakra-xyk | chakra-stable | chakra-clmm | xylo | discovered:*
 
 OptimalRoute
   is_split: bool
@@ -353,7 +353,7 @@ Per-hop `minAmountOut` is **0**. Only the route-total `minimum_output` is enforc
 Permit2 **AllowanceTransfer** (not `SignatureTransfer` / witness). User approves ERC-20 → Permit2 once; each swap may sign a `PermitSingle` granting the aggregator an exact-amount, short-lived allowance.
 
 ```solidity
-enum DexType { Xyk, Stable, Clmm }
+enum DexType { Xyk, Stable, Clmm, Xylo } // Xylo appended (T-XYLO), never inserted
 
 struct Hop {
     address pool;
@@ -413,6 +413,7 @@ function splitSwap(
 7. Execute each sub-route. Intermediate and final hop recipients are **the aggregator** (v1 simplicity; leftover accounting is then local).
    - **Xyk:** `tokenIn.transfer(pool, amount); pool.swap(amount0Out, amount1Out, address(this), "")` — empty data, no callback. `amountOut` from on-chain `getReserves` + V2 formula (0 per-hop min).
    - **Stable:** `tokenIn.transfer(pool, amount); IStableSwap(pool).exchange(i, j, amount, 0)`.
+   - **Xylo (T-XYLO):** `tokenIn.forceApprove(pool, amount); IXyloPool(pool).swap(tokenIn, tokenOut, amount, 0, address(this), block.timestamp)` then reset the allowance to 0. The Xylo `swap` **pulls via `transferFrom`** — do **not** wrap it as `IStableSwap.exchange` (different custody + selector). Factory membership via `IXyloFactory(factory).getPool(tokenIn, tokenOut) == pool` (not Uni V2 `getPair`, not the Chakra stable factory).
    - **Clmm:** `pool.swap(address(this), zeroForOne, int256(amount), sqrtPriceLimit, data)` with `uniswapV3SwapCallback` paying the pool. Callback **must** require `msg.sender` is `getPool` of an allowlisted CLMM factory. Do not put `nonReentrant` on the callback.
 8. `amountOut = tokenOut.balanceOf(this) - tokenOutBalanceBefore`. `require(amountOut >= minAmountOut)`.
 9. Transfer **all** `tokenOut` balance to `msg.sender`.
@@ -436,6 +437,7 @@ Deploy our own factories so splits are real even if organic Arc DEX TVL is ~0.
 | `chakra-xyk` | Vendored Uniswap V2 core Factory + Pair | USDC/EURC, USDC/mBTC, EURC/mBTC | 30 bps |
 | `chakra-stable` | Original 2-token StableSwap (Apache-2.0) | USDC/EURC, **≥20×** xy=k depth | `A=100`, 4 bps |
 | `chakra-clmm` | Vendored Uniswap V3 core Factory + Pool | USDC/mBTC **30 bps required**; 5 bps optional extra venue | 30 bps (5 bps optional) |
+| `xylo` (T-XYLO) | Organic XyloNet stableswap (Arc), `getPool(address,address)` factory | USDC/EURC (pinned; USDC/USYC stays out of catalog) | `A=200`, 4 bps **fee on output**, `swap` pulls via `transferFrom` |
 
 Seed sizes must make **split-better-than-single** true at a documented notional (see testing). Discovery adapters may watch third-party factories; they never replace the seeded set, never auto-allowlist on the aggregator, and extra tokens stay out of the v1 catalog.
 

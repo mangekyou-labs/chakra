@@ -28,6 +28,12 @@ export interface SubRoute {
     source: string;
     path: string[];
     poolAddresses: string[];
+    /** Per-hop DEX type (`xyk` | `stable` | `clmm` | …). T4.7 — server-owned. */
+    dexTypes: string[];
+    /** Per-hop venue fee in bps. T4.7. */
+    hopFees: number[];
+    /** Per-hop allowlisted factory ('' = legacy pool). T4.7. */
+    hopFactories: string[];
     amountIn: string;
     amountOut: string;
     fractionBps: number;
@@ -50,6 +56,8 @@ export interface BuildTxStep {
     pool_address: string;
     token_in: string;
     token_out: string;
+    /** Per-hop fee in bps from the quote (T4.6/T4.7). Omit → venue default. */
+    fee_bps?: number;
 }
 export interface BuildTxSubRoute {
     amount_in: string;
@@ -88,7 +96,12 @@ export interface TokenRow {
     address: string;
     decimals: number;
 }
-/** `source.split(" → ")` → per-hop venue → dex_type. */
+/**
+ * Quote → build_tx steps mapping (T4.7). Prefers server-owned per-hop
+ * `dexTypes`; falls back to `source.split(" → ")` for in-flight clients that
+ * received a legacy quote. `fee_bps` is carried through so `/build_tx`
+ * encodes the snapshot fee.
+ */
 export declare function quoteSubRoutesToSteps(subRoute: SubRoute): BuildTxStep[];
 export declare class ChakraClient {
     private baseUrl;
