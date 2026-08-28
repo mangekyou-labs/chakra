@@ -11,7 +11,7 @@
     "lint:fix": "eslint . --fix",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "test": "vitest run",
+    "test": "NODE_ENV=development vitest run",
     "typecheck": "tsc --noEmit",
     "qa:wallet:validate": "node ../scripts/qa-wallet-validate.mjs",
     "qa:wallet:setup": "node ../scripts/qa-wallet-setup.mjs",

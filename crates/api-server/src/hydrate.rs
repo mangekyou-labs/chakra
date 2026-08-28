@@ -21,7 +21,9 @@ fn collect_pool_refs(paths: &[Path]) -> (Vec<(String, String)>, Vec<(String, Str
                 "chakra-xyk" => {
                     xyk.insert((source.clone(), pool_address.clone()));
                 }
-                "chakra-stable" => {
+                // T-XYLO: the Xylo pool state lives in the stable bucket
+                // (StablePoolStateValue with A=200).
+                "chakra-stable" | "xylo" => {
                     stable.insert((source.clone(), pool_address.clone()));
                 }
                 "chakra-clmm" => {

@@ -347,6 +347,67 @@ async fn quote_hydrates_chakra_snapshot_routes() {
     );
 }
 
+// ─── 3b. T4.7 quote hop metadata ────────────────────────────────────────────
+
+/// T4.7: every sub-route carries explicit per-hop `dex_types[]`, `hop_fees`,
+/// and `hop_factories` (length == pool_addresses) — the UI/SDK must not
+/// reconstruct the DEX type from the joined `source` string.
+#[tokio::test]
+async fn quote_emits_explicit_per_hop_dex_type_fee_factory() {
+    let (router, _, _) = test_app(Some(chakra_snapshot()), None).await;
+
+    // Direct stable route.
+    let (status, body) = get(
+        &router,
+        &format!("/api/v1/quote?token_in={USDC_ERC20}&token_out={EURC}&amount_in=1000000000"),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+    let routes = body["data"]["sub_routes"].as_array().unwrap();
+    assert!(!routes.is_empty(), "must have at least one sub-route");
+    let stable = routes
+        .iter()
+        .find(|r| r["source"].as_str().unwrap() == "chakra-stable")
+        .expect("chakra-stable sub-route");
+    assert_eq!(stable["dex_types"], json!(["stable"]));
+    assert_eq!(stable["hop_fees"], json!([4]));
+    assert_eq!(stable["hop_factories"], json!([""]));
+    assert_eq!(
+        stable["dex_types"].as_array().unwrap().len(),
+        stable["pool_addresses"].as_array().unwrap().len(),
+        "dex_types length must equal pool_addresses length"
+    );
+    assert_eq!(
+        stable["hop_fees"].as_array().unwrap().len(),
+        stable["pool_addresses"].as_array().unwrap().len()
+    );
+
+    // SC-2 split: xyk leg carries dex_type "xyk", fee 30.
+    let (status, body) = get(
+        &router,
+        &format!("/api/v1/quote?token_in={USDC_ERC20}&token_out={EURC}&amount_in=180000000000"),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+    let routes = body["data"]["sub_routes"].as_array().unwrap();
+    let xyk = routes
+        .iter()
+        .find(|r| r["source"].as_str().unwrap() == "chakra-xyk")
+        .expect("split must include chakra-xyk leg");
+    assert_eq!(xyk["dex_types"], json!(["xyk"]));
+    assert_eq!(xyk["hop_fees"], json!([30]));
+
+    // USDC→mBTC xyk route.
+    let (status, body) = get(
+        &router,
+        &format!("/api/v1/quote?token_in={USDC_ERC20}&token_out={MBTC}&amount_in=1000000"),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+    let routes = body["data"]["sub_routes"].as_array().unwrap();
+    assert!(routes.iter().all(|r| r["dex_types"] == json!(["xyk"])));
+}
+
 #[tokio::test]
 async fn quote_does_not_call_rpc_when_hydrate_disabled() {
     // Fixture RPC that would panic if /quote ever called it.

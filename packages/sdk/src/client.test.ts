@@ -67,6 +67,9 @@ describe('ChakraClient.quote', () => {
             source: 'chakra-xyk → chakra-clmm',
             path: [USDC, '0x3333333333333333333333333333333333333333', EURC],
             pool_addresses: ['0x1111111111111111111111111111111111111111', '0x2222222222222222222222222222222222222222'],
+            dex_types: ['xyk', 'clmm'],
+            hop_fees: [30, 30],
+            hop_factories: ['0xffffffffffffffffffffffffffffffffffffffff', ''],
             amount_in: '700000',
             amount_out: '600000',
             fraction_bps: 7000,
@@ -84,6 +87,10 @@ describe('ChakraClient.quote', () => {
     expect(quote.isSplit).toBe(true);
     expect(quote.subRoutes[0].fractionBps).toBe(7000);
     expect(quote.subRoutes[0].source).toBe('chakra-xyk → chakra-clmm');
+    // T4.7: server-owned per-hop metadata is parsed, not reconstructed.
+    expect(quote.subRoutes[0].dexTypes).toEqual(['xyk', 'clmm']);
+    expect(quote.subRoutes[0].hopFees).toEqual([30, 30]);
+    expect(quote.subRoutes[0].hopFactories).toEqual(['0xffffffffffffffffffffffffffffffffffffffff', '']);
   });
 });
 
@@ -119,6 +126,9 @@ describe('ChakraClient.buildTx', () => {
           source: 'chakra-stable',
           path: [USDC, EURC],
           poolAddresses: ['0x0000000000000000000000000000000000000002'],
+          dexTypes: ['stable'],
+          hopFees: [4],
+          hopFactories: [''],
           amountIn: '1000000',
           amountOut: '999550',
           fractionBps: 10000,
@@ -139,6 +149,7 @@ describe('ChakraClient.buildTx', () => {
         pool_address: '0x0000000000000000000000000000000000000002',
         token_in: USDC,
         token_out: EURC,
+        fee_bps: 4,
       },
     ]);
   });
@@ -150,14 +161,50 @@ describe('quoteSubRoutesToSteps', () => {
       source: 'chakra-xyk → chakra-clmm',
       path: [USDC, '0x3333333333333333333333333333333333333333', EURC],
       poolAddresses: ['0x1111111111111111111111111111111111111111', '0x2222222222222222222222222222222222222222'],
+      dexTypes: ['xyk', 'clmm'],
+      hopFees: [30, 30],
+      hopFactories: ['', ''],
       amountIn: '700000',
       amountOut: '600000',
       fractionBps: 7000,
     });
     expect(steps).toEqual([
-      { dex_type: 'xyk', pool_address: '0x1111111111111111111111111111111111111111', token_in: USDC, token_out: '0x3333333333333333333333333333333333333333' },
-      { dex_type: 'clmm', pool_address: '0x2222222222222222222222222222222222222222', token_in: '0x3333333333333333333333333333333333333333', token_out: EURC },
+      { dex_type: 'xyk', pool_address: '0x1111111111111111111111111111111111111111', token_in: USDC, token_out: '0x3333333333333333333333333333333333333333', fee_bps: 30 },
+      { dex_type: 'clmm', pool_address: '0x2222222222222222222222222222222222222222', token_in: '0x3333333333333333333333333333333333333333', token_out: EURC, fee_bps: 30 },
     ]);
+  });
+
+  it('falls back to the joined source when dexTypes is absent (legacy quote)', () => {
+    const steps = quoteSubRoutesToSteps({
+      source: 'chakra-stable',
+      path: [USDC, EURC],
+      poolAddresses: ['0x0000000000000000000000000000000000000002'],
+      dexTypes: [],
+      hopFees: [],
+      hopFactories: [],
+      amountIn: '1000000',
+      amountOut: '999550',
+      fractionBps: 10000,
+    });
+    expect(steps).toEqual([
+      { dex_type: 'stable', pool_address: '0x0000000000000000000000000000000000000002', token_in: USDC, token_out: EURC },
+    ]);
+  });
+
+  it('uses server dex_types over the joined source when they disagree', () => {
+    const steps = quoteSubRoutesToSteps({
+      source: 'chakra-xyk',
+      path: [USDC, EURC],
+      poolAddresses: ['0x0000000000000000000000000000000000000002'],
+      dexTypes: ['stable'],
+      hopFees: [4],
+      hopFactories: [''],
+      amountIn: '1000000',
+      amountOut: '999550',
+      fractionBps: 10000,
+    });
+    expect(steps[0].dex_type).toBe('stable');
+    expect(steps[0].fee_bps).toBe(4);
   });
 });
 

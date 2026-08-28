@@ -51,12 +51,16 @@ export async function fetchSuggestedFee(): Promise<bigint> {
     const feeHistoryJson = (await feeHistoryRes.json()) as {
       result?: { baseFeePerGas?: string[]; reward?: string[][] };
     };
-    if (feeHistoryJson.result?.reward?.[0]?.[0]) {
-      return BigInt(feeHistoryJson.result.reward[0][0]);
+    // T6.3: maxFeePerGas must be base + priority tip. The priority reward
+    // alone would underpay the base fee.
+    const baseFee = feeHistoryJson.result?.baseFeePerGas?.[1];
+    const tip = feeHistoryJson.result?.reward?.[0]?.[0];
+    if (baseFee) {
+      const base = BigInt(baseFee);
+      const priority = tip ? BigInt(tip) : 0n;
+      return base + priority;
     }
-    if (feeHistoryJson.result?.baseFeePerGas?.[1]) {
-      return BigInt(feeHistoryJson.result.baseFeePerGas[1]);
-    }
+    if (tip) return BigInt(tip);
   } catch {
     // Fall through
   }

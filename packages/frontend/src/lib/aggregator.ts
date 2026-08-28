@@ -9,6 +9,12 @@ export interface SubRoute {
   source: string;
   path: string[];
   pool_addresses: string[];
+  /** Per-hop DEX type (`xyk` | `stable` | `clmm` | …). T4.7 — server-owned. */
+  dex_types?: string[];
+  /** Per-hop venue fee in bps. T4.7. */
+  hop_fees?: number[];
+  /** Per-hop allowlisted factory ('' = legacy pool). T4.7. */
+  hop_factories?: string[];
   amount_in: string;
   amount_out: string;
   fraction_bps: number;
@@ -37,6 +43,8 @@ export interface BuildTxStep {
   pool_address: string;
   token_in: string;
   token_out: string;
+  /** Per-hop fee in bps from the quote (T4.6/T4.7). Omit → venue default. */
+  fee_bps?: number;
 }
 
 export interface BuildTxSubRoute {
@@ -61,9 +69,10 @@ export interface BuildTxResponse {
 }
 
 /**
- * Quote → build_tx steps mapping (SDK helper, reused by UI):
- * `source.split(" → ")` → per-hop venue; path[i]/path[i+1] → token_in/token_out;
- * pool_addresses[i] → pool_address.
+ * Quote → build_tx steps mapping (T4.7). Prefers server-owned per-hop
+ * `dex_types`; falls back to `source.split(" → ")` for in-flight clients that
+ * received a legacy quote. `fee_bps` is carried through so `/build_tx`
+ * encodes the snapshot fee.
  */
 export function quoteSubRoutesToSteps(subRoute: SubRoute): BuildTxStep[] {
   const venues = subRoute.source
@@ -71,18 +80,25 @@ export function quoteSubRoutesToSteps(subRoute: SubRoute): BuildTxStep[] {
     .map((v) => v.trim())
     .filter(Boolean);
   const mapped = venues.length > 0 ? venues : ['chakra-xyk'];
-  return subRoute.pool_addresses.map((pool, i) => ({
-    dex_type: venueToDexType(mapped[i] ?? 'chakra-xyk'),
-    pool_address: pool,
-    token_in: subRoute.path[i] ?? '',
-    token_out: subRoute.path[i + 1] ?? '',
-  }));
+  return subRoute.pool_addresses.map((pool, i) => {
+    const serverType = subRoute.dex_types?.[i];
+    const step: BuildTxStep = {
+      dex_type: serverType ?? venueToDexType(mapped[i] ?? 'chakra-xyk'),
+      pool_address: pool,
+      token_in: subRoute.path[i] ?? '',
+      token_out: subRoute.path[i + 1] ?? '',
+    };
+    const fee = subRoute.hop_fees?.[i];
+    if (fee !== undefined && fee > 0) step.fee_bps = fee;
+    return step;
+  });
 }
 
-function venueToDexType(venue: string): 'xyk' | 'stable' | 'clmm' {
+function venueToDexType(venue: string): string {
   const v = venue.toLowerCase();
   if (v === 'chakra-stable' || v === 'stable') return 'stable';
   if (v === 'chakra-clmm' || v === 'clmm') return 'clmm';
+  if (v === 'xylo') return 'xylo';
   return 'xyk';
 }
 

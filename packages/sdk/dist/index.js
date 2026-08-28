@@ -9,7 +9,12 @@ export class ChakraApiError extends Error {
         this.code = code;
     }
 }
-/** `source.split(" → ")` → per-hop venue → dex_type. */
+/**
+ * Quote → build_tx steps mapping (T4.7). Prefers server-owned per-hop
+ * `dexTypes`; falls back to `source.split(" → ")` for in-flight clients that
+ * received a legacy quote. `fee_bps` is carried through so `/build_tx`
+ * encodes the snapshot fee.
+ */
 export function quoteSubRoutesToSteps(subRoute) {
     const venues = subRoute.source
         .split(' → ')
@@ -17,19 +22,29 @@ export function quoteSubRoutesToSteps(subRoute) {
         .filter(Boolean);
     const mapped = venues.length > 0 ? venues : ['chakra-xyk'];
     return subRoute.poolAddresses.map((pool, i) => {
-        const venue = mapped[i] ?? 'chakra-xyk';
-        const dexType = venue === 'chakra-stable' || venue === 'stable'
-            ? 'stable'
-            : venue === 'chakra-clmm' || venue === 'clmm'
-                ? 'clmm'
-                : 'xyk';
-        return {
+        const serverType = subRoute.dexTypes?.[i];
+        const dexType = serverType ?? venueToDexType(mapped[i] ?? 'chakra-xyk');
+        const step = {
             dex_type: dexType,
             pool_address: pool,
             token_in: subRoute.path[i] ?? '',
             token_out: subRoute.path[i + 1] ?? '',
         };
+        const fee = subRoute.hopFees?.[i];
+        if (fee !== undefined && fee > 0)
+            step.fee_bps = fee;
+        return step;
     });
+}
+function venueToDexType(venue) {
+    const v = venue.toLowerCase();
+    if (v === 'chakra-stable' || v === 'stable')
+        return 'stable';
+    if (v === 'chakra-clmm' || v === 'clmm')
+        return 'clmm';
+    if (v === 'xylo')
+        return 'xylo';
+    return 'xyk';
 }
 function slippageToBps(slippage, slippageBps) {
     if (slippageBps !== undefined)
@@ -118,6 +133,9 @@ export class ChakraClient {
                 source: sr.source,
                 path: sr.path,
                 poolAddresses: sr.pool_addresses,
+                dexTypes: sr.dex_types ?? [],
+                hopFees: sr.hop_fees ?? [],
+                hopFactories: sr.hop_factories ?? [],
                 amountIn: sr.amount_in,
                 amountOut: sr.amount_out,
                 fractionBps: sr.fraction_bps,

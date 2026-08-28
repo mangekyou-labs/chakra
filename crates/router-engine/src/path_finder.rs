@@ -54,6 +54,13 @@ pub fn pairs_from_chakra_snapshot(snapshot: &MarketSnapshot, mbtc_address: &str)
             if !nodes.contains(&a) || !nodes.contains(&b) {
                 continue;
             }
+            // T4.7: the snapshot's `dex_type` is the hop identity; fall back
+            // to the source-derived type for legacy snapshots.
+            let dex_type = if pair.dex_type.is_empty() {
+                dex_type_for_source(&source.source)
+            } else {
+                pair.dex_type.clone()
+            };
             pairs.push(TradingPair {
                 token_a: TokenId::Contract { address: a },
                 token_b: TokenId::Contract { address: b },
@@ -63,6 +70,7 @@ pub fn pairs_from_chakra_snapshot(snapshot: &MarketSnapshot, mbtc_address: &str)
                 reserve_a: None,
                 reserve_b: None,
                 factory: pair.factory.clone(),
+                dex_type,
             });
         }
     }
@@ -81,9 +89,23 @@ pub fn pairs_from_chakra_snapshot(snapshot: &MarketSnapshot, mbtc_address: &str)
             reserve_a: None,
             reserve_b: None,
             factory: clmm.factory.clone(),
+            dex_type: "clmm".to_string(),
         });
     }
     pairs
+}
+
+/// Map a Chakra source id to its DEX type (legacy snapshots without a
+/// stamped `dex_type`). Unknown sources default to `xyk` — the pre-T3.1
+/// default.
+fn dex_type_for_source(source: &str) -> String {
+    if source == "chakra-stable" {
+        "stable".to_string()
+    } else if source == "chakra-clmm" {
+        "clmm".to_string()
+    } else {
+        "xyk".to_string()
+    }
 }
 
 /// Path finder maintains the token graph and discovers paths.
@@ -120,8 +142,15 @@ impl PathFinder {
 
         // Add new edges
         for pair in pairs {
-            self.graph
-                .add_pair(&pair.token_a, &pair.token_b, source, &pair.pool_address, pair.fee_bps);
+            self.graph.add_pair_meta(
+                &pair.token_a,
+                &pair.token_b,
+                source,
+                &pair.pool_address,
+                pair.fee_bps,
+                &pair.dex_type,
+                &pair.factory,
+            );
         }
 
         // Invalidate all cached paths (source changed)
@@ -465,6 +494,7 @@ mod tests {
                 reserve_a: Some(1_000_000),
                 reserve_b: Some(2_000_000),
                 factory: String::new(),
+                dex_type: String::new(),
             }],
         );
 
