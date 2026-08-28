@@ -50,10 +50,10 @@ lives in the local worktree `.env` (`RENDER_API_KEY`, git-ignored).
 | `CHAKRA_CHAIN_ID` | `5042002` |
 | `CHAKRA_CORS_ORIGINS` | `https://chakra-arc-dex.vercel.app,http://localhost:3000` |
 | `CHAKRA_LISTEN_ADDR` | `0.0.0.0:10000` |
-| `CHAKRA_AGGREGATOR` | `0xA59ad3E82d251c3489582e1aA5Bee494d0d2a569` |
+| `CHAKRA_AGGREGATOR` | `0xEa1b2C24bd41163590960F8e40afe6cb4CC92006` |
 | `CHAKRA_MBTC_ADDRESS` | `0xbf5a25D7070FaACAe309D66D05372a6b212ECbdF` |
-| `CHAKRA_SEED_FACTORIES` | `0x0c812E5D55D767533c8E4783D33b28EA825b4D8e:xyk,0x77Ce21FDAAea40Fd94aCf65fF3220A0A7Db7D690:stable,0xf6dEa9e6dfE392aaBE366240db4839709572fa69:clmm` |
-| `CHAKRA_DISCOVERY_FACTORIES` | same three factories |
+| `CHAKRA_SEED_FACTORIES` | `0x0c812E5D55D767533c8E4783D33b28EA825b4D8e:xyk,0x77Ce21FDAAea40Fd94aCf65fF3220A0A7Db7D690:stable,0xf6dEa9e6dfE392aaBE366240db4839709572fa69:clmm,0x60EDeFB094B84BBC6430cc130B358A43Ba1979e2:xylo` |
+| `CHAKRA_DISCOVERY_FACTORIES` | same four factories |
 | `CHAKRA_EVM_WS_ENABLED` | `true` |
 
 Worker reads `CHAKRA_REDIS_URL` / `CHAKRA_RPC_*`; `SNAPSHOT_*` remain legacy overrides.
@@ -93,15 +93,17 @@ curl "https://chakra-api-0a5i.onrender.com/api/v1/quote?token_in=0x3600...0000&t
 curl https://chakra-arc-dex.vercel.app                    # HTTP 200, Chakra UI
 ```
 
-Smoke evidence (2026-08-28, after `128ff47`):
+Smoke evidence (2026-08-28, redeploy + XyloNet live):
 - `/health` → 200 `{"status":"ok"}`
 - `/ready` → 200 `{"status":"ready","ready":true,"snapshot_id":"snapshot-…"}`
 - `/quote` USDC→EURC 1e6 → `expected_output: 996915` via `chakra-stable`
-  pool `0xe4a881f4211b5cc11d8298032136a0d72e93cb02` (4 bps, impact 30 bps)
+  pool `0xe4a881f4211b5cc11d8298032136a0d72e93cb02` (4 bps, impact 30 bps, `dex_types: ["stable"]`)
+- `/quote` USDC→EURC 5e6 → `expected_output: 4680042` routing `xylo`
+  pool `0x3df3966f5138143dce7a9cfddc2c0310ce083bb1` (4 bps, `dex_types: ["xylo"]`, `hop_factories: ["0x60edefb094b84bbc6430cc130b358a43ba1979e2"]`)
+- `/build_tx` (1e6 & 5e6) → `to: "0xea1b2c24bd41163590960f8e40afe6cb4cc92006"`, valid `splitSwap` calldata and Permit2 typed data
 - `/tokens` → USDC / EURC / mBTC catalog
-- Redis holds `chakra:snapshot:current` + 4 `chakra:pool:*` keys (3 xyk + 1 stable)
+- Redis holds `chakra:snapshot:current` + `chakra:pool:*` keys
 - CORS: `access-control-allow-origin: https://chakra-arc-dex.vercel.app`
-
 Known limits (not host gates): USDC→mBTC returns `NO_ROUTE` because the mBTC xyk pools
 hold dust reserves (`MIN_XYK_RESERVE_STROOPS` filter) and the CLMM pool lacks complete
 tick coverage (worker intentionally skips incomplete CLMM publishes).
