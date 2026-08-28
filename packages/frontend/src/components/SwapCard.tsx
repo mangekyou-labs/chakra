@@ -92,13 +92,18 @@ export function SwapCard() {
     setSettingsHydrated(true);
   }
 
-  // Derive token objects from catalog
+  // Derive token objects from catalog (case-insensitive address match —
+  // the API catalog is lowercased, FALLBACK_SWAP_TOKENS is mixed case).
   const tokenIn = useMemo(
-    () => catalogTokens.find((t) => t.address === tokenInAddress) ?? null,
+    () =>
+      catalogTokens.find((t) => t.address.toLowerCase() === tokenInAddress?.toLowerCase()) ??
+      null,
     [catalogTokens, tokenInAddress],
   );
   const tokenOut = useMemo(
-    () => catalogTokens.find((t) => t.address === tokenOutAddress) ?? null,
+    () =>
+      catalogTokens.find((t) => t.address.toLowerCase() === tokenOutAddress?.toLowerCase()) ??
+      null,
     [catalogTokens, tokenOutAddress],
   );
 

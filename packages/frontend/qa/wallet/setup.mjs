@@ -4,8 +4,8 @@ import { mkdirSync, existsSync, writeFileSync, rmSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { MetaMaskWallet } from '@tenkeylabs/dappwright';
 
-const PROFILE_DIR = resolve(import.meta.dirname, '..', 'output', 'playwright', 'chromium-profile');
-const ARTIFACTS_DIR = resolve(import.meta.dirname, '..', 'output', 'playwright', 'evidence');
+const PROFILE_DIR = resolve(import.meta.dirname, '..', '..', 'output', 'playwright', 'chromium-profile');
+const ARTIFACTS_DIR = resolve(import.meta.dirname, '..', '..', 'output', 'playwright', 'evidence');
 
 // Clean previous run artifacts (not the profile unless --clean flag).
 const clean = process.argv.includes('--clean');

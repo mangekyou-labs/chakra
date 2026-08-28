@@ -1,6 +1,23 @@
 #!/usr/bin/env node
 // qa-wallet-validate.mjs — validate required env vars before Playwright starts.
+// Loads the gitignored packages/frontend/.env (same file qa.wallet.config.ts loads),
+// so `npm run qa:wallet:validate && npm run qa:wallet` behaves consistently.
 // Exit code 1 = fail (browser must not launch).
+// QA_WALLET_SECRET is never printed — only its shape (mnemonic word count / key prefix).
+
+import { existsSync, readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
+
+// Mirrors qa.wallet.config.ts: process.loadEnvFile on packages/frontend/.env.
+const ENV_FILE = resolve(import.meta.dirname, '..', '..', '.env');
+if (existsSync(ENV_FILE)) {
+  for (const line of readFileSync(ENV_FILE, 'utf8').split('\n')) {
+    const m = line.match(/^\s*([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*)\s*$/);
+    if (m && !(m[1] in process.env)) {
+      process.env[m[1]] = m[2].replace(/^["']|["']$/g, '');
+    }
+  }
+}
 
 const REQUIRED = [
   { key: 'QA_WALLET_SECRET', desc: 'mnemonic or private key for disposable wallet' },
@@ -20,10 +37,24 @@ for (const { key, desc, default: def } of REQUIRED) {
 if (missing.length > 0) {
   console.error('❌ Missing required QA wallet environment variables:');
   console.error(missing.join('\n'));
-  console.error('\nExport these before running qa:wallet:');
+  console.error('\nAdd QA_WALLET_SECRET to packages/frontend/.env (gitignored) or export it:');
   console.error('  export QA_WALLET_SECRET="your mnemonic or private key"');
-  console.error('  export QA_API_URL="https://chakra-api-0a5i.onrender.com"');
   process.exit(1);
+}
+
+// Shape check without printing the secret itself.
+const secret = process.env.QA_WALLET_SECRET.trim();
+if (secret.includes(' ')) {
+  const words = secret.split(/\s+/);
+  console.log(`   Secret: mnemonic (${words.length} words)`);
+  if (![12, 24].includes(words.length)) {
+    console.error('❌ Mnemonic must be 12 or 24 words');
+    process.exit(1);
+  }
+} else if (secret.startsWith('0x')) {
+  console.log('   Secret: private key (0x-prefixed)');
+} else {
+  console.log('   Secret: private key (raw hex)');
 }
 
 // Scan for accidental mnemonic/password leakage in other env vars.
