@@ -198,15 +198,15 @@ cd packages/frontend && npm test
 
 Network: **Arc testnet** `chainId` 5042002 (`0x4CEF52`). Disposable persistent Chromium profile initialized with dAppwright (or equivalent). `DAPP_URL` is local preview or public UI.
 
-- [ ] `qa:wallet:validate` / setup / cleanup logs exist and contain no seed, password, or private key
-- [ ] Extension-loaded snapshot; provider chain ID `0x4CEF52`
-- [ ] Connect-approval screenshot / snapshot
-- [ ] Critical path: connect → add/switch Arc testnet → select USDC/EURC → amount → quote visible (legs, impact, fee 0) → Permit2 if needed → swap → success → Arcscan link (SC-3, SC-13)
-- [ ] At least one run uses a size expected to split when practical; if e2e uses a smaller size, SC-4 is still proven by a dedicated on-chain **split** tx (cast or UI), not by multi-hop alone
+- [x] `qa:wallet:validate` / setup / cleanup logs exist and contain no seed, password, or private key (verified 2026-08-28; validate prints only mnemonic word count)
+- [x] Extension-loaded snapshot; provider chain ID `0x4CEF52` (verified 2026-08-28 — header menu switch + MetaMask notification popup Confirm; dAppwright `addNetwork`/`confirmNetworkSwitch` broken on MetaMask 13.17)
+- [x] Connect-approval screenshot / snapshot
+- [x] Critical path: connect → add/switch Arc testnet → select USDC/EURC → amount → quote visible (legs, impact, fee 0) → Permit2 if needed → swap → success → Arcscan link (SC-3, SC-13; **live PASS 2026-08-28** — `swap-critical-path` exit 0, tx `0xa630da3c842d7613ebbbd4d8f66749892a4e42c510933e0e1c3f4966907ef0dd`)
+- [x] At least one run uses a size expected to split when practical; if e2e uses a smaller size, SC-4 is still proven by a dedicated on-chain **split** tx (cast or UI), not by multi-hop alone (SC-4 proven separately: tx `0x42e85916ade38b87ef0440ef71d8f3330075ecf2a481247dc2ac33376b287fa8`)
 - [ ] Mobile viewport (stacked layout) does not hide confirm CTA — partial: verified 375×812 via Playwright CLI without MetaMask (CTA "Connect Wallet" visible; rerun with the harness at T9.4)
 - [ ] Named-session isolation (`playwright-cli -s=chakra-wallet`)
-- [ ] Artifact scan: no mnemonic / private key in traces or screenshots
-- [ ] Do not treat `test:e2e:injected*` as a substitute for this harness
+- [x] Artifact scan: no mnemonic / private key in traces or screenshots (scan 2026-08-28 — no seed words in `output/playwright/`)
+- [x] Do not treat `test:e2e:injected*` as a substitute for this harness
 
 ### Public / on-chain evidence (manual + scripted)
 
@@ -217,12 +217,12 @@ Network: **Arc testnet** `chainId` 5042002 (`0x4CEF52`). Disposable persistent C
   - `/quote` (5e6 USDC→EURC) → 200 split execution (`is_split: true`, 4680269 total, xylo legs + `chakra-stable`)
   - `/quote` (1e6 USDC→mBTC) → 200 honest `NO_ROUTE` error
   - `/build_tx` (1e6 & 5e6) → 200 with `to: "0xea1b2c24bd41163590960f8e40afe6cb4cc92006"` targeting new aggregator
-- [ ] On-chain **split** (≥2 sub-routes in one tx) on `testnet.arcscan.app`; multi-hop single-path is extra, not a substitute (SC-4)
+- [x] On-chain **split** (≥2 sub-routes in one tx) on `testnet.arcscan.app`; multi-hop single-path is extra, not a substitute (SC-4; **live 2026-08-28** — tx `0x42e85916ade38b87ef0440ef71d8f3330075ecf2a481247dc2ac33376b287fa8`, 3 sub-routes 2×xylo+1×stable, `isSplit=1`, 5e6 USDC→4,674,618 EURC)
 - [ ] Venue matrix ≥3 pairs × ≥3 sizes checked in (SC-8, partial: USDC↔EURC pairs routable across stable and xylo in `docs/evidence/chakra-t91-venue-matrix.json`; live 3-pair routing open pending T2.1–T2.4 re-seed)
 - [x] Split vs single-path benchmark checked in (SC-2, SC-8, verified 2026-08-28 in `docs/evidence/chakra-t92-split-benchmark.json`; +893.01 bps gain)
 - [x] Integrator 30-min walkthrough followed once by a clean environment (SC-6, SC-9, verified 2026-08-28 in `/tmp/chakra-clean-clone-t72` in 6 seconds against hosted API; evidence in `docs/evidence/chakra-t72-walkthrough.json`)
 - [x] Quote p95 &lt; 500 ms after warm Redis, measured **at the API process** (exclude client RTT) and checked in (SC-10, verified 2026-08-28 in `docs/evidence/chakra-t95-quote-latency.json`; server-side API-process p95 = 23 ms)
-- [ ] Worker refresh latency after a live swap: Redis write **≤ 5 s** after inclusion (SC-11, local test verified in `evm_watcher::poll_refreshes_pool_store_after_fixture_swap_within_5s`; live proof open following T9.3)
+- [ ] Worker refresh latency after a live swap: Redis write **≤ 5 s** after inclusion (SC-11, local test verified in `evm_watcher::poll_refreshes_pool_store_after_fixture_swap_within_5s`; **live 2026-08-28 finding** — worker publishes snapshots on the 600 s discovery cycle (`snapshot-1787918142123` → `snapshot-1787918742038`, gap 599.9 s) and `/ready` always reports `pool_keys: []`; per-swap pool-key write is not observable via the public API because Redis is private — needs a metrics endpoint or Redis access to close)
 
 ## Test Data
 

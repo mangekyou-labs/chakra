@@ -12,18 +12,25 @@
  *   - Broadcasts splitSwap with value = 0n, waits 1 confirmation
  *   - Verifies Arcscan explorer link and recent-swaps localStorage entry
  *   - Gracefully SKIPS when QA_WALLET_SECRET is not configured
+ *
+ * Locators mirror production helpers (src/lib/chain.ts, src/lib/recent-swaps.ts,
+ * src/components/SwapCard.tsx) — explorer `.app`, `chakra:recent-swaps:{chainId}:{address}`,
+ * `Swap confirmed!` banner, single primary button, unaudited ack modal.
+ * Network switch is app-driven via the primary button's switchToArc flow.
  */
 import { test, expect } from '@playwright/test';
 import dappwright, { MetaMaskWallet } from '@tenkeylabs/dappwright';
+import {
+  QA_CHAIN_ID,
+  QA_RPC_URL,
+  QA_EXPLORER_URL,
+  QA_STORAGE_PREFIX,
+  QA_SWAP_CONFIRMED_TEXT,
+} from './constants';
 
 const DAPP_URL = process.env.DAPP_URL || 'https://chakra-arc-dex.vercel.app';
 const _API_URL = process.env.QA_API_URL || 'https://chakra-api-0a5i.onrender.com';
-const CHAIN_ID = parseInt(process.env.QA_CHAIN_ID || '5042002', 10);
 const QA_WALLET_SECRET = process.env.QA_WALLET_SECRET || '';
-
-// Arc testnet tokens
-const _USDC = '0x3600000000000000000000000000000000000000';
-const _EURC = '0x89B50855Aa3bE2F677cD6303Cec089B5F319D72a';
 
 test.describe('Chakra Arc Testnet — MetaMask Critical Path (T9.4)', () => {
   test('MetaMask real wallet swap flow (skip when unconfigured)', async () => {
@@ -35,7 +42,7 @@ test.describe('Chakra Arc Testnet — MetaMask Critical Path (T9.4)', () => {
 
     const isMnemonic = QA_WALLET_SECRET.trim().includes(' ');
 
-    // 2. Launch headed Chromium with dAppwright MetaMask
+    // 2. Launch headed Chromium with dAppwright MetaMask (mnemonic seed preferred)
     const [wallet, page, context] = await dappwright.bootstrap('chromium', {
       wallet: 'metamask',
       version: MetaMaskWallet.recommendedVersion,
@@ -45,7 +52,7 @@ test.describe('Chakra Arc Testnet — MetaMask Critical Path (T9.4)', () => {
     });
 
     try {
-      // If private key was provided, import it
+      // If private key was provided, import it (fallback path only)
       if (!isMnemonic) {
         const pk = QA_WALLET_SECRET.trim().startsWith('0x')
           ? QA_WALLET_SECRET.trim().slice(2)
@@ -53,86 +60,143 @@ test.describe('Chakra Arc Testnet — MetaMask Critical Path (T9.4)', () => {
         await wallet.importPK(pk);
       }
 
-      // 3. Add and switch to Arc Testnet network
-      await wallet.addNetwork({
-        networkName: 'Arc Testnet',
-        rpc: 'https://rpc.testnet.arc.io',
-        chainId: CHAIN_ID,
-        symbol: 'USDC',
-      });
-      await wallet.switchNetwork('Arc Testnet');
-
-      // 4. Navigate to Chakra UI
+      // 3. Navigation / connection is app-driven: MetaMask may not know Arc yet,
+      //    so the UI's switchToArc handles wallet_addEthereumChain via the app.
       await page.goto(DAPP_URL, { waitUntil: 'domcontentloaded' });
       await expect(page).toHaveTitle(/Chakra/i);
 
-      // 5. Connect wallet
+      // 4. Connect wallet (EIP-6963 injected connector — no RainbowKit modal)
       const connectBtn = page.getByRole('button', { name: /connect/i }).first();
       await expect(connectBtn).toBeVisible({ timeout: 15_000 });
       await connectBtn.click();
 
-      // If wallet selection modal appears, click MetaMask
-      const metaMaskOption = page.getByText(/metamask/i).first();
-      if (await metaMaskOption.isVisible({ timeout: 3_000 }).catch(() => false)) {
-        await metaMaskOption.click();
-      }
-
       // Approve connection in MetaMask
       await wallet.approve();
       await page.bringToFront();
+      await expect(page.getByRole('button', { name: /connect/i }).first()).toBeHidden({
+        timeout: 15_000,
+      });
 
-      // 6. Enter swap parameters (1.0 USDC -> EURC)
+      // 5. Primary button drives state: Connect -> Switch to Arc Testnet -> Swap.
+      //    The swap card's primary button is disabled while !onArcTestnet — the
+      //    switch action lives in the header wallet menu (HeaderWallet.tsx).
+      const primaryBtn = page.locator('button.btn-primary').first();
+      await expect(primaryBtn).toBeVisible({ timeout: 15_000 });
+
+      // Open the header address chip and use the menu's "Switch to Arc Testnet".
+      // dAppwright's addNetwork/confirmNetworkSwitch are broken on MetaMask 13.17
+      // (stub/UI-selection mismatch) — drive the MetaMask notification popup directly.
+      await expect(page.getByRole('button', { name: /^0x/ }).first()).toBeVisible({
+        timeout: 20_000,
+      });
+      const addrChip = page.getByRole('button', { name: /^0x/ }).first();
+      await addrChip.click();
+      await expect(page.getByRole('button', { name: /switch to arc testnet/i }).first()).toBeVisible({
+        timeout: 10_000,
+      });
+      const switchMenuItem = page.getByRole('button', { name: /switch to arc testnet/i });
+      await switchMenuItem.first().click();
+          // The wallet_switchEthereumChain -> wallet_addEthereumChain flow opens a
+          // MetaMask notification popup with Cancel/Confirm. The add-chain flow can
+          // require TWO confirms (add network, then switch) — loop until no popup remains.
+          for (let attempt = 0; attempt < 3; attempt += 1) {
+            await page.waitForTimeout(2_000).catch(() => {});
+            const popup = context.pages().find((p) => p.url().includes('notification.html'));
+            if (!popup) {
+              console.log(`[switch] attempt ${attempt}: no popup`);
+              break;
+            }
+            const confirmBtn = popup.getByRole('button', { name: /confirm/i });
+            if (await confirmBtn.isVisible({ timeout: 5_000 }).catch(() => false)) {
+              console.log(`[switch] attempt ${attempt}: confirming ${popup.url().slice(-30)}`);
+              await confirmBtn.click();
+              await confirmBtn.waitFor({ state: 'detached', timeout: 10_000 }).catch(() => {});
+            } else {
+              console.log(`[switch] attempt ${attempt}: popup no confirm btn`);
+              break;
+            }
+          }
+          await page.bringToFront().catch(() => {});
+          // Wait for the swap card's primary button to become actionable (on Arc):
+          // the dot locator is fragile; the button label is the authoritative signal.
+          await expect(page.locator('button.btn-primary').first()).toHaveText(/^(Enter amount|Finding route|Swap)/, {
+            timeout: 30_000,
+          });
+
+      // 6. Enter swap parameters (1.0 USDC -> EURC; defaults now apply correctly).
       const sellInput = page.locator('input[placeholder="0.0"]').first();
       await expect(sellInput).toBeVisible({ timeout: 10_000 });
       await sellInput.fill('1.0');
 
-      // 7. Wait for quote to resolve
-      await page.waitForTimeout(2000);
+      // 7. Wait for quote to resolve — the primary button is the authoritative
+      //    signal: 'Finding route…' while loading, 'No route available' on failure,
+      //    'Swap' when a route exists (SwapCard.tsx primaryLabel).
+      await expect(primaryBtn).toBeEnabled({ timeout: 45_000 });
+      await expect(primaryBtn).toHaveText(/^Swap$/, { timeout: 45_000 });
 
-      // Verify route details
-      const routeSection = page.locator('text=Route');
-      await expect(routeSection).toBeVisible({ timeout: 15_000 });
+      // Verify route/protocol-fee summary rows (RouteDisplay + quote panel)
+      await expect(page.getByText('Route', { exact: true }).first()).toBeVisible();
+      await expect(page.getByText('Protocol fee', { exact: true }).first()).toBeVisible();
 
-      // Verify protocol fee is 0.00%
-      const protocolFee = page.locator('text=Protocol fee');
-      await expect(protocolFee).toBeVisible();
+      // 8. Execute Swap via the single primary button
+      await primaryBtn.click();
 
-      // 8. Handle Permit2 Allowance / Approval if required
-      const approveBtn = page.getByRole('button', { name: /approve/i });
-      if (await approveBtn.isVisible({ timeout: 3_000 }).catch(() => false)) {
-        await approveBtn.click();
-        await wallet.confirmTransaction();
-        await page.bringToFront();
-        await expect(approveBtn).not.toBeVisible({ timeout: 30_000 });
+      // 9. Unaudited-contracts ack modal (first send) — matches UnauditedModal.tsx
+      const unauditedAck = page.getByRole('button', { name: /i understand — proceed/i });
+      if (await unauditedAck.isVisible({ timeout: 3_000 }).catch(() => false)) {
+        await unauditedAck.click();
       }
 
-      // 9. Execute Swap
-      const swapBtn = page.getByRole('button', { name: /^swap$/i });
-      await expect(swapBtn).toBeEnabled({ timeout: 15_000 });
-      await swapBtn.click();
+      // 10. Sequence MetaMask popups to match handlePrimary:
+      //     optional ERC-20 approve confirm -> EIP-712 PermitSingle sign -> splitSwap confirm
+      const approvingLabel = page.locator('button.btn-primary', {
+        hasText: /approve usdc/i,
+      });
+      if (await approvingLabel.isVisible({ timeout: 3_000 }).catch(() => false)) {
+        await wallet.confirmTransaction();
+        await page.bringToFront();
+      }
 
-      // 10. Handle EIP-712 PermitSingle signing if prompted
+      // EIP-712 PermitSingle typed data may be skipped when allowance is sufficient
       try {
         await wallet.sign();
       } catch {
         // Typed data may have been skipped if Permit2 allowance was already sufficient
       }
 
-      // 11. Confirm the on-chain swap transaction
+      // splitSwap confirmation (value = 0n per build_tx)
       await wallet.confirmTransaction();
       await page.bringToFront();
 
-      // 12. Verify transaction success state and recent-swaps in localStorage
-      const successBanner = page.locator('text=/Transaction Submitted|Swap Successful/i');
+      // 11. Verify transaction success state — capture hash BEFORE the 3s banner hide
+      const successBanner = page.locator(`text=${QA_SWAP_CONFIRMED_TEXT}`);
       await expect(successBanner).toBeVisible({ timeout: 60_000 });
 
-      // Verify Arcscan explorer link
-      const explorerLink = page.locator('a[href*="testnet.arcscan.io/tx/"]');
+      // Verify Arcscan explorer link (.app — matches arcscanTxUrl)
+      const explorerLink = page.locator(`a[href*="${QA_EXPLORER_URL}/tx/"]`);
       await expect(explorerLink).toBeVisible();
+      const txUrl = await explorerLink.getAttribute('href');
+      expect(txUrl).toBeTruthy();
 
-      // Verify recent swaps stored in localStorage
-      const recentSwaps = await page.evaluate(() => localStorage.getItem('chakra_recent_swaps'));
-      expect(recentSwaps).toBeTruthy();
+      // 12. Verify recent swaps stored in localStorage under the production key
+      const recentSwaps = await page.evaluate(
+        ({ prefix, chainId }) => {
+          const keys: string[] = [];
+          for (let i = 0; i < localStorage.length; i += 1) {
+            const k = localStorage.key(i);
+            if (k && k.startsWith(`${prefix}:${chainId}:`)) keys.push(k);
+          }
+          return keys;
+        },
+        { prefix: QA_STORAGE_PREFIX, chainId: QA_CHAIN_ID },
+      );
+      expect(recentSwaps.length).toBeGreaterThan(0);
+      const latest = await page.evaluate((key: string) => localStorage.getItem(key), recentSwaps[0]);
+      expect(latest).toBeTruthy();
+      const parsed = JSON.parse(latest || '[]') as Array<{ txHash?: string; isSplit?: boolean }>;
+      expect(parsed[0]?.txHash).toBeTruthy();
+      // 1.0 USDC sorts to a single-path route at this size; isSplit may be false.
+      expect(typeof parsed[0]?.isSplit).toBe('boolean');
     } finally {
       await context.close();
     }

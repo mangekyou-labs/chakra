@@ -269,12 +269,13 @@ Each task: **outcome**, **deps**, **validation**, **tests**. Status: not started
   **Validation:** `is_split=true` and higher output recorded (SC-2, SC-8).  
   **Tests:** SC-2, SC-8.  
   **Done 2026-08-28:** Live benchmark of 5e6 USDC→EURC proves split route yields 4,680,269 atomic units (~4.680269 EURC) vs 4,296,582 atomic units (~4.296582 EURC) for best single route (xylo), delivering **+383,687 atomic units (~+0.383687 EURC / +893.01 bps / +8.93%)** improvement for the user. Evidence recorded in `docs/evidence/chakra-t92-split-benchmark.json`.
-- [ ] **T9.3** On-chain **split** swap (≥2 sub-routes in one tx); Arcscan URL  
+- [x] **T9.3** On-chain **split** swap (≥2 sub-routes in one tx); Arcscan URL (DONE 2026-08-28, live)  
   **Deps:** T5.2, T6.3 or cast.  
   **Validation:** `https://testnet.arcscan.app/tx/…` shows split execution. Multi-hop single-path is extra, not a substitute (SC-4).  
-  **Tests:** SC-4.
+  **Tests:** SC-4.  
+  **Done 2026-08-28 (live):** Broadcast 5e6 USDC→EURC split via `/build_tx` calldata (empty-sig Permit2 path, allowance pre-set via `IAllowanceTransfer.approve` + ERC-20 `approve`). Tx `0x42e85916ade38b87ef0440ef71d8f3330075ecf2a481247dc2ac33376b287fa8` (block 59271873, status 1, gas 344,674): 3 sub-routes — 2× xylo (1,263,225→1,074,649 and 385,400→327,598) + 1× chakra-stable (3,351,375→3,262,608) — aggregator `Swap` event `isSplit=1`, 4,674,618 EURC credited to operator. **Note:** `forge script --skip-simulation` was needed (local sim reverts on Arc USDC system precompile `0x1800…0000`; on-chain path works — `cast estimate` gas 74826 ok). `ExecuteSplitSwap.s.sol` run via `arc-operator.sh` requires `--skip-simulation`; the raw `/build_tx` calldata uses the empty-signature permit path (allowance pre-set) so no EIP-712 splice is needed for operator broadcast.
 
-- [ ] **T9.4 CLI-first MetaMask wallet QA (required)**  
+- [x] **T9.4 CLI-first MetaMask wallet QA (DONE 2026-08-28, live)**  
   **Outcome:** Disposable persistent Chromium profile (dAppwright) exercised with Playwright CLI on Arc testnet.  
   **Deps:** T6.3, running `DAPP_URL` (T8.2 or `npm run dev`).  
   **Validation evidence:**
@@ -287,7 +288,7 @@ Each task: **outcome**, **deps**, **validation**, **tests**. Status: not started
   - Operator notes in `docs/qa-playwright-metamask.md` (Arc testnet, not Flare/Coston2)
   **Tests:** All MetaMask harness checkboxes (SC-3, SC-7, SC-13).  
   **Do not** treat injected EIP-1193 smokes as a substitute.
-  **Progress 2026-08-27:** **not started as extension-backed QA.** `qa/wallet/swap-critical-path.spec.ts` is an APIRequest-only scaffold: it does not navigate the dApp, load/connect MetaMask, switch Arc, approve Permit2, sign EIP-712, send, wait for a receipt, verify Arcscan/recent swaps, or sanitize artifacts. It supplies no partial SC-3/SC-7 evidence.
+  **Done 2026-08-28 (live):** `swap-critical-path` exit 0 (38.3 s) against local fixed build (`DAPP_URL=http://localhost:3000`, hosted API baked). On-chain tx `0xa630da3c842d7613ebbbd4d8f66749892a4e42c510933e0e1c3f4966907ef0dd` (block 59292405, status 1, gas 263,480): QA wallet `0xc603C3…dCE76` → aggregator, 1e6 USDC → 864,471 EURC (xylo, `isSplit=0` at 1.0 size), Swap event + Permit2 pull logs. Full sequence: mnemonic bootstrap → connect+approve → header-menu network switch (MetaMask notification popup Confirm driven directly — dAppwright `addNetwork`/`confirmNetworkSwitch` are broken on MetaMask 13.17: stub `confirmNetworkSwitch`, stale selectors in `addNetwork`) → 1.0 USDC → EURC quote (Route/Protocol fee 0%) → Swap → unaudited ack → ERC-20 approve confirm → Permit2 sign (skipped, allowance pre-set) → splitSwap confirm → `Swap confirmed!` banner → Arcscan `.app` link → `chakra:recent-swaps:5042002:{addr}` localStorage. Artifact scan: no seed words in `output/playwright/`. **Fixes found during run:** (a) token default race — FALLBACK_SWAP_TOKENS mixed-case `EURC_ADDRESS` vs lowercased catalog made `tokenOut` null and unmounted the Buy selector (case-insensitive address match in SwapCard + TokenSelector); (b) `qa:wallet` npm scripts resolved `../scripts/` to `packages/scripts/` (moved to `qa/wallet/`); (c) `qa.wallet.config.ts` now `process.loadEnvFile` on `packages/frontend/.env`.
 
 - [x] **T9.5** Quote p95 &lt; 500 ms after warm Redis, measured at the API process (done 2026-08-28)  
   **Deps:** T8.1.  
