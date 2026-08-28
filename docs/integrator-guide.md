@@ -3,7 +3,7 @@
 Quickstart for wallets, dApps, and trading bots integrating the Arc Testnet DEX aggregator REST API.
 
 **Network:** Arc Testnet (`chainId` 5042002 / `0x4CEF52`)
-**API base:** `http://localhost:8080` (local) or your hosted instance
+**API base:** `https://chakra-api-0a5i.onrender.com` (hosted) or `http://localhost:8080` (local harness)
 **OpenAPI:** [openapi.yaml](./openapi.yaml) · **API reference:** [api-reference.md](./api-reference.md)
 
 ## Token catalog
@@ -19,8 +19,9 @@ Native USDC (18 dp) is **gas only** — never a swap token (SC-12).
 ## 1. Health + readiness
 
 ```bash
-API=http://localhost:8080
-
+# Hosted API
+API=https://chakra-api-0a5i.onrender.com
+# Or local harness: API=http://localhost:8080
 # Liveness
 curl -s "$API/api/v1/health" | jq .
 
@@ -123,8 +124,7 @@ The aggregator executes atomically: if any hop fails, the entire tx reverts.
 ```typescript
 import { ChakraClient } from '@lumagg/sdk';
 
-const client = new ChakraClient('http://localhost:8080');
-
+const client = new ChakraClient({ apiUrl: process.env.API_URL || 'https://chakra-api-0a5i.onrender.com' });
 // Health
 const healthy = await client.isHealthy();
 
@@ -152,7 +152,7 @@ Example script:
 
 ```bash
 cd packages/sdk && npm run build
-npx tsx examples/quote-build.ts
+API_URL=https://chakra-api-0a5i.onrender.com npx tsx examples/quote-build.ts
 ```
 
 ## 5. Local development
