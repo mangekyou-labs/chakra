@@ -218,11 +218,11 @@ Network: **Arc testnet** `chainId` 5042002 (`0x4CEF52`). Disposable persistent C
   - `/quote` (1e6 USDC→mBTC) → 200 honest `NO_ROUTE` error
   - `/build_tx` (1e6 & 5e6) → 200 with `to: "0xea1b2c24bd41163590960f8e40afe6cb4cc92006"` targeting new aggregator
 - [ ] On-chain **split** (≥2 sub-routes in one tx) on `testnet.arcscan.app`; multi-hop single-path is extra, not a substitute (SC-4)
-- [ ] Venue matrix ≥3 pairs × ≥3 sizes checked in (SC-8)
-- [ ] Split vs single-path benchmark checked in (SC-2, SC-8)
+- [x] Venue matrix ≥3 pairs × ≥3 sizes checked in (SC-8, verified 2026-08-28 in `docs/evidence/chakra-t91-venue-matrix.json`)
+- [x] Split vs single-path benchmark checked in (SC-2, SC-8, verified 2026-08-28 in `docs/evidence/chakra-t92-split-benchmark.json`; +893.01 bps gain)
 - [x] Integrator 30-min walkthrough followed once by a clean environment (SC-6, SC-9, verified 2026-08-28 in `/tmp/chakra-clean-clone-t72` in 6 seconds against hosted API; evidence in `docs/evidence/chakra-t72-walkthrough.json`)
-- [ ] Quote p95 &lt; 500 ms after warm Redis, measured **at the API process** (exclude client RTT) and checked in (SC-10)
-- [ ] Worker refresh latency after a live swap: Redis write **≤ 5 s** after inclusion, measured (SC-11)
+- [x] Quote p95 &lt; 500 ms after warm Redis, measured **at the API process** (exclude client RTT) and checked in (SC-10, verified 2026-08-28 in `docs/evidence/chakra-t95-quote-latency.json`; server-side API-process p95 = 23 ms)
+- [ ] Worker refresh latency after a live swap: Redis write **≤ 5 s** after inclusion (SC-11, local test verified in `evm_watcher::poll_refreshes_pool_store_after_fixture_swap_within_5s`; live proof open following T9.3)
 
 ## Test Data
 
@@ -251,14 +251,14 @@ Seed documentation (implementation fills exact amounts):
 
 ## Manual Testing
 
-- [ ] Dense pro-terminal visual check desktop 1280+ and mobile 390 (SC-3 UX)
-- [ ] Token logos, % chips, route legs, impact, slippage, explorer, recent swaps present
-- [ ] Unaudited-contract warning before first swap
-- [ ] Keyboard: connect, amount, token switch, confirm
-- [ ] MetaMask, and spot-check one additional EIP-6963 wallet (Rabby or Coinbase) if available
+- [ ] Dense pro-terminal visual check desktop 1280+ and mobile 390 (SC-3 UX, partial: layout/contrast verified in `docs/evidence/chakra-t98-manual-ux-a11y.json`; second-wallet spot-check open)
+- [x] Token logos, % chips, route legs, impact, slippage, explorer, recent swaps present (verified in `docs/evidence/chakra-t98-manual-ux-a11y.json`)
+- [x] Unaudited-contract warning before first swap (verified in `docs/evidence/chakra-t98-manual-ux-a11y.json`)
+- [x] Keyboard: connect, amount, token switch, confirm (verified in `docs/evidence/chakra-t98-manual-ux-a11y.json`)
+- [ ] MetaMask, and spot-check one additional EIP-6963 wallet (Rabby or Coinbase) if available (gated on browser wallet extension)
 - [ ] Faucet empty / insufficient gas (native USDC) error is readable
 - [ ] Pause aggregator → UI error; unpause → swap works
-- [ ] Accessibility: labels, contrast on terminal palette, not color-only impact
+- [x] Accessibility: labels, contrast on terminal palette, not color-only impact (verified in `docs/evidence/chakra-t98-manual-ux-a11y.json`)
 
 ## Performance Testing
 
