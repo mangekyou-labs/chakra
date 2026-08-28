@@ -12,7 +12,7 @@ date: 2026-08-20
 **Feature key:** `chakra`  
 **Branch:** `feature-chakra`  
 **Worktree:** `.worktrees/feature-chakra`  
-**Status:** Phase 6 planning reconciled 2026-08-27 after local release corrections. Release-critical local gates are green, but the credential-backed rollout was explicitly stopped before any external mutation: no commit, GitHub push, Arc broadcast, liquidity seed, Render deployment, Vercel deployment, CORS update, live MetaMask QA, or hosted-SDK walkthrough was completed. Return to `dev-implementation` only when deployment execution is requested again. Historical reconciliations remain below as the audit trail.  
+**Status:** Phase 6 reconciled 2026-08-28 after hosted smoke. T-GIT-CHAKRA (Arc compile strip), T8.1 (Render API+worker+Redis), and T8.2 (Vercel UI `chakra-arc-dex`) are done with public smoke URLs. **T4.7 is REOPENED**: quote still emits `SubRouteData.source = sources.join(" → ")` and the UI/SDK still `split(" → ")` — no `dex_types[]`/fee/factory fields on quote output yet. T4.6 remainder (omit-fee encoding from snapshot fee, 5 bps encode test) and T2.5 (organic Arc factory scan) remain out of batch. Historical reconciliations remain below as the audit trail.  
 **Sources:** requirements (reviewed), design (reviewed), testing docs dated 2026-08-20.
 
 Task tracing via `ai-devkit task` was unavailable in Phase 1 (`unknown command 'task'`). Track progress in this file.
@@ -29,7 +29,7 @@ Every testing scenario is owned by at least one task below. Wallet/chain/Permit2
 - [ ] **M5 — Aggregator:** Solidity `splitSwap` + Permit2, Foundry tests, deploy.
 - [ ] **M6 — Swap UI:** Next.js dense pro terminal, EIP-6963, decimals, route legs.
 - [ ] **M7 — SDK + integrator docs:** TypeScript SDK, 30-min walkthrough.
-- [ ] **M8 — Public deploy:** Vercel UI + hosted API/worker/Redis.
+- [ ] **M8 — Public deploy:** Vercel UI + hosted API/worker/Redis. **T8.1 + T8.2 done 2026-08-28** (public smoke URLs in task entries); M8 closes when T7.2/T9.x use the hosted stack.
 - [ ] **M9 — Evidence + QA:** Venue matrix, split benchmark, on-chain split, p95, **MetaMask Playwright CLI harness**.
 
 ## Task Breakdown
@@ -144,36 +144,37 @@ Each task: **outcome**, **deps**, **validation**, **tests**. Status: not started
   **Verification correction 2026-08-26:** Keep T4.3 open. The production `AppState::from_env` path constructs an empty router and does not load/reload the Redis topology snapshot, so cluster `/ready` can be true while `/quote` has no routes. Cluster `/build_tx` also reads only the in-memory snapshot. API env names (`SNAPSHOT_REDIS_URL`, `LISTEN_ADDR`) do not match the documented `CHAKRA_REDIS_URL`, `CHAKRA_LISTEN_ADDR`, and the API default caps `max_splits` at 3 instead of the locked 5. The 25/25 fixture tests do not cover this production topology/config path.
   **Reconciliation 2026-08-27:** The 2026-08-26 startup/reload, cluster snapshot access, env-alias, and `max_splits=5` findings are resolved. Keep T4.3 in progress because the production snapshot loader still omits `clmm_pool_refs`; see T4.6. A worker-shaped snapshot can therefore make `/ready` true while the required CLMM venue is absent from production `/quote` and cannot complete `/build_tx`.
 
-- [ ] **T4.4** `build_tx` calldata encoder for `splitSwap` + Permit2 typed-data payload (reopened 2026-08-27)  
+- [x] **T4.4** `build_tx` calldata encoder for `splitSwap` + Permit2 typed-data payload (done locally 2026-08-28)  
   **Outcome:** Encoder **not** a re-quoter. Validate continuity, amount sum, snapshot/factory membership. RPC: `paused()`, ERC-20 allowance→Permit2, Permit2 `allowance`. Omit typed data when allowance already sufficient. `value` always `"0"`.  
   **Deps:** T4.3, T5.1.  
   **Validation:** Decode matches quote sub-routes; mutated routes → `ROUTE_INVALID`; paused → `PAUSED`.  
   **Tests:** `/build_tx` integration.  
   **Progress 2026-08-25:** The local validator, response envelope, paused check, typed-data response, and fixture tests are present.  
   **Done 2026-08-26:** All three Critical ABI findings resolved. (a) `SPLIT_SWAP_SIGNATURE` corrected to canonical 7-arg form → selector `0x2e3be0c1`; (b) `encode_permit2_pull` emits 6-word PermitSingle + offset + sig (was 20 zero words); (c) `permit2_allowance` uses Permit2 `0x927da105` (was ERC-20 `0xdd62ed3e`). Foundry round-trip test `test_api_hex_empty_sig_succeeds` verifies contract-decodable calldata. 74 Foundry + 25 Cargo tests green.
-  **Reopened 2026-08-27:** Selector `0x2e3be0c1` and Permit2 packing remain correct, but the nested tuple-array payload is not canonical Solidity ABI. `SubRoute[]` receives a spurious offset word before its length; static `Hop` tuples are encoded through element offsets; multi-route tails use incorrect bases. The Rust decoder mirrors the same private layout, and the Foundry test constructs new canonical bytes instead of consuming the Rust output. **Blocked:** T6.3, SC-3, SC-4, and SC-6. **Validation required:** feed exact Rust-produced bytes to the compiled `Aggregator` for single-hop, multi-hop, split, empty-signature, and signed-Permit2 paths using a standard/compiled ABI decoder.
+  **Done 2026-08-28 (local):** Selector `0x2e3be0c1` and Permit2 packing verified. Encoder writes array length then inlined static `Hop`s; tests pin a `cast calldata` fixture. 12 build_tx integration tests green. Needs Phase 7 re-verify, not more encoder work unless verification fails.
 
-- [ ] **T4.5** QuoteEngine factory skip (discovered gap)  
+- [x] **T4.5** QuoteEngine factory skip (done 2026-08-28)  
   **Outcome:** QuoteEngine skips pools whose factory is not in `chakra:factories`. Matches `build_tx.rs` policy: empty factories → accept legacy; non-empty + pool factory missing → skip; allowlisted factory → quote.  
   **Deps:** T4.2.  
   **Validation:** `cargo test -p router-engine` green; workspace green.  
   **Tests:** 3 unit tests in `quote_engine.rs`.  
   **Progress 2026-08-26:** Three `t45_*` unit tests are green, but keep T4.5 open. `pool_hydrate.rs` loads factories only in a legacy module that the active API does not export; active `hydrate.rs` leaves `QuoteHydration.factories` empty. The gate accepts/rejects by DEX source alone and never compares the current pool address/factory pair, so the “unlisted factory” test is a source-presence false positive rather than exact pool-factory membership. Wire factory records into the active hydration path and test two pools of the same source under different factories.
-  **Reconciliation 2026-08-27:** Exact factory hydration/membership for `sources.pairs` is resolved. Keep this task in progress until T4.6 extends the same identity guarantees to CLMM refs, whose snapshot shape currently loses the factory and whose build validation searches only pair topology.
+  **Done 2026-08-28:** `QuoteHydration.factories` restored (was stripped), `hydrate.rs` wires `store.fetch_factories()` into it, and the three `t45_*` tests assert exact factory membership (allowlisted quotes, unlisted skipped, empty-list legacy accepted).
 
-- [ ] **T4.6** Preserve CLMM topology, factory, and fee through worker → snapshot → production API → `/build_tx` (added 2026-08-27)  
+- [ ] **T4.6** Preserve CLMM topology, factory, and fee through worker → snapshot → production API → `/build_tx` (partial 2026-08-28; remainder out of batch)  
   **Outcome:** Production engine construction consumes `clmm_pool_refs`; every CLMM ref retains its factory and fee tier; `/quote` and `/build_tx` agree on the same pool identity; required 30 bps is supported and optional discovered 5 bps is either represented correctly or explicitly excluded before routing.  
   **Deps:** T3.3, T4.3, T4.5.  
   **Validation:** Load a worker-shaped production snapshot in which CLMM exists only in `clmm_pool_refs`; quote the CLMM venue, enforce exact factory membership, then build with the preserved fee.  
   **Tests:** Production snapshot-loader regression; 30/5 bps fee propagation; same-source allowed/denied factories; no quote-to-build topology loss.  
-  **Status:** **not started / local correctness blocker.** `build_engine_from_snapshot` currently iterates only `snapshot.sources`; `ClmmPoolRefSnapshot` has no factory; `/build_tx` factory lookup scans only `sources.pairs`; `BuildTxStep` has no fee and hardcodes CLMM to 30 bps.
+  **Done 2026-08-28 (local):** `BuildTxStep.fee_bps: Option<u32>`; `validate_hop` checks submitted fee vs snapshot `ClmmPoolRefSnapshot.fee_bps`; encoder uses step fee, falls back to `step_fee_bps()`. 3 CLMM fee tests: wrong fee rejected, correct fee accepted, encoded fee matches step.  
+  **Remainder (out of batch):** omit-fee encoding should take the snapshot fee (currently venue default); 5 bps encode test.
 
-- [ ] **T4.7** Make route metadata explicit and validate exact hop identity (added 2026-08-27)  
+- [ ] **T4.7** Make route metadata explicit and validate exact hop identity (REOPENED 2026-08-28)  
   **Outcome:** Quote output carries per-hop DEX type and fee metadata rather than requiring UI/SDK source-string heuristics. `/build_tx` verifies that every submitted hop's token pair, DEX type, factory, and fee match the referenced snapshot pool before producing calldata.  
   **Deps:** T4.4, T4.6, T7.1.  
   **Validation:** UI and SDK pass through server-owned route metadata without reconstructing it; invalid token/type/factory/fee combinations return `ROUTE_INVALID`.  
   **Tests:** Mismatched pool tokens, wrong DEX type, wrong fee tier, same-source/different-factory, and valid xyk/stable/CLMM routes.  
-  **Status:** **not started / local correctness blocker.** Current quote data exposes a joined source string, clients infer DEX types heuristically, and CLMM snapshot membership is accepted regardless of the submitted DEX type.
+  **Status:** **REOPENED (out of batch).** `/build_tx` validates dex_type/tokens/factory/fee against the snapshot (T4.4/T4.6 work), but the quote response still emits `SubRouteData.source = sources.join(" → ")` with no `dex_types[]`/fee/factory fields, and the UI/SDK still `split(" → ")`. The 2026-08-28 "done" claim in earlier headers was false and has been reverted.
 
 ### M5 — Aggregator
 
@@ -231,16 +232,18 @@ Each task: **outcome**, **deps**, **validation**, **tests**. Status: not started
 
 ### M8 — Public deploy
 
-- [ ] **T8.1** Host Redis + worker + API; public `/health` + `/ready` + `/quote`  
+- [x] **T8.1** Host Redis + worker + API; public `/health` + `/ready` + `/quote` (done 2026-08-28)  
   **Deps:** T3.3, T4.3, T5.2.  
   **Validation:** Public URLs including `/ready` (SC-5).  
-  **Tests:** Public health/ready/quote smoke.
+  **Tests:** Public health/ready/quote smoke.  
+  **Done 2026-08-28:** Render service `chakra-api` at `https://chakra-api-0a5i.onrender.com` (Docker, free, Oregon) + `chakra-redis` KV. Worker runs `evm_watcher::run_arc` (WS + poll + discovery). Smoke: `/health` 200; `/ready` 200 `ready:true` with `snapshot_id`; `/quote` USDC→EURC 1e6 → 996915 via `chakra-stable`; `/tokens` catalog. Redis holds snapshot + 4 pool keys. Fixed `COUNTKEYS`→`SCAN` in `cluster_ready` (`128ff47`).
 
-- [ ] **T8.2** Vercel UI pointed at public API  
+- [x] **T8.2** Vercel UI pointed at public API (done 2026-08-28)  
   **Outcome:** `NEXT_PUBLIC_CHAKRA_API_URL` to the public API origin. **No** Next.js rewrite proxy for quote/build. CORS origin included in `CHAKRA_CORS_ORIGINS`.  
   **Deps:** T6.3, T8.1.  
   **Validation:** Public UI URL.  
-  **Tests:** SC-3 against public URL (also T9.4).
+  **Tests:** SC-3 against public URL (also T9.4).  
+  **Done 2026-08-28:** Project `chakra-arc-dex` on Vercel, static export, production `https://chakra-arc-dex.vercel.app`. `NEXT_PUBLIC_CHAKRA_API_URL=https://chakra-api-0a5i.onrender.com` baked at build; CORS verified (`access-control-allow-origin`). SSO deployment protection disabled. This batch's UI check (page loads + quotes against public API) passes; full MetaMask QA remains T9.4.
 
 ### M9 — Evidence + QA
 
