@@ -517,3 +517,36 @@ Everything runs on fixture RPC/WS servers and a **memory store** in tests (SC-11
 - **`cd packages/sdk` (T7.1, 2026-08-25): `npm test` 12 passed / 0 failed** (6 new client tests: quote params incl. no `prefer_arc`/percent slippage, bps parse, buildTx `user` + steps body, 2-hop step mapper, envelope `.code` error, isHealthy path); `npm run build` (tsc) exit 0; `npx tsx examples/quote-build.ts` → `example not executed — API not up` (no local API running — no SC-6 live claim).
 - `npx ai-devkit@latest lint --feature chakra` (2026-08-25, after T6.1/T7.1/T6.2): all checks passed.
 - Live Arc broadcasts for T2.1–T2.5/T5.2 all **blocked** (no operator key in this environment; never `--private-key` on CLI); live SC-11 WS→Redis proof is **T9.6**.
+
+### Phase 5 Xylo + Aggregator Redeploy + Hosted Verification (2026-08-28)
+
+- **XyloNet Integration (T-XYLO):**
+  - `contracts/evm/src/Aggregator.sol`: `DexType.Xylo` (3), `_xyloOut` (`forceApprove`, `swap(..., address(this), deadline)`, reset allowance), `_assertPool` (`getPool(in,out) == pool`).
+  - `contracts/evm/src/interfaces/IXyloNet.sol` and `contracts/evm/src/MockXylo.sol` added.
+  - `contracts/evm/test/Aggregator.t.sol`: 5 new Xylo tests (happy path swap, unknown factory revert, USYC pair block, not usable as stable hop, `removeFactory` gating). Forge suite: **81 passed / 0 failed**.
+  - `crates/dex-adapters/src/evm_quote_math.rs`: `xylo_quote` (A=200, 4 bps fee on output) pinned to live same-block RPC vectors (`calculateSwap(1e6 USDC→EURC) = 865542`).
+  - `crates/market-data-worker/src/evm_watcher.rs`: `FactoryConfig::parse` fixed so `dex_type == "xylo"` maps to `source: "xylo"` for both seed and discovery.
+  - `crates/market-data-worker/src/fetch_pipeline.rs`: Added `chakra-xylo` coalesce fallback to `EvmXylo`.
+  - `crates/router-engine/src/quote_engine.rs`: Dispatches `source == "xylo"` to `local_xylo_quote`.
+  - `crates/api-server/src/build_tx.rs`: `DexType::Xylo` mapped to enum value 3 with 4 bps fee.
+  - Workspace tests: `market-snapshot` 36 passed, `market-data-worker` 17 passed, `router-engine` 48 passed, `dex-adapters --lib` 78 passed, `api-server` tests 25 passed.
+  - SDK (14 passed) and Frontend (66 passed) tests green.
+- **Aggregator Redeployment (T5.2):**
+  - Broadcast to Arc testnet via `scripts/arc-operator.sh --broadcast script script/DeployAggregator.s.sol`.
+  - New Aggregator address: `0xEa1b2C24bd41163590960F8e40afe6cb4CC92006` (Tx hash: `0x4cef6ba6e6d7132a7517666b2ce6c1ab7f5ae882ca9c80bb82ad9658ab71a22d`).
+  - On-chain properties verified:
+    - Codesize: 22,258 hex chars (11,128 bytes, was 10,139 bytes).
+    - Owner: `0x12E266744f6d25D372000e066eCc0DF5a752276d`.
+    - Paused: `false`.
+    - `factoryDexType` allowlists: Xyk (`0x0c81...`)=0, Stable (`0x77Ce...`)=1, Clmm (`0xf6dE...`)=2, Xylo (`0x60ED...`)=3.
+- **Hosted Deployment & Verification (Render):**
+  - Commits `1e810b6` and `6d9cc78` pushed to `chakra/main`.
+  - Render service `srv-da8g4non74is73ds1jgg` updated with new `CHAKRA_AGGREGATOR` and `CHAKRA_SEED_FACTORIES`/`CHAKRA_DISCOVERY_FACTORIES` containing `0x60EDeFB094B84BBC6430cc130B358A43Ba1979e2:xylo`.
+  - Deploy `dep-da8j4g8ae00c73d3j4cg` successfully rolled out to `live`.
+  - Live API smoke tests (`https://chakra-api-0a5i.onrender.com`):
+    - `GET /api/v1/health`: 200 OK
+    - `GET /api/v1/ready`: 200 ready:true
+    - `GET /api/v1/quote` (1e6 USDC→EURC): 200 OK, returns 996,915 via `chakra-stable` (`dex_types: ["stable"]`)
+    - `GET /api/v1/quote` (5e6 USDC→EURC): 200 OK, returns 4,680,042 routing `xylo` (`dex_types: ["xylo"]`)
+    - `GET /api/v1/quote` (1e6 USDC→mBTC): 200 OK, returns `NO_ROUTE` error
+    - `POST /api/v1/build_tx`: 200 OK, returns calldata with `to: "0xea1b2c24bd41163590960f8e40afe6cb4cc92006"` matching the newly deployed Aggregator contract.
