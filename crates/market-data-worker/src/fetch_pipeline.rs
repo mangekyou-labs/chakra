@@ -1,27 +1,25 @@
-//! Ledger-driven pool-state fetch pipeline: high-priority `FetchTask` queue →
-//! RPC workers → Redis sink.
+//! EVM pool-state fetch pipeline for the Arc path: high-priority `FetchTask`
+//! queue → RPC workers → Redis sink.
 //!
-//! Full-market refresh is **not** scheduled here. Bootstrap + periodic
-//! discovery publish pool state to Redis; this pipeline only handles
-//! ledger-touched pools (Jupiter-style event-driven updates).
+//! Only EVM venues are handled (`chakra-xyk` / `chakra-stable` /
+//! `chakra-clmm` + `discovered:*`). Arc adapters are never constructed.
 
 use {
-    crate::{clmm_metrics::ClmmCoverageMetrics, pool_state_publish::Arc venue_state_to_value, worker::WorkerShared},
-    anyhow::{Context, Result},
+    crate::{clmm_metrics::ClmmCoverageMetrics, worker::WorkerShared},
+    anyhow::Result,
     dex_adapters::{
-        Arc venue::Arc venueAdapter, Arc venue_clmm::Arc venueClmmAdapter,
-        batch_refresh::batch_refresh_Arc venue_reserves_parallel, Arc venue::Arc venueAdapter, Arc venue::Arc venueAdapter,
-        pool_index::PoolRef, rpc::ArcRpc, Arc venue::Arc venueAdapter, sushi::SushiAdapter, DexAdapter, EvmRpcClient,
+        evm_logs::normalize_evm_address,
+        evm_rpc::EvmRpcClient,
+        pool_index::PoolRef,
     },
     market_snapshot::{
         pool_state_store::{
-            should_publish_clmm_to_redis, Arc venuePoolStateValue, Arc venuePoolStateValue, PoolStateStore,
-            StablePoolStateValue, XykPoolStateValue,
+            should_publish_clmm_to_redis, PoolStateStore, StablePoolStateValue, XykPoolStateValue,
         },
-        ClmmPoolRefSnapshot, ClmmPoolSnapshot, SourceSnapshot, TradingPairSnapshot,
+        ClmmPoolRefSnapshot, ClmmPoolSnapshot, TradingPairSnapshot,
     },
     std::{
-        collections::{HashMap, HashSet},
+        collections::HashSet,
         sync::{
             atomic::{AtomicU64, AtomicUsize, Ordering},
             Arc,
@@ -33,22 +31,6 @@ use {
 
 #[derive(Debug, Clone)]
 pub enum FetchTask {
-    Arc venueBatch {
-        pool_addresses: Vec<String>,
-    },
-    Arc venueBatch {
-        pool_addresses: Vec<String>,
-    },
-    Arc venueBatch {
-        pool_addresses: Vec<String>,
-    },
-    Arc venuePool {
-        pool_address: String,
-    },
-    ClmmPool {
-        source: String,
-        pool_address: String,
-    },
     /// EVM xy=k pool (Arc, chakra-xyk / discovered:xyk).
     EvmXyk {
         pool_address: String,
@@ -104,8 +86,6 @@ impl FetchPipelineMetrics {
 #[derive(Debug)]
 enum PoolStateUpdate {
     Xyk(Vec<XykPoolStateValue>),
-    Arc venue(Vec<Arc venuePoolStateValue>),
-    Arc venue(Vec<Arc venuePoolStateValue>),
     Stable(Vec<StablePoolStateValue>),
     Clmm(ClmmPoolSnapshot),
 }
@@ -134,13 +114,6 @@ impl FetchPipelineConfig {
     }
 }
 
-pub fn fetch_pipeline_enabled_from_env() -> bool {
-    std::env::var("FETCH_PIPELINE_ENABLED")
-        .ok()
-        .map(|v| matches!(v.to_ascii_lowercase().as_str(), "1" | "true" | "yes" | "on"))
-        .unwrap_or(true)
-}
-
 #[derive(Clone)]
 pub struct FetchPipelineHandle {
     high_tx: mpsc::Sender<FetchTask>,
@@ -166,26 +139,11 @@ impl FetchPipelineHandle {
     }
 }
 
-/// One batched task per xy=k/Arc venue/Arc venue source per poll; CLMM/Arc venue stay
-/// one-task-per-pool (heavier RPC).
+/// One task per touched pool (EVM fetches are single-pool RPC calls).
 pub(crate) fn coalesce_touched_into_tasks(touched: HashSet<PoolRef>) -> Vec<FetchTask> {
-    let mut Arc venue = Vec::new();
-    let mut Arc venue = Vec::new();
-    let mut Arc venue = Vec::new();
     let mut tasks = Vec::new();
-
     for pool in touched {
         match pool.source.as_str() {
-            "Arc venue" => Arc venue.push(pool.pool_address),
-            "Arc venue" => Arc venue.push(pool.pool_address),
-            "Arc venue" => Arc venue.push(pool.pool_address),
-            "Arc venue" => tasks.push(FetchTask::Arc venuePool {
-                pool_address: pool.pool_address,
-            }),
-            "sushi" | "Arc venue_clmm" => tasks.push(FetchTask::ClmmPool {
-                source: pool.source,
-                pool_address: pool.pool_address,
-            }),
             // Arc venues (seed = chakra-*, discovered factories = discovered:*).
             "chakra-xyk" | "discovered:xyk" => tasks.push(FetchTask::EvmXyk {
                 pool_address: pool.pool_address,
@@ -201,53 +159,20 @@ pub(crate) fn coalesce_touched_into_tasks(touched: HashSet<PoolRef>) -> Vec<Fetc
             }
         }
     }
-
-    let mut push_batch = |source: &str, mut addrs: Vec<String>| {
-        if addrs.is_empty() {
-            return;
-        }
-        addrs.sort();
-        addrs.dedup();
-        match source {
-            "Arc venue" => tasks.push(FetchTask::Arc venueBatch { pool_addresses: addrs }),
-            "Arc venue" => tasks.push(FetchTask::Arc venueBatch { pool_addresses: addrs }),
-            "Arc venue" => tasks.push(FetchTask::Arc venueBatch { pool_addresses: addrs }),
-            _ => {}
-        }
-    };
-    push_batch("Arc venue", Arc venue);
-    push_batch("Arc venue", Arc venue);
-    push_batch("Arc venue", Arc venue);
     tasks
 }
 
 struct FetchWorkerContext {
-    rpc: Arc<ArcRpc>,
-    evm: Option<Arc<EvmRpcClient>>,
-    Arc venue: Arc<Arc venueAdapter>,
-    Arc venue: Arc<Arc venueAdapter>,
-    Arc venue: Arc<Arc venueAdapter>,
-    Arc venue: Arc<Arc venueAdapter>,
-    sushi: Arc<SushiAdapter>,
-    Arc venue_clmm: Arc<Arc venueClmmAdapter>,
+    evm: Arc<EvmRpcClient>,
     shared: Arc<RwLock<WorkerShared>>,
-    refresh_concurrency: usize,
     clmm_metrics: Option<Arc<ClmmCoverageMetrics>>,
 }
 
 pub fn spawn_fetch_pipeline(
     config: FetchPipelineConfig,
     pool_store: Arc<dyn PoolStateStore>,
-    rpc: Arc<ArcRpc>,
-    evm: Option<Arc<EvmRpcClient>>,
+    evm: Arc<EvmRpcClient>,
     shared: Arc<RwLock<WorkerShared>>,
-    Arc venue: Arc<Arc venueAdapter>,
-    Arc venue: Arc<Arc venueAdapter>,
-    Arc venue: Arc<Arc venueAdapter>,
-    Arc venue: Arc<Arc venueAdapter>,
-    sushi: Arc<SushiAdapter>,
-    Arc venue_clmm: Arc<Arc venueClmmAdapter>,
-    clmm_metrics: Option<Arc<ClmmCoverageMetrics>>,
 ) -> FetchPipelineHandle {
     let (high_tx, mut high_rx) = mpsc::channel::<FetchTask>(config.high_queue_capacity);
     let (redis_tx, mut redis_rx) = mpsc::channel(config.high_queue_capacity.max(1024));
@@ -256,17 +181,9 @@ pub fn spawn_fetch_pipeline(
     let stats_metrics = metrics.clone();
 
     let worker_ctx = Arc::new(FetchWorkerContext {
-        rpc,
         evm,
-        Arc venue,
-        Arc venue,
-        Arc venue,
-        Arc venue,
-        sushi,
-        Arc venue_clmm,
         shared,
-        refresh_concurrency: config.refresh_concurrency,
-        clmm_metrics: clmm_metrics.clone(),
+        clmm_metrics: None,
     });
 
     let semaphore = Arc::new(tokio::sync::Semaphore::new(config.worker_count));
@@ -310,10 +227,6 @@ pub fn spawn_fetch_pipeline(
         while let Some(update) = redis_rx.recv().await {
             let result = match update {
                 PoolStateUpdate::Xyk(values) if !values.is_empty() => pool_store_sink.set_xyk_batch(&values).await,
-                PoolStateUpdate::Arc venue(values) if !values.is_empty() => {
-                    pool_store_sink.set_Arc venue_batch(&values).await
-                }
-                PoolStateUpdate::Arc venue(values) if !values.is_empty() => pool_store_sink.set_Arc venue_batch(&values).await,
                 PoolStateUpdate::Stable(values) if !values.is_empty() => {
                     pool_store_sink.set_stable_batch(&values).await
                 }
@@ -333,21 +246,20 @@ pub fn spawn_fetch_pipeline(
         .and_then(|v| v.parse().ok())
         .unwrap_or(60)
         .max(15);
-    let stats_clmm = clmm_metrics.clone();
     tokio::spawn(async move {
         let mut interval = tokio::time::interval(std::time::Duration::from_secs(stats_interval_secs));
         interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
         interval.tick().await;
         loop {
             interval.tick().await;
-            stats_metrics.log_periodic_summary(stats_clmm.as_deref());
+            stats_metrics.log_periodic_summary(None);
         }
     });
 
     info!(
         worker_count = config.worker_count,
         refresh_concurrency = config.refresh_concurrency,
-        "Fetch pipeline started (ledger touched → RPC workers → Redis)"
+        "Fetch pipeline started (ledger touched → EVM RPC workers → Redis)"
     );
 
     FetchPipelineHandle { high_tx, metrics }
@@ -355,122 +267,15 @@ pub fn spawn_fetch_pipeline(
 
 async fn execute_fetch_task(ctx: &FetchWorkerContext, task: FetchTask) -> Result<Vec<PoolStateUpdate>> {
     match task {
-        FetchTask::Arc venueBatch { pool_addresses } => {
-            let sources = ctx.shared.read().await.sources.clone();
-            let results =
-                batch_refresh_Arc venue_reserves_parallel(ctx.rpc.as_ref(), &pool_addresses, ctx.refresh_concurrency)
-                    .await?;
-            ctx.Arc venue.apply_batch_reserves(&results).await;
-            let values = xyk_values_from_batch(&sources, "Arc venue", &results);
-            Ok(if values.is_empty() {
-                vec![]
-            } else {
-                vec![PoolStateUpdate::Xyk(values)]
-            })
-        }
-        FetchTask::Arc venueBatch { pool_addresses } => {
-            ctx.Arc venue.refresh_pool_addresses(&pool_addresses).await?;
-            let states = ctx.Arc venue.export_pool_quote_states_for(&pool_addresses).await;
-            let values: Vec<Arc venuePoolStateValue> = states
-                .into_iter()
-                .map(|state| Arc venuePoolStateValue {
-                    pool_address: state.pool_address,
-                    tokens: state.tokens,
-                    reserves: state.reserves,
-                    fee_bps: state.fee_bps,
-                    is_stable: state.is_stable,
-                    amp: state.amp,
-                    updated_at_ms: 0,
-                })
-                .collect();
-            Ok(if values.is_empty() {
-                vec![]
-            } else {
-                vec![PoolStateUpdate::Arc venue(values)]
-            })
-        }
-        FetchTask::Arc venueBatch { pool_addresses } => {
-            ctx.Arc venue.refresh_touched_pools(&pool_addresses).await?;
-            let sources = ctx.shared.read().await.sources.clone();
-            let values =
-                collect_xyk_from_adapter_cache(&sources, "Arc venue", &pool_addresses, ctx.Arc venue.as_ref()).await;
-            Ok(if values.is_empty() {
-                vec![]
-            } else {
-                vec![PoolStateUpdate::Xyk(values)]
-            })
-        }
-        FetchTask::Arc venuePool { pool_address } => {
-            if !ctx.Arc venue.refresh_pool(&pool_address).await? {
-                return Ok(vec![]);
-            }
-            let values: Vec<Arc venuePoolStateValue> = ctx
-                .Arc venue
-                .export_pool_quote_states_for(std::slice::from_ref(&pool_address))
-                .await
-                .into_iter()
-                .filter(|(_, state)| state.records.len() >= 2)
-                .map(|(addr, state)| Arc venue_state_to_value(&addr, &state))
-                .collect();
-            Ok(if values.is_empty() {
-                vec![]
-            } else {
-                vec![PoolStateUpdate::Arc venue(values)]
-            })
-        }
-        FetchTask::ClmmPool { source, pool_address } => {
-            match source.as_str() {
-                "sushi" => ctx.sushi.ensure_pool_loaded(&pool_address).await?,
-                "Arc venue_clmm" => ctx.Arc venue_clmm.ensure_pool_loaded(&pool_address).await?,
-                other => {
-                    anyhow::bail!("unknown CLMM source {}", other);
-                }
-            }
-
-            let exported = match source.as_str() {
-                "sushi" => ctx.sushi.export_clmm_snapshots().await,
-                "Arc venue_clmm" => ctx.Arc venue_clmm.export_clmm_snapshots().await,
-                _ => Vec::new(),
-            };
-            let Some(snapshot) = exported.into_iter().find(|s| s.pool_address == pool_address) else {
-                return Ok(vec![]);
-            };
-            if let Some(metrics) = &ctx.clmm_metrics {
-                metrics.record_snapshot(&snapshot);
-            }
-            if !should_publish_clmm_to_redis(&snapshot) {
-                debug!(
-                    source = %source,
-                    pool = %pool_address,
-                    "CLMM fetch: skipped Redis publish (incomplete coverage)"
-                );
-                return Ok(vec![]);
-            };
-
-            let mut guard = ctx.shared.write().await;
-            if let Some(existing) = guard
-                .clmm_pools
-                .iter_mut()
-                .find(|p| p.source == snapshot.source && p.pool_address == snapshot.pool_address)
-            {
-                *existing = snapshot.clone();
-            } else {
-                guard.clmm_pools.push(snapshot.clone());
-            }
-
-            Ok(vec![PoolStateUpdate::Clmm(snapshot)])
-        }
         FetchTask::EvmXyk { pool_address } => {
-            let evm = ctx.evm.as_ref().context("EvmXyk task without an EVM client")?;
             let (source, pair) = find_evm_pair(&ctx.shared, "xyk", &pool_address).await?;
-            let value = dex_adapters::evm_fetch::fetch_xyk_state(evm.as_ref(), source.as_str(), &pair).await?;
+            let value = dex_adapters::evm_fetch::fetch_xyk_state(ctx.evm.as_ref(), source.as_str(), &pair).await?;
             Ok(vec![PoolStateUpdate::Xyk(vec![value])])
         }
         FetchTask::EvmStable { pool_address } => {
-            let evm = ctx.evm.as_ref().context("EvmStable task without an EVM client")?;
             let (source, pair) = find_evm_pair(&ctx.shared, "stable", &pool_address).await?;
             let value = dex_adapters::evm_fetch::fetch_stable_state(
-                evm.as_ref(),
+                ctx.evm.as_ref(),
                 source.as_str(),
                 &pair,
                 dex_adapters::evm_fetch::CHAKRA_STABLE_A,
@@ -479,16 +284,12 @@ async fn execute_fetch_task(ctx: &FetchWorkerContext, task: FetchTask) -> Result
             Ok(vec![PoolStateUpdate::Stable(vec![value])])
         }
         FetchTask::EvmClmm { pool_address } => {
-            let evm = ctx.evm.as_ref().context("EvmClmm task without an EVM client")?;
             let (pool_ref, existing) = {
                 let guard = ctx.shared.read().await;
                 let existing = guard
                     .clmm_pools
                     .iter()
-                    .find(|p| {
-                        dex_adapters::evm_logs::normalize_evm_address(&p.pool_address)
-                            == dex_adapters::evm_logs::normalize_evm_address(&pool_address)
-                    })
+                    .find(|p| normalize_evm_address(&p.pool_address) == normalize_evm_address(&pool_address))
                     .cloned();
                 let Some(existing) = existing.as_ref() else {
                     anyhow::bail!("EvmClmm pool {pool_address} not in topology");
@@ -507,7 +308,7 @@ async fn execute_fetch_task(ctx: &FetchWorkerContext, task: FetchTask) -> Result
                 )
             };
             let snapshot =
-                dex_adapters::evm_fetch::fetch_clmm_state(evm.as_ref(), &pool_ref.source, &pool_ref, Some(&existing))
+                dex_adapters::evm_fetch::fetch_clmm_state(ctx.evm.as_ref(), &pool_ref.source, &pool_ref, Some(&existing))
                     .await?;
             if let Some(metrics) = &ctx.clmm_metrics {
                 metrics.record_snapshot(&snapshot);
@@ -543,89 +344,13 @@ async fn find_evm_pair(
     let guard = shared.read().await;
     for source in &guard.sources {
         for pair in &source.pairs {
-            if pair.dex_type == dex_type
-                && dex_adapters::evm_logs::normalize_evm_address(&pair.pool_address)
-                    == dex_adapters::evm_logs::normalize_evm_address(pool_address)
+            if pair.dex_type == dex_type && normalize_evm_address(&pair.pool_address) == normalize_evm_address(pool_address)
             {
                 return Ok((source.source.clone(), pair.clone()));
             }
         }
     }
     anyhow::bail!("EVM {dex_type} pool {pool_address} not in topology")
-}
-
-fn xyk_values_from_batch(
-    sources: &[SourceSnapshot],
-    source: &str,
-    results: &[(String, Option<(u128, u128)>)],
-) -> Vec<XykPoolStateValue> {
-    let Some(source_snapshot) = sources.iter().find(|s| s.source == source) else {
-        return Vec::new();
-    };
-    let topology: HashMap<String, &TradingPairSnapshot> = source_snapshot
-        .pairs
-        .iter()
-        .map(|p| (p.pool_address.clone(), p))
-        .collect();
-
-    let mut out = Vec::new();
-    for (addr, reserves) in results {
-        let Some((r0, r1)) = reserves else {
-            continue;
-        };
-        let Some(pair) = topology.get(addr) else {
-            continue;
-        };
-        out.push(XykPoolStateValue::new(
-            source,
-            addr,
-            &pair.token_a,
-            &pair.token_b,
-            pair.fee_bps,
-            *r0,
-            *r1,
-        ));
-    }
-    out
-}
-
-async fn collect_xyk_from_adapter_cache(
-    sources: &[SourceSnapshot],
-    source: &str,
-    pool_addresses: &[String],
-    adapter: &dyn DexAdapter,
-) -> Vec<XykPoolStateValue> {
-    let wanted: HashSet<&str> = pool_addresses.iter().map(|s| s.as_str()).collect();
-    let topology: HashMap<String, &TradingPairSnapshot> = sources
-        .iter()
-        .find(|s| s.source == source)
-        .into_iter()
-        .flat_map(|s| &s.pairs)
-        .map(|p| (p.pool_address.clone(), p))
-        .collect();
-
-    let mut out = Vec::new();
-    for pair in adapter.get_cached_pairs().await {
-        if !wanted.contains(pair.pool_address.as_str()) {
-            continue;
-        }
-        let (Some(reserve_a), Some(reserve_b)) = (pair.reserve_a, pair.reserve_b) else {
-            continue;
-        };
-        let Some(topo) = topology.get(&pair.pool_address) else {
-            continue;
-        };
-        out.push(XykPoolStateValue::new(
-            source,
-            &pair.pool_address,
-            &topo.token_a,
-            &topo.token_b,
-            pair.fee_bps,
-            reserve_a,
-            reserve_b,
-        ));
-    }
-    out
 }
 
 #[cfg(test)]
@@ -640,40 +365,6 @@ mod tests {
     }
 
     #[test]
-    fn coalesce_batches_Arc venue_and_Arc venue_per_poll() {
-        let touched = HashSet::from([
-            pref("Arc venue", "A2"),
-            pref("Arc venue", "A1"),
-            pref("Arc venue", "A1"),
-            pref("Arc venue", "S1"),
-            pref("sushi", "CLMM1"),
-            pref("Arc venue", "C1"),
-        ]);
-        let tasks = coalesce_touched_into_tasks(touched);
-        let Arc venue = tasks.iter().find_map(|t| match t {
-            FetchTask::Arc venueBatch { pool_addresses } => Some(pool_addresses.clone()),
-            _ => None,
-        });
-        assert_eq!(
-            Arc venue.as_deref(),
-            Some(["A1".to_string(), "A2".to_string()].as_slice())
-        );
-        let Arc venue = tasks.iter().find_map(|t| match t {
-            FetchTask::Arc venueBatch { pool_addresses } => Some(pool_addresses.clone()),
-            _ => None,
-        });
-        assert_eq!(Arc venue.as_deref(), Some(["S1".to_string()].as_slice()));
-        assert_eq!(
-            tasks
-                .iter()
-                .filter(|t| matches!(t, FetchTask::ClmmPool { .. } | FetchTask::Arc venuePool { .. }))
-                .count(),
-            2
-        );
-        assert_eq!(tasks.len(), 4);
-    }
-
-    #[test]
     fn coalesce_maps_evm_chakra_sources_to_evm_tasks() {
         let touched = HashSet::from([
             pref("chakra-xyk", "0xP1"),
@@ -681,6 +372,7 @@ mod tests {
             pref("chakra-stable", "0xS1"),
             pref("discovered:clmm", "0xC1"),
             pref("chakra-clmm", "0xC2"),
+            pref("Arc venue", "0xArc"),
         ]);
         let tasks = coalesce_touched_into_tasks(touched);
         assert!(tasks
@@ -698,5 +390,10 @@ mod tests {
         assert!(tasks
             .iter()
             .any(|t| matches!(t, FetchTask::EvmClmm { pool_address } if pool_address == "0xC2")));
+        // Arc sources never produce tasks on the Arc path.
+        assert!(!tasks
+            .iter()
+            .any(|t| matches!(t, FetchTask::EvmXyk { pool_address } if pool_address == "0xArc")));
+        assert_eq!(tasks.len(), 5);
     }
 }

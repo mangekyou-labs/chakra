@@ -398,6 +398,10 @@ pub struct BuildTxStep {
     pub pool_address: String,
     pub token_in: String,
     pub token_out: String,
+    /// Per-hop fee in bps from the quote snapshot. The server validates this
+    /// against the snapshot; omitting it falls back to the venue default.
+    #[serde(default)]
+    pub fee_bps: Option<u32>,
 }
 
 #[derive(Serialize)]
