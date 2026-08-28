@@ -570,18 +570,22 @@ Everything runs on fixture RPC/WS servers and a **memory store** in tests (SC-11
 
 ### T9 Grant-Style Evidence Pack (2026-08-28)
 
-- **Venue Routing Matrix (T9.1 / SC-8):**
-  - Evaluated 15 matrix scenarios across 5 pairs (USDC↔EURC, USDC↔mBTC, EURC↔mBTC, mBTC↔USDC) and 3 sizes each against live hosted API (`https://chakra-api-0a5i.onrender.com`).
+- **Venue Routing Matrix (T9.1 / SC-8 — Partial):**
+  - Evaluated 15 matrix points across 5 pairs (USDC↔EURC, USDC↔mBTC, EURC↔mBTC, mBTC↔USDC) and 3 sizes each on live hosted API (`https://chakra-api-0a5i.onrender.com`).
+  - Reclassified envelope errors: USDC↔EURC pairs are routable across `chakra-stable` and `xylo`; mBTC pairs return `NO_ROUTE` due to under-seeded testnet pool balances and incomplete CLMM ticks. Live 3-pair routing remains open gated on T2.1–T2.4 liquidity re-seed.
   - Evidence logged in `docs/evidence/chakra-t91-venue-matrix.json`.
 - **Split vs Single-Path Benchmark (T9.2 / SC-2 / SC-8):**
-  - Live benchmark of 5e6 USDC→EURC proves split optimizer outputs 4,680,269 EURC vs 4,296,582 EURC for best single venue (`xylo`), delivering **+383,687 EURC (+893.01 bps / +8.93%)** improvement for the user.
+  - Live benchmark of 5e6 USDC→EURC (5 USDC input) proves split optimizer outputs 4,680,269 atomic units (~4.68 EURC) vs 4,296,582 atomic units (~4.30 EURC) for best single venue (`xylo`), delivering **+383,687 atomic units (+0.3837 EURC / +893.01 bps / +8.93%)** improvement for the user.
   - Evidence logged in `docs/evidence/chakra-t92-split-benchmark.json`.
 - **Quote Latency p95 Benchmark & API-Boundary Instrumentation (T9.5 / SC-10):**
   - Added API-boundary timer (`start_time.elapsed().as_millis()`) in `crates/api-server/src/handlers.rs` (commit `d3f8c79`), deployed to Render (`dep-da8jk6cs728c73bvdrb0`), and verified live.
   - Measured 100 consecutive requests to `GET /api/v1/quote` on hosted API. Server-side `compute_time_ms` p95 = **23 ms** (min 9 ms, avg 13.16 ms, median 11 ms, p90 18 ms, max 74 ms; gate < 500 ms).
   - Evidence logged in `docs/evidence/chakra-t95-quote-latency.json`.
-- **UX & Accessibility Audit (T9.8 / SC-3 UX):**
-  - Tested desktop (1280×800) and mobile (375×667) viewports. Unaudited status banner, keyboard accessibility, token selectors, slippage settings, recent swaps storage, and WCAG AA color contrast confirmed.
+- **UX & Accessibility Audit (T9.8 / SC-3 UX — Partial):**
+  - Audited desktop (1280×800) and mobile (375×667) viewports on live Vercel UI.
+  - Measured real DOM contrast ratios: Heading 'Swap' (16.62:1) and Amount Input (15.03:1) pass WCAG AA/AAA; Status Banner (4.07:1) and Sell Label (3.42:1) fall below standard 4.5:1 threshold; Disabled CTA (2.64:1) is exempt.
+  - Captured real browser `Tab` (14 focusable steps) and `Shift+Tab` keyboard traversal sequence via `playwright-cli press`.
+  - Second-wallet (Rabby/Coinbase) EIP-6963 spot check and live on-chain confirm UI state remain open pending browser wallet extensions.
   - Evidence logged in `docs/evidence/chakra-t98-manual-ux-a11y.json`.
-- **Master Evidence Pack Index (T9.7):**
-  - Compiled grant catalog `docs/evidence/README.md` indexing all 13 Success Criteria (SC-1 through SC-13), public URLs, on-chain contract deployments, and artifact files.
+- **Master Evidence Pack Index (T9.7 — Partial):**
+  - Compiled grant catalog `docs/evidence/README.md` indexing all 13 Success Criteria (SC-1 through SC-13), public URLs, on-chain contract deployments, and artifact files with explicit open/gated criteria tracking.

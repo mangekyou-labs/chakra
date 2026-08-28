@@ -1,6 +1,6 @@
 {
   "scenario": "T9.8 Manual UX & Accessibility Audit",
-  "timestamp_utc": "2026-08-28T07:42:00Z",
+  "timestamp_utc": "2026-08-28T07:44:00Z",
   "status": "OPEN_PARTIAL",
   "tested_url": "https://chakra-arc-dex.vercel.app",
   "viewports_tested": [
@@ -40,7 +40,7 @@
       "effective_background": "rgb(26, 31, 39)",
       "contrast_ratio": 3.42,
       "wcag_aa_standard_pass": false,
-      "notes": "Secondary muted label."
+      "notes": "Secondary muted label falls below 4.5:1."
     },
     {
       "element": "Amount Input",
@@ -67,25 +67,33 @@
       "notes": "Disabled state is exempt from standard contrast requirement under WCAG 2.1 §1.4.3."
     }
   ],
-  "keyboard_focusable_elements_count": 16,
-  "keyboard_focus_order": [
-    "1: A (Chakra brand)",
-    "2: A (Swap)",
-    "3: BUTTON (Docs)",
-    "4: BUTTON (Open menu - mobile only)",
-    "5: A (Discord)",
-    "6: A (GitHub)",
-    "7: BUTTON (Connect Wallet)",
-    "8: BUTTON (Swap settings)",
-    "9: INPUT (Amount in)",
-    "10: BUTTON (Token in: USDC)",
-    "11: BUTTON (Swap token direction)",
-    "12: A (Documentation)",
-    "13: A (Discord)",
-    "14: A (Open source)"
-  ],
+  "real_keyboard_traversal": {
+    "test_method": "playwright-cli press Tab and press Shift+Tab (real browser event dispatch)",
+    "forward_tab_focus_order": [
+      "Tab 1: A (Chakra brand)",
+      "Tab 2: A (Swap nav)",
+      "Tab 3: BUTTON (Docs dropdown)",
+      "Tab 4: A (Discord link)",
+      "Tab 5: A (GitHub link)",
+      "Tab 6: BUTTON (Connect Wallet header CTA)",
+      "Tab 7: BUTTON (Swap settings gear)",
+      "Tab 8: INPUT (Sell amount input)",
+      "Tab 9: BUTTON (Token selector: 'U USDC')",
+      "Tab 10: BUTTON (Swap token direction)",
+      "Tab 11: A (Documentation footer link)",
+      "Tab 12: A (Discord footer link)",
+      "Tab 13: A (Open source footer link)"
+    ],
+    "reverse_shift_tab_focus_order": [
+      "Shift+Tab 1: A (Open source footer link)",
+      "Shift+Tab 2: A (Discord footer link)",
+      "Shift+Tab 3: A (Documentation footer link)",
+      "Shift+Tab 4: BUTTON (Swap token direction)",
+      "Shift+Tab 5: BUTTON (Token selector: 'U USDC')"
+    ]
+  },
   "open_audit_items": [
-    "Second-wallet (Rabby/Coinbase) EIP-6963 spot check is open (requires browser extensions).",
+    "Second-wallet (Rabby/Coinbase) EIP-6963 spot check is open (requires external browser extensions).",
     "Live on-chain transaction confirmation UI state is open (requires funded MetaMask on Arc testnet)."
   ]
 }
