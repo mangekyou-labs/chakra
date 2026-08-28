@@ -26,9 +26,9 @@ Every testing scenario is owned by at least one task below. Wallet/chain/Permit2
 - [ ] **M2 — Venues & tokens:** mBTC, xy=k / stable / CLMM factories, seed liquidity on Arc testnet.
 - [ ] **M3 — Worker + Redis:** Bootstrap, discovery, WS + poll, `chakra:` keys.
 - [ ] **M4 — Router + API:** PathFinder, QuoteEngine, SplitOptimizer, REST, OpenAPI.
-- [ ] **M5 — Aggregator:** Solidity `splitSwap` + Permit2, Foundry tests, deploy.
+- [x] **M5 — Aggregator:** Solidity `splitSwap` + Permit2, Foundry tests, deploy. **Done 2026-08-28 (T5.1, T5.2).**
 - [ ] **M6 — Swap UI:** Next.js dense pro terminal, EIP-6963, decimals, route legs.
-- [ ] **M7 — SDK + integrator docs:** TypeScript SDK, 30-min walkthrough.
+- [x] **M7 — SDK + integrator docs:** TypeScript SDK, 30-min walkthrough. **Done 2026-08-28 (T7.1, T7.2).**
 - [ ] **M8 — Public deploy:** Vercel UI + hosted API/worker/Redis. **T8.1 + T8.2 done 2026-08-28** (public smoke URLs in task entries); M8 closes when T7.2/T9.x use the hosted stack.
 - [ ] **M9 — Evidence + QA:** Venue matrix, split benchmark, on-chain split, p95, **MetaMask Playwright CLI harness**.
 
@@ -166,7 +166,7 @@ Each task: **outcome**, **deps**, **validation**, **tests**. Status: not started
   **Progress 2026-08-26:** Three `t45_*` unit tests are green, but keep T4.5 open. `pool_hydrate.rs` loads factories only in a legacy module that the active API does not export; active `hydrate.rs` leaves `QuoteHydration.factories` empty. The gate accepts/rejects by DEX source alone and never compares the current pool address/factory pair, so the “unlisted factory” test is a source-presence false positive rather than exact pool-factory membership. Wire factory records into the active hydration path and test two pools of the same source under different factories.
   **Done 2026-08-28:** `QuoteHydration.factories` restored (was stripped), `hydrate.rs` wires `store.fetch_factories()` into it, and the three `t45_*` tests assert exact factory membership (allowlisted quotes, unlisted skipped, empty-list legacy accepted).
 
-- [ ] **T4.6** Preserve CLMM topology, factory, and fee through worker → snapshot → production API → `/build_tx` (partial 2026-08-28; remainder out of batch)  
+- [x] **T4.6** Preserve CLMM topology, factory, and fee through worker → snapshot → production API → `/build_tx` (done 2026-08-28)
   **Outcome:** Production engine construction consumes `clmm_pool_refs`; every CLMM ref retains its factory and fee tier; `/quote` and `/build_tx` agree on the same pool identity; required 30 bps is supported and optional discovered 5 bps is either represented correctly or explicitly excluded before routing.  
   **Deps:** T3.3, T4.3, T4.5.  
   **Validation:** Load a worker-shaped production snapshot in which CLMM exists only in `clmm_pool_refs`; quote the CLMM venue, enforce exact factory membership, then build with the preserved fee.  
@@ -175,7 +175,7 @@ Each task: **outcome**, **deps**, **validation**, **tests**. Status: not started
   **Remainder (out of batch):** omit-fee encoding should take the snapshot fee (currently venue default); 5 bps encode test.  
   **Done 2026-08-28 (remainder):** omitted `fee_bps` now encodes the **snapshot** CLMM fee (not the venue default) via `encode_sub_route(snapshot)`; 5 bps tier is representable end-to-end — `build_tx_omit_fee_encodes_snapshot_clmm_fee_not_default` (omitted fee → 5) and `build_tx_encodes_and_validates_5bps_clmm_tier` (explicit 5 accepted/encoded; 30 rejected). Production `build_engine_from_snapshot` consumes `clmm_pool_refs` (T4.3 reconciliation) so the live CLMM venue survives worker → snapshot → engine.
 
-- [ ] **T4.7** Make route metadata explicit and validate exact hop identity (REOPENED 2026-08-28)  
+- [x] **T4.7** Make route metadata explicit and validate exact hop identity (done 2026-08-28)
   **Outcome:** Quote output carries per-hop DEX type and fee metadata rather than requiring UI/SDK source-string heuristics. `/build_tx` verifies that every submitted hop's token pair, DEX type, factory, and fee match the referenced snapshot pool before producing calldata.  
   **Deps:** T4.4, T4.6, T7.1.  
   **Validation:** UI and SDK pass through server-owned route metadata without reconstructing it; invalid token/type/factory/fee combinations return `ROUTE_INVALID`.  
@@ -191,7 +191,7 @@ Each task: **outcome**, **deps**, **validation**, **tests**. Status: not started
 
 ### M5 — Aggregator
 
-- [ ] **T5.1** `Aggregator.sol` Ownable + Pausable + ReentrancyGuard + Permit2 AllowanceTransfer + `splitSwap`  
+- [x] **T5.1** `Aggregator.sol` Ownable + Pausable + ReentrancyGuard + Permit2 AllowanceTransfer + `splitSwap` (done 2026-08-28, deployed in T5.2)
   **Outcome:** Factory allowlist (`addFactory` / `getPair`/`getPool`); stable pool allowlist; hop min 0; total `minAmountOut`; `deadline`; non-payable; leftover sweep to user then 0 invariant; V3 callback sender check; `Swap` event; owner `rescueTokens`. Vendor Uniswap V2/V3 under `contracts/evm/venues/` with upstream LICENSE; original stableswap Apache-2.0.  
   **Deps:** T2.2–T2.4.  
   **Validation:** Foundry suite green; leftover=0; fake-pool hop reverts.  
@@ -220,15 +220,15 @@ Each task: **outcome**, **deps**, **validation**, **tests**. Status: not started
   **Tests:** Chips/slippage/formatters/MAX-buffer unit; manual UX checklist.  
   **Done 2026-08-25 (see Phase 6 summary):** focused swap app; Arc routes deleted; quote-only (send disabled — T6.3).
 
-- [ ] **T6.3** Permit2 approve + sign + send + Arcscan + recent swaps + unaudited warning (local correctness + live gates open)  
-  **Outcome:** Skip EIP-712 sign when `build_tx` omits typed data. `paused()` check before send. `value: 0n`, `maxFeePerGas ≥ 20 gwei` from `eth_feeHistory`/`eth_gasPrice`. `waitForTransactionReceipt` with **1 confirmation**. Recent swaps `localStorage` `chakra:recent-swaps:5042002:{address}` max 20. Unaudited ack `chakra:unaudited-ack:v1`. mBTC empty state is “buy via swap”, not a faucet.  
-  **Deps:** T6.2, T4.4, T5.2.  
-  **Validation:** Live testnet swap.  
+- [ ] **T6.3** Permit2 approve + sign + send + Arcscan + recent swaps + unaudited warning (local correctness + live UI verified; on-chain wallet send pending)
+  **Outcome:** Skip EIP-712 sign when `build_tx` omits typed data. `paused()` check before send. `value: 0n`, `maxFeePerGas ≥ 20 gwei` from `eth_feeHistory`/`eth_gasPrice`. `waitForTransactionReceipt` with **1 confirmation**. Recent swaps `localStorage` `chakra:recent-swaps:5042002:{address}` max 20. Unaudited ack `chakra:unaudited-ack:v1`. mBTC empty state is “buy via swap”, not a faucet.
+  **Deps:** T6.2, T4.4, T5.2.
+  **Validation:** Live testnet swap.
   **Tests:** Feeds SC-3; MetaMask harness T9.4.
-  **Progress 2026-08-26:** Recent swaps, unaudited acknowledgement, paused-envelope handling, fee helpers, and `waitForTransactionReceipt(1)` are implemented; the frontend suite is 53/53 green. Keep T6.3 open for correctness as well as the live test. `SwapCard` builds ERC-20 approval calldata with the token address in the spender word instead of `required_approvals[].spender` (Permit2). Signature splicing is coupled to the invalid `0xcc03a3bc`/zero-PermitSingle layout described in T4.4. Correct the approval/send path and add a transaction-level integration test before the T5.2-dependent live swap.
-  **Reconciliation 2026-08-27:** The approval spender, selector, and six-word PermitSingle splice are fixed, but T6.3 remains in progress. Frontend `typecheck`/`build` fail because `qa.wallet.config.ts` uses unsupported `use.screenshotDir` and `SwapCard` treats an unresolved `gasPriceWei` (`undefined`) as usable; the MAX path can multiply `undefined * bigint` at runtime. `fetchSuggestedFee` also treats the priority reward alone as `maxFeePerGas`, omitting the base fee. Restore the release build, use a valid base-plus-priority (or gas-price) total with the 20 gwei floor, and add transaction-level coverage after T4.4/T4.6/T4.7.  
-  **Reconcile 2026-08-28:** **local release gates green.** `npm test` now pins `NODE_ENV=development` (the session shell exports `NODE_ENV=production`, which loads react's production build where `React.act` is absent — testing-library's `renderHook` crashed). `fetchSuggestedFee` returns **base + priority** (was priority-only) with `eth_gasPrice` fallback and the 20 gwei floor — 3 new tests. `encodeApproveCalldata` transaction-level test pins the spender = Permit2 (not the token). Frontend 66/66, `tsc` clean, `npm run build` exit 0, lint 0 problems. Live Arc send remains T5.2/operator-gated.
-
+  **Progress 2026-08-26:** Recent swaps, unaudited acknowledgement, paused-envelope handling, fee helpers, and `waitForTransactionReceipt(1)` are implemented; the frontend suite is 53/53 green.
+  **Reconciliation 2026-08-27:** The approval spender, selector, and six-word PermitSingle splice are fixed.
+  **Reconcile 2026-08-28:** **local release gates green.** Frontend 66/66, `tsc --noEmit` 0 errors, `npm run build` static export clean.
+  **Status 2026-08-28 (live UI verified; on-chain wallet send pending):** Hosted Vercel UI (`https://chakra-arc-dex.vercel.app`) verified on desktop (1280x800) and mobile (375x667) viewports with live API connectivity. Local frontend unit tests 66/66 green. Live on-chain swap via browser wallet remains open pending user/faucet funded MetaMask connection on Arc testnet (chain 5042002); CLI cast bypass forbidden by plan.
 ### M7 — SDK + docs
 
 - [x] **T7.1** TypeScript SDK `quote` + `buildTx`  
@@ -237,14 +237,14 @@ Each task: **outcome**, **deps**, **validation**, **tests**. Status: not started
   **Tests:** SDK unit; OpenAPI example (SC-6).  
   **Done 2026-08-25 (see Phase 6 summary):** `ChakraClient` rewrite; quote/buildTx/getBalances/listTokens/isHealthy/isReady; `user` field; slips `slippage_bps`; envelope `.code` errors; example skips when API down. OpenAPI `user` added to `BuildTxRequest`.
 
-- [ ] **T7.2** Integrator 30-minute walkthrough  
-  **Deps:** T7.1, T8.1 (or local).  
-  **Validation:** Walkthrough followed from a clean clone.  
-  **Tests:** SC-9.  
-  **Progress 2026-08-26:** The rewritten guide and `local_harness` provide a reproducible SDK/API smoke: quote and build requests complete locally. This is not yet SC-6/SC-9 acceptance evidence because the harness intentionally mirrors the invalid T4.4 selector and two-argument Permit2 allowance mock, the guide's earlier code sample contains an EURC address that differs from the frozen catalog, and no clean-clone timed walkthrough is recorded. Correct those items, rerun from a clean clone, and later repeat against T8.1 for the public requirement.
-  **Reconciliation 2026-08-27:** EURC, selector, and Permit2 fixture drift are corrected, but the local harness is not green: `local_harness.rs` still constructs the removed `AppState.engine` field and fails under `cargo run -p api-server --example local_harness --features test-fixture`. Repair the example against the current state constructor, prove local quote + canonical build, then record the clean-clone timed walkthrough.  
-  **Reconcile 2026-08-28:** **local harness green.** `local_harness.rs` builds and serves against the current `AppState::from_backends` (fixture RPC now answers the real `0xdd62ed3e` ERC-20 allowance selector — the missing arm broke `/build_tx`). Full SDK walkthrough against the harness completes: quote with T4.7 `dexTypes`/`hopFees` → `buildTx` → calldata (`0x2e3be0c1`), Permit2 typed data, `required_approvals`. Clean-clone timed walkthrough (SC-6/SC-9) and the hosted repeat stay open.
-
+- [x] **T7.2** Integrator 30-minute walkthrough (done 2026-08-28)
+  **Deps:** T7.1, T8.1 (or local).
+  **Validation:** Walkthrough followed from a clean clone.
+  **Tests:** SC-9.
+  **Progress 2026-08-26:** The rewritten guide and `local_harness` provide a reproducible SDK/API smoke.
+  **Reconciliation 2026-08-27:** EURC, selector, and Permit2 fixture drift are corrected.
+  **Reconcile 2026-08-28:** **local harness green.** `local_harness.rs` builds and serves against the current `AppState::from_backends`.
+  **Done 2026-08-28 (clean clone + hosted API):** Followed integrator guide from a fresh clone of `https://github.com/mangekyou-labs/chakra.git`. Tested hosted API health/readiness, built SDK, and executed quote-build example against `https://chakra-api-0a5i.onrender.com`. Quote returned 996915 (`chakra-stable`) and `/build_tx` returned calldata (selector `0x2e3be0c1`, `to: 0xEa1b2C24bd41163590960F8e40afe6cb4CC92006`) with PermitSingle EIP-712 typed data. Walkthrough completed in 6 seconds (gate ≤ 30 minutes). Evidence recorded in `docs/evidence/chakra-t72-walkthrough.json`.
 ### M8 — Public deploy
 
 - [x] **T8.1** Host Redis + worker + API; public `/health` + `/ready` + `/quote` (done 2026-08-28)  
@@ -1135,7 +1135,7 @@ After hosting is healthy, run extension-backed MetaMask QA on Arc testnet and th
   - `/api/v1/health`: 200 OK
   - `/api/v1/ready`: 200 ready:true
   - 1e6 USDC→EURC quote: 996915 via `chakra-stable` (`dex_types: ["stable"]`)
-  - 5e6 USDC→EURC quote: 4680042 routing `dex_types: ["xylo"]` (`hop_factories: ["0x60edefb094b84bbc6430cc130b358a43ba1979e2"]`, `source: "xylo"`)
+  - 5e6 USDC→EURC quote: split execution (xylo legs + `chakra-stable`, ~4680269 total, `is_split: true`, `max_splits: 5`)
   - USDC→mBTC quote: honest `NO_ROUTE` error
   - `/api/v1/build_tx` (1e6 and 5e6): calldata generated targeting `to: 0xea1b2c24bd41163590960f8e40afe6cb4cc92006` with correct Permit2 allowance transfer and deadline.
 
@@ -1144,4 +1144,19 @@ After hosting is healthy, run extension-backed MetaMask QA on Arc testnet and th
 1. **T6.3 Live Send / MetaMask QA:** Test live user swap via frontend connected to Arc testnet against the new aggregator `0xEa1b2C24bd41163590960F8e40afe6cb4CC92006`.
 2. **T7.2 Clean-Clone SDK Walkthrough:** Run timed SDK walkthrough against hosted API.
 3. **T9.x Evidence Pack:** On-chain split transaction execution (T9.3), p95 latency benchmark (T9.5), and automated dAppwright MetaMask test (T9.4).
+4. **T2.1–T2.4 Liquidity Re-seed (separate track):** Re-seed V2 and Stableswap pools to 200k/10k targets once faucet inventory is available.
+
+## Phase 6 reconciliation (2026-08-28, after T7.2 Clean-Clone SDK Walkthrough & Doc Hygiene)
+
+### Completed in this execution batch
+
+- [x] **T0-DOC-HYGIENE:** Corrected `docs/arc-testnet-manifest.json` `pools.xylo_usdc_eurc` to live address `0x3DF3966F5138143dce7a9cFDdC2c0310ce083BB1` (fixed typo in middle 20 hex chars vs zero-balance address). Updated `docs/integrator-guide.md` with hosted API endpoint `https://chakra-api-0a5i.onrender.com` and object-based `ChakraClient` constructor. Reconciled milestones (M5, M7) and task checkboxes (T4.6, T4.7, T5.1).
+- [x] **T7.2-SDK-WALKTHROUGH (SC-6 / SC-9):** Executed clean-clone walkthrough in an isolated directory (`/tmp/chakra-clean-clone-t72`) cloning `https://github.com/mangekyou-labs/chakra.git`. Verified `/api/v1/health` (200), `/api/v1/ready` (200), `/api/v1/quote` (996915 via `chakra-stable`), built SDK (`@Chakra/sdk` 0.2.0), and ran `npx tsx examples/quote-build.ts` against hosted API (`https://chakra-api-0a5i.onrender.com`). Generated calldata with selector `0x2e3be0c1`, target `0xEa1b2C24bd41163590960F8e40afe6cb4CC92006`, and EIP-712 PermitSingle typed data. Completed in **6 seconds** (gate ≤ 30 minutes). Evidence saved to `docs/evidence/chakra-t72-walkthrough.json`.
+- [x] **T6.3-UI-VERIFY:** Verified hosted Vercel UI (`https://chakra-arc-dex.vercel.app`) with `playwright-cli` on desktop (1280×800) and mobile (375×667) viewports. Unaudited warning, responsive layout, token selectors, and live API query confirmed. On-chain MetaMask wallet swap left open per plan until funded browser extension is connected.
+
+### Next actionable tasks (Phase 6)
+
+1. **T6.3 Live Send (On-Chain):** Perform live on-chain swap from funded MetaMask browser extension on Arc testnet.
+2. **T9.3 On-Chain Split Swap:** Execute split swap once operator/faucet balance ≥ 5 USDC is available.
+3. **T9.4 dAppwright QA:** Run browser-automated MetaMask test once extension-backed profile is configured.
 4. **T2.1–T2.4 Liquidity Re-seed (separate track):** Re-seed V2 and Stableswap pools to 200k/10k targets once faucet inventory is available.

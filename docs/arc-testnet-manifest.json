@@ -43,7 +43,7 @@
     "v2_usdc_mbtc": "0x36b7abd56018c33f2117c599ad1c7d0efedf36d7",
     "v2_eurc_mbtc": "0x1ac3c4d188bd3bfe7a6e3a8e9d65467cd4f08af1",
     "v3_usdc_mbtc": "0xe431ff3b4ddc062af084d26785045abbab984cb5",
-    "xylo_usdc_eurc": "0x3DF3966F98F7e64119dFEdfd8EbD8d5386f63BB1"
+    "xylo_usdc_eurc": "0x3DF3966F5138143dce7a9cFDdC2c0310ce083BB1"
   },
   "timestamps": {
     "manifest_created": "2026-08-27T00:00:00Z",
