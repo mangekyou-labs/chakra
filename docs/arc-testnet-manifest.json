@@ -29,10 +29,11 @@
   },
   "deployer": "0x12E266744f6d25D372000e066eCc0DF5a752276d",
   "contracts": {
-    "aggregator": "0xA59ad3E82d251c3489582e1aA5Bee494d0d2a569",
+    "aggregator": "0xEa1b2C24bd41163590960F8e40afe6cb4CC92006",
     "xyk_factory": "0x0c812E5D55D767533c8E4783D33b28EA825b4D8e",
     "stable_factory": "0x77Ce21FDAAea40Fd94aCf65fF3220A0A7Db7D690",
     "clmm_factory": "0xf6dEa9e6dfE392aaBE366240db4839709572fa69",
+    "xylo_factory": "0x60EDeFB094B84BBC6430cc130B358A43Ba1979e2",
     "mbtc": "0xbf5a25D7070FaACAe309D66D05372a6b212ECbdF",
     "liquidity_seeder": "0xD32711Efc8492cBC55665a3c4C536A6e3d2B913a"
   },
@@ -41,7 +42,8 @@
     "v2_usdc_eurc": "0x201cd935c4b206beeec47269fe26bd041050a590",
     "v2_usdc_mbtc": "0x36b7abd56018c33f2117c599ad1c7d0efedf36d7",
     "v2_eurc_mbtc": "0x1ac3c4d188bd3bfe7a6e3a8e9d65467cd4f08af1",
-    "v3_usdc_mbtc": "0xe431ff3b4ddc062af084d26785045abbab984cb5"
+    "v3_usdc_mbtc": "0xe431ff3b4ddc062af084d26785045abbab984cb5",
+    "xylo_usdc_eurc": "0x3DF3966F98F7e64119dFEdfd8EbD8d5386f63BB1"
   },
   "timestamps": {
     "manifest_created": "2026-08-27T00:00:00Z",
@@ -50,7 +52,8 @@
   },
   "transaction_hashes": [
     "0xf393992dd6a4ac11b9672249d54f8103bfe7db25b0a3912281aca6c192b4e74c",
-    "0xeb77c000e67a4c01a22fffaaa2e5d0122822c32dd92f31cdbb8d69c0e326f748"
+    "0xeb77c000e67a4c01a22fffaaa2e5d0122822c32dd92f31cdbb8d69c0e326f748",
+    "0x4cef6ba6e6d7132a7517666b2ce6c1ab7f5ae882ca9c80bb82ad9658ab71a22d"
   ],
   "secrets_note": "This manifest contains only public on-chain data. No private keys, mnemonics, or API secrets are stored here."
 }
