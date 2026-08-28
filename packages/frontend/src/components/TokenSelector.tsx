@@ -52,6 +52,7 @@ export function TokenSelector({
       t.name.toLowerCase().includes(qLower) ||
       t.address.toLowerCase().includes(qLower),
   );
+  const excludeLower = exclude?.toLowerCase();
 
   useEffect(() => {
     if (!open) return;
@@ -144,7 +145,7 @@ export function TokenSelector({
                 )}
                 {filtered.map((token) => {
                   const bal = balancesReady ? getErc20Balance(token.address) : null;
-                  const isExcluded = token.address === exclude;
+                  const isExcluded = excludeLower !== undefined && token.address.toLowerCase() === excludeLower;
                   return (
                     <button
                       key={token.address}

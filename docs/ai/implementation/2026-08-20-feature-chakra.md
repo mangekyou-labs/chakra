@@ -618,3 +618,17 @@ Everything runs on fixture RPC/WS servers and a **memory store** in tests (SC-11
   - Updated default endpoints in `scripts/qa-wallet-validate.mjs`.
   - Created `docs/qa-playwright-metamask.md`.
   - ESLint (0 errors, 0 warnings) and TypeScript typecheck clean across frontend.
+
+### Phase 5 Live Execution — T9.3 / T9.4 / T9.6 + QA harness fixes (2026-08-28)
+
+- **T9.3 on-chain split swap (LIVE):** Operator executed the hosted `/build_tx` calldata (5e6 USDC→EURC) → `0x42e85916ade38b87ef0440ef71d8f3330075ecf2a481247dc2ac33376b287fa8` (block 59271873, status 1). 3 sub-routes in one tx (2× xylo + 1× chakra-stable), aggregator `Swap` event `isSplit=1`, 4,674,618 EURC credited. **Findings:**
+  - `forge script --simulate` (and the dry-run implied by `--broadcast`) reverts locally on Arc's USDC system precompile `0x1800…0000` (native precompile stack-underflow; `vm.mockCall` intercepts direct calls but not the USDC proxy's delegatecall path) — broadcast required `--skip-simulation`.
+  - `/build_tx` omits `typed_data` once the Permit2 allowance is pre-set (empty-signature permit path); `ExecuteSplitSwap` sets ERC-20 `approve(Permit2)` + `Permit2.approve(USDC, aggregator)` first. The 120 s `sigDeadline` window means calldata must be broadcast promptly.
+- **T9.4 MetaMask swap (LIVE):** `swap-critical-path` exit 0 (38.3 s) → tx `0xa630da3c842d7613ebbbd4d8f66749892a4e42c510933e0e1c3f4966907ef0dd` (block 59292405, status 1): 1e6 USDC → 864,471 EURC via xylo. Sequence: mnemonic bootstrap → connect → header-menu switch → quote → Swap → unaudited ack → swap confirm → `Swap confirmed!` + Arcscan link + `chakra:recent-swaps:5042002:{addr}`.
+- **QA harness / UI fixes (T9.4 prep):**
+  - **UI token-default race (real bug):** `SwapCard` defaults ran on the FALLBACK catalog render (mixed-case `EURC_ADDRESS`), then the lowercased API catalog made `tokenOut`'s exact-match `find` fail → Buy token selector unmounted (`tokenOut` null) → "No route available". Fixed with case-insensitive address matching in `SwapCard` (tokenIn/tokenOut) and `TokenSelector` (`exclude`).
+  - **dAppwright 2.13.12 + MetaMask 13.17:** `confirmNetworkSwitch` is a no-op stub; `addNetwork` drives stale extension UI selectors and can close the context. Network switch now drives the MetaMask `notification.html` popup Confirm directly via `context.pages()`.
+  - `qa:wallet:validate/setup` moved to `packages/frontend/qa/wallet/` (npm scripts were resolving `../scripts/` to `packages/scripts/`); `qa.wallet.config.ts` loads `packages/frontend/.env` via `process.loadEnvFile`; validator loads the same file and prints only the secret shape.
+  - Disposable QA wallet `0xc603C3…dCE76` funded from operator (6e6 ERC-20 USDC + 6 native USDC) via keystore-backed `cast send` (key never on argv); `FundQaWallet.s.sol` helper added.
+- **T9.6 (live finding):** Worker publishes snapshots on the 600 s discovery cycle (two consecutive snapshot IDs 599.9 s apart); `/ready` always reports `pool_keys: []` despite working quotes; per-swap pool-key refresh is **not observable via the public API** (Redis is private). SC-11 live gate needs a metrics endpoint or Redis access.
+- **Vercel:** `vercel --prod` upload repeatedly failed with `AbortError` (CLI network issue); the T9.4 run used the locally served fixed build (`DAPP_URL=http://localhost:3000`, hosted API baked via `NEXT_PUBLIC_CHAKRA_API_URL=https://chakra-api-0a5i.onrender.com npm run build`). The UI fix is **not yet deployed to Vercel** — needs a `vercel --prod` retry or push-driven deploy.
