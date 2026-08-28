@@ -11,7 +11,7 @@ date: 2026-08-20
 **Product:** Chakra  
 **Feature key:** `chakra`  
 **Workspace:** `.worktrees/feature-chakra` (`feature-chakra`)  
-**Phase:** 7 implementation re-check completed 2026-08-27 — **not aligned; return to Phase 5**. Most of the 2026-08-26 correction queue landed, but the Rust `/build_tx` encoder still does not produce canonical Solidity tuple-array calldata, production CLMM topology is absent from the API graph, frontend production typing/build and the local integration harness fail, and required live/evidence gates remain open. See [Phase 7 Implementation Re-check](#phase-7-implementation-re-check-2026-08-27).
+**Phase:** 5 completed 2026-08-28 — T-GIT-CHAKRA (Arc compile strip), T8.1 (Render), and T8.2 (Vercel) done with public smoke URLs. Phase 7 re-check pending with fresh verify evidence; T4.7 remains open (quote still joins `source`; see planning doc).
 
 ## Development Setup
 
