@@ -19,7 +19,7 @@ contract DeployAggregator is Script {
             vm.envOr("CHAKRA_EURC_ADDRESS", address(0x89B50855Aa3bE2F677cD6303Cec089B5F319D72a));
         address mbtc = vm.envAddress("CHAKRA_MBTC_ADDRESS");
 
-        vm.startBroadcast();
+        vm.startBroadcast(vm.envUint("PRIVATE_KEY"));
         Aggregator agg = new Aggregator(permit2, usdc, eurc, mbtc);
 
         // Factories come from env placeholders; no auto-allowlist, no broadcasting
