@@ -1,47 +1,91 @@
 {
   "scenario": "T9.8 Manual UX & Accessibility Audit",
-  "timestamp_utc": "2026-08-28T07:32:00Z",
+  "timestamp_utc": "2026-08-28T07:42:00Z",
+  "status": "OPEN_PARTIAL",
   "tested_url": "https://chakra-arc-dex.vercel.app",
   "viewports_tested": [
     {
       "name": "Desktop Pro Terminal",
       "dimensions": "1280x800",
-      "status": "PASS",
+      "status": "AUDITED",
       "details": "Layout renders centered swap terminal (520px) with header navigation, brand badge, docs dropdown, and action CTA."
     },
     {
       "name": "Mobile Responsive Viewport",
       "dimensions": "375x667",
-      "status": "PASS",
+      "status": "AUDITED",
       "details": "Responsive layout adapts cleanly; hamburger menu toggles navigation links; CTA button remains full width and accessible."
     }
   ],
-  "accessibility_and_ux_checklist": {
-    "unaudited_warning_banner": {
-      "status": "PASS",
-      "role": "status",
-      "text": "Arc Testnet · Contracts unaudited · Verify amounts before signing · Not financial advice"
+  "dom_contrast_measurements": [
+    {
+      "element": "Status Banner",
+      "foreground_color": "rgb(107, 114, 128)",
+      "effective_background": "rgb(10, 11, 13)",
+      "contrast_ratio": 4.07,
+      "wcag_aa_standard_pass": false,
+      "notes": "Muted secondary text falls slightly below 4.5:1 threshold."
     },
-    "token_selectors": {
-      "status": "PASS",
-      "details": "Token badges with circle iconography, symbol labels, and dropdown carets for USDC, EURC, and mBTC."
+    {
+      "element": "Heading 'Swap'",
+      "foreground_color": "rgb(243, 244, 246)",
+      "effective_background": "rgb(18, 21, 26)",
+      "contrast_ratio": 16.62,
+      "wcag_aa_standard_pass": true,
+      "notes": "Exceeds WCAG AAA threshold (7.0:1)."
     },
-    "slippage_settings": {
-      "status": "PASS",
-      "details": "Configurable slippage with default 0.5% (50 bps); modal supports custom and preset chips."
+    {
+      "element": "Sell Label",
+      "foreground_color": "rgb(107, 114, 128)",
+      "effective_background": "rgb(26, 31, 39)",
+      "contrast_ratio": 3.42,
+      "wcag_aa_standard_pass": false,
+      "notes": "Secondary muted label."
     },
-    "keyboard_navigation": {
-      "status": "PASS",
-      "details": "Interactive elements utilize native <button> and <input> with valid role, aria-label, and focus outlines."
+    {
+      "element": "Amount Input",
+      "foreground_color": "rgb(243, 244, 246)",
+      "effective_background": "rgb(26, 31, 39)",
+      "contrast_ratio": 15.03,
+      "wcag_aa_standard_pass": true,
+      "notes": "High contrast input text."
     },
-    "color_contrast_and_palette": {
-      "status": "PASS",
-      "details": "Terminal dark mode palette (--bg-0, --surface-panel, --accent) complies with WCAG AA contrast for text elements."
+    {
+      "element": "Header Connect Wallet Button",
+      "foreground_color": "rgb(156, 163, 175)",
+      "effective_background": "rgb(10, 11, 13)",
+      "contrast_ratio": 7.76,
+      "wcag_aa_standard_pass": true,
+      "notes": "Exceeds WCAG AAA threshold."
     },
-    "recent_swaps_store": {
-      "status": "PASS",
-      "storage_key": "chakra:recent-swaps:5042002:{address}",
-      "details": "Scoped by chain ID and address, max 20 entries, derives Arcscan URLs dynamically."
+    {
+      "element": "Disabled Primary CTA",
+      "foreground_color": "rgb(92, 101, 112)",
+      "effective_background": "rgb(30, 36, 44)",
+      "contrast_ratio": 2.64,
+      "wcag_aa_standard_pass": false,
+      "notes": "Disabled state is exempt from standard contrast requirement under WCAG 2.1 §1.4.3."
     }
-  }
+  ],
+  "keyboard_focusable_elements_count": 16,
+  "keyboard_focus_order": [
+    "1: A (Chakra brand)",
+    "2: A (Swap)",
+    "3: BUTTON (Docs)",
+    "4: BUTTON (Open menu - mobile only)",
+    "5: A (Discord)",
+    "6: A (GitHub)",
+    "7: BUTTON (Connect Wallet)",
+    "8: BUTTON (Swap settings)",
+    "9: INPUT (Amount in)",
+    "10: BUTTON (Token in: USDC)",
+    "11: BUTTON (Swap token direction)",
+    "12: A (Documentation)",
+    "13: A (Discord)",
+    "14: A (Open source)"
+  ],
+  "open_audit_items": [
+    "Second-wallet (Rabby/Coinbase) EIP-6963 spot check is open (requires browser extensions).",
+    "Live on-chain transaction confirmation UI state is open (requires funded MetaMask on Arc testnet)."
+  ]
 }
