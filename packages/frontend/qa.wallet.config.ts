@@ -2,7 +2,7 @@ import { defineConfig, devices } from '@playwright/test';
 import { resolve } from 'path';
 
 // Persistent Chromium profile directory (gitignored).
-const PROFILE_DIR = resolve(__dirname, '..', 'scripts', '..', 'output', 'playwright', 'chromium-profile');
+const _PROFILE_DIR = resolve(__dirname, '..', 'scripts', '..', 'output', 'playwright', 'chromium-profile');
 
 export default defineConfig({
   testDir: './qa/wallet',
@@ -26,13 +26,6 @@ export default defineConfig({
       name: 'chromium-wallet',
       use: {
         ...devices['Desktop Chrome'],
-        launchOptions: {
-          args: [
-            `--load-extension=${PROFILE_DIR}`,
-            '--disable-extensions-except=',
-            '--no-sandbox',
-          ],
-        },
       },
     },
   ],
