@@ -149,6 +149,38 @@ pub async fn fetch_stable_state(
     Ok(value)
 }
 
+/// XyloNet pool state (T-XYLO): `getReserves()` (stored reserves — the venue
+/// `calculateSwap` uses `reserve0/reserve1`, not balances) + `A=200` (amp
+/// 20000 / A_PRECISION 100) + 4 bps fee on output. Reuses the stableswap
+/// value shape; the QuoteEngine dispatches `xylo` sources to `xylo_quote`.
+pub async fn fetch_xylo_state(
+    client: &EvmRpcClient,
+    source: &str,
+    pair: &TradingPairSnapshot,
+) -> Result<StablePoolStateValue> {
+    let response = client
+        .eth_call(&pair.pool_address, &calldata(&get_reserves_selector(), &[]))
+        .await?;
+    let words = split_words(&response)?;
+    if words.len() < 2 {
+        bail!("xylo getReserves returned {} words", words.len());
+    }
+    let (reserve0, reserve1) = (word_to_u128_bytes(&words[0])?, word_to_u128_bytes(&words[1])?);
+    let mut value = StablePoolStateValue::new(
+        source,
+        &pair.pool_address,
+        &pair.token_a,
+        &pair.token_b,
+        reserve0,
+        reserve1,
+        // Xylo amp: `getAmplificationParameter() = 20000` with `A_PRECISION = 100`.
+        200,
+        pair.fee_bps,
+    );
+    value.factory = pair.factory.clone();
+    Ok(value)
+}
+
 /// `slot0()` + `liquidity()` merged over the existing snapshot. Tick/bitmap
 /// coverage is carried through untouched — if the pool was never fully loaded
 /// (`coverage` is `None` or incomplete), the caller must skip the Redis write.

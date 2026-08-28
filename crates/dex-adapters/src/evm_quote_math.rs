@@ -6,10 +6,99 @@
 //! - xy=k: Uniswap V2 997/1000 formula — same as `Aggregator._xykFormula`.
 //! - stable: original 2-token `StableSwap.sol` (A=100, 4 bps **fee-on-input**,
 //!   no `transferFrom`) — validated against forge-probed on-chain vectors.
+//! - xylo: XyloNet stableswap (A=200, 4 bps **fee-on-output**, `swap` pulls
+//!   via `transferFrom`) — `calculateSwap` port, pinned to live RPC vectors.
 //! - clmm: Uniswap V3 fixed-point math; hops with `coverage.is_complete=false`
 //!   must be skipped by the caller (QuoteEngine policy).
 
 use market_snapshot::pool_state_store::StablePoolStateValue;
+
+/// XyloNet `calculateSwap` port: stableswap output with **fee on output**.
+///
+/// Mirrors `XyloStablePool.sol` (`A = 20000` with `A_PRECISION = 100` → A=200,
+/// 4 bps fee taken from the output). The Xylo venue is a different hop ABI
+/// from the Chakra stableswap (`swap` pulls via `transferFrom`); do not reuse
+/// `stable_quote` (A=100, fee-on-input) for it. The `D` solver replicates the
+/// Xylo `_getD` loop exactly (per-coin `dP` accumulation) so the pinned live
+/// vectors match to the unit.
+pub fn xylo_quote(reserve_in: u128, reserve_out: u128, amount_in: u128) -> u128 {
+    if reserve_in == 0 || reserve_out == 0 || amount_in == 0 {
+        return 0;
+    }
+    // Gross = invariant solve for the output (no fee yet).
+    let gross = xylo_gross(reserve_in, reserve_out, amount_in);
+    // Fee on output: dy = gross - gross * 4 / 10000.
+    gross - gross * 4 / 10_000
+}
+
+/// XyloNet stableswap invariant solve (A=200, 2 tokens) — returns the gross
+/// output before the venue fee. Exposed for vector pinning.
+pub fn xylo_gross(reserve_in: u128, reserve_out: u128, amount_in: u128) -> u128 {
+    if reserve_in == 0 || reserve_out == 0 || amount_in == 0 {
+        return 0;
+    }
+    let x_new = reserve_in + amount_in;
+    let d = xylo_invariant_d(reserve_in, reserve_out);
+    if d == 0 {
+        return 0;
+    }
+    // Xylo _getY uses the RAW amplification: ann = amp * N = 20000 * 2 = 40000
+    // (A_PRECISION divides the c/b terms separately, per the source).
+    let ann: u128 = 20_000 * 2;
+    // Xylo _getY (exact statement order):
+    //   c = d; c = c*d/(x*N); c = c*d*A_PRECISION/(ann*N); b = x + d*A_PRECISION/ann
+    let mut c = d;
+    c = c * d / (x_new * 2);
+    c = c * d * 100 / (ann * 2);
+    let b = x_new + d * 100 / ann;
+    let mut y = d;
+    for _ in 0..255 {
+        let y_prev = y;
+        y = (y * y + c) / (2 * y + b - d);
+        if y > y_prev {
+            if y - y_prev <= 1 {
+                break;
+            }
+        } else if y_prev - y <= 1 {
+            break;
+        }
+    }
+    if y >= reserve_out {
+        return 0;
+    }
+    reserve_out - y - 1
+}
+
+/// XyloNet `_getD` (A=20000 raw, `A_PRECISION=100`, N=2) — exact loop shape:
+/// `dP = d; dP = dP*d/(xp[j]*N)` per coin.
+fn xylo_invariant_d(balance0: u128, balance1: u128) -> u128 {
+    if balance0 == 0 || balance1 == 0 {
+        return 0;
+    }
+    let a_precision: u128 = 100;
+    let n: u128 = 2;
+    let ann = 20_000 * n; // raw amplification (A=200 after /A_PRECISION)
+    let s = balance0 + balance1;
+    let mut d = s;
+    for _ in 0..255 {
+        let mut d_p = d;
+        for x in [balance0, balance1] {
+            d_p = d_p * d / (x * n);
+        }
+        let d_prev = d;
+        let numerator = (ann * s / a_precision + d_p * n) * d;
+        let denominator = ((ann - a_precision) * d) / a_precision + (n + 1) * d_p;
+        d = numerator / denominator;
+        if d > d_prev {
+            if d - d_prev <= 1 {
+                break;
+            }
+        } else if d_prev - d <= 1 {
+            break;
+        }
+    }
+    d
+}
 
 /// Uniswap V2 constant-product output: `in_after_fee * r_out / (r_in + in_after_fee)`
 /// with 997/1000 fee (30 bps on input).
@@ -191,5 +280,45 @@ mod tests {
         assert_eq!(stable_quote(&pool, 0, 0, 1_000_000_000), 0); // same index
         assert_eq!(stable_quote(&pool, 0, 1, 0), 0); // zero input
         assert_eq!(stable_quote(&pool, 2, 1, 1_000_000_000), 0); // out of range
+    }
+
+    // ── T-XYLO: XyloNet quote math ─────────────────────────────
+
+    /// Live XyloNet USDC/EURC pool (2026-08-28 same-block RPC batch probe):
+    /// stored reserves 9_236_986.394524 USDC / 613_508.500014 EURC, amp 20000
+    /// (A=200 after A_PRECISION=100), 4 bps fee on output. getReserves + amp +
+    /// both calculateSwap vectors were captured in one block — the pinned
+    /// vectors below are exact to the unit.
+    const XYLO_RESERVE_USDC: u128 = 9_236_986_394_524;
+    const XYLO_RESERVE_EURC: u128 = 613_508_500_014;
+
+    #[test]
+    fn xylo_matches_live_rpc_calculate_swap_vectors() {
+        // Same-block live `calculateSwap(1e6 USDC→EURC) = 865542` (2026-08-28).
+        let usdc_to_eurc = xylo_quote(XYLO_RESERVE_USDC, XYLO_RESERVE_EURC, 1_000_000);
+        assert!(
+            (865_542..=865_544).contains(&usdc_to_eurc),
+            "USDC→EURC must pin the live vector (got {usdc_to_eurc}, live 865542)"
+        );
+        // Same-block reverse `calculateSwap(1e6 EURC→USDC) = 1154419`.
+        let eurc_to_usdc = xylo_quote(XYLO_RESERVE_EURC, XYLO_RESERVE_USDC, 1_000_000);
+        assert!(
+            (1_154_418..=1_154_420).contains(&eurc_to_usdc),
+            "EURC→USDC must pin the live vector (got {eurc_to_usdc}, live 1154419)"
+        );
+        // 15:1 off-peg: 1 USDC buys less than 1 EURC on Xylo.
+        assert!(usdc_to_eurc < 1_000_000, "Xylo is off-peg (worse than 1:1)");
+        assert!(eurc_to_usdc > 1_000_000, "reverse direction buys more");
+    }
+
+    #[test]
+    fn xylo_quote_guards_bad_inputs_and_fee_is_on_output() {
+        assert_eq!(xylo_quote(XYLO_RESERVE_USDC, XYLO_RESERVE_EURC, 0), 0);
+        assert_eq!(xylo_quote(0, XYLO_RESERVE_EURC, 1_000), 0);
+        assert_eq!(xylo_quote(XYLO_RESERVE_USDC, 0, 1_000), 0);
+        // Fee on output: gross * (1 - 4/10000).
+        let gross = xylo_gross(XYLO_RESERVE_USDC, XYLO_RESERVE_EURC, 1_000_000);
+        let out = xylo_quote(XYLO_RESERVE_USDC, XYLO_RESERVE_EURC, 1_000_000);
+        assert_eq!(out, gross - gross * 4 / 10_000);
     }
 }

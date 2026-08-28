@@ -916,6 +916,9 @@ mod tests {
             sources: vec![name.to_string()],
             pool_addresses: vec![format!("pool-{name}")],
             hops: 1,
+            dex_types: vec!["xyk".to_string()],
+            fee_bps: vec![30],
+            factories: vec![String::new()],
         }
     }
 

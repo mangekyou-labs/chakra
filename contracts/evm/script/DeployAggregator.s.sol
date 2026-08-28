@@ -27,9 +27,13 @@ contract DeployAggregator is Script {
         address xyk = vm.envOr("CHAKRA_XYK_FACTORY", address(0));
         address stable = vm.envOr("CHAKRA_STABLE_FACTORY", address(0));
         address clmm = vm.envOr("CHAKRA_CLMM_FACTORY", address(0));
+        // T-XYLO: XyloNet factory (pinned USDC/EURC pool only; the aggregator
+        // verifies `getPool(tokenIn, tokenOut) == pool` per hop).
+        address xylo = vm.envOr("CHAKRA_XYLO_FACTORY", address(0));
         if (xyk != address(0)) agg.addFactory(xyk, Aggregator.DexType.Xyk);
         if (stable != address(0)) agg.addFactory(stable, Aggregator.DexType.Stable);
         if (clmm != address(0)) agg.addFactory(clmm, Aggregator.DexType.Clmm);
+        if (xylo != address(0)) agg.addFactory(xylo, Aggregator.DexType.Xylo);
         vm.stopBroadcast();
 
         console.log("Aggregator", address(agg));
@@ -37,5 +41,6 @@ contract DeployAggregator is Script {
         console.log("Xyk factory allowlisted", xyk != address(0));
         console.log("Stable factory allowlisted", stable != address(0));
         console.log("Clmm factory allowlisted", clmm != address(0));
+        console.log("Xylo factory allowlisted", xylo != address(0));
     }
 }

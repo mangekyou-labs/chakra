@@ -83,6 +83,14 @@ pub struct SubRouteData {
     pub source: String,
     pub path: Vec<String>,
     pub pool_addresses: Vec<String>,
+    /// Per-hop DEX type (`xyk` | `stable` | `clmm` | …) — T4.7 explicit hop
+    /// metadata. Length == `pool_addresses`. UI/SDK must not infer the DEX
+    /// type from the joined `source` string.
+    pub dex_types: Vec<String>,
+    /// Per-hop venue fee in bps (T4.7). Same length as `pool_addresses`.
+    pub hop_fees: Vec<u32>,
+    /// Per-hop allowlisted factory (empty string = legacy pool). T4.7.
+    pub hop_factories: Vec<String>,
     pub amount_in: String,
     pub amount_out: String,
     pub fraction_bps: u32,
@@ -228,6 +236,9 @@ pub async fn get_quote(State(state): State<AppState>, Query(params): Query<Quote
             source: so.path.sources.join(" → "),
             path: so.path.tokens.iter().map(|t| t.canonical()).collect(),
             pool_addresses: so.path.pool_addresses.clone(),
+            dex_types: so.path.dex_types.clone(),
+            hop_fees: so.path.fee_bps.clone(),
+            hop_factories: so.path.factories.clone(),
             amount_in: so.amount_in.to_string(),
             amount_out: so.expected_amount_out.to_string(),
             fraction_bps: (so.fraction * 10_000.0).round() as u32,

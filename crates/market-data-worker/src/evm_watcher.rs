@@ -65,10 +65,12 @@ impl FactoryConfig {
             .split_once(':')
             .context("factory tuple must be address:dex_type")?;
         let dex_type = dex_type.to_ascii_lowercase();
-        if !matches!(dex_type.as_str(), "xyk" | "stable" | "clmm") {
-            bail!("unknown factory dex_type {dex_type:?} (expected xyk|stable|clmm)");
+        if !matches!(dex_type.as_str(), "xyk" | "stable" | "clmm" | "xylo") {
+            bail!("unknown factory dex_type {dex_type:?} (expected xyk|stable|clmm|xylo)");
         }
-        let source = if is_seed {
+        let source = if dex_type == "xylo" {
+            "xylo".to_string()
+        } else if is_seed {
             format!("chakra-{dex_type}")
         } else {
             format!("discovered:{dex_type}")
@@ -339,6 +341,33 @@ impl EvmRunner {
                                     pool_address: pool,
                                     fee_bps: 4,
                                     dex_type: "stable".to_string(),
+                                    factory: factory.address.clone(),
+                                },
+                            ));
+                        }
+                    }
+                    // T-XYLO: XyloNet `getPool(address,address)` (same selector
+                    // shape as the stable factory) over the catalog pairs.
+                    // The Xylo USDC/EURC pool is pinned; USDC/USYC stays out of
+                    // the catalog so it is never discovered here.
+                    "xylo" => {
+                        if let Some(pool) = dex_adapters::evm_fetch::factory_has_stable_pool(
+                            &self.http,
+                            &factory.address,
+                            token_a,
+                            token_b,
+                        )
+                        .await?
+                        {
+                            let (a, b) = pair_key(token_a, token_b);
+                            sources_stable.push((
+                                factory.source.clone(),
+                                TradingPairSnapshot {
+                                    token_a: a,
+                                    token_b: b,
+                                    pool_address: pool,
+                                    fee_bps: 4,
+                                    dex_type: "xylo".to_string(),
                                     factory: factory.address.clone(),
                                 },
                             ));
@@ -1113,6 +1142,10 @@ mod tests {
         assert_eq!(discovered.source, "discovered:stable");
         assert!(!discovered.is_seed);
         assert!(FactoryConfig::parse("0xABCD:clmm", true).is_ok());
+        let xylo_seed = FactoryConfig::parse("0xABCD:xylo", true).unwrap();
+        assert_eq!(xylo_seed.source, "xylo");
+        let xylo_disc = FactoryConfig::parse("0xABCD:xylo", false).unwrap();
+        assert_eq!(xylo_disc.source, "xylo");
         assert!(FactoryConfig::parse("0xABCD:liquidity-pool", true).is_err());
         assert!(FactoryConfig::parse("no-colon", true).is_err());
     }

@@ -15,6 +15,10 @@ pub struct Edge {
     pub source: String,
     pub pool_address: String,
     pub fee_bps: u32,
+    /// Per-edge DEX type (`xyk` | `stable` | `clmm` | …). T4.7 hop metadata.
+    pub dex_type: String,
+    /// Allowlisted venue factory address (empty = legacy). T4.7 hop metadata.
+    pub factory: String,
     pub last_updated_ms: u64,
 }
 
@@ -34,6 +38,20 @@ impl TokenGraph {
 
     /// Add a bidirectional edge (trading pair) to the graph.
     pub fn add_pair(&mut self, token_a: &TokenId, token_b: &TokenId, source: &str, pool_address: &str, fee_bps: u32) {
+        self.add_pair_meta(token_a, token_b, source, pool_address, fee_bps, "", "")
+    }
+
+    /// Add a bidirectional edge with T4.7 hop metadata (dex type + factory).
+    pub fn add_pair_meta(
+        &mut self,
+        token_a: &TokenId,
+        token_b: &TokenId,
+        source: &str,
+        pool_address: &str,
+        fee_bps: u32,
+        dex_type: &str,
+        factory: &str,
+    ) {
         let key_a = token_a.canonical();
         let key_b = token_b.canonical();
         let now = chrono::Utc::now().timestamp_millis() as u64;
@@ -47,6 +65,8 @@ impl TokenGraph {
             source: source.to_string(),
             pool_address: pool_address.to_string(),
             fee_bps,
+            dex_type: dex_type.to_string(),
+            factory: factory.to_string(),
             last_updated_ms: now,
         });
 
@@ -56,6 +76,8 @@ impl TokenGraph {
             source: source.to_string(),
             pool_address: pool_address.to_string(),
             fee_bps,
+            dex_type: dex_type.to_string(),
+            factory: factory.to_string(),
             last_updated_ms: now,
         });
     }
@@ -121,6 +143,9 @@ impl TokenGraph {
                     tokens: vec![start.clone(), edge.target.clone()],
                     sources: vec![edge.source.clone()],
                     pool_addresses: vec![edge.pool_address.clone()],
+                    dex_types: vec![edge.dex_type.clone()],
+                    fee_bps: vec![edge.fee_bps],
+                    factories: vec![edge.factory.clone()],
                 });
             }
         }
@@ -132,11 +157,39 @@ impl TokenGraph {
         let mut multi_hop_count = 0usize;
 
         // BFS for indirect paths only (direct pools already in `results`).
-        let mut queue: VecDeque<(String, Vec<TokenId>, Vec<String>, Vec<String>, HashSet<String>)> = VecDeque::new();
+        let mut queue: VecDeque<(
+            String,
+            Vec<TokenId>,
+            Vec<String>,
+            Vec<String>,
+            Vec<String>,
+            Vec<u32>,
+            Vec<String>,
+            HashSet<String>,
+        )> = VecDeque::new();
 
-        queue.push_back((start_key.clone(), vec![start.clone()], vec![], vec![], HashSet::new()));
+        queue.push_back((
+            start_key.clone(),
+            vec![start.clone()],
+            vec![],
+            vec![],
+            vec![],
+            vec![],
+            vec![],
+            HashSet::new(),
+        ));
 
-        while let Some((current_key, token_path, source_path, pool_path, visited_pools)) = queue.pop_front() {
+        while let Some((
+            current_key,
+            token_path,
+            source_path,
+            pool_path,
+            dex_path,
+            fee_path,
+            factory_path,
+            visited_pools,
+        )) = queue.pop_front()
+        {
             if multi_hop_count >= max_multi_hop_paths {
                 break;
             }
@@ -176,11 +229,23 @@ impl TokenGraph {
                     let mut new_pools = pool_path.clone();
                     new_pools.push(edge.pool_address.clone());
 
+                    let mut new_dex = dex_path.clone();
+                    new_dex.push(edge.dex_type.clone());
+
+                    let mut new_fees = fee_path.clone();
+                    new_fees.push(edge.fee_bps);
+
+                    let mut new_factories = factory_path.clone();
+                    new_factories.push(edge.factory.clone());
+
                     results.push(Path {
                         hops: new_sources.len(),
                         tokens: new_tokens,
                         sources: new_sources,
                         pool_addresses: new_pools,
+                        dex_types: new_dex,
+                        fee_bps: new_fees,
+                        factories: new_factories,
                     });
                     multi_hop_count += 1;
 
@@ -203,10 +268,28 @@ impl TokenGraph {
                 let mut new_pools = pool_path.clone();
                 new_pools.push(edge.pool_address.clone());
 
+                let mut new_dex = dex_path.clone();
+                new_dex.push(edge.dex_type.clone());
+
+                let mut new_fees = fee_path.clone();
+                new_fees.push(edge.fee_bps);
+
+                let mut new_factories = factory_path.clone();
+                new_factories.push(edge.factory.clone());
+
                 let mut new_visited = visited_pools.clone();
                 new_visited.insert(edge.pool_address.clone());
 
-                queue.push_back((target_key, new_tokens, new_sources, new_pools, new_visited));
+                queue.push_back((
+                    target_key,
+                    new_tokens,
+                    new_sources,
+                    new_pools,
+                    new_dex,
+                    new_fees,
+                    new_factories,
+                    new_visited,
+                ));
             }
         }
 
@@ -302,6 +385,53 @@ mod tests {
 
         let paths = graph.find_paths(&Arc(), &eth(), 4, 100, 0);
         assert!(paths.is_empty());
+    }
+
+    /// T4.7: per-hop dex_type / fee / factory metadata rides through path
+    /// discovery (both direct and multi-hop).
+    #[test]
+    fn test_paths_carry_per_hop_dex_type_fee_factory() {
+        let mut graph = TokenGraph::new();
+        graph.add_pair_meta(
+            &Arc(),
+            &usdc(),
+            "chakra-stable",
+            "stable_pool",
+            4,
+            "stable",
+            "0xSTABLE_FACTORY",
+        );
+        graph.add_pair_meta(&usdc(), &eth(), "chakra-xyk", "xyk_pool", 30, "xyk", "0xXYK_FACTORY");
+
+        // Direct path: Arc → usdc via chakra-stable.
+        let direct = graph.find_paths(&Arc(), &usdc(), 4, 100, 0);
+        assert_eq!(direct.len(), 1);
+        assert_eq!(direct[0].dex_types, vec!["stable".to_string()]);
+        assert_eq!(direct[0].fee_bps, vec![4]);
+        assert_eq!(direct[0].factories, vec!["0xSTABLE_FACTORY".to_string()]);
+
+        // Multi-hop: Arc → usdc → eth via stable then xyk.
+        let multi = graph.find_paths(&Arc(), &eth(), 4, 100, 0);
+        assert!(multi.iter().any(|p| p.hops == 2));
+        let two_hop = multi.iter().find(|p| p.hops == 2).unwrap();
+        assert_eq!(two_hop.dex_types, vec!["stable".to_string(), "xyk".to_string()]);
+        assert_eq!(two_hop.fee_bps, vec![4, 30]);
+        assert_eq!(
+            two_hop.factories,
+            vec!["0xSTABLE_FACTORY".to_string(), "0xXYK_FACTORY".to_string()]
+        );
+    }
+
+    /// T4.7: edges added through the legacy `add_pair` (no metadata) still
+    /// yield empty dex_type/factory vectors (legacy sources never quote).
+    #[test]
+    fn test_legacy_edges_yield_empty_hop_metadata() {
+        let mut graph = TokenGraph::new();
+        graph.add_pair(&Arc(), &usdc(), "Arc venue", "pool_1", 30);
+        let paths = graph.find_paths(&Arc(), &usdc(), 4, 100, 0);
+        assert_eq!(paths[0].dex_types, vec![String::new()]);
+        assert_eq!(paths[0].fee_bps, vec![30]);
+        assert_eq!(paths[0].factories, vec![String::new()]);
     }
 
     #[test]

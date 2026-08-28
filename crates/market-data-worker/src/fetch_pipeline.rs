@@ -7,15 +7,9 @@
 use {
     crate::{clmm_metrics::ClmmCoverageMetrics, worker::WorkerShared},
     anyhow::Result,
-    dex_adapters::{
-        evm_logs::normalize_evm_address,
-        evm_rpc::EvmRpcClient,
-        pool_index::PoolRef,
-    },
+    dex_adapters::{evm_logs::normalize_evm_address, evm_rpc::EvmRpcClient, pool_index::PoolRef},
     market_snapshot::{
-        pool_state_store::{
-            should_publish_clmm_to_redis, PoolStateStore, StablePoolStateValue, XykPoolStateValue,
-        },
+        pool_state_store::{should_publish_clmm_to_redis, PoolStateStore, StablePoolStateValue, XykPoolStateValue},
         ClmmPoolRefSnapshot, ClmmPoolSnapshot, TradingPairSnapshot,
     },
     std::{
@@ -32,17 +26,14 @@ use {
 #[derive(Debug, Clone)]
 pub enum FetchTask {
     /// EVM xy=k pool (Arc, chakra-xyk / discovered:xyk).
-    EvmXyk {
-        pool_address: String,
-    },
+    EvmXyk { pool_address: String },
     /// EVM stableswap pool (Arc, chakra-stable / discovered:stable).
-    EvmStable {
-        pool_address: String,
-    },
+    EvmStable { pool_address: String },
     /// EVM CLMM pool (Arc, chakra-clmm / discovered:clmm).
-    EvmClmm {
-        pool_address: String,
-    },
+    EvmClmm { pool_address: String },
+    /// XyloNet stableswap pool (T-XYLO, source `xylo`). Catalog USDC/EURC
+    /// only; the topology snapshot carries the pinned pool.
+    EvmXylo { pool_address: String },
 }
 
 #[derive(Default)]
@@ -152,6 +143,10 @@ pub(crate) fn coalesce_touched_into_tasks(touched: HashSet<PoolRef>) -> Vec<Fetc
                 pool_address: pool.pool_address,
             }),
             "chakra-clmm" | "discovered:clmm" => tasks.push(FetchTask::EvmClmm {
+                pool_address: pool.pool_address,
+            }),
+            // T-XYLO: the pinned XyloNet USDC/EURC pool (source `xylo`).
+            "xylo" | "discovered:xylo" | "chakra-xylo" => tasks.push(FetchTask::EvmXylo {
                 pool_address: pool.pool_address,
             }),
             other => {
@@ -283,6 +278,11 @@ async fn execute_fetch_task(ctx: &FetchWorkerContext, task: FetchTask) -> Result
             .await?;
             Ok(vec![PoolStateUpdate::Stable(vec![value])])
         }
+        FetchTask::EvmXylo { pool_address } => {
+            let (source, pair) = find_evm_pair(&ctx.shared, "xylo", &pool_address).await?;
+            let value = dex_adapters::evm_fetch::fetch_xylo_state(ctx.evm.as_ref(), source.as_str(), &pair).await?;
+            Ok(vec![PoolStateUpdate::Stable(vec![value])])
+        }
         FetchTask::EvmClmm { pool_address } => {
             let (pool_ref, existing) = {
                 let guard = ctx.shared.read().await;
@@ -307,9 +307,13 @@ async fn execute_fetch_task(ctx: &FetchWorkerContext, task: FetchTask) -> Result
                     existing.clone(),
                 )
             };
-            let snapshot =
-                dex_adapters::evm_fetch::fetch_clmm_state(ctx.evm.as_ref(), &pool_ref.source, &pool_ref, Some(&existing))
-                    .await?;
+            let snapshot = dex_adapters::evm_fetch::fetch_clmm_state(
+                ctx.evm.as_ref(),
+                &pool_ref.source,
+                &pool_ref,
+                Some(&existing),
+            )
+            .await?;
             if let Some(metrics) = &ctx.clmm_metrics {
                 metrics.record_snapshot(&snapshot);
             }
@@ -344,7 +348,8 @@ async fn find_evm_pair(
     let guard = shared.read().await;
     for source in &guard.sources {
         for pair in &source.pairs {
-            if pair.dex_type == dex_type && normalize_evm_address(&pair.pool_address) == normalize_evm_address(pool_address)
+            if pair.dex_type == dex_type
+                && normalize_evm_address(&pair.pool_address) == normalize_evm_address(pool_address)
             {
                 return Ok((source.source.clone(), pair.clone()));
             }

@@ -11,11 +11,10 @@
  *
  * Run: npx playwright test --config=qa.wallet.config.ts
  */
-import { test, expect, type Page } from '@playwright/test';
+import { test, expect } from '@playwright/test';
 
 const API_URL = process.env.QA_API_URL || 'http://127.0.0.1:8080';
 const CHAIN_ID = parseInt(process.env.QA_CHAIN_ID || '5042002', 10);
-const EVIDENCE_DIR = process.env.QA_EVIDENCE_DIR || '../../output/playwright/evidence';
 
 // Arc testnet USDC and EURC catalog addresses.
 const USDC = '0x3600000000000000000000000000000000000000';
@@ -61,10 +60,11 @@ test.describe('Chakra Arc Testnet — critical swap path', () => {
         sub_routes: quote.sub_routes.map((sr: any) => ({
           amount_in: sr.amount_in,
           steps: sr.pool_addresses.map((addr: string, i: number) => ({
-            dex_type: sr.source.includes('stable') ? 'stable' : 'xyk',
+            dex_type: sr.dex_types?.[i] ?? (sr.source.includes('stable') ? 'stable' : 'xyk'),
             pool_address: addr,
             token_in: i === 0 ? USDC : EURC,
             token_out: i === sr.pool_addresses.length - 1 ? EURC : USDC,
+            ...(sr.hop_fees?.[i] ? { fee_bps: sr.hop_fees[i] } : {}),
           })),
         })),
       },

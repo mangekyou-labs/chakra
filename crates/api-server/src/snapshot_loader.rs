@@ -25,6 +25,11 @@ fn snapshot_pair_to_trading(pair: &TradingPairSnapshot, source: &str) -> router_
         reserve_a: None,
         reserve_b: None,
         factory: pair.factory.clone(),
+        dex_type: if pair.dex_type.is_empty() {
+            "xyk".to_string()
+        } else {
+            pair.dex_type.clone()
+        },
     }
 }
 
@@ -60,6 +65,7 @@ pub async fn build_engine_from_snapshot(config: &AppConfig, snapshot: &MarketSna
                 reserve_a: None,
                 reserve_b: None,
                 factory: clmm.factory.clone(),
+                dex_type: "clmm".to_string(),
             });
     }
     for (source, trading_pairs) in pairs_by_source {
@@ -234,6 +240,7 @@ mod tests {
                     reserve_a: Some(1_000_000_000),
                     reserve_b: Some(2_000_000_000),
                     factory: String::new(),
+                    dex_type: "xyk".to_string(),
                 }],
             )
             .await;

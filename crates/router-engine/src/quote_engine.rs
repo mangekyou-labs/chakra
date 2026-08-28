@@ -196,6 +196,7 @@ impl QuoteEngine {
                         reserve_a: p.reserve_a,
                         reserve_b: p.reserve_b,
                         factory: String::new(),
+                        dex_type: String::new(),
                     })
                     .collect();
 
@@ -538,12 +539,7 @@ impl QuoteEngine {
 
     /// Quote a single path by simulating each hop sequentially.
     /// Uses local AMM computation from Redis hydration + cached reserves.
-    async fn quote_path(
-        &self,
-        path: &Path,
-        amount_in: u128,
-        hydration: Option<&QuoteHydration>,
-    ) -> Option<Quote> {
+    async fn quote_path(&self, path: &Path, amount_in: u128, hydration: Option<&QuoteHydration>) -> Option<Quote> {
         let mut current_amount = amount_in;
         let mut total_fee_bps: u32 = 0;
         let mut max_impact_bps: u32 = 0;
@@ -583,6 +579,8 @@ impl QuoteEngine {
                 )
             } else if source == "chakra-stable" {
                 self.local_stable_quote(token_in, token_out, current_amount, pool_address, source, hydration)
+            } else if source == "xylo" {
+                self.local_xylo_quote(token_in, token_out, current_amount, pool_address, source, hydration)
             } else if source == "chakra-xyk" {
                 self.local_evm_xyk_quote(token_in, token_out, current_amount, pool_address, source, hydration)
             } else {
@@ -761,6 +759,51 @@ impl QuoteEngine {
         })
     }
 
+    /// XyloNet hop (T-XYLO): `xylo_quote` (A=200, 4 bps fee-on-output) on the
+    /// hydrated stored reserves. Never the Chakra stable math (A=100,
+    /// fee-on-input) — the Xylo venue has a different swap ABI.
+    fn local_xylo_quote(
+        &self,
+        token_in: &TokenId,
+        token_out: &TokenId,
+        amount_in: u128,
+        pool_address: &str,
+        source: &str,
+        hydration: Option<&QuoteHydration>,
+    ) -> Option<dex_adapters::AdapterQuote> {
+        let state = hydration?
+            .stable_pools
+            .get(&QuoteHydration::stable_pool_key(source, pool_address))?;
+        let (reserve_in, reserve_out) = if token_in.canonical().eq_ignore_ascii_case(&state.token_a)
+            && token_out.canonical().eq_ignore_ascii_case(&state.token_b)
+        {
+            (state.balance_a, state.balance_b)
+        } else if token_in.canonical().eq_ignore_ascii_case(&state.token_b)
+            && token_out.canonical().eq_ignore_ascii_case(&state.token_a)
+        {
+            (state.balance_b, state.balance_a)
+        } else {
+            return None;
+        };
+        let amount_out = dex_adapters::evm_quote_math::xylo_quote(reserve_in, reserve_out, amount_in);
+        if amount_out == 0 {
+            return None;
+        }
+        // Impact vs the on-peg 1:1 spot (equal-decimals stableswap); the
+        // 4 bps output fee is always paid.
+        let spot_out = amount_in;
+        let price_impact_bps = if spot_out > amount_out {
+            ((spot_out - amount_out) * 10_000 / spot_out) as u32
+        } else {
+            0
+        };
+        Some(dex_adapters::AdapterQuote {
+            amount_out,
+            fee_bps: state.fee_bps,
+            price_impact_bps,
+        })
+    }
+
     /// Chakra xy=k hop: Uniswap V2 997/1000 (`evm_quote_math::xyk_quote`) on
     /// the hydrated reserves, with integer price impact.
     fn local_evm_xyk_quote(
@@ -885,6 +928,7 @@ impl QuoteEngine {
                             reserve_a: p.reserve_a,
                             reserve_b: p.reserve_b,
                             factory: String::new(),
+                            dex_type: String::new(),
                         })
                         .collect();
 
@@ -1435,6 +1479,7 @@ mod tests {
             reserve_a: Some(reserve_a),
             reserve_b: Some(reserve_b),
             factory: String::new(),
+            dex_type: String::new(),
         }
     }
 
@@ -1459,6 +1504,7 @@ mod tests {
             reserve_a: Some(reserve_a),
             reserve_b: Some(reserve_b),
             factory: String::new(),
+            dex_type: String::new(),
         }
     }
 
@@ -1472,6 +1518,7 @@ mod tests {
             reserve_a: None,
             reserve_b: None,
             factory: String::new(),
+            dex_type: String::new(),
         }
     }
 
@@ -1917,5 +1964,152 @@ mod tests {
             "empty factories must still quote legacy pools"
         );
         assert!(route.total_expected_out > 0);
+    }
+
+    // ── T-XYLO: XyloNet hop routing ────────────────────────────
+
+    const XYLO_POOL_UE: &str = "0x0000000000000000000000000000000000000009";
+    /// Live XyloNet stored reserves (2026-08-28 same-block probe).
+    const XYLO_RESERVE_USDC: u128 = 9_236_986_394_524;
+    const XYLO_RESERVE_EURC: u128 = 613_508_500_014;
+
+    fn xylo_snapshot() -> MarketSnapshot {
+        MarketSnapshot::from_sources(
+            "chakra-xylo-1",
+            1_700_000_000_000,
+            "arc-testnet",
+            vec![
+                SourceSnapshot {
+                    source: "chakra-stable".to_string(),
+                    pairs: vec![TradingPairSnapshot {
+                        token_a: USDC_ERC20.to_string(),
+                        token_b: EURC.to_string(),
+                        pool_address: STABLE_POOL_UE.to_string(),
+                        fee_bps: 4,
+                        dex_type: "stable".to_string(),
+                        factory: String::new(),
+                    }],
+                },
+                SourceSnapshot {
+                    source: "xylo".to_string(),
+                    pairs: vec![TradingPairSnapshot {
+                        token_a: USDC_ERC20.to_string(),
+                        token_b: EURC.to_string(),
+                        pool_address: XYLO_POOL_UE.to_string(),
+                        fee_bps: 4,
+                        dex_type: "xylo".to_string(),
+                        factory: String::new(),
+                    }],
+                },
+            ],
+        )
+    }
+
+    fn xylo_hydration() -> QuoteHydration {
+        QuoteHydration {
+            stable_pools: HashMap::from([
+                (
+                    QuoteHydration::stable_pool_key("chakra-stable", STABLE_POOL_UE),
+                    StablePoolStateValue::new(
+                        "chakra-stable",
+                        STABLE_POOL_UE,
+                        USDC_ERC20,
+                        EURC,
+                        STABLE_UE_SEED,
+                        STABLE_UE_SEED,
+                        100,
+                        4,
+                    ),
+                ),
+                (
+                    QuoteHydration::stable_pool_key("xylo", XYLO_POOL_UE),
+                    StablePoolStateValue::new(
+                        "xylo",
+                        XYLO_POOL_UE,
+                        USDC_ERC20,
+                        EURC,
+                        XYLO_RESERVE_USDC,
+                        XYLO_RESERVE_EURC,
+                        200,
+                        4,
+                    ),
+                ),
+            ]),
+            ..Default::default()
+        }
+    }
+
+    /// T-XYLO: at 1e6 USDC→EURC the balanced Chakra stable (0.9996 EURC)
+    /// beats the off-peg Xylo (0.8655 EURC) — the router must keep preferring
+    /// chakra-stable at small size.
+    #[tokio::test]
+    async fn xylo_loses_to_chakra_stable_at_small_size() {
+        let engine = QuoteEngine::new(PathFinderConfig::default(), SplitConfig::default());
+        engine.update_from_chakra_snapshot(&xylo_snapshot(), MBTC).await;
+
+        let request = RouteRequest {
+            token_in: token(USDC_ERC20),
+            token_out: token(EURC),
+            amount_in: 1_000_000,
+            slippage_bps: Some(50),
+            max_hops: Some(1),
+            max_splits: Some(1),
+            prefer_arc: None,
+        };
+        let paths = engine.find_candidate_paths(&request).await;
+        let route = engine
+            .get_route_with_paths(&request, &paths, Some(&xylo_hydration()))
+            .await;
+
+        assert_eq!(route.sub_orders.len(), 1);
+        assert_eq!(
+            route.sub_orders[0].path.sources,
+            vec!["chakra-stable".to_string()],
+            "small size must prefer the balanced Chakra stable over off-peg Xylo"
+        );
+        // 1e6 on the 200k stable pool: 999599 (4 bps fee-on-input).
+        assert_eq!(route.total_expected_out, 999_599);
+    }
+
+    /// T-XYLO: at a size that drains the Chakra stable (~4e6 EURC out), the
+    /// deep Xylo pool is the better venue — the router must route through it
+    /// (dex_types: ["xylo"]).
+    #[tokio::test]
+    async fn xylo_wins_at_chakra_capacity_sizes() {
+        let engine = QuoteEngine::new(PathFinderConfig::default(), SplitConfig::default());
+        engine.update_from_chakra_snapshot(&xylo_snapshot(), MBTC).await;
+
+        // Chakra stable has 200_000e6 per side; 4_500_000e6 USDC in drains
+        // more than half its EURC side (capacity-bound). Xylo has 613_508e6
+        // EURC reserves and an A=200 curve — much deeper for EURC out.
+        let amount_in = 4_500_000_000_000u128;
+        let request = RouteRequest {
+            token_in: token(USDC_ERC20),
+            token_out: token(EURC),
+            amount_in,
+            slippage_bps: Some(50),
+            max_hops: Some(1),
+            max_splits: Some(1),
+            prefer_arc: None,
+        };
+        let paths = engine.find_candidate_paths(&request).await;
+        let route = engine
+            .get_route_with_paths(&request, &paths, Some(&xylo_hydration()))
+            .await;
+
+        let stable_out = dex_adapters::evm_quote_math::stable_quote(
+            &xylo_hydration().stable_pools[&QuoteHydration::stable_pool_key("chakra-stable", STABLE_POOL_UE)],
+            0,
+            1,
+            amount_in,
+        );
+        let xylo_out = dex_adapters::evm_quote_math::xylo_quote(XYLO_RESERVE_USDC, XYLO_RESERVE_EURC, amount_in);
+        assert!(xylo_out > stable_out, "Xylo must be deeper at capacity size");
+        assert_eq!(
+            route.sub_orders[0].path.sources,
+            vec!["xylo".to_string()],
+            "capacity size must route through Xylo"
+        );
+        assert!(route.total_expected_out > stable_out);
     }
 }

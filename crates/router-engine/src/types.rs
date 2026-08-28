@@ -15,6 +15,9 @@ pub struct TradingPair {
     /// Allowlisted venue factory address (from snapshot stamp). Empty = legacy.
     #[serde(default)]
     pub factory: String,
+    /// DEX type (`xyk` | `stable` | `clmm` | …). T4.7 hop metadata.
+    #[serde(default)]
+    pub dex_type: String,
 }
 
 /// Standardized quote from a single DEX source.
@@ -45,6 +48,17 @@ pub struct Path {
     pub pool_addresses: Vec<String>,
     /// Number of hops
     pub hops: usize,
+    /// Per-hop DEX type (`xyk` | `stable` | `clmm` | … — extensible string
+    /// enum, not a closed set). T4.7: quote hop metadata, no source-string
+    /// heuristics.
+    #[serde(default)]
+    pub dex_types: Vec<String>,
+    /// Per-hop venue fee in bps (T4.7).
+    #[serde(default)]
+    pub fee_bps: Vec<u32>,
+    /// Per-hop allowlisted factory address (empty = legacy). T4.7.
+    #[serde(default)]
+    pub factories: Vec<String>,
 }
 
 /// A sub-order in a split execution.

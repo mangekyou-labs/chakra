@@ -14,6 +14,7 @@ import {IUniswapV2Pair} from "./interfaces/IUniswapV2Pair.sol";
 import {IUniswapV3Factory} from "./interfaces/IUniswapV3Factory.sol";
 import {IUniswapV3Pool} from "./interfaces/IUniswapV3Pool.sol";
 import {IStableSwap} from "./interfaces/IStableSwap.sol";
+import {IXyloFactory, IXyloPool} from "./interfaces/IXyloNet.sol";
 
 /// @title Aggregator — atomic splitSwap over allowlisted venues with Permit2 pull.
 /// @notice Non-upgradeable. Factory allowlist gates every hop; Permit2
@@ -25,7 +26,8 @@ contract Aggregator is Ownable, Pausable, ReentrancyGuard {
     enum DexType {
         Xyk,
         Stable,
-        Clmm
+        Clmm,
+        Xylo
     }
 
     struct Hop {
@@ -250,6 +252,16 @@ contract Aggregator is Ownable, Pausable, ReentrancyGuard {
                     return;
                 }
             }
+        } else if (hop.dexType == DexType.Xylo) {
+            // Xylo factory membership: `getPool(address,address)` (not Uni V2
+            // `getPair`, not the Chakra stable factory).
+            for (uint256 i = 0; i < factoryList.length; i++) {
+                address factory = factoryList[i];
+                if (factoryDexType[factory] != DexType.Xylo) continue;
+                if (IXyloFactory(factory).getPool(hop.tokenIn, hop.tokenOut) == hop.pool) {
+                    return;
+                }
+            }
         } else {
             for (uint256 i = 0; i < factoryList.length; i++) {
                 address factory = factoryList[i];
@@ -284,6 +296,9 @@ contract Aggregator is Ownable, Pausable, ReentrancyGuard {
         if (hop.dexType == DexType.Stable) {
             return _stableOut(hop, amountIn);
         }
+        if (hop.dexType == DexType.Xylo) {
+            return _xyloOut(hop, amountIn);
+        }
         return _clmmOut(hop, amountIn);
     }
 
@@ -311,6 +326,20 @@ contract Aggregator is Ownable, Pausable, ReentrancyGuard {
         uint8 j = i == 0 ? 1 : 0;
         IERC20(hop.tokenIn).safeTransfer(hop.pool, amountIn);
         dy = pool.exchange(i, j, amountIn, 0);
+    }
+
+    /// @notice Xylo: the pool pulls via `transferFrom`, so approve exactly
+    ///         `amountIn`, call `swap(tokenIn, tokenOut, amountIn, 0,
+    ///         address(this), deadline)`, then reset the allowance to 0.
+    function _xyloOut(Hop calldata hop, uint256 amountIn) internal returns (uint256 amountOut) {
+        IXyloPool pool = IXyloPool(hop.pool);
+        address tokenIn = hop.tokenIn;
+        IERC20(tokenIn).forceApprove(hop.pool, amountIn);
+        amountOut = pool.swap(tokenIn, hop.tokenOut, amountIn, 0, address(this), block.timestamp);
+        uint256 remaining = IERC20(tokenIn).allowance(address(this), hop.pool);
+        if (remaining > 0) {
+            IERC20(tokenIn).forceApprove(hop.pool, 0);
+        }
     }
 
     /// @notice CLMM: exact-in swap; callback pays the pool. Returns output from deltas.

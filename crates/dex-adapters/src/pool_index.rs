@@ -55,9 +55,6 @@ impl KnownPoolIndex {
     }
 }
 
-pub fn touched_pools_from_events(
-    _events: &[crate::evm_rpc::EvmLog],
-    _index: &KnownPoolIndex,
-) -> HashSet<PoolRef> {
+pub fn touched_pools_from_events(_events: &[crate::evm_rpc::EvmLog], _index: &KnownPoolIndex) -> HashSet<PoolRef> {
     HashSet::new()
 }
