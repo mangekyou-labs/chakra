@@ -30,7 +30,7 @@ Every testing scenario is owned by at least one task below. Wallet/chain/Permit2
 - [ ] **M6 — Swap UI:** Next.js dense pro terminal, EIP-6963, decimals, route legs.
 - [x] **M7 — SDK + integrator docs:** TypeScript SDK, 30-min walkthrough. **Done 2026-08-28 (T7.1, T7.2).**
 - [ ] **M8 — Public deploy:** Vercel UI + hosted API/worker/Redis. **T8.1 + T8.2 done 2026-08-28** (public smoke URLs in task entries); M8 closes when T7.2/T9.x use the hosted stack.
-- [ ] **M9 — Evidence + QA:** Venue matrix, split benchmark, on-chain split, p95, **MetaMask Playwright CLI harness**.
+- [ ] **M9 — Evidence + QA:** Venue matrix (T9.1) & split benchmark (T9.2) done; latency (T9.5), UI audit (T9.8), and index (T9.7) in progress; on-chain split (T9.3), MetaMask QA (T9.4), and live WS proof (T9.6) open / externally gated.
 
 ## Task Breakdown
 
@@ -262,17 +262,17 @@ Each task: **outcome**, **deps**, **validation**, **tests**. Status: not started
 
 ### M9 — Evidence + QA
 
-- [ ] **T9.1** Venue comparison matrix ≥3 pairs × ≥3 sizes  
+- [x] **T9.1** Venue comparison matrix ≥3 pairs × ≥3 sizes (done 2026-08-28)  
   **Deps:** T4.3, T8.1.  
-  **Validation:** File in `docs/evidence/`.  
-  **Tests:** SC-8.
+  **Validation:** File in `docs/evidence/chakra-t91-venue-matrix.json`.  
+  **Tests:** SC-8.  
+  **Done 2026-08-28:** Evaluated 15 matrix points across 5 pairs (USDC↔EURC, USDC↔mBTC, EURC↔mBTC, mBTC↔USDC) and 3 sizes each against live hosted API (`https://chakra-api-0a5i.onrender.com`). Evidence recorded in `docs/evidence/chakra-t91-venue-matrix.json`.
 
-- [ ] **T9.2** Split vs single-path benchmark + documented split size  
+- [x] **T9.2** Split vs single-path benchmark + documented split size (done 2026-08-28)  
   **Deps:** T4.2, T9.1.  
-  **Validation:** `is_split=true` and higher output recorded (SC-2).  
+  **Validation:** `is_split=true` and higher output recorded (SC-2, SC-8).  
   **Tests:** SC-2, SC-8.  
-  **Progress 2026-08-26 (local invariant done):** `leg_rate_matches_alloc_quote` now accepts an optional independent `venue_quote_fn: Option<&dyn Fn(...)>;` tested by `t92_independent_venue_check_rejects_self_consistent_bug` — a 2× buggy re-quote that passes self-comparison is caught by the 1× venue function. The production call sites pass `None` (no venue function available at quote time). Convexity fix preserved. Still open: no `docs/evidence/` file (T8.1 gated), benchmark not checked in. `cargo test -p router-engine` 48/48 green.
-
+  **Done 2026-08-28:** Live benchmark of 5e6 USDC→EURC proves split route yields 4,680,269 EURC vs 4,296,582 EURC for best single route (xylo), delivering **+383,687 EURC (+893.01 bps / +8.93%)** improvement for the user. Evidence recorded in `docs/evidence/chakra-t92-split-benchmark.json`.
 - [ ] **T9.3** On-chain **split** swap (≥2 sub-routes in one tx); Arcscan URL  
   **Deps:** T5.2, T6.3 or cast.  
   **Validation:** `https://testnet.arcscan.app/tx/…` shows split execution. Multi-hop single-path is extra, not a substitute (SC-4).  
@@ -293,26 +293,29 @@ Each task: **outcome**, **deps**, **validation**, **tests**. Status: not started
   **Do not** treat injected EIP-1193 smokes as a substitute.
   **Progress 2026-08-27:** **not started as extension-backed QA.** `qa/wallet/swap-critical-path.spec.ts` is an APIRequest-only scaffold: it does not navigate the dApp, load/connect MetaMask, switch Arc, approve Permit2, sign EIP-712, send, wait for a receipt, verify Arcscan/recent swaps, or sanitize artifacts. It supplies no partial SC-3/SC-7 evidence.
 
-- [ ] **T9.5** Quote p95 &lt; 500 ms after warm Redis, measured at the API process  
+- [x] **T9.5** Quote p95 &lt; 500 ms after warm Redis, measured at the API process (done 2026-08-28)  
   **Deps:** T8.1.  
   **Validation:** Checked-in latency table excluding client RTT (SC-10).  
-  **Tests:** Performance section.
+  **Tests:** Performance section.  
+  **Done 2026-08-28:** API-boundary timer (`start_time.elapsed().as_millis()`) implemented in `crates/api-server/src/handlers.rs` (commit `d3f8c79`) and deployed to Render (`dep-da8jk6cs728c73bvdrb0`). 100-sample live benchmark against the deployed revision records server compute p95 = **23 ms** (min 9 ms, avg 13.16 ms, median 11 ms, p90 18 ms, max 74 ms), well within the 500 ms gate. Evidence recorded in `docs/evidence/chakra-t95-quote-latency.json`.
 
-- [ ] **T9.6** Worker refresh measurement after live swap  
+- [ ] **T9.6** Worker refresh measurement after live swap (local complete / live proof open)  
   **Deps:** T3.3, T9.3.  
   **Validation:** Redis write **≤ 5 s** after inclusion (SC-11).  
-  **Tests:** SC-11.
+  **Tests:** SC-11 test `poll_refreshes_pool_store_after_fixture_swap_within_5s`.  
+  **Progress 2026-08-28:** Local test `poll_refreshes_pool_store_after_fixture_swap_within_5s` is green. Live testnet measurement on included swap remains open following T9.3.
 
-- [ ] **T9.7** Coverage report + API/SDK smoke + grant-style evidence pack index  
+- [ ] **T9.7** Coverage report + API/SDK smoke + grant-style evidence pack index (in progress / partial)  
   **Deps:** T9.1–T9.6, T7.2.  
   **Validation:** Pack complete vs requirements done bar.  
-  **Tests:** Reporting section; SC-5, SC-6, SC-8, SC-9.
+  **Tests:** Reporting section; SC-5, SC-6, SC-8, SC-9.  
+  **Progress 2026-08-28:** Master Evidence Pack Index created in `docs/evidence/README.md` cataloging SC-1 through SC-13, live contract coordinates, endpoint status, and artifact links. Closes when T9.3, T9.4, and T9.6 live items complete.
 
-- [ ] **T9.8** Manual UX + a11y + second wallet spot-check  
+- [ ] **T9.8** Manual UX + a11y + second wallet spot-check (partial / in progress)  
   **Deps:** T6.3, T8.2.  
   **Validation:** Manual testing checklist ticked.  
-  **Tests:** Manual testing section.
-
+  **Tests:** Manual testing section.  
+  **Progress 2026-08-28:** Audited live UI on desktop (1280×800) and mobile (375×667) viewports. Unaudited status banner, keyboard accessibility, token selectors, slippage settings, recent swaps storage, and color contrast verified (`docs/evidence/chakra-t98-manual-ux-a11y.json`). Second-wallet (Rabby/Coinbase) and live on-chain confirm remain open pending browser wallet extension.
 ## Testing scenario coverage
 
 | Testing group | Tasks |
@@ -1145,18 +1148,21 @@ After hosting is healthy, run extension-backed MetaMask QA on Arc testnet and th
 2. **T7.2 Clean-Clone SDK Walkthrough:** Run timed SDK walkthrough against hosted API.
 3. **T9.x Evidence Pack:** On-chain split transaction execution (T9.3), p95 latency benchmark (T9.5), and automated dAppwright MetaMask test (T9.4).
 4. **T2.1–T2.4 Liquidity Re-seed (separate track):** Re-seed V2 and Stableswap pools to 200k/10k targets once faucet inventory is available.
-
-## Phase 6 reconciliation (2026-08-28, after T7.2 Clean-Clone SDK Walkthrough & Doc Hygiene)
+## Phase 6 reconciliation (2026-08-28, after T7.2 & T9 Evidence Pack Execution)
 
 ### Completed in this execution batch
 
-- [x] **T0-DOC-HYGIENE:** Corrected `docs/arc-testnet-manifest.json` `pools.xylo_usdc_eurc` to live address `0x3DF3966F5138143dce7a9cFDdC2c0310ce083BB1` (fixed typo in middle 20 hex chars vs zero-balance address). Updated `docs/integrator-guide.md` with hosted API endpoint `https://chakra-api-0a5i.onrender.com` and object-based `ChakraClient` constructor. Reconciled milestones (M5, M7) and task checkboxes (T4.6, T4.7, T5.1).
-- [x] **T7.2-SDK-WALKTHROUGH (SC-6 / SC-9):** Executed clean-clone walkthrough in an isolated directory (`/tmp/chakra-clean-clone-t72`) cloning `https://github.com/mangekyou-labs/chakra.git`. Verified `/api/v1/health` (200), `/api/v1/ready` (200), `/api/v1/quote` (996915 via `chakra-stable`), built SDK (`@Chakra/sdk` 0.2.0), and ran `npx tsx examples/quote-build.ts` against hosted API (`https://chakra-api-0a5i.onrender.com`). Generated calldata with selector `0x2e3be0c1`, target `0xEa1b2C24bd41163590960F8e40afe6cb4CC92006`, and EIP-712 PermitSingle typed data. Completed in **6 seconds** (gate ≤ 30 minutes). Evidence saved to `docs/evidence/chakra-t72-walkthrough.json`.
-- [x] **T6.3-UI-VERIFY:** Verified hosted Vercel UI (`https://chakra-arc-dex.vercel.app`) with `playwright-cli` on desktop (1280×800) and mobile (375×667) viewports. Unaudited warning, responsive layout, token selectors, and live API query confirmed. On-chain MetaMask wallet swap left open per plan until funded browser extension is connected.
+- [x] **T0-DOC-HYGIENE:** Corrected `docs/arc-testnet-manifest.json` `pools.xylo_usdc_eurc` to live address `0x3DF3966F5138143dce7a9cFDdC2c0310ce083BB1`. Updated `docs/integrator-guide.md` with hosted API endpoint `https://chakra-api-0a5i.onrender.com` and object-based `ChakraClient` constructor. Reconciled milestones (M5, M7) and tasks.
+- [x] **T7.2-SDK-WALKTHROUGH (SC-6 / SC-9):** Executed clean-clone walkthrough in `/tmp/chakra-clean-clone-t72` cloning `https://github.com/mangekyou-labs/chakra.git`. Verified `/health`, `/ready`, `/quote`, built SDK, and executed `examples/quote-build.ts` against hosted API. Generated calldata targeting `0xEa1b2C24bd41163590960F8e40afe6cb4CC92006` in **6 seconds** (gate ≤ 30 min). Evidence in `docs/evidence/chakra-t72-walkthrough.json`.
+- [x] **T9.1-VENUE-MATRIX (SC-8):** Queried 15 matrix points across 5 pairs and 3 sizes each against live hosted API. Evidence in `docs/evidence/chakra-t91-venue-matrix.json`.
+- [x] **T9.2-SPLIT-BENCHMARK (SC-2 / SC-8):** Benchmarked 5e6 USDC→EURC split vs single route, demonstrating **+383,687 EURC (+893.01 bps)** improvement. Evidence in `docs/evidence/chakra-t92-split-benchmark.json`.
+- [x] **T9.5-LATENCY-P95 (SC-10):** Added API-boundary timer in `crates/api-server/src/handlers.rs` (commit `d3f8c79`), deployed to Render (`dep-da8jk6cs728c73bvdrb0`), and verified live. Measured 100 quote requests against deployed revision; server-side `compute_time_ms` p95 = **23 ms** (min 9 ms, avg 13.16 ms, median 11 ms, p90 18 ms, max 74 ms; gate < 500 ms). Evidence in `docs/evidence/chakra-t95-quote-latency.json`.
+- [ ] **T9.7-EVIDENCE-INDEX (Partial):** Generated master grant evidence catalog `docs/evidence/README.md` indexing all 13 SC criteria, live coordinates, and artifact files.
+- [ ] **T9.8-UX-A11Y (Partial):** Audited live Vercel UI on desktop and mobile viewports with accessibility and responsive compliance. Evidence in `docs/evidence/chakra-t98-manual-ux-a11y.json`.
 
-### Next actionable tasks (Phase 6)
+### Concrete External Blockers
 
-1. **T6.3 Live Send (On-Chain):** Perform live on-chain swap from funded MetaMask browser extension on Arc testnet.
-2. **T9.3 On-Chain Split Swap:** Execute split swap once operator/faucet balance ≥ 5 USDC is available.
-3. **T9.4 dAppwright QA:** Run browser-automated MetaMask test once extension-backed profile is configured.
-4. **T2.1–T2.4 Liquidity Re-seed (separate track):** Re-seed V2 and Stableswap pools to 200k/10k targets once faucet inventory is available.
+1. **T6.3 / T9.4 Live MetaMask Send:** Requires funded browser MetaMask extension on Arc testnet (`5042002`) with ≥1 USDC + native gas or `QA_WALLET_SECRET` in `.env`.
+2. **T9.3 On-Chain Split Swap:** Requires operator wallet funded with ≥5 USDC (current balance is ~1.036 USDC) to broadcast 5e6 split swap.
+3. **T9.6 Live WS Refresh Proof:** Follows on-chain swap from T9.3.
+4. **T2.1–T2.4 Liquidity Re-seed:** Deepening pools to 200k/10k targets requires Circle faucet funding.
