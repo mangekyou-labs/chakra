@@ -36,7 +36,7 @@ This document indexes all 13 Success Criteria (SC-1 through SC-13), public hoste
 
 1. **`docs/evidence/chakra-t72-walkthrough.json`**: Clean-clone SDK walkthrough output against hosted API (6 s execution).
 2. **`docs/evidence/chakra-t91-venue-matrix.json`**: 15-scenario route matrix across 5 pairs and 3 sizes, analyzing live routability and documenting the testnet mBTC liquidity gap.
-3. **`docs/evidence/chakra-t92-split-benchmark.json`**: Split vs single-path optimization benchmark demonstrating +893.01 bps (+383,687 EURC) gain.
+3. **`docs/evidence/chakra-t92-split-benchmark.json`**: Split vs single-path optimization benchmark demonstrating +893.01 bps gain (+383,687 atomic units / ~+0.383687 EURC).
 4. **`docs/evidence/chakra-t95-quote-latency.json`**: 100-sample latency benchmark demonstrating 23 ms p95 server-side API compute time on deployed revision `dep-da8jk6cs728c73bvdrb0`.
 5. **`docs/evidence/chakra-t98-manual-ux-a11y.json`**: Desktop and mobile UI viewport audit with measured DOM contrast ratios and focus order (`status: OPEN_PARTIAL`).
 

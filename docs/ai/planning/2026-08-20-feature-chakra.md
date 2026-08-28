@@ -271,7 +271,7 @@ Each task: **outcome**, **deps**, **validation**, **tests**. Status: not started
   **Deps:** T4.2, T9.1.  
   **Validation:** `is_split=true` and higher output recorded (SC-2, SC-8).  
   **Tests:** SC-2, SC-8.  
-  **Done 2026-08-28:** Live benchmark of 5e6 USDC→EURC proves split route yields 4,680,269 EURC vs 4,296,582 EURC for best single route (xylo), delivering **+383,687 EURC (+893.01 bps / +8.93%)** improvement for the user. Evidence recorded in `docs/evidence/chakra-t92-split-benchmark.json`.
+  **Done 2026-08-28:** Live benchmark of 5e6 USDC→EURC proves split route yields 4,680,269 atomic units (~4.680269 EURC) vs 4,296,582 atomic units (~4.296582 EURC) for best single route (xylo), delivering **+383,687 atomic units (~+0.383687 EURC / +893.01 bps / +8.93%)** improvement for the user. Evidence recorded in `docs/evidence/chakra-t92-split-benchmark.json`.
 - [ ] **T9.3** On-chain **split** swap (≥2 sub-routes in one tx); Arcscan URL  
   **Deps:** T5.2, T6.3 or cast.  
   **Validation:** `https://testnet.arcscan.app/tx/…` shows split execution. Multi-hop single-path is extra, not a substitute (SC-4).  
@@ -1154,7 +1154,7 @@ After hosting is healthy, run extension-backed MetaMask QA on Arc testnet and th
 - [x] **T0-DOC-HYGIENE:** Corrected `docs/arc-testnet-manifest.json` `pools.xylo_usdc_eurc` to live address `0x3DF3966F5138143dce7a9cFDdC2c0310ce083BB1`. Updated `docs/integrator-guide.md` with hosted API endpoint `https://chakra-api-0a5i.onrender.com` and object-based `ChakraClient` constructor. Reconciled milestones (M5, M7) and tasks.
 - [x] **T7.2-SDK-WALKTHROUGH (SC-6 / SC-9):** Executed clean-clone walkthrough in `/tmp/chakra-clean-clone-t72` cloning `https://github.com/mangekyou-labs/chakra.git`. Verified `/health`, `/ready`, `/quote`, built SDK, and executed `examples/quote-build.ts` against hosted API. Generated calldata targeting `0xEa1b2C24bd41163590960F8e40afe6cb4CC92006` in **6 seconds** (gate ≤ 30 min). Evidence in `docs/evidence/chakra-t72-walkthrough.json`.
 - [ ] **T9.1-VENUE-MATRIX (Partial):** Evaluated 15 matrix points across 5 pairs and 3 sizes each on hosted API; reclassified envelope errors and documented the live testnet mBTC liquidity gap. Evidence in `docs/evidence/chakra-t91-venue-matrix.json`.
-- [x] **T9.2-SPLIT-BENCHMARK (SC-2 / SC-8):** Benchmarked 5e6 USDC→EURC split vs single route, demonstrating **+383,687 EURC (+893.01 bps)** improvement. Evidence in `docs/evidence/chakra-t92-split-benchmark.json`.
+- [x] **T9.2-SPLIT-BENCHMARK (SC-2 / SC-8):** Benchmarked 5e6 USDC→EURC split vs single route, demonstrating **+383,687 atomic units (~+0.383687 EURC / +893.01 bps)** improvement. Evidence in `docs/evidence/chakra-t92-split-benchmark.json`.
 - [x] **T9.5-LATENCY-P95 (SC-10):** Added API-boundary timer in `crates/api-server/src/handlers.rs` (commit `d3f8c79`), deployed to Render (`dep-da8jk6cs728c73bvdrb0`), and verified live. Measured 100 quote requests against deployed revision; server-side `compute_time_ms` p95 = **23 ms** (min 9 ms, avg 13.16 ms, median 11 ms, p90 18 ms, max 74 ms; gate < 500 ms). Evidence in `docs/evidence/chakra-t95-quote-latency.json`.
 - [ ] **T9.7-EVIDENCE-INDEX (Partial):** Generated master grant evidence catalog `docs/evidence/README.md` indexing all 13 SC criteria, live coordinates, and artifact files.
 - [ ] **T9.8-UX-A11Y (Partial):** Audited live Vercel UI on desktop and mobile viewports with accessibility and responsive compliance. Evidence in `docs/evidence/chakra-t98-manual-ux-a11y.json`.
