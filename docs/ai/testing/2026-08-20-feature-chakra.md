@@ -295,3 +295,31 @@ Load/stress beyond p95 is not a v1 gate.
 | Envelope / `price_impact_bps` / skip-if-allowance | API (design Phase 3) |
 | localStorage recent-swaps + unaudited-ack | UI (design Phase 3) |
 | Multicall3 balances never-sum; 1-conf; public RPC not Canteen `$RPC`; ETH-display copy; prague/`prevrandao`; never-call CCTP/Gateway/USYC/FxEscrow/Memo/Multicall3From | Arc Canteen full-index addendum |
+
+## Verification Evidence (Phase 5 Continuation, 2026-08-28)
+
+- **T4.3 Production CLMM Snapshot Quoter:**
+  - Integration test `ready_and_clmm_only_snapshot_quotes_and_builds` in `crates/api-server/tests/chakra_rest_test.rs`.
+  - Confirmed `/ready` returns `200 OK` (`ready: true`) on worker CLMM snapshots.
+  - Confirmed `/quote` quotes CLMM pool with `dex_types: ["clmm"]`, `hop_fees: [30]`, `hop_factories: [CLMM_FACTORY]`.
+  - Confirmed `/build_tx` succeeds with `to: AGGREGATOR`, `value: "0"`, and valid calldata targeting deployed contract.
+  - All 53 tests in `api-server` and 196 tests across active workspace crates passing.
+
+- **T2.5 Factory Discovery Scanner:**
+  - Unit tests: `scripts/test_discovery_scan.py` (8/8 passing).
+  - Public Arc RPC block windowing added to `scripts/discovery_scan.sh` (latest 10,000 blocks / `CHAKRA_SCAN_FROM_BLOCK`) to comply with RPC getLogs range limits.
+  - Live execution against seeded/discovery factories verified (read-only, 0 errors, no allowlist changes).
+
+- **T9.8 WCAG AA Theme Contrast:**
+  - Unit test `packages/frontend/src/lib/contrast.test.ts` (vitest) tests contrast against actual backgrounds.
+  - Raised `--text-muted` in `globals.css` from `#6b7280` to `#848fa0`.
+  - DOM measurements in `docs/evidence/chakra-t98-manual-ux-a11y.json` updated: Status Banner (6.02:1, PASS), Sell Label (5.06:1, PASS), Buy Label (5.06:1, PASS), Slippage Header (5.59:1, PASS). Captured desktop and mobile audit screenshots.
+  - Frontend unit suite: 67/67 tests passing, TypeScript clean.
+
+- **T9.4 MetaMask E2E Harness (Playwright + dAppwright):**
+  - Rewrote `packages/frontend/qa/wallet/swap-critical-path.spec.ts` with real `@tenkeylabs/dappwright` MetaMask automation for headed Chromium.
+  - Tested graceful skip behavior when `QA_WALLET_SECRET` is unset (`1 skipped`, exit 0).
+  - Updated `scripts/qa-wallet-setup.mjs` with MetaMask extension pre-downloading.
+  - Updated `scripts/qa-wallet-validate.mjs` with live defaults.
+  - Added `docs/qa-playwright-metamask.md`.
+  - ESLint 0 errors, 0 warnings.
