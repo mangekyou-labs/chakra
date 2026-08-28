@@ -1,57 +1,28 @@
-use {
-    anyhow::{bail, Context, Result},
-    Chakra_config::aggregator::AggregatorConfig,
-    std::path::PathBuf,
-};
+use anyhow::Result;
 
 fn print_help() {
     println!(
-        "chakra-market-data-worker {}\n\n\
-         Usage: chakra-market-data-worker --config <FILE> [--check-config]\n\n\
-         Options:\n  --config <FILE>  Chakra Aggregator TOML configuration\n  \
-         --check-config  Validate configuration and exit\n  -h, --help      Show this help\n  \
+        "chakra-market-data-worker {}\n\n         Usage: chakra-market-data-worker\n\n         Reads all configuration from environment variables.\n\n         Options:\n  -h, --help      Show this help\n  \
          -V, --version   Show version",
         env!("CARGO_PKG_VERSION")
     );
 }
 
-fn parse_args() -> Result<Option<(Option<PathBuf>, bool)>> {
+#[tokio::main]
+async fn main() -> Result<()> {
     let mut args = std::env::args().skip(1);
-    let mut config = None;
-    let mut check = false;
     while let Some(arg) = args.next() {
         match arg.as_str() {
-            "--config" => config = Some(args.next().context("--config requires a file path")?.into()),
-            "--check-config" => check = true,
             "-h" | "--help" => {
                 print_help();
-                return Ok(None);
+                return Ok(());
             }
             "-V" | "--version" => {
                 println!("chakra-market-data-worker {}", env!("CARGO_PKG_VERSION"));
-                return Ok(None);
+                return Ok(());
             }
-            _ => bail!("unknown argument: {arg}"),
+            _ => anyhow::bail!("unknown argument: {arg}"),
         }
-    }
-    Ok(Some((config, check)))
-}
-
-#[tokio::main]
-async fn main() -> Result<()> {
-    let Some((path, check)) = parse_args()? else {
-        return Ok(());
-    };
-    if let Some(path) = path {
-        let config: AggregatorConfig = Chakra_config::load(&path)?;
-        config.validate_cluster()?;
-        config.apply();
-    } else if check {
-        bail!("--check-config requires --config <FILE>");
-    }
-    if check {
-        println!("configuration is valid");
-        return Ok(());
     }
 
     tracing_subscriber::fmt()

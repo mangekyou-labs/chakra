@@ -37,6 +37,7 @@ fn split_swap_calldata_matches_solidity_abi_for_nested_routes() {
             dex_type: "xyk".to_string(),
             token_in: "0x0000000000000000000000000000000000000001".to_string(),
             token_out: "0x0000000000000000000000000000000000000002".to_string(),
+            fee_bps: None,
         }],
     }];
 
@@ -760,4 +761,186 @@ async fn build_tx_rejects_pool_from_non_allowlisted_factory() {
     let (status, resp) = post(&router, "/api/v1/build_tx", body).await;
     assert_eq!(status, StatusCode::BAD_REQUEST);
     assert_eq!(resp["error"]["code"], ApiErrorCode::RouteInvalid.as_str());
+}
+
+// ─── 9. CLMM fee validation ────────────────────────────────────────────────
+
+const CLMM_POOL: &str = "0x0000000000000000000000000000000000000010";
+const CLMM_FACTORY: &str = "0x00000000000000000000000000000000000000f1";
+
+/// Snapshot with a CLMM pool at 30 bps fee.
+fn clmm_snapshot() -> MarketSnapshot {
+    MarketSnapshot::from_sources(
+        "chakra-build-clmm",
+        1_700_000_000_000,
+        "arc-testnet",
+        vec![SourceSnapshot {
+            source: "chakra-clmm".to_string(),
+            pairs: vec![],
+        }],
+    )
+    .with_clmm_pool_refs(vec![market_snapshot::ClmmPoolRefSnapshot {
+        source: "chakra-clmm".to_string(),
+        pool_address: CLMM_POOL.to_string(),
+        token0: USDC_ERC20.to_string(),
+        token1: EURC.to_string(),
+        fee_bps: 30,
+        tick_spacing: 10,
+        factory: CLMM_FACTORY.to_string(),
+    }])
+}
+
+fn clmm_body_with_fee(fee_bps: u32) -> Value {
+    json!({
+        "user": USER,
+        "token_in": USDC_ERC20.to_ascii_lowercase(),
+        "token_out": EURC.to_ascii_lowercase(),
+        "amount_in": "1000000",
+        "min_amount_out": "990000",
+        "sub_routes": [{
+            "amount_in": "1000000",
+            "steps": [{
+                "dex_type": "clmm",
+                "pool_address": CLMM_POOL,
+                "token_in": USDC_ERC20.to_ascii_lowercase(),
+                "token_out": EURC.to_ascii_lowercase(),
+                "fee_bps": fee_bps
+            }]
+        }]
+    })
+}
+
+#[tokio::test]
+async fn build_tx_rejects_wrong_fee_for_clmm_pool() {
+    use market_snapshot::pool_state_store::FactoryRecord;
+    let (url, _server) = permit_needed_fixture();
+    let mut config = app_config();
+    config.chakra_aggregator = AGGREGATOR.to_string();
+    let snapshot_store = Arc::new(MemorySnapshotStore::new());
+    snapshot_store.publish_snapshot(&clmm_snapshot()).await.unwrap();
+    let pool_store = Arc::new(MemoryPoolStateStore::new());
+    pool_store
+        .set_factories(&[FactoryRecord::new(CLMM_FACTORY, "clmm", "chakra-clmm")])
+        .await
+        .unwrap();
+
+    let engine = QuoteEngine::new(PathFinderConfig::default(), SplitConfig::default());
+    engine.update_from_chakra_snapshot(&clmm_snapshot(), MBTC).await;
+
+    let state = AppState::from_backends(
+        config,
+        Some(snapshot_store.clone() as Arc<dyn market_snapshot::store::SnapshotStore>),
+        Some(pool_store.clone() as Arc<dyn market_snapshot::pool_state_store::PoolStateStore>),
+        Some(snapshot_store),
+        Some(pool_store),
+        Some(Arc::new(dex_adapters::evm_rpc::EvmRpcClient::single(&url).unwrap())),
+        MBTC.to_string(),
+        None,
+    )
+    .await;
+    let router = build_router(state, RateLimitState::from_env());
+
+    // Submit fee_bps = 5 but snapshot says 30 → should reject.
+    let body = clmm_body_with_fee(5);
+    let (status, resp) = post(&router, "/api/v1/build_tx", body).await;
+    assert_eq!(status, StatusCode::BAD_REQUEST);
+    assert_eq!(resp["error"]["code"], ApiErrorCode::RouteInvalid.as_str());
+    let msg = resp["error"]["message"].as_str().unwrap_or("");
+    assert!(
+        msg.contains("fee") || msg.contains("Fee"),
+        "error should mention fee, got: {msg}"
+    );
+}
+
+#[tokio::test]
+async fn build_tx_accepts_correct_fee_for_clmm_pool() {
+    use market_snapshot::pool_state_store::FactoryRecord;
+    let (url, _server) = permit_needed_fixture();
+    let mut config = app_config();
+    config.chakra_aggregator = AGGREGATOR.to_string();
+    let snapshot_store = Arc::new(MemorySnapshotStore::new());
+    snapshot_store.publish_snapshot(&clmm_snapshot()).await.unwrap();
+    let pool_store = Arc::new(MemoryPoolStateStore::new());
+    pool_store
+        .set_factories(&[FactoryRecord::new(CLMM_FACTORY, "clmm", "chakra-clmm")])
+        .await
+        .unwrap();
+
+    let engine = QuoteEngine::new(PathFinderConfig::default(), SplitConfig::default());
+    engine.update_from_chakra_snapshot(&clmm_snapshot(), MBTC).await;
+
+    let state = AppState::from_backends(
+        config,
+        Some(snapshot_store.clone() as Arc<dyn market_snapshot::store::SnapshotStore>),
+        Some(pool_store.clone() as Arc<dyn market_snapshot::pool_state_store::PoolStateStore>),
+        Some(snapshot_store),
+        Some(pool_store),
+        Some(Arc::new(dex_adapters::evm_rpc::EvmRpcClient::single(&url).unwrap())),
+        MBTC.to_string(),
+        None,
+    )
+    .await;
+    let router = build_router(state, RateLimitState::from_env());
+
+    // Submit fee_bps = 30 matching snapshot → should pass.
+    let body = clmm_body_with_fee(30);
+    let (status, _body) = post(&router, "/api/v1/build_tx", body).await;
+    assert_eq!(status, StatusCode::OK);
+}
+
+#[tokio::test]
+async fn build_tx_encodes_step_fee_not_hardcoded_30() {
+    use market_snapshot::pool_state_store::FactoryRecord;
+    let (url, _server) = permit_needed_fixture();
+    let mut config = app_config();
+    config.chakra_aggregator = AGGREGATOR.to_string();
+    let snapshot_store = Arc::new(MemorySnapshotStore::new());
+    snapshot_store.publish_snapshot(&clmm_snapshot()).await.unwrap();
+    let pool_store = Arc::new(MemoryPoolStateStore::new());
+    pool_store
+        .set_factories(&[FactoryRecord::new(CLMM_FACTORY, "clmm", "chakra-clmm")])
+        .await
+        .unwrap();
+
+    let engine = QuoteEngine::new(PathFinderConfig::default(), SplitConfig::default());
+    engine.update_from_chakra_snapshot(&clmm_snapshot(), MBTC).await;
+
+    let state = AppState::from_backends(
+        config,
+        Some(snapshot_store.clone() as Arc<dyn market_snapshot::store::SnapshotStore>),
+        Some(pool_store.clone() as Arc<dyn market_snapshot::pool_state_store::PoolStateStore>),
+        Some(snapshot_store),
+        Some(pool_store),
+        Some(Arc::new(dex_adapters::evm_rpc::EvmRpcClient::single(&url).unwrap())),
+        MBTC.to_string(),
+        None,
+    )
+    .await;
+    let router = build_router(state, RateLimitState::from_env());
+
+    // Encode with fee_bps = 30 (matching snapshot).
+    let body = clmm_body_with_fee(30);
+    let (status, body_resp) = post(&router, "/api/v1/build_tx", body).await;
+    assert_eq!(status, StatusCode::OK);
+    let data_hex = body_resp["data"]["data"].as_str().unwrap();
+    let bytes = decode_hex(data_hex);
+    let head = decode_head(&bytes);
+
+    // Routes block: [count][offset_to_SubRoute0][SubRoute0_data...]
+    // The element offset is relative to the start of the head (after count word).
+    let routes_base = head.routes_offset;
+    let _count = u256_at(&bytes, routes_base) as usize;
+    let sub0_offset = u256_at(&bytes, routes_base + 32) as usize;
+    let sub_base = routes_base + 32 + sub0_offset;
+    // SubRoute: amountIn (word 0), hopsOffset (word 1), Hop[] data...
+    let hops_offset = u256_at(&bytes, sub_base + 32) as usize;
+    let hops_base = sub_base + hops_offset;
+    // Hop count is the first word of the dynamic Hop[].
+    let hop_count = u256_at(&bytes, hops_base) as usize;
+    assert_eq!(hop_count, 1, "should have exactly 1 hop");
+
+    // Hop layout: pool(32) + dexType(32) + tokenIn(32) + tokenOut(32) + fee(32)
+    let hop_data = hops_base + 32; // skip the length word
+    let fee_encoded = u256_at(&bytes, hop_data + 4 * 32);
+    assert_eq!(fee_encoded, 30, "fee must be 30 bps from the step, not hardcoded");
 }

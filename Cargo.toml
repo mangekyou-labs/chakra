@@ -1,23 +1,10 @@
 [workspace]
 members = [
-    "crates/Chakra-config",
     "crates/market-snapshot",
     "crates/market-data-worker",
     "crates/router-engine",
     "crates/dex-adapters",
     "crates/api-server",
-    "crates/Chakra-alerts",
-    "crates/sdk",
-]
-exclude = [
-    "crates/Chakra-swap-api",
-    "crates/arbitrage",
-    "crates/analytics-indexer",
-    "crates/limit-keeper",
-    "contracts/shared-types",
-    "contracts/aggregator",
-    "contracts/vault",
-    "contracts/order-escrow",
 ]
 resolver = "2"
 
@@ -25,16 +12,9 @@ resolver = "2"
 version = "0.2.1"
 edition = "2021"
 license = "Apache-2.0"
-repository = "https://github.com/Chakra/Arc-dex-agg"
+repository = "https://github.com/mangekyou-labs/chakra"
 
 [workspace.dependencies]
-# Arc
-Arc-xdr = "25.0.0"
-Arc-strkey = { version = "0.0.16", features = ["serde-decoded"] }
-Arc-baselib = "0.5.5"
-Arc-client = "0.5.4"
-Arc-rpc-client = "25.0.0"
-
 # Async
 tokio = { version = "1", features = ["full"] }
 async-trait = "0.1"
@@ -67,27 +47,8 @@ base64 = "0.22"
 itertools = "0.14"
 reqwest = { version = "0.12", features = ["json"] }
 chrono = "0.4"
-url = "2"
-
-# EVM (Arc)
-tiny-keccak = { version = "2", features = ["keccak"] }
-tokio-tungstenite = "0.24"
-
-# pipeline
-burberry = { git = "https://github.com/ligulfzhou/burberry", rev = "7cf9d163228b0e115946c789bcceff5723b334ef" }
 
 [profile.release]
 opt-level = 2
 lto = "thin"
 overflow-checks = true
-
-# Arc WASM release (workspace members cannot define [profile.*] locally).
-[profile.contract-release]
-inherits = "release"
-opt-level = "z"
-overflow-checks = true
-debug = 0
-strip = "debuginfo"
-panic = "abort"
-codegen-units = 1
-lto = true

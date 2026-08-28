@@ -1,0 +1,42 @@
+# Rust build artifacts
+target/
+**/target/
+
+# Local env / secrets
+.env
+.env.*
+!.env.example
+
+# Node
+packages/frontend/node_modules/
+packages/frontend/.next/
+packages/frontend/out/
+packages/sdk/node_modules/
+
+# Git
+.git/
+.gitignore
+
+# Local data
+data/
+
+# Arc-origin leftovers that must never be COPYed into the image
+crates/Chakra-config/
+crates/Chakra-alerts/
+crates/Chakra-swap-api/
+crates/arbitrage/
+crates/analytics-indexer/
+contracts/
+deploy/
+deploy.sh
+deploy_arb.sh
+deploy_indexer.sh
+deploy_limit_testnet_server.sh
+deploy_server.sh
+deploy_site.sh
+docker-compose.selfhost.yml
+integrations/
+packaging/
+scripts/
+thirdparty/
+docs/

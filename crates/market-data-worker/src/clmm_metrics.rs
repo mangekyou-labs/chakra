@@ -33,12 +33,6 @@ impl ClmmCoverageMetrics {
         }
     }
 
-    pub fn record_snapshots(&self, pools: &[ClmmPoolSnapshot]) {
-        for pool in pools {
-            self.record_snapshot(pool);
-        }
-    }
-
     pub fn snapshot(&self) -> ClmmCoverageMetricsSnapshot {
         ClmmCoverageMetricsSnapshot {
             refresh_attempts: self.refresh_attempts.load(Ordering::Relaxed),
