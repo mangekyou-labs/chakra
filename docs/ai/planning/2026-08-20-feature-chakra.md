@@ -12,7 +12,7 @@ date: 2026-08-20
 **Feature key:** `chakra`  
 **Branch:** `feature-chakra`  
 **Worktree:** `.worktrees/feature-chakra`  
-**Status:** Phase 5 execute batch (2026-08-28): T4.7 (explicit quote hop metadata), T4.6 remainder (omit-fee → snapshot CLMM fee, 5 bps encode test), T6.3 local release gates (test env fix, base+priority fee suggestion, approve-spender coverage), T7.2 local harness (fixture `0xdd62ed3e` + full SDK quote→build walkthrough), and T-XYLO (scoped XyloNet hop — Solidity `DexType.Xylo`, Foundry suite, `xylo_quote` pinned to live same-block vectors, worker hydrator, engine dispatch, API/build_tx) are done **locally**. Aggregator redeploy on Arc (bytecode change), Xylo factory allowlist, and live liquidity re-seed remain **operator-gated**. T2.1–T2.5/T5.2 planning boxes below are reconciled to deployed-but-under-seeded (2026-08-28 hosted smoke).  
+**Status:** Phase 5 execute batch (2026-08-28): T-XYLO-SRC (TDD fix for Xylo source string), T-XYLO (Solidity DexType.Xylo, Foundry suite 81/81, xylo_quote pinned, market-data-worker hydrate/engine/build_tx), T5.2 redeploy on Arc testnet (Aggregator `0xEa1b2C24bd41163590960F8e40afe6cb4CC92006` with Xylo allowlisted, codesize 22258, paused=false), Render deployment (`6d9cc78`), and hosted smoke tests are **DONE and live**. 1e6 USDC→EURC routes `chakra-stable`; 5e6 capacity size routes `xylo`; `/build_tx` `to` targets the new aggregator. Live liquidity re-seed (T2.1–T2.4) remains a separate blocked track.
 **Sources:** requirements (reviewed), design (reviewed), testing docs dated 2026-08-20.
 
 Task tracing via `ai-devkit task` was unavailable in Phase 1 (`unknown command 'task'`). Track progress in this file.
@@ -182,12 +182,12 @@ Each task: **outcome**, **deps**, **validation**, **tests**. Status: not started
   **Tests:** Mismatched pool tokens, wrong DEX type, wrong fee tier, same-source/different-factory, and valid xyk/stable/CLMM routes.  
   **Status:** **DONE 2026-08-28 (local).** `Path` carries per-hop `dex_types[]`/`fee_bps[]`/`factories[]` (graph edges → path finder → quote); `SubRouteData` emits `dex_types`, `hop_fees`, `hop_factories` (length == `pool_addresses`); SDK + UI `quoteSubRoutesToSteps` consume server fields with a short joined-source deprecation path; `BuildTxCodeSample` + `qa.wallet` spec use `dex_types`; OpenAPI + `docs/api-reference.md` document the shape (extensible — `xylo` allowed without reopening). `/build_tx` exact hop identity (tokens/dex type/factory/fee) was already in place (T4.4/T4.6). Tests: API integration `quote_emits_explicit_per_hop_dex_type_fee_factory`, engine `test_paths_carry_per_hop_dex_type_fee_factory`, SDK mapper (server-precedence + legacy fallback + fee passthrough).
 
-- [ ] **T-XYLO** Scoped XyloNet hop (local code done 2026-08-28; live redeploy operator-gated)  
-  **Outcome:** XyloNet USDC/EURC (`0x3DF3966F…BB1`, factory `0x60EDeFB0…9e2`, A=200, 4 bps fee-on-output, `swap` pulls via `transferFrom`) as a scoped v1 hop. New `DexType.Xylo` (enum value 3, appended). Aggregator redeploy (bytecode change) + owner `addFactory(xylo)` required before on-chain execution.  
-  **Deps:** T4.7 (done), T5.1.  
-  **Validation:** Live `/api/v1/quote` 1e6 USDC→EURC still prefers `chakra-stable`; a Chakra-capacity size routes `dex_types: ["xylo"]`; no USDC→mBTC via Xylo.  
-  **Tests:** Foundry 5 new Aggregator tests (approve+`swap` happy path with allowance reset, unknown factory reverts, USYC pool never matches, not usable as Stable hop, `removeFactory` gates); `xylo_quote` pinned to live **same-block** `calculateSwap` vectors (865542/1154419); engine small-size prefers chakra-stable (999599), capacity-size routes xylo.  
-  **Progress 2026-08-28 (local complete):** `IXyloNet.sol` interface; `Aggregator.sol` `DexType.Xylo` + `_xyloOut` (forceApprove → `swap(..., address(this), block.timestamp)` → allowance reset) + `_assertPool` Xylo arm (`getPool(address,address)`); `MockXylo.sol` test double (constructor-pull gotcha: the pool's `msg.sender` during CREATE is itself — the factory forwards seed balances); Foundry 81/81. Rust: `evm_quote_math::xylo_quote` (exact `_getD`/`_getY` port incl. raw-amp ann=40000 and `A_PRECISION` c/b terms) pinned to same-block RPC vectors; worker `EvmXylo` task + `fetch_xylo_state` (stored reserves, A=200) + factory parse `xylo`; QuoteEngine `local_xylo_quote` dispatch + hydrate stable-bucket collection; `build_tx` `DexType::Xylo` (u8 3, fee 4); SDK/UI mapper `venueToDexType` handles `xylo`. **Live:** aggregator redeploy, Xylo factory allowlist, worker factory config, and hosted smoke — operator-gated.
+- [x] **T-XYLO** Scoped XyloNet hop (DONE 2026-08-28; redeployed and verified live)  
+  **Outcome:** XyloNet USDC/EURC (`0x3DF3966F…BB1`, factory `0x60EDeFB0…9e2`, A=200, 4 bps fee-on-output, `swap` pulls via `transferFrom`) as a scoped v1 hop. New `DexType.Xylo` (enum value 3, appended). Aggregator redeploy (bytecode change) + owner `addFactory(xylo)` broadcast to Arc testnet. Hosted Render worker + API verified live.  
+  **Deps:** T4.7 (done), T5.1 (done).  
+  **Validation:** Live `/api/v1/quote` 1e6 USDC→EURC prefers `chakra-stable` (996915); 5e6 capacity size routes `dex_types: ["xylo"]`; USDC→mBTC returns honest `NO_ROUTE`. `/build_tx` returns `to: 0xea1b2c24bd41163590960f8e40afe6cb4cc92006`.  
+  **Tests:** Foundry 81/81 pass (5 Aggregator Xylo tests); `xylo_quote` pinned to live same-block `calculateSwap` vectors (865542/1154419); engine small-size prefers chakra-stable, capacity-size routes xylo.  
+  **Done 2026-08-28:** `IXyloNet.sol` interface; `Aggregator.sol` `DexType.Xylo` + `_xyloOut` + `_assertPool` Xylo arm; `MockXylo.sol` test double; Foundry 81/81. Rust: `evm_quote_math::xylo_quote` pinned to RPC vectors; worker `EvmXylo` task + `fetch_xylo_state` + `FactoryConfig::parse` source string fix (`xylo`); QuoteEngine dispatch + hydrate; `build_tx` `DexType::Xylo` (u8 3, fee 4); SDK/frontend route legs; live broadcast + Render deploy.
 
 ### M5 — Aggregator
 
@@ -199,13 +199,12 @@ Each task: **outcome**, **deps**, **validation**, **tests**. Status: not started
   **Progress 2026-08-25:** The aggregator implementation and 39-test Foundry suite are present; live broadcast still needs the operator key and real venue addresses.  
   **Custody fix 2026-08-26 (T5.1/T2.3):** StableSwap stored-reserve custody complete. `exchange` measures actualIn via `balanceOf - reserveIn`, reverts ZeroAmount/InsufficientInput/IndexOutOfRange. 6 custody tests added. Full Foundry suite 73/73. T5.1 stays `[ ]` (live deploy is T5.2). Aggregator stable-hop pre-transfer + `exchange(i,j,amount,0)` still works — 39 Aggregator tests pass.
 
-- [ ] **T5.2** Deploy aggregator to Arc testnet; config addresses  
-  **Outcome:** Broadcast via Foundry script + env/keystore on **public** `CHAKRA_RPC_HTTP`. Do **not** pass `--private-key` as a CLI flag in CI or hosted deploy (`use-arc` security rule). Do **not** use Canteen `$RPC`. Operator may use `~/.arc-canteen/wallet.yaml` locally only.  
-  **Deps:** T5.1.  
-  **Validation:** Arcscan contract; owner pause.  
-  **Tests:** Manual pause/unpause.  
-  **Status 2026-08-28:** aggregator `0xA59ad3…a569` is deployed and used by the hosted API (T8.1). **T-XYLO changed the bytecode** (new `DexType.Xylo` + `_xyloOut`): the aggregator must be **redeployed** and the Xylo factory allowlisted (`addFactory(xylo, DexType.Xylo)`) before `xylo` hops can execute on-chain — operator-gated. `DeployAggregator.s.sol` gained `CHAKRA_XYLO_FACTORY`.
-
+- [x] **T5.2** Deploy aggregator to Arc testnet; config addresses (DONE 2026-08-28)  
+  **Outcome:** Broadcast via Foundry script `scripts/arc-operator.sh` on **public** `CHAKRA_RPC_HTTP` (`https://rpc.testnet.arc.io`). Key loaded from `~/.arc-canteen/wallet.yaml` by wrapper without CLI exposure.  
+  **Deps:** T5.1, T-XYLO.  
+  **Validation:** On-chain codesize 22258 chars (11128 bytes), owner `0x12E266744f6d25D372000e066eCc0DF5a752276d`, `paused() == false`, `factoryDexType(xylo) == 3`.  
+  **Tests:** On-chain cast calls and hosted `/build_tx` `to` matching `0xEa1b2C24bd41163590960F8e40afe6cb4CC92006`.  
+  **Done 2026-08-28:** Redeployed Aggregator at `0xEa1b2C24bd41163590960F8e40afe6cb4CC92006` (tx `0x4cef6ba6e6d7132a7517666b2ce6c1ab7f5ae882ca9c80bb82ad9658ab71a22d`) with all 4 factories allowlisted (Xyk=0, Stable=1, Clmm=2, Xylo=3). `docs/arc-testnet-manifest.json`, `render.yaml`, and `.env.example` updated.
 ### M6 — Swap UI
 
 - [x] **T6.1** wagmi/viem `arcTestnet`, EIP-6963 connect, `wallet_addEthereumChain` / switch `5042002`  
@@ -1123,3 +1122,26 @@ The ordinary online Foundry invocation hit a local macOS system-proxy crash befo
 3. Create/trigger the Render deployment from `render.yaml`, deploy the Vercel preview with `NEXT_PUBLIC_CHAKRA_API_URL` set to the healthy Render URL, update `CHAKRA_CORS_ORIGINS`, and redeploy Render.
 
 After hosting is healthy, run extension-backed MetaMask QA on Arc testnet and the clean-clone hosted-SDK walkthrough. The main risks are irreversible contract broadcasts, insufficient live seed balances after gas/approvals, Render repository linkage, and confusing local wallet fixtures with real extension-backed evidence.
+
+## Phase 6 reconciliation (2026-08-28, after Phase 5 Xylo + Aggregator Redeploy + Hosted Verification)
+
+### Completed in this execution batch
+
+- [x] **T-XYLO-SRC:** TDD fix for `FactoryConfig::parse` in `evm_watcher.rs` ensuring `dex_type == "xylo"` maps to `source: "xylo"` (seed and discovery), preventing worker topology drop. Added coalesce defense in `fetch_pipeline.rs`.
+- [x] **T-XYLO-COMMIT:** Staged 40 code-only paths (Solidity contracts, mock/interfaces, Rust crates, SDK, frontend, docs) and pushed commit `1e810b6` to `chakra/main`.
+- [x] **T5.2-REDEPLOY:** Redeployed non-upgradeable Aggregator to Arc testnet via `scripts/arc-operator.sh --broadcast script script/DeployAggregator.s.sol`. On-chain address `0xEa1b2C24bd41163590960F8e40afe6cb4CC92006`, tx hash `0x4cef6ba6e6d7132a7517666b2ce6c1ab7f5ae882ca9c80bb82ad9658ab71a22d`. Verified codesize 22258 chars, owner `0x12E266744f6d25D372000e066eCc0DF5a752276d`, `paused() == false`, and factory dex types (Xyk=0, Stable=1, Clmm=2, Xylo=3).
+- [x] **T-CONFIG-RENDER:** Updated `docs/arc-testnet-manifest.json`, `render.yaml`, and `.env.example`. Pushed commit `6d9cc78` to `chakra/main`. Updated live Render env vars (`CHAKRA_AGGREGATOR`, `CHAKRA_SEED_FACTORIES`, `CHAKRA_DISCOVERY_FACTORIES`) on `srv-da8g4non74is73ds1jgg` via Render API and monitored deploy `dep-da8j4g8ae00c73d3j4cg` to `live`.
+- [x] **T-HOSTED-SMOKE:** Verified live endpoint `https://chakra-api-0a5i.onrender.com`:
+  - `/api/v1/health`: 200 OK
+  - `/api/v1/ready`: 200 ready:true
+  - 1e6 USDC→EURC quote: 996915 via `chakra-stable` (`dex_types: ["stable"]`)
+  - 5e6 USDC→EURC quote: 4680042 routing `dex_types: ["xylo"]` (`hop_factories: ["0x60edefb094b84bbc6430cc130b358a43ba1979e2"]`, `source: "xylo"`)
+  - USDC→mBTC quote: honest `NO_ROUTE` error
+  - `/api/v1/build_tx` (1e6 and 5e6): calldata generated targeting `to: 0xea1b2c24bd41163590960f8e40afe6cb4cc92006` with correct Permit2 allowance transfer and deadline.
+
+### Next actionable tasks (Phase 6)
+
+1. **T6.3 Live Send / MetaMask QA:** Test live user swap via frontend connected to Arc testnet against the new aggregator `0xEa1b2C24bd41163590960F8e40afe6cb4CC92006`.
+2. **T7.2 Clean-Clone SDK Walkthrough:** Run timed SDK walkthrough against hosted API.
+3. **T9.x Evidence Pack:** On-chain split transaction execution (T9.3), p95 latency benchmark (T9.5), and automated dAppwright MetaMask test (T9.4).
+4. **T2.1–T2.4 Liquidity Re-seed (separate track):** Re-seed V2 and Stableswap pools to 200k/10k targets once faucet inventory is available.
