@@ -567,3 +567,21 @@ Everything runs on fixture RPC/WS servers and a **memory store** in tests (SC-11
   - Tested desktop (1280×800) and mobile (375×667) viewports.
   - Verified banner, unaudited disclaimer, SwapCard layout, responsive menu on mobile, and live API connection.
   - Full on-chain wallet swap pending MetaMask extension connection.
+
+### T9 Grant-Style Evidence Pack (2026-08-28)
+
+- **Venue Routing Matrix (T9.1 / SC-8):**
+  - Evaluated 15 matrix scenarios across 5 pairs (USDC↔EURC, USDC↔mBTC, EURC↔mBTC, mBTC↔USDC) and 3 sizes each against live hosted API (`https://chakra-api-0a5i.onrender.com`).
+  - Evidence logged in `docs/evidence/chakra-t91-venue-matrix.json`.
+- **Split vs Single-Path Benchmark (T9.2 / SC-2 / SC-8):**
+  - Live benchmark of 5e6 USDC→EURC proves split optimizer outputs 4,680,269 EURC vs 4,296,582 EURC for best single venue (`xylo`), delivering **+383,687 EURC (+893.01 bps / +8.93%)** improvement for the user.
+  - Evidence logged in `docs/evidence/chakra-t92-split-benchmark.json`.
+- **Quote Latency p95 Benchmark & API-Boundary Instrumentation (T9.5 / SC-10):**
+  - Added API-boundary timer (`start_time.elapsed().as_millis()`) in `crates/api-server/src/handlers.rs` (commit `d3f8c79`), deployed to Render (`dep-da8jk6cs728c73bvdrb0`), and verified live.
+  - Measured 100 consecutive requests to `GET /api/v1/quote` on hosted API. Server-side `compute_time_ms` p95 = **23 ms** (min 9 ms, avg 13.16 ms, median 11 ms, p90 18 ms, max 74 ms; gate < 500 ms).
+  - Evidence logged in `docs/evidence/chakra-t95-quote-latency.json`.
+- **UX & Accessibility Audit (T9.8 / SC-3 UX):**
+  - Tested desktop (1280×800) and mobile (375×667) viewports. Unaudited status banner, keyboard accessibility, token selectors, slippage settings, recent swaps storage, and WCAG AA color contrast confirmed.
+  - Evidence logged in `docs/evidence/chakra-t98-manual-ux-a11y.json`.
+- **Master Evidence Pack Index (T9.7):**
+  - Compiled grant catalog `docs/evidence/README.md` indexing all 13 Success Criteria (SC-1 through SC-13), public URLs, on-chain contract deployments, and artifact files.

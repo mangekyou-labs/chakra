@@ -1,0 +1,47 @@
+{
+  "scenario": "T9.8 Manual UX & Accessibility Audit",
+  "timestamp_utc": "2026-08-28T07:32:00Z",
+  "tested_url": "https://chakra-arc-dex.vercel.app",
+  "viewports_tested": [
+    {
+      "name": "Desktop Pro Terminal",
+      "dimensions": "1280x800",
+      "status": "PASS",
+      "details": "Layout renders centered swap terminal (520px) with header navigation, brand badge, docs dropdown, and action CTA."
+    },
+    {
+      "name": "Mobile Responsive Viewport",
+      "dimensions": "375x667",
+      "status": "PASS",
+      "details": "Responsive layout adapts cleanly; hamburger menu toggles navigation links; CTA button remains full width and accessible."
+    }
+  ],
+  "accessibility_and_ux_checklist": {
+    "unaudited_warning_banner": {
+      "status": "PASS",
+      "role": "status",
+      "text": "Arc Testnet · Contracts unaudited · Verify amounts before signing · Not financial advice"
+    },
+    "token_selectors": {
+      "status": "PASS",
+      "details": "Token badges with circle iconography, symbol labels, and dropdown carets for USDC, EURC, and mBTC."
+    },
+    "slippage_settings": {
+      "status": "PASS",
+      "details": "Configurable slippage with default 0.5% (50 bps); modal supports custom and preset chips."
+    },
+    "keyboard_navigation": {
+      "status": "PASS",
+      "details": "Interactive elements utilize native <button> and <input> with valid role, aria-label, and focus outlines."
+    },
+    "color_contrast_and_palette": {
+      "status": "PASS",
+      "details": "Terminal dark mode palette (--bg-0, --surface-panel, --accent) complies with WCAG AA contrast for text elements."
+    },
+    "recent_swaps_store": {
+      "status": "PASS",
+      "storage_key": "chakra:recent-swaps:5042002:{address}",
+      "details": "Scoped by chain ID and address, max 20 entries, derives Arcscan URLs dynamically."
+    }
+  }
+}

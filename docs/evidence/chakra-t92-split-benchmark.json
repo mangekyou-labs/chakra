@@ -1,0 +1,119 @@
+{
+  "scenario": "SC-2 / SC-8 Split vs Single-Path Optimizer Benchmark",
+  "timestamp_utc": "2026-08-28T07:30:57Z",
+  "api_base": "https://chakra-api-0a5i.onrender.com",
+  "chain_id": 5042002,
+  "pair": "USDC->EURC",
+  "amount_in": "5000000",
+  "split_optimizer_result": {
+    "is_split": true,
+    "expected_output": "4680269",
+    "minimum_output": "4586663",
+    "price_impact_bps": 703,
+    "legs": 3,
+    "sub_routes": [
+      {
+        "amount_in": "1299809",
+        "amount_out": "1116949",
+        "dex_types": [
+          "xylo"
+        ],
+        "fraction_bps": 2600,
+        "hop_factories": [
+          "0x60edefb094b84bbc6430cc130b358a43ba1979e2"
+        ],
+        "hop_fees": [
+          4
+        ],
+        "path": [
+          "0x3600000000000000000000000000000000000000",
+          "0x89b50855aa3be2f677cd6303cec089b5f319d72a"
+        ],
+        "pool_addresses": [
+          "0x3df3966f5138143dce7a9cfddc2c0310ce083bb1"
+        ],
+        "source": "xylo"
+      },
+      {
+        "amount_in": "365536",
+        "amount_out": "314112",
+        "dex_types": [
+          "xylo"
+        ],
+        "fraction_bps": 731,
+        "hop_factories": [
+          "0x60edefb094b84bbc6430cc130b358a43ba1979e2"
+        ],
+        "hop_fees": [
+          4
+        ],
+        "path": [
+          "0x3600000000000000000000000000000000000000",
+          "0x89b50855aa3be2f677cd6303cec089b5f319d72a"
+        ],
+        "pool_addresses": [
+          "0x3df3966f5138143dce7a9cfddc2c0310ce083bb1"
+        ],
+        "source": "xylo"
+      },
+      {
+        "amount_in": "3334655",
+        "amount_out": "3249208",
+        "dex_types": [
+          "stable"
+        ],
+        "fraction_bps": 6669,
+        "hop_factories": [
+          "0x77ce21fdaaea40fd94acf65ff3220a0a7db7d690"
+        ],
+        "hop_fees": [
+          4
+        ],
+        "path": [
+          "0x3600000000000000000000000000000000000000",
+          "0x89b50855aa3be2f677cd6303cec089b5f319d72a"
+        ],
+        "pool_addresses": [
+          "0xe4a881f4211b5cc11d8298032136a0d72e93cb02"
+        ],
+        "source": "chakra-stable"
+      }
+    ]
+  },
+  "single_path_baseline": {
+    "source": "xylo",
+    "expected_output": "4296582",
+    "minimum_output": "4275099",
+    "price_impact_bps": 1406,
+    "sub_routes": [
+      {
+        "amount_in": "5000000",
+        "amount_out": "4296582",
+        "dex_types": [
+          "xylo"
+        ],
+        "fraction_bps": 10000,
+        "hop_factories": [
+          "0x60edefb094b84bbc6430cc130b358a43ba1979e2"
+        ],
+        "hop_fees": [
+          4
+        ],
+        "path": [
+          "0x3600000000000000000000000000000000000000",
+          "0x89b50855aa3be2f677cd6303cec089b5f319d72a"
+        ],
+        "pool_addresses": [
+          "0x3df3966f5138143dce7a9cfddc2c0310ce083bb1"
+        ],
+        "source": "xylo"
+      }
+    ]
+  },
+  "comparison": {
+    "split_higher_output": true,
+    "delta_units": 383687,
+    "gain_basis_points": 893.01,
+    "summary": "Split optimizer delivers 383687 more EURC atomic units (+893.01 bps) compared to best single-venue route (xylo)."
+  }
+}
