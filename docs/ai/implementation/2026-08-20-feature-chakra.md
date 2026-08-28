@@ -550,3 +550,20 @@ Everything runs on fixture RPC/WS servers and a **memory store** in tests (SC-11
     - `GET /api/v1/quote` (5e6 USDC→EURC): 200 OK, returns 4,680,042 routing `xylo` (`dex_types: ["xylo"]`)
     - `GET /api/v1/quote` (1e6 USDC→mBTC): 200 OK, returns `NO_ROUTE` error
     - `POST /api/v1/build_tx`: 200 OK, returns calldata with `to: "0xea1b2c24bd41163590960f8e40afe6cb4cc92006"` matching the newly deployed Aggregator contract.
+
+### Clean-Clone SDK Walkthrough & UI Verification (2026-08-28)
+
+- **Clean-Clone SDK Walkthrough (T7.2 / SC-6 / SC-9):**
+  - Executed in `/tmp/chakra-clean-clone-t72` cloning `https://github.com/mangekyou-labs/chakra.git`.
+  - Tested hosted API liveness and readiness (`https://chakra-api-0a5i.onrender.com`).
+  - Installed `@Chakra/sdk` dependencies, compiled with TypeScript (`npm run build`).
+  - Executed `npx tsx examples/quote-build.ts` with `API_URL=https://chakra-api-0a5i.onrender.com`.
+  - Quote received: 1e6 USDC → 996,915 EURC via `chakra-stable` (`dex_types: ["stable"]`, `pool: 0xe4a881f4211b5cc11d8298032136a0d72e93cb02`).
+  - `build_tx` output verified: `to: "0xea1b2c24bd41163590960f8e40afe6cb4cc92006"`, calldata selector `0x2e3be0c1`, `chainId: 5042002`, `value: "0"`, PermitSingle EIP-712 typed data present.
+  - Total clean-clone elapsed time: **6 seconds** (well within the ≤30 minute gate).
+  - Evidence logged in `docs/evidence/chakra-t72-walkthrough.json`.
+- **Frontend UI Verification (T6.3 / T8.2):**
+  - Verified `https://chakra-arc-dex.vercel.app` using `playwright-cli`.
+  - Tested desktop (1280×800) and mobile (375×667) viewports.
+  - Verified banner, unaudited disclaimer, SwapCard layout, responsive menu on mobile, and live API connection.
+  - Full on-chain wallet swap pending MetaMask extension connection.

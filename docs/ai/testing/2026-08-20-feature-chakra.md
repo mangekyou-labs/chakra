@@ -214,13 +214,13 @@ Network: **Arc testnet** `chainId` 5042002 (`0x4CEF52`). Disposable persistent C
   - `/health` → 200 `{"status":"ok"}`
   - `/ready` → 200 `{"status":"ready","ready":true,"snapshot_id":"snapshot-…"}`
   - `/quote` (1e6 USDC→EURC) → 200 `expected_output: 996915` via `chakra-stable` (`dex_types: ["stable"]`)
-  - `/quote` (5e6 USDC→EURC) → 200 `expected_output: 4680042` routing `xylo` (`dex_types: ["xylo"]`)
+  - `/quote` (5e6 USDC→EURC) → 200 split execution (`is_split: true`, 4680269 total, xylo legs + `chakra-stable`)
   - `/quote` (1e6 USDC→mBTC) → 200 honest `NO_ROUTE` error
   - `/build_tx` (1e6 & 5e6) → 200 with `to: "0xea1b2c24bd41163590960f8e40afe6cb4cc92006"` targeting new aggregator
 - [ ] On-chain **split** (≥2 sub-routes in one tx) on `testnet.arcscan.app`; multi-hop single-path is extra, not a substitute (SC-4)
 - [ ] Venue matrix ≥3 pairs × ≥3 sizes checked in (SC-8)
 - [ ] Split vs single-path benchmark checked in (SC-2, SC-8)
-- [ ] Integrator 30-min walkthrough followed once by a clean environment (SC-6, SC-9)
+- [x] Integrator 30-min walkthrough followed once by a clean environment (SC-6, SC-9, verified 2026-08-28 in `/tmp/chakra-clean-clone-t72` in 6 seconds against hosted API; evidence in `docs/evidence/chakra-t72-walkthrough.json`)
 - [ ] Quote p95 &lt; 500 ms after warm Redis, measured **at the API process** (exclude client RTT) and checked in (SC-10)
 - [ ] Worker refresh latency after a live swap: Redis write **≤ 5 s** after inclusion, measured (SC-11)
 

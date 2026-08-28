@@ -1,0 +1,87 @@
+{
+  "scenario": "SC-6 / SC-9 / T7.2 Clean-Clone SDK Walkthrough",
+  "timestamp_utc": "2026-08-28T07:28:53Z",
+  "elapsed_seconds": 6,
+  "gate_seconds_limit": 1800,
+  "status": "PASS",
+  "environment": {
+    "repository": "https://github.com/mangekyou-labs/chakra.git",
+    "git_head": "a29ef6d",
+    "chain_id": 5042002,
+    "api_base": "https://chakra-api-0a5i.onrender.com",
+    "aggregator_address": "0xEa1b2C24bd41163590960F8e40afe6cb4CC92006"
+  },
+  "health_check": {
+    "endpoint": "/api/v1/health",
+    "status": 200,
+    "response": {
+      "success": true,
+      "data": {
+        "status": "ok"
+      }
+    }
+  },
+  "ready_check": {
+    "endpoint": "/api/v1/ready",
+    "status": 200,
+    "response": {
+      "success": true,
+      "data": {
+        "status": "ready",
+        "ready": true,
+        "snapshot_id": "snapshot-1787901854145",
+        "pool_keys": []
+      }
+    }
+  },
+  "sdk_quote": {
+    "tokenIn": "0x3600000000000000000000000000000000000000",
+    "tokenOut": "0x89b50855aa3be2f677cd6303cec089b5f319d72a",
+    "amountIn": "1000000",
+    "expectedOutput": "996915",
+    "minimumOutput": "991930",
+    "priceImpactBps": 30,
+    "protocolFeeBps": 0,
+    "isSplit": false,
+    "maxSplits": 5,
+    "subRoutes": [
+      {
+        "source": "chakra-stable",
+        "path": [
+          "0x3600000000000000000000000000000000000000",
+          "0x89b50855aa3be2f677cd6303cec089b5f319d72a"
+        ],
+        "poolAddresses": [
+          "0xe4a881f4211b5cc11d8298032136a0d72e93cb02"
+        ],
+        "dexTypes": [
+          "stable"
+        ],
+        "hopFees": [
+          4
+        ],
+        "hopFactories": [
+          "0x77ce21fdaaea40fd94acf65ff3220a0a7db7d690"
+        ],
+        "amountIn": "1000000",
+        "amountOut": "996915",
+        "fractionBps": 10000
+      }
+    ],
+    "computeTimeMs": 1
+  },
+  "sdk_build_tx": {
+    "to": "0xea1b2c24bd41163590960f8e40afe6cb4cc92006",
+    "chainId": 5042002,
+    "value": "0",
+    "calldata_selector": "0x2e3be0c1",
+    "typedData_primaryType": "PermitSingle",
+    "requiredApprovals": [
+      {
+        "token": "0x3600000000000000000000000000000000000000",
+        "spender": "0x000000000022D473030F116dDEE9F6B43aC78BA3",
+        "amount": "1000000"
+      }
+    ]
+  }
+}
