@@ -30,7 +30,7 @@ Every testing scenario is owned by at least one task below. Wallet/chain/Permit2
 - [ ] **M6 — Swap UI:** Next.js dense pro terminal, EIP-6963, decimals, route legs.
 - [x] **M7 — SDK + integrator docs:** TypeScript SDK, 30-min walkthrough. **Done 2026-08-28 (T7.1, T7.2).**
 - [ ] **M8 — Public deploy:** Vercel UI + hosted API/worker/Redis. **T8.1 + T8.2 done 2026-08-28** (public smoke URLs in task entries); M8 closes when T7.2/T9.x use the hosted stack.
-- [ ] **M9 — Evidence + QA:** Venue matrix (T9.1) & split benchmark (T9.2) done; latency (T9.5), UI audit (T9.8), and index (T9.7) in progress; on-chain split (T9.3), MetaMask QA (T9.4), and live WS proof (T9.6) open / externally gated.
+- [ ] **M9 — Evidence + QA:** Split benchmark (T9.2), latency p95 (T9.5), and SDK walkthrough (T7.2) done; venue matrix (T9.1), UI audit (T9.8), and index (T9.7) partial; on-chain split (T9.3), MetaMask QA (T9.4), and live WS proof (T9.6) open / externally gated.
 
 ## Task Breakdown
 
@@ -262,12 +262,11 @@ Each task: **outcome**, **deps**, **validation**, **tests**. Status: not started
 
 ### M9 — Evidence + QA
 
-- [x] **T9.1** Venue comparison matrix ≥3 pairs × ≥3 sizes (done 2026-08-28)  
+- [ ] **T9.1** Venue comparison matrix ≥3 pairs × ≥3 sizes (partial / live 3-pair routing open)  
   **Deps:** T4.3, T8.1.  
   **Validation:** File in `docs/evidence/chakra-t91-venue-matrix.json`.  
   **Tests:** SC-8.  
-  **Done 2026-08-28:** Evaluated 15 matrix points across 5 pairs (USDC↔EURC, USDC↔mBTC, EURC↔mBTC, mBTC↔USDC) and 3 sizes each against live hosted API (`https://chakra-api-0a5i.onrender.com`). Evidence recorded in `docs/evidence/chakra-t91-venue-matrix.json`.
-
+  **Done 2026-08-28 (partial):** Evaluated 15 matrix points across 5 pairs (USDC↔EURC, USDC↔mBTC, EURC↔mBTC, mBTC↔USDC) and 3 sizes each against live hosted API (`https://chakra-api-0a5i.onrender.com`). Reclassified envelope errors: USDC↔EURC pairs are routable across stable and xylo; mBTC pairs exhibit the testnet dust/incomplete tick gap. Evidence recorded in `docs/evidence/chakra-t91-venue-matrix.json`. Complete live 3-pair routing remains gated on T2.1–T2.4 liquidity re-seed.
 - [x] **T9.2** Split vs single-path benchmark + documented split size (done 2026-08-28)  
   **Deps:** T4.2, T9.1.  
   **Validation:** `is_split=true` and higher output recorded (SC-2, SC-8).  
@@ -1154,7 +1153,7 @@ After hosting is healthy, run extension-backed MetaMask QA on Arc testnet and th
 
 - [x] **T0-DOC-HYGIENE:** Corrected `docs/arc-testnet-manifest.json` `pools.xylo_usdc_eurc` to live address `0x3DF3966F5138143dce7a9cFDdC2c0310ce083BB1`. Updated `docs/integrator-guide.md` with hosted API endpoint `https://chakra-api-0a5i.onrender.com` and object-based `ChakraClient` constructor. Reconciled milestones (M5, M7) and tasks.
 - [x] **T7.2-SDK-WALKTHROUGH (SC-6 / SC-9):** Executed clean-clone walkthrough in `/tmp/chakra-clean-clone-t72` cloning `https://github.com/mangekyou-labs/chakra.git`. Verified `/health`, `/ready`, `/quote`, built SDK, and executed `examples/quote-build.ts` against hosted API. Generated calldata targeting `0xEa1b2C24bd41163590960F8e40afe6cb4CC92006` in **6 seconds** (gate ≤ 30 min). Evidence in `docs/evidence/chakra-t72-walkthrough.json`.
-- [x] **T9.1-VENUE-MATRIX (SC-8):** Queried 15 matrix points across 5 pairs and 3 sizes each against live hosted API. Evidence in `docs/evidence/chakra-t91-venue-matrix.json`.
+- [ ] **T9.1-VENUE-MATRIX (Partial):** Evaluated 15 matrix points across 5 pairs and 3 sizes each on hosted API; reclassified envelope errors and documented the live testnet mBTC liquidity gap. Evidence in `docs/evidence/chakra-t91-venue-matrix.json`.
 - [x] **T9.2-SPLIT-BENCHMARK (SC-2 / SC-8):** Benchmarked 5e6 USDC→EURC split vs single route, demonstrating **+383,687 EURC (+893.01 bps)** improvement. Evidence in `docs/evidence/chakra-t92-split-benchmark.json`.
 - [x] **T9.5-LATENCY-P95 (SC-10):** Added API-boundary timer in `crates/api-server/src/handlers.rs` (commit `d3f8c79`), deployed to Render (`dep-da8jk6cs728c73bvdrb0`), and verified live. Measured 100 quote requests against deployed revision; server-side `compute_time_ms` p95 = **23 ms** (min 9 ms, avg 13.16 ms, median 11 ms, p90 18 ms, max 74 ms; gate < 500 ms). Evidence in `docs/evidence/chakra-t95-quote-latency.json`.
 - [ ] **T9.7-EVIDENCE-INDEX (Partial):** Generated master grant evidence catalog `docs/evidence/README.md` indexing all 13 SC criteria, live coordinates, and artifact files.

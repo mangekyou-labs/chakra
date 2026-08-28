@@ -218,7 +218,7 @@ Network: **Arc testnet** `chainId` 5042002 (`0x4CEF52`). Disposable persistent C
   - `/quote` (1e6 USDC→mBTC) → 200 honest `NO_ROUTE` error
   - `/build_tx` (1e6 & 5e6) → 200 with `to: "0xea1b2c24bd41163590960f8e40afe6cb4cc92006"` targeting new aggregator
 - [ ] On-chain **split** (≥2 sub-routes in one tx) on `testnet.arcscan.app`; multi-hop single-path is extra, not a substitute (SC-4)
-- [x] Venue matrix ≥3 pairs × ≥3 sizes checked in (SC-8, verified 2026-08-28 in `docs/evidence/chakra-t91-venue-matrix.json`)
+- [ ] Venue matrix ≥3 pairs × ≥3 sizes checked in (SC-8, partial: USDC↔EURC pairs routable across stable and xylo in `docs/evidence/chakra-t91-venue-matrix.json`; live 3-pair routing open pending T2.1–T2.4 re-seed)
 - [x] Split vs single-path benchmark checked in (SC-2, SC-8, verified 2026-08-28 in `docs/evidence/chakra-t92-split-benchmark.json`; +893.01 bps gain)
 - [x] Integrator 30-min walkthrough followed once by a clean environment (SC-6, SC-9, verified 2026-08-28 in `/tmp/chakra-clean-clone-t72` in 6 seconds against hosted API; evidence in `docs/evidence/chakra-t72-walkthrough.json`)
 - [x] Quote p95 &lt; 500 ms after warm Redis, measured **at the API process** (exclude client RTT) and checked in (SC-10, verified 2026-08-28 in `docs/evidence/chakra-t95-quote-latency.json`; server-side API-process p95 = 23 ms)
