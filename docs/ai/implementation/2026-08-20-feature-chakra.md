@@ -11,7 +11,7 @@ date: 2026-08-20
 **Product:** Chakra  
 **Feature key:** `chakra`  
 **Workspace:** `.worktrees/feature-chakra` (`feature-chakra`)  
-**Phase:** 5 completed 2026-08-28 — T-GIT-CHAKRA (Arc compile strip), T8.1 (Render), and T8.2 (Vercel) done with public smoke URLs. Phase 7 re-check pending with fresh verify evidence; T4.7 remains open (quote still joins `source`; see planning doc).
+**Phase:** 5 continuation (2026-08-28) — T4.3 (production CLMM loader + quote/build_tx test covered & closed), T2.5 (discovery scanner updated with Arc testnet block windowing & executed), T9.8 (WCAG AA contrast raised to >= 4.5:1, verified with red/green vitest & playwright-cli DOM re-audit), T9.4 (real dAppwright MetaMask harness implemented in swap-critical-path.spec.ts, setup/validate scripts updated, docs/qa-playwright-metamask.md added, skip verified).
 
 ## Development Setup
 
@@ -589,3 +589,32 @@ Everything runs on fixture RPC/WS servers and a **memory store** in tests (SC-11
   - Evidence logged in `docs/evidence/chakra-t98-manual-ux-a11y.json`.
 - **Master Evidence Pack Index (T9.7 — Partial):**
   - Compiled grant catalog `docs/evidence/README.md` indexing all 13 Success Criteria (SC-1 through SC-13), public URLs, on-chain contract deployments, and artifact files with explicit open/gated criteria tracking.
+
+### Phase 5 Continuation Tasks (2026-08-28)
+
+- **Production CLMM Loader & Quoter (T4.3):**
+  - `build_engine_from_snapshot` verified consuming `snapshot.clmm_pool_refs` (T4.6).
+  - Added production-path integration test `ready_and_clmm_only_snapshot_quotes_and_builds` in `crates/api-server/tests/chakra_rest_test.rs`:
+    - Verifies `/api/v1/ready` returns 200 OK with `ready: true` and snapshot ID for worker CLMM-only snapshots.
+    - Verifies `/api/v1/quote` quotes CLMM pool with `dex_types: ["clmm"]`, `hop_fees: [30]`, and `hop_factories: [CLMM_FACTORY]`.
+    - Verifies `/api/v1/build_tx` encodes calldata targeting `Aggregator` (`0xEa1b2C24bd41163590960F8e40afe6cb4CC92006`) with `value: "0"`.
+  - All 53 tests in `api-server` and 196 tests across active workspace crates passing.
+- **Factory Discovery Scanner (T2.5):**
+  - Updated `scripts/discovery_scan.sh` to auto-window `fromBlock` to latest 10,000 blocks (`CHAKRA_SCAN_FROM_BLOCK`) to comply with public Arc RPC node `eth_getLogs` block range limits.
+  - Fixed bash log count extraction.
+  - Verified unit test suite: 8/8 tests pass in `scripts/test_discovery_scan.py`.
+  - Executed live scan on Arc testnet across seeded/discovery factories: read-only, 0 errors, no allowlist mutations.
+- **Theme WCAG AA Contrast Fix & Re-Audit (T9.8):**
+  - Added red unit test `packages/frontend/src/lib/contrast.test.ts` asserting >= 4.5:1 contrast against `--bg-0` (`#0a0b0d`) and `--surface-raised` (`#1a1f27`).
+  - Raised `--text-muted` in `packages/frontend/src/app/globals.css` from `#6b7280` to `#848fa0`.
+  - Unit tests green (67/67 passing in frontend vitest; TypeScript clean).
+  - Re-audited via `playwright-cli`: Status Banner contrast raised from 4.07 to 6.02 (PASS); Sell/Buy Label contrast raised from 3.42 to 5.06 (PASS); Slippage Header 5.59 (PASS). Captured desktop and mobile audit screenshots.
+  - Updated `docs/evidence/chakra-t98-manual-ux-a11y.json`.
+- **MetaMask E2E Harness Implementation (T9.4):**
+  - Rewrote `packages/frontend/qa/wallet/swap-critical-path.spec.ts` using `@tenkeylabs/dappwright` to automate real MetaMask extension interactions on Chromium.
+  - Supports mnemonic seed phrases and raw private keys, adds/switches to Arc Testnet (`5042002`), connects, quotes, handles Permit2 approvals and EIP-712 PermitSingle signing, confirms swap tx with `value = 0n`, and verifies Arcscan link and `localStorage` recent swaps.
+  - Automatically skips cleanly when `QA_WALLET_SECRET` is unset (`1 skipped`, exit 0).
+  - Added MetaMask extension pre-caching to `scripts/qa-wallet-setup.mjs`.
+  - Updated default endpoints in `scripts/qa-wallet-validate.mjs`.
+  - Created `docs/qa-playwright-metamask.md`.
+  - ESLint (0 errors, 0 warnings) and TypeScript typecheck clean across frontend.

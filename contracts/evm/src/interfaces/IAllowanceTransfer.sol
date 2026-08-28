@@ -29,6 +29,9 @@ interface IAllowanceTransfer {
 
     /// @notice Pull `amount` of `token` from `from` into `to` using msg.sender's allowance.
     function transferFrom(address from, address to, uint160 amount, address token) external;
+    /// @notice Sets allowance for a spender.
+    function approve(address token, address spender, uint160 amount, uint48 expiration) external;
+
 
     /// @notice Current AllowanceTransfer allowance for (user, token, spender).
     function allowance(address user, address token, address spender)

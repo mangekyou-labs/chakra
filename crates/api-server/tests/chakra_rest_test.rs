@@ -20,8 +20,12 @@ use {
     dex_adapters::evm_rpc::fixture,
     market_snapshot::{
         decimals::{EURC, NATIVE_USDC, USDC_ERC20},
-        pool_state_store::{MemoryPoolStateStore, PoolStateStore, StablePoolStateValue, XykPoolStateValue},
+        pool_state_store::{
+            FactoryRecord, MemoryPoolStateStore, PoolStateStore, StablePoolStateValue,
+            XykPoolStateValue,
+        },
         store::{MemorySnapshotStore, SnapshotStore},
+        ClmmBitmapWordSnapshot, ClmmCoverageSnapshot, ClmmPoolRefSnapshot, ClmmPoolSnapshot, ClmmTickSnapshot,
         MarketSnapshot, SourceSnapshot, TradingPairSnapshot,
     },
     router_engine::{path_finder::PathFinderConfig, split_optimizer::SplitConfig, QuoteEngine},
@@ -187,6 +191,19 @@ async fn send(router: &Router, request: Request<Body>) -> (StatusCode, Value) {
 
 async fn get(router: &Router, path: &str) -> (StatusCode, Value) {
     send(router, Request::builder().uri(path).body(Body::empty()).unwrap()).await
+}
+
+async fn post(router: &Router, path: &str, body: Value) -> (StatusCode, Value) {
+    send(
+        router,
+        Request::builder()
+            .method(Method::POST)
+            .uri(path)
+            .header(header::CONTENT_TYPE, "application/json")
+            .body(Body::from(serde_json::to_vec(&body).unwrap()))
+            .unwrap(),
+    )
+    .await
 }
 
 // ─── 1. Envelope + error codes ──────────────────────────────────────────────
@@ -671,6 +688,192 @@ fn config_rejects_canteen_and_invented_alchemy_urls() {
             "{good}"
         );
     }
+}
+
+// ─── 9. Production CLMM snapshot loader + ready + quote + build_tx ─────────
+
+#[tokio::test]
+async fn ready_and_clmm_only_snapshot_quotes_and_builds() {
+    const CLMM_POOL: &str = "0x0000000000000000000000000000000000000010";
+    const CLMM_FACTORY: &str = "0x00000000000000000000000000000000000000f1";
+    const USER: &str = "0x1234567890123456789012345678901234567890";
+    const AGGREGATOR: &str = "0xEa1b2C24bd41163590960F8e40afe6cb4CC92006";
+
+    // 1. Worker-shaped snapshot with CLMM only in clmm_pool_refs
+    let snapshot = MarketSnapshot::from_sources(
+        "chakra-worker-clmm-1",
+        1_700_000_000_000,
+        "arc-testnet",
+        vec![SourceSnapshot {
+            source: "chakra-clmm".to_string(),
+            pairs: vec![],
+        }],
+    )
+    .with_clmm_pool_refs(vec![ClmmPoolRefSnapshot {
+        source: "chakra-clmm".to_string(),
+        pool_address: CLMM_POOL.to_string(),
+        token0: USDC_ERC20.to_ascii_lowercase(),
+        token1: EURC.to_ascii_lowercase(),
+        fee_bps: 30,
+        tick_spacing: 200,
+        factory: CLMM_FACTORY.to_string(),
+    }]);
+
+    let snapshot_store = Arc::new(MemorySnapshotStore::new());
+    snapshot_store.publish_snapshot(&snapshot).await.unwrap();
+
+    // 2. Seed CLMM state and factory into pool store
+    use dex_adapters::clmm_math::bitmap;
+    let pool_store = Arc::new(MemoryPoolStateStore::new());
+    let clmm_pool_snapshot = ClmmPoolSnapshot {
+        source: "chakra-clmm".to_string(),
+        pool_address: CLMM_POOL.to_string(),
+        token0: USDC_ERC20.to_ascii_lowercase(),
+        token1: EURC.to_ascii_lowercase(),
+        fee_bps: 30,
+        tick_spacing: 200,
+        sqrt_price_x96: dex_adapters::clmm_math::sqrt_ratio_at_tick(0).0,
+        tick: 0,
+        liquidity: 10_000_000_000_000,
+        factory: CLMM_FACTORY.to_string(),
+        ticks: vec![
+            ClmmTickSnapshot {
+                tick: -1000,
+                liquidity_gross: 10_000_000_000_000,
+                liquidity_net: 10_000_000_000_000,
+            },
+            ClmmTickSnapshot {
+                tick: 1000,
+                liquidity_gross: 10_000_000_000_000,
+                liquidity_net: -10_000_000_000_000,
+            },
+        ],
+        chunk_bitmaps: vec![ClmmBitmapWordSnapshot {
+            word_pos: bitmap::chunk_bitmap_position(bitmap::chunk_address(bitmap::compress_tick(-1000, 200)).0).0,
+            word: {
+                let mut word = [0u8; 32];
+                let lower_bit =
+                    bitmap::chunk_bitmap_position(bitmap::chunk_address(bitmap::compress_tick(-1000, 200)).0).1;
+                let upper_bit =
+                    bitmap::chunk_bitmap_position(bitmap::chunk_address(bitmap::compress_tick(1000, 200)).0).1;
+                word[31 - (lower_bit / 8) as usize] |= 1u8 << (lower_bit % 8);
+                word[31 - (upper_bit / 8) as usize] |= 1u8 << (upper_bit % 8);
+                word
+            },
+        }],
+        word_bitmaps: vec![ClmmBitmapWordSnapshot {
+            word_pos: bitmap::word_bitmap_position(
+                bitmap::chunk_bitmap_position(bitmap::chunk_address(bitmap::compress_tick(-1000, 200)).0).0,
+            )
+            .0,
+            word: {
+                let mut word = [0u8; 32];
+                let l2_bit = bitmap::word_bitmap_position(
+                    bitmap::chunk_bitmap_position(bitmap::chunk_address(bitmap::compress_tick(-1000, 200)).0).0,
+                )
+                .1;
+                word[31 - (l2_bit / 8) as usize] |= 1u8 << (l2_bit % 8);
+                word
+            },
+        }],
+        coverage: Some(ClmmCoverageSnapshot {
+            is_complete: true,
+            min_loaded_tick: Some(-1000),
+            max_loaded_tick: Some(1000),
+            scanned_word_start: None,
+            scanned_word_end: None,
+        }),
+    };
+    pool_store.set_clmm_batch(&[clmm_pool_snapshot]).await.unwrap();
+    pool_store
+        .set_factories(&[FactoryRecord::new(CLMM_FACTORY, "clmm", "chakra-clmm")])
+        .await
+        .unwrap();
+
+    // 3. Build AppState with aggregator configured and mock RPC fixture
+    let (url, _server) = fixture::spawn(|method, params| match method {
+        "eth_call" => {
+            let data = params[0]["data"].as_str().unwrap();
+            let sel4 = &data[..10];
+            if sel4 == "0x5c975abb" || sel4 == "0xdd62ed3e" {
+                Ok(json!(
+                    "0x0000000000000000000000000000000000000000000000000000000000000000"
+                ))
+            } else if sel4 == "0x927da105" {
+                Ok(json!("0x000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"))
+            } else {
+                Err(json!(format!("unexpected eth_call selector {sel4}")))
+            }
+        }
+        other => Err(json!(format!("unexpected method {other}"))),
+    });
+
+    let mut config = app_config();
+    config.chakra_aggregator = AGGREGATOR.to_string();
+
+    let state = AppState::from_backends(
+        config,
+        Some(snapshot_store.clone() as Arc<dyn SnapshotStore>),
+        Some(pool_store.clone() as Arc<dyn PoolStateStore>),
+        Some(snapshot_store.clone()),
+        Some(pool_store.clone()),
+        Some(Arc::new(dex_adapters::evm_rpc::EvmRpcClient::single(&url).unwrap())),
+        MBTC.to_string(),
+        None,
+    )
+    .await;
+    let router = build_router(state, RateLimitState::from_env());
+
+    // 4. Verify /ready returns 200 OK
+    let (status, ready_body) = get(&router, "/api/v1/ready").await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(ready_body["data"]["ready"], true);
+    assert_eq!(ready_body["data"]["snapshot_id"], "chakra-worker-clmm-1");
+
+    // 5. Verify /quote works for CLMM pair and emits explicit hop metadata
+    let (status, quote_body) = get(
+        &router,
+        &format!("/api/v1/quote?token_in={USDC_ERC20}&token_out={EURC}&amount_in=1000000"),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK, "quote status: {status}, body: {quote_body}");
+    assert_eq!(quote_body["success"], true, "quote_body: {quote_body}");
+    let quote_data = &quote_body["data"];
+    assert_eq!(quote_data["protocol_fee_bps"], 0, "quote_data: {quote_data}");
+    let sub_routes = quote_data["sub_routes"].as_array().expect("sub_routes array");
+    assert_eq!(sub_routes.len(), 1);
+    let route = &sub_routes[0];
+    assert_eq!(route["dex_types"][0], "clmm");
+    assert_eq!(route["hop_fees"][0], 30);
+    assert_eq!(
+        route["hop_factories"][0].as_str().unwrap().to_ascii_lowercase(),
+        CLMM_FACTORY.to_ascii_lowercase()
+    );
+
+    // 6. Verify /build_tx succeeds with value: "0" and valid transaction payload
+    let build_tx_body = json!({
+        "user": USER,
+        "token_in": USDC_ERC20.to_ascii_lowercase(),
+        "token_out": EURC.to_ascii_lowercase(),
+        "amount_in": "1000000",
+        "min_amount_out": "990000",
+        "sub_routes": [{
+            "amount_in": "1000000",
+            "steps": [{
+                "dex_type": "clmm",
+                "pool_address": CLMM_POOL,
+                "token_in": USDC_ERC20.to_ascii_lowercase(),
+                "token_out": EURC.to_ascii_lowercase(),
+                "fee_bps": 30
+            }]
+        }]
+    });
+    let (status, tx_body) = post(&router, "/api/v1/build_tx", build_tx_body).await;
+    assert_eq!(status, StatusCode::OK, "build_tx response: {tx_body}");
+    let tx_data = &tx_body["data"];
+    assert_eq!(tx_data["to"].as_str().unwrap().to_ascii_lowercase(), AGGREGATOR.to_ascii_lowercase());
+    assert_eq!(tx_data["value"], "0");
+    assert!(tx_data["data"].as_str().unwrap().starts_with("0x"));
 }
 
 // Keep `Duration` in scope for future windowed tests.

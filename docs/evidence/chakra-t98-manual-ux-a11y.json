@@ -20,11 +20,11 @@
   "dom_contrast_measurements": [
     {
       "element": "Status Banner",
-      "foreground_color": "rgb(107, 114, 128)",
+      "foreground_color": "rgb(132, 143, 160)",
       "effective_background": "rgb(10, 11, 13)",
-      "contrast_ratio": 4.07,
-      "wcag_aa_standard_pass": false,
-      "notes": "Muted secondary text falls slightly below 4.5:1 threshold."
+      "contrast_ratio": 6.02,
+      "wcag_aa_standard_pass": true,
+      "notes": "Raised --text-muted from #6b7280 to #848fa0; now exceeds WCAG AA 4.5:1 threshold."
     },
     {
       "element": "Heading 'Swap'",
@@ -36,11 +36,11 @@
     },
     {
       "element": "Sell Label",
-      "foreground_color": "rgb(107, 114, 128)",
+      "foreground_color": "rgb(132, 143, 160)",
       "effective_background": "rgb(26, 31, 39)",
-      "contrast_ratio": 3.42,
-      "wcag_aa_standard_pass": false,
-      "notes": "Secondary muted label falls below 4.5:1."
+      "contrast_ratio": 5.06,
+      "wcag_aa_standard_pass": true,
+      "notes": "Raised --text-muted; exceeds WCAG AA 4.5:1 threshold (5.06:1)."
     },
     {
       "element": "Amount Input",

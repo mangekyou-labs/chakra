@@ -24,7 +24,7 @@ This document indexes all 13 Success Criteria (SC-1 through SC-13), public hoste
 | **SC-4** | On-chain atomic split swap (≥2 sub-routes in 1 tx) on Arcscan | Requires ≥5 USDC operator balance; live split route proven in `/quote` and `/build_tx` | **Gated (Operator Funds)** |
 | **SC-5** | Public hosted UI, `/health`, `/ready`, `/quote`, `/build_tx` | `https://chakra-arc-dex.vercel.app` & `https://chakra-api-0a5i.onrender.com` | **PASS** |
 | **SC-6** | TypeScript SDK quote + `build_tx` example | `packages/sdk/examples/quote-build.ts` & `docs/evidence/chakra-t72-walkthrough.json` | **PASS** |
-| **SC-7** | Playwright CLI MetaMask test on Arc testnet | `packages/frontend/qa.wallet.config.ts` (requires headed extension profile / `QA_WALLET_SECRET`) | **Gated (Wallet Secret)** |
+| **SC-7** | Playwright CLI MetaMask test on Arc testnet | `docs/qa-playwright-metamask.md` & `packages/frontend/qa/wallet/swap-critical-path.spec.ts` (dAppwright harness code complete; live headed run gated on `QA_WALLET_SECRET`) | **Harness Implemented / Live Gated** |
 | **SC-8** | Venue comparison matrix (≥3 pairs × ≥3 sizes) & split benchmark | `docs/evidence/chakra-t91-venue-matrix.json` & `docs/evidence/chakra-t92-split-benchmark.json` | **OPEN / PARTIAL (Gated on T2.1–T2.4 Re-seed)** |
 | **SC-9** | Integrator 30-minute walkthrough | `docs/integrator-guide.md` & `docs/evidence/chakra-t72-walkthrough.json` (executed in 6 seconds) | **PASS** |
 | **SC-10**| Quote latency p95 < 500 ms at API process | `docs/evidence/chakra-t95-quote-latency.json` (server p95 = 23 ms across 100 samples on deployed commit `d3f8c79`) | **PASS** |
@@ -39,6 +39,9 @@ This document indexes all 13 Success Criteria (SC-1 through SC-13), public hoste
 3. **`docs/evidence/chakra-t92-split-benchmark.json`**: Split vs single-path optimization benchmark demonstrating +893.01 bps gain (+383,687 atomic units / ~+0.383687 EURC).
 4. **`docs/evidence/chakra-t95-quote-latency.json`**: 100-sample latency benchmark demonstrating 23 ms p95 server-side API compute time on deployed revision `dep-da8jk6cs728c73bvdrb0`.
 5. **`docs/evidence/chakra-t98-manual-ux-a11y.json`**: Desktop and mobile UI viewport audit with measured DOM contrast ratios and focus order (`status: OPEN_PARTIAL`).
+6. **`docs/qa-playwright-metamask.md`**: Technical specification and operational guide for the automated dAppwright MetaMask E2E testing harness on Arc testnet.
+7. **`docs/evidence/chakra-t98-desktop-audit.png`**: Desktop (1280×800) rendered UI audit snapshot with updated contrast.
+8. **`docs/evidence/chakra-t98-mobile-audit.png`**: Mobile (375×667) responsive rendered UI audit snapshot with updated contrast.
 
 ## Concrete External Blockers
 

@@ -1,8 +1,8 @@
 #!/usr/bin/env node
-// qa-wallet-setup.mjs — create gitignored persistent Chromium profile for Playwright + dAppwright.
-import { execSync } from 'node:child_process';
+// qa-wallet-setup.mjs — setup directory and pre-cache MetaMask extension for dAppwright.
 import { mkdirSync, existsSync, writeFileSync, rmSync } from 'node:fs';
 import { resolve } from 'node:path';
+import { MetaMaskWallet } from '@tenkeylabs/dappwright';
 
 const PROFILE_DIR = resolve(import.meta.dirname, '..', 'output', 'playwright', 'chromium-profile');
 const ARTIFACTS_DIR = resolve(import.meta.dirname, '..', 'output', 'playwright', 'evidence');
@@ -30,6 +30,13 @@ writeFileSync(
     2,
   ),
 );
+try {
+  console.log('📦 Pre-fetching MetaMask extension via dAppwright...');
+  const extPath = await MetaMaskWallet.download({ version: MetaMaskWallet.recommendedVersion });
+  console.log(`✅ MetaMask extension cached: ${extPath}`);
+} catch (err) {
+  console.warn(`⚠️  MetaMask pre-download notice: ${err.message}`);
+}
 
 console.log(`✅ Profile directory: ${PROFILE_DIR}`);
 console.log(`✅ Evidence directory: ${ARTIFACTS_DIR}`);
