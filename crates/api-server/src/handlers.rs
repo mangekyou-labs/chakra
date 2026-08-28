@@ -128,6 +128,7 @@ fn parse_amount_in(raw: &str) -> Result<u128, ApiError> {
 }
 
 pub async fn get_quote(State(state): State<AppState>, Query(params): Query<QuoteQuery>) -> impl IntoResponse {
+    let start_time = std::time::Instant::now();
     let mbtc = state.mbtc_address.clone();
     let token_in = match parse_token(params.token_in.as_deref().unwrap_or_default(), &mbtc) {
         Ok(t) => t,
@@ -256,7 +257,7 @@ pub async fn get_quote(State(state): State<AppState>, Query(params): Query<Quote
             is_split: route.is_split,
             max_splits,
             sub_routes,
-            compute_time_ms: route.compute_time_ms,
+            compute_time_ms: start_time.elapsed().as_millis() as u64,
         }))),
     )
 }
