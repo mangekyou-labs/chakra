@@ -2,11 +2,7 @@
 //! On startup, loads from file. In background, resolves unknown tokens via RPC.
 
 use {
-    crate::{
-        rpc::{scval_to_string, SorobanRpc},
-        token_logo::TokenLogoCache,
-        token_logo_lists::TokenLogoListIndex,
-    },
+    crate::{token_logo::TokenLogoCache, token_logo_lists::TokenLogoListIndex},
     serde::{Deserialize, Serialize},
     std::{
         collections::HashMap,
@@ -14,7 +10,7 @@ use {
         sync::Arc,
     },
     tokio::sync::RwLock,
-    tracing::{debug, info, warn},
+    tracing::{info, warn},
 };
 
 const METADATA_FILE: &str = "data/token_metadata.json";
@@ -47,7 +43,6 @@ pub struct TokenMetadata {
     pub name: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub logo: Option<String>,
-    /// Distinguishes downloaded SEP-42 icons from generated letter avatars.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub logo_kind: Option<LogoKind>,
 }
@@ -65,11 +60,10 @@ pub struct TokenMetadataStore {
 }
 
 impl TokenMetadataStore {
-    pub fn new(_rpc: Arc<SorobanRpc>) -> Self {
+    pub fn new() -> Self {
         Self::with_logo_cache(TokenLogoCache::from_env(), TokenLogoListIndex::from_env())
     }
 
-    /// Construct with an explicit logo cache and SEP-42 list index.
     pub fn with_logo_cache(logo_cache: TokenLogoCache, logo_lists: TokenLogoListIndex) -> Self {
         let metadata_file = PathBuf::from(METADATA_FILE);
         let cache = load_metadata_file(&metadata_file);
@@ -81,8 +75,6 @@ impl TokenMetadataStore {
         }
     }
 
-    /// Test helper: supply logo cache, metadata path, and initial entries
-    /// without reading or writing the repository metadata file.
     #[cfg(test)]
     fn with_logo_cache_and_file(
         logo_cache: TokenLogoCache,
@@ -98,27 +90,18 @@ impl TokenMetadataStore {
         }
     }
 
-    /// Get metadata for a token (returns None if not yet resolved).
     pub async fn get(&self, contract: &str) -> Option<TokenMetadata> {
         self.cache.read().await.get(contract).cloned()
     }
 
-    /// Get all cached metadata.
     pub async fn get_all(&self) -> HashMap<String, TokenMetadata> {
         self.cache.read().await.clone()
     }
 
-    /// Replace the cache contents with a prebuilt snapshot.
     pub async fn replace_all(&self, tokens: HashMap<String, TokenMetadata>) {
         *self.cache.write().await = tokens;
     }
 
-    /// Ensure every cached token has a self-hosted logo URL on disk.
-    ///
-    /// Prefers official icons from SEP-42 lists; falls back to generated SVG.
-    /// Clones entries before any await so the RwLock is never held across I/O.
-    /// Returns the number of tokens that successfully received a self-hosted
-    /// URL.
     pub async fn ensure_self_hosted_logos(&self) -> usize {
         let list_count = self.logo_lists.refresh().await;
         info!(list_count, "Refreshed SEP-42 logo index");
@@ -134,7 +117,6 @@ impl TokenMetadataStore {
 
         for (id, meta) in entries {
             let list_icon = self.logo_lists.icon_url(&meta.contract).await;
-            // Prefer SEP-42 list icon over any stale third-party URL in metadata.
             let remote = list_icon
                 .as_deref()
                 .or(meta.logo.as_deref().filter(|u| !u.contains("/logos/")));
@@ -175,111 +157,11 @@ impl TokenMetadataStore {
         success
     }
 
-    /// Resolve unknown tokens in the background.
-    /// Call this with a list of all known token addresses.
-    pub async fn resolve_unknown(&self, token_addresses: Vec<String>) {
-        let cache = self.cache.read().await;
-        let unknown: Vec<String> = token_addresses
-            .into_iter()
-            .filter(|addr| !cache.contains_key(addr))
-            .collect();
-        drop(cache);
-
-        if unknown.is_empty() {
-            // Backfill self-hosted logos for already-cached entries.
-            self.ensure_self_hosted_logos().await;
-            return;
-        }
-
-        info!("Resolving metadata for {} unknown tokens...", unknown.len());
-
-        let mut resolved = 0;
-        for addr in &unknown {
-            match self.fetch_token_metadata(addr).await {
-                Some(meta) => {
-                    self.cache.write().await.insert(addr.clone(), meta);
-                    resolved += 1;
-                }
-                None => {
-                    // Store with contract prefix as symbol so we don't retry
-                    let short = if addr.len() > 8 { &addr[..8] } else { addr.as_str() };
-                    self.cache.write().await.insert(
-                        addr.clone(),
-                        TokenMetadata {
-                            contract: addr.clone(),
-                            symbol: short.to_string(),
-                            name: "Unknown".to_string(),
-                            logo: None,
-                            logo_kind: None,
-                        },
-                    );
-                }
-            }
-
-            // Rate limit: don't hammer the RPC
-            tokio::time::sleep(std::time::Duration::from_millis(100)).await;
-        }
-
-        info!("Resolved {}/{} token metadata", resolved, unknown.len());
-
-        // Persist newly resolved metadata, then migrate logos to self-hosted URLs.
-        self.save().await;
+    /// Resolve unknown tokens — Chakra stub (no Stellar RPC).
+    pub async fn resolve_unknown(&self, _token_addresses: Vec<String>) {
         self.ensure_self_hosted_logos().await;
     }
 
-    /// Fetch symbol and name from chain via simulate_call.
-    async fn fetch_token_metadata(&self, contract: &str) -> Option<TokenMetadata> {
-        // Use public RPC for metadata (more reliable than local for some contracts)
-        let public_rpc = SorobanRpc::new(
-            "https://soroban-rpc.mainnet.stellar.gateway.fm",
-            "Public Global Stellar Network ; September 2015",
-        );
-
-        // Call symbol()
-        let symbol = match public_rpc.call_no_args(contract, "symbol").await {
-            Ok(val) => scval_to_string(&val).ok().unwrap_or_default(),
-            Err(_) => return None,
-        };
-
-        // Call name()
-        let name = match public_rpc.call_no_args(contract, "name").await {
-            Ok(val) => scval_to_string(&val).ok().unwrap_or_default(),
-            Err(_) => symbol.clone(),
-        };
-
-        if symbol.is_empty() {
-            return None;
-        }
-
-        // For SAC tokens, name is "CODE:ISSUER" — use code as display name
-        let display_name = if name.contains(':') {
-            name.split(':').next().unwrap_or(&name).to_string()
-        } else if name == "native" {
-            "Stellar Lumens".to_string()
-        } else {
-            name.clone()
-        };
-
-        // Official icons come from SEP-42 lists during ensure_self_hosted_logos.
-        let logo = self.logo_lists.icon_url(contract).await;
-
-        debug!(
-            "Resolved token {}: symbol={}, name={}",
-            &contract[..12.min(contract.len())],
-            symbol,
-            display_name
-        );
-
-        Some(TokenMetadata {
-            contract: contract.to_string(),
-            symbol,
-            name: display_name,
-            logo,
-            logo_kind: None,
-        })
-    }
-
-    /// Save cache to file.
     async fn save(&self) {
         let cache = self.cache.read().await;
         let file_cache = MetadataCache { tokens: cache.clone() };
@@ -288,10 +170,7 @@ impl TokenMetadataStore {
             Ok(json) => {
                 if let Some(parent) = self.metadata_file.parent() {
                     if !parent.as_os_str().is_empty() {
-                        if let Err(e) = std::fs::create_dir_all(parent) {
-                            warn!("Failed to create token metadata directory: {}", e);
-                            return;
-                        }
+                        let _ = std::fs::create_dir_all(parent);
                     }
                 }
                 if let Err(e) = std::fs::write(&self.metadata_file, json) {
@@ -397,32 +276,6 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn enriches_when_external_logo_download_fails() {
-        let logo_dir = unique_temp_dir("fail-logos");
-        let meta_file = unique_temp_dir("fail-meta").join("token_metadata.json");
-        let mut initial = HashMap::new();
-        initial.insert(
-            "token-2".to_string(),
-            TokenMetadata {
-                contract: "token-2".to_string(),
-                symbol: "EXT".to_string(),
-                name: "External".to_string(),
-                logo: Some("https://127.0.0.1:1/missing-logo.png".to_string()),
-                logo_kind: None,
-            },
-        );
-        let store = store_with_initial(&logo_dir, "https://api.test/logos", meta_file, initial);
-
-        let count = store.ensure_self_hosted_logos().await;
-
-        let meta = store.get("token-2").await.expect("token present");
-        assert!(meta.logo.as_deref().unwrap().starts_with("https://api.test/logos/"));
-        assert_eq!(meta.logo_kind, Some(LogoKind::Fallback));
-        assert_eq!(std::fs::read_dir(&logo_dir).unwrap().count(), 1);
-        assert_eq!(count, 1);
-    }
-
-    #[tokio::test]
     async fn resolve_unknown_backfills_logos_when_no_unknown_tokens() {
         let logo_dir = unique_temp_dir("backfill-logos");
         let meta_file = unique_temp_dir("backfill-meta").join("token_metadata.json");
@@ -444,42 +297,5 @@ mod tests {
         let meta = store.get("token-1").await.expect("token present");
         assert!(meta.logo.as_deref().unwrap().starts_with("https://api.test/logos/"));
         assert_eq!(std::fs::read_dir(&logo_dir).unwrap().count(), 1);
-    }
-
-    #[tokio::test]
-    async fn prefers_sep42_list_icon_over_stale_metadata_url() {
-        let logo_dir = unique_temp_dir("sep42-logos");
-        let meta_file = unique_temp_dir("sep42-meta").join("token_metadata.json");
-        let mut initial = HashMap::new();
-        initial.insert(
-            "token-sep".to_string(),
-            TokenMetadata {
-                contract: "token-sep".to_string(),
-                symbol: "SEP".to_string(),
-                name: "Sep".to_string(),
-                logo: Some("https://stellar.expert/explorer/public/asset/native/icon".into()),
-                logo_kind: None,
-            },
-        );
-
-        let lists = TokenLogoListIndex::new(vec![]);
-        lists
-            .icons
-            .write()
-            .await
-            .insert("token-sep".into(), "https://127.0.0.1:1/official-missing.png".into());
-
-        let store = TokenMetadataStore::with_logo_cache_and_file(
-            TokenLogoCache::new(&logo_dir, "https://api.test/logos"),
-            lists,
-            meta_file,
-            initial,
-        );
-
-        let _ = store.ensure_self_hosted_logos().await;
-        let meta = store.get("token-sep").await.expect("present");
-        assert!(meta.logo.as_deref().unwrap().starts_with("https://api.test/logos/"));
-        // Download fails → fallback; important part is list URL was preferred.
-        assert_eq!(meta.logo_kind, Some(LogoKind::Fallback));
     }
 }

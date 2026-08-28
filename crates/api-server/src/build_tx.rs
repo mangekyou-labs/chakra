@@ -79,7 +79,9 @@ fn encode_sub_route(sub: &BuildTxSubRoute) -> Result<Vec<u8>> {
     hops.extend_from_slice(&abi::uint_word(sub.steps.len() as u128));
     for step in &sub.steps {
         let dex_type = DexType::parse(&step.dex_type).ok_or_else(|| anyhow!("unknown dex_type: {}", step.dex_type))?;
-        let fee_bps = step_fee_bps(dex_type);
+        // T4.6: Use the per-hop fee from the client/quote when provided;
+        // fall back to the venue default (e.g., 30 bps for xyk/clmm).
+        let fee_bps = step.fee_bps.unwrap_or_else(|| step_fee_bps(dex_type));
         // Hop is entirely static, so Hop[] stores tuples inline without an
         // element-offset table.
         hops.extend_from_slice(&encode_hop(step, dex_type, fee_bps)?);
@@ -279,6 +281,17 @@ async fn validate_hop(state: &AppState, snapshot: &MarketSnapshot, step: &BuildT
         bail!("pool {pool} tokens do not match submitted hop");
     }
 
+    // T4.6: Validate per-hop fee when the client provides it.
+    if let Some(submitted_fee) = step.fee_bps {
+        if let Some(snapshot_fee) = snapshot_pool_fee(snapshot, &pool, dex_type) {
+            if submitted_fee != snapshot_fee {
+                bail!(
+                    "pool {pool} fee mismatch: submitted {submitted_fee} bps, snapshot {snapshot_fee} bps"
+                );
+            }
+        }
+    }
+
     let factories = match _pool_state_source(state) {
         Some(store) => store.fetch_factories().await.unwrap_or_default(),
         None => Vec::new(),
@@ -360,6 +373,24 @@ fn snapshot_pool_factory(snapshot: &MarketSnapshot, pool: &str) -> Option<String
                 .find(|p| p.pool_address.eq_ignore_ascii_case(pool))
                 .map(|p| p.factory.clone())
                 .filter(|f| !f.is_empty())
+        })
+}
+
+/// Look up the on-chain fee for a pool from the snapshot. Returns `None` when
+/// the pool is not found or the snapshot doesn't carry fee data.
+fn snapshot_pool_fee(snapshot: &MarketSnapshot, pool: &str, dex_type: DexType) -> Option<u32> {
+    snapshot
+        .sources
+        .iter()
+        .flat_map(|s| s.pairs.iter())
+        .find(|p| p.pool_address.eq_ignore_ascii_case(pool) && p.dex_type == dex_type_name(dex_type))
+        .map(|p| p.fee_bps)
+        .or_else(|| {
+            snapshot
+                .clmm_pool_refs
+                .iter()
+                .find(|p| dex_type == DexType::Clmm && p.pool_address.eq_ignore_ascii_case(pool))
+                .map(|p| p.fee_bps)
         })
 }
 

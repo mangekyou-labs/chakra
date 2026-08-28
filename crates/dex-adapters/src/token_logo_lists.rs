@@ -1,11 +1,9 @@
 //! Token logo index: contract address → official icon URL.
 //!
-//! Sources (merged in priority order):
-//! 1. LumAgg overrides verified against exact mainnet contract IDs
-//! 2. Soroswap token list
-//! 3. LOBSTR curated list (hex contract IDs normalized to StrKey)
-//! 4. StellarExpert Top50
-//! 5. MetaMask Stellar token list
+//! Arc EVM catalog only (Stellar SAC lists removed). Sources (merged in
+//! priority order):
+//! 1. Arc overrides verified against the frozen catalog addresses
+//! 2. Remote token lists (configurable via `TOKEN_LOGO_LIST_URLS`)
 
 use {
     serde::Deserialize,
@@ -14,44 +12,25 @@ use {
     tracing::{info, warn},
 };
 
-const DEFAULT_LIST_URLS: &[&str] = &[
-    "https://raw.githubusercontent.com/soroswap/token-list/main/tokenList.json",
-    "https://lobstr.co/api/v1/sep/assets/curated.json",
-    "https://api.stellar.expert/explorer/public/asset-list/top50",
-    "https://raw.githubusercontent.com/MetaMask/snap-stellar-wallet/main/tokenlists/unified-pubnet.json",
-];
+const DEFAULT_LIST_URLS: &[&str] = &[];
 
-// Keep this list deliberately small. A symbol alone is not enough to identify
-// a Stellar asset; every entry must be verified against the exact contract ID.
+// Keep this list deliberately small. Every entry is verified against the
+// frozen Arc catalog address (USDC / EURC / mBTC).
 const VERIFIED_LOGO_OVERRIDES: &[(&str, &str)] = &[
     (
-        // Native XLM SAC; icon is served by the Stellar Development Foundation.
-        "CAS3J7GYLGXMF6TDJBBYYSE3HQ6BBSMLNUQ34T6TZMYMW2EVH34XOWMA",
-        "https://cdn.sanity.io/images/e2r40yh6/production-i18n/d4809d7123ca78f57b05601982932f5cfa62c3ac-32x32.png?w=192&h=192&fm=png",
+        // USDC (native Arc testnet, 6 dp).
+        "0x3600000000000000000000000000000000000000",
+        "https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/ethereum/assets/0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48/logo.png",
     ),
     (
-        // Gravity HITZ official repository.
-        "CBAPZAZNNB4X3VPXV2LYA5RMV7XHXIVREES2GG7R5GUXDZ4R4CKOY4EU",
-        "https://raw.githubusercontent.com/skyhitz/hitz-gravity/main/frontend/public/icon-128.png",
+        // EURC (Circle euro).
+        "0x89b50855aa3be2f677cd6303cec089b5f319d72a",
+        "https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/ethereum/assets/0x1aBaEA1f7C830bD89Acc67eC4af516284b1bC33c/logo.png",
     ),
     (
-        // XAU contract published by xau.cl.
-        "CC5UXAGZOU27OQBKBYTQMES3NVO6EV6FCMWSNPPHAPIS6S24ENM3C24A",
-        "https://xau.cl/wp-content/uploads/2024/01/logo_xau_low.png",
-    ),
-    (
-        // Balanced's Stellar configuration maps this contract to bnUSD.
-        "CCT4ZYIYZ3TUO2AWQFEOFGBZ6HQP3GW5TA37CK7CRZVFRDXYTHTYX7KP",
-        "https://raw.githubusercontent.com/balancednetwork/icons/main/tokens/bnusd.png",
-    ),
-    (
-        // LIBRE and DAWG contracts are published by LibreQuidity and Soroswap's list.
-        "CBEM2CAIYLM3HBOPU5HLQL7V5BUAKM3N77DYQKX4FNHTQLQUUD2ZFBOX",
-        "https://librequidity.org/LIBRE.png",
-    ),
-    (
-        "CD3X4GOWBPDU57NIPMPEMH7LFNAMBDTY5SKJCHLY7IDDWJQVUTU7CBBK",
-        "https://librequidity.org/DAWG.png",
+        // mBTC (owner-mint Arc testnet).
+        "0xbf5a25d7070faacae309d66d05372a6b212ecbdf",
+        "https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/bitcoin/info/logo.png",
     ),
 ];
 
@@ -184,18 +163,15 @@ pub(crate) fn parse_sep42_assets(assets: &[Sep42Asset]) -> Vec<(String, String)>
     out
 }
 
-/// Accept StrKey `C...` or 64-char hex contract hash; return StrKey.
+/// Accept a 40-char EVM address (with or without `0x`) or a 64-char hex
+/// contract hash; return `0x`-prefixed lowercase. Stellar StrKeys are not Arc
+/// contract ids.
 pub fn normalize_contract_id(raw: &str) -> Option<String> {
     let s = raw.trim();
-    if s.starts_with('C') && s.len() == 56 {
-        return stellar_strkey::Contract::from_string(s).ok().map(|c| format!("{c}"));
-    }
-    if s.len() == 64 && s.chars().all(|c| c.is_ascii_hexdigit()) {
-        let mut bytes = [0u8; 32];
-        for i in 0..32 {
-            bytes[i] = u8::from_str_radix(&s[i * 2..i * 2 + 2], 16).ok()?;
-        }
-        return Some(format!("{}", stellar_strkey::Contract(bytes)));
+    let hex = s.strip_prefix("0x").unwrap_or(s);
+    let hex_len = hex.len();
+    if (hex_len == 40 || hex_len == 64) && hex.chars().all(|c| c.is_ascii_hexdigit()) {
+        return Some(format!("0x{}", hex.to_ascii_lowercase()));
     }
     None
 }
@@ -228,12 +204,20 @@ mod tests {
     use super::*;
 
     #[test]
-    fn normalize_contract_accepts_strkey_and_hex() {
-        let usdc = "CCW67TSZV3SSS2HXMBQ5JFGCKJNXKZM7UQUWUZPUTHXSTZLEO7SJMI75";
-        assert_eq!(normalize_contract_id(usdc).as_deref(), Some(usdc));
-
-        let hex = "adefce59aee52968f76061d494c2525b75659fa4296a65f499ef29e56477e496";
-        assert_eq!(normalize_contract_id(hex).as_deref(), Some(usdc));
+    fn normalize_contract_accepts_evm_address_and_contract_hash() {
+        // Arc EVM address (20 bytes) → 0x-prefixed lowercase.
+        let addr = "0x3600000000000000000000000000000000000000";
+        assert_eq!(normalize_contract_id(addr).as_deref(), Some(addr));
+        assert_eq!(
+            normalize_contract_id(&addr[2..].to_ascii_uppercase()).as_deref(),
+            Some(addr)
+        );
+        // 64-char contract hash → 0x-prefixed lowercase.
+        let hash = "ADEFCE59AEE52968F76061D494C2525B75659FA4296A65F499EF29E56477E496";
+        assert_eq!(
+            normalize_contract_id(hash).as_deref(),
+            Some("0xadefce59aee52968f76061d494c2525b75659fa4296a65f499ef29e56477e496")
+        );
 
         assert!(normalize_contract_id("not-a-contract").is_none());
     }
@@ -257,13 +241,14 @@ mod tests {
 
     #[test]
     fn parse_sep42_assets_skips_incomplete_entries() {
+        let usdc_hex = "3600000000000000000000000000000000000000000000000000000000000000";
         let assets = vec![
             Sep42Asset {
-                contract: Some("CCW67TSZV3SSS2HXMBQ5JFGCKJNXKZM7UQUWUZPUTHXSTZLEO7SJMI75".into()),
+                contract: Some(usdc_hex.into()),
                 icon: Some("https://example.com/usdc.png".into()),
             },
             Sep42Asset {
-                contract: Some("CCW67TSZV3SSS2HXMBQ5JFGCKJNXKZM7UQUWUZPUTHXSTZLEO7SJMI75".into()),
+                contract: Some(usdc_hex.into()),
                 icon: None,
             },
             Sep42Asset {

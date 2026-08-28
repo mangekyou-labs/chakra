@@ -12,13 +12,7 @@ path = "src/main.rs"
 market-snapshot = { path = "../market-snapshot" }
 market-data-worker = { path = "../market-data-worker" }
 router-engine = { path = "../router-engine" }
-dex-adapters = { path = "../dex-adapters" }
-lumagg-alerts = { path = "../lumagg-alerts" }
-lumagg-config = { path = "../lumagg-config" }
-
-stellar-xdr.workspace = true
-stellar-strkey.workspace = true
-soroban-client.workspace = true
+dex-adapters = { path = "../dex-adapters", features = ["test-fixture"] }
 
 tokio.workspace = true
 async-trait.workspace = true
@@ -36,23 +30,11 @@ anyhow.workspace = true
 tracing.workspace = true
 tracing-subscriber.workspace = true
 reqwest.workspace = true
+
 hex.workspace = true
-tiny-keccak.workspace = true
+tiny-keccak = { version = "2", features = ["keccak"] }
 
 rusqlite = { version = "0.32", features = ["bundled"] }
 
 [dev-dependencies]
 tempfile = "3"
-# Enable the test-fixture so `cargo test --workspace` can compile integration
-# tests that use the fixture JSON-RPC server.  The feature propagates to
-# dex-adapters/test-fixture which gates `evm_rpc::fixture`.
-dex-adapters = { path = "../dex-adapters", features = ["test-fixture"] }
-
-[features]
-default = []
-# Enable `dex_adapters::evm_rpc::fixture` for integration tests.
-test-fixture = ["dex-adapters/test-fixture"]
-
-[[example]]
-name = "local_harness"
-required-features = ["test-fixture"]

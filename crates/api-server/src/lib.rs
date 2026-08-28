@@ -17,10 +17,15 @@ use {
         routing::{get, post},
         Router,
     },
+    config::AppConfig,
     rate_limit::RateLimitState,
     state::AppState,
-    std::net::SocketAddr,
-    tower_http::cors::{AllowOrigin, CorsLayer},
+    std::{net::SocketAddr, path::PathBuf},
+    tower_http::{
+        cors::{AllowOrigin, CorsLayer},
+        limit::RequestBodyLimitLayer,
+        services::ServeDir,
+    },
     tracing::info,
 };
 
@@ -61,22 +66,71 @@ pub fn build_router(app_state: AppState, rate_limit: RateLimitState) -> Router {
         ])
         .allow_headers([axum::http::header::CONTENT_TYPE]);
 
-    Router::new().merge(api).layer(cors)
+    let app = Router::new()
+        .merge(api)
+        .layer(cors)
+        .layer(RequestBodyLimitLayer::new(128 * 1024));
+
+    let logo_dir = PathBuf::from(std::env::var("TOKEN_LOGO_DIR").unwrap_or_else(|_| "data/logos".into()));
+    let _ = std::fs::create_dir_all(&logo_dir);
+    app.nest_service("/logos", ServeDir::new(logo_dir))
 }
 
 pub async fn run_server() -> anyhow::Result<()> {
+    let config = AppConfig::from_env();
+    let listen_addr: SocketAddr = config.listen_addr.parse()?;
     let state = AppState::from_env().await?;
-    let listen_addr: SocketAddr = state.config.listen_addr.parse()?;
     let rate_limit = RateLimitState::from_env();
     let app = build_router(state.clone(), rate_limit);
 
     info!(
         "Chakra API listening on {} (rpc={})",
-        listen_addr, state.config.chakra_rpc_http
+        listen_addr, config.chakra_rpc_http
     );
 
     let listener = tokio::net::TcpListener::bind(listen_addr).await?;
     axum::serve(listener, app.into_make_service_with_connect_info::<SocketAddr>()).await?;
 
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use {
+        axum::http::{header::CONTENT_TYPE, Request, StatusCode},
+        tower::ServiceExt,
+    };
+
+    #[tokio::test]
+    async fn serves_logo_files_from_configured_directory() {
+        let dir = std::env::temp_dir().join(format!(
+            "chakra-logo-serve-{}-{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .map(|d| d.as_nanos())
+                .unwrap_or(0)
+        ));
+        std::fs::create_dir_all(&dir).unwrap();
+        let sample = dir.join("sample.svg");
+        std::fs::write(&sample, b"<svg xmlns=\"http://www.w3.org/2000/svg\"></svg>").unwrap();
+
+        let app = axum::Router::new().nest_service("/logos", tower_http::services::ServeDir::new(&dir));
+
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .uri("/logos/sample.svg")
+                    .body(axum::body::Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(response.status(), StatusCode::OK);
+        let content_type = response.headers().get(CONTENT_TYPE).unwrap().to_str().unwrap();
+        assert!(content_type.starts_with("image/svg+xml"), "got {content_type}");
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
 }

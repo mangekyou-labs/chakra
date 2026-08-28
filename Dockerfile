@@ -1,5 +1,6 @@
 # ─── Stage 1: Build Rust binaries ─────────────────────────────────────────────
-FROM rust:1.87-bookworm AS builder
+# rust:1.88 matches rust-toolchain.toml (channel = "1.88.0").
+FROM rust:1.88-bookworm AS builder
 
 WORKDIR /app
 COPY Cargo.toml Cargo.lock ./
@@ -39,7 +40,5 @@ USER chakra
 # tini is PID 1; entrypoint runs worker + api as children.
 ENTRYPOINT ["tini", "--"]
 CMD ["/app/docker-entrypoint.sh"]
-
-# Health: API liveness
-HEALTHCHECK --interval=15s --timeout=3s --start-period=30s --retries=3 \
-    CMD curl -sf http://127.0.0.1:${PORT:-8080}/api/v1/health || exit 1
+# No HEALTHCHECK: the runtime image has no curl, and Render uses
+# `healthCheckPath: /api/v1/health` (see render.yaml).

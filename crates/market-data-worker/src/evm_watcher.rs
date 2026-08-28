@@ -881,8 +881,8 @@ fn now_ms() -> u64 {
 
 // ─── Entry points ───────────────────────────────────────────────────────────
 
-/// Spawn the one-and-only fetch pipeline for the Arc path (EVM client; Stellar
-/// adapters are never constructed — the stub `SorobanRpc` is never contacted).
+/// Spawn the one-and-only fetch pipeline for the Arc path (EVM client only;
+/// Stellar adapters are never constructed).
 pub(crate) fn spawn_arc_pipeline(
     pool_store: Arc<dyn PoolStateStore>,
     shared: Arc<RwLock<WorkerShared>>,
@@ -890,26 +890,7 @@ pub(crate) fn spawn_arc_pipeline(
     worker_config: &crate::worker::WorkerConfig,
 ) -> fetch_pipeline::FetchPipelineHandle {
     let pipeline_config = fetch_pipeline::FetchPipelineConfig::from_env(worker_config.pool_state_refresh_concurrency);
-    let stub = || {
-        Arc::new(dex_adapters::rpc::SorobanRpc::new(
-            "https://soroban-rpc.invalid",
-            "arc-stub",
-        ))
-    };
-    fetch_pipeline::spawn_fetch_pipeline(
-        pipeline_config,
-        pool_store,
-        stub(),
-        Some(http),
-        shared,
-        Arc::new(dex_adapters::soroswap::SoroswapAdapter::new(stub())),
-        Arc::new(dex_adapters::aquarius::AquariusAdapter::new(stub())),
-        Arc::new(dex_adapters::phoenix::PhoenixAdapter::new(stub())),
-        Arc::new(dex_adapters::comet::CometAdapter::new(stub())),
-        Arc::new(dex_adapters::sushi::SushiAdapter::new(stub())),
-        Arc::new(dex_adapters::aquarius_clmm::AquariusClmmAdapter::new(stub())),
-        None,
-    )
+    fetch_pipeline::spawn_fetch_pipeline(pipeline_config, pool_store, http, shared)
 }
 
 /// Top-level Arc entry. `WorkerConfig` supplies store URLs (`CHAKRA_REDIS_URL`
@@ -1108,21 +1089,13 @@ mod tests {
 
     fn worker_config_stub() -> WorkerConfig {
         WorkerConfig {
-            mode: crate::worker::WorkerMode::Arc,
-            rpc_url: "https://soroban-rpc.invalid".to_string(),
-            network_passphrase: "arc-testnet".to_string(),
             snapshot_backend: SnapshotStoreBackend::Memory,
             snapshot_dir: std::path::PathBuf::from("/tmp/chakra-test-snapshots"),
             snapshot_redis_url: None,
             snapshot_redis_channel: "chakra:snapshot:events".to_string(),
             snapshot_redis_keep_latest: 3,
-            refresh_interval_secs: 30,
-            pool_publish_interval_secs: 2,
             pool_state_refresh_concurrency: 4,
             discovery_interval_secs: 600,
-            ledger_poll: std::time::Duration::from_millis(100),
-            ledger_watcher_enabled: false,
-            fetch_pipeline_enabled: true,
             snapshot_store: None,
             pool_store: None,
         }
