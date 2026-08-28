@@ -24,10 +24,24 @@ pub async fn cluster_ready(redis_url: &str) -> Result<bool> {
     if !snapshot {
         return Ok(false);
     }
-    let pool_count: i64 = redis::cmd("COUNTKEYS")
-        .arg("chakra:pool:*")
-        .query_async(&mut conn)
-        .await?;
+    // SCAN the `chakra:pool:*` key space (COUNTKEYS does not exist in Redis).
+    let mut pool_count: i64 = 0;
+    let mut cursor: i64 = 0;
+    loop {
+        let (next, keys): (i64, Vec<String>) = redis::cmd("SCAN")
+            .arg(cursor)
+            .arg("MATCH")
+            .arg("chakra:pool:*")
+            .arg("COUNT")
+            .arg(256)
+            .query_async(&mut conn)
+            .await?;
+        pool_count += keys.len() as i64;
+        cursor = next;
+        if cursor == 0 {
+            break;
+        }
+    }
     Ok(pool_count > 0)
 }
 
