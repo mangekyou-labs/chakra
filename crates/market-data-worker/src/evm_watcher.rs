@@ -239,6 +239,9 @@ pub(crate) struct EvmRunner {
     poll_cursor: Option<u64>,
     watch: Option<Arc<RwLock<Vec<String>>>>,
     watch_revision: Arc<AtomicU64>,
+    /// Manifest venues that passed startup verification (bytecode present).
+    /// Only these are published to `chakra:factories` (SC-15 2026-08-29).
+    verified_factories: std::sync::RwLock<Vec<FactoryConfig>>,
 }
 
 impl EvmRunner {
@@ -257,6 +260,7 @@ impl EvmRunner {
             poll_cursor: None,
             watch: None,
             watch_revision: Arc::new(AtomicU64::new(0)),
+            verified_factories: std::sync::RwLock::new(Vec::new()),
         }
     }
 
@@ -293,8 +297,46 @@ impl EvmRunner {
         let mut clmm_pools: Vec<ClmmPoolSnapshot> = Vec::new();
         let factories = self.config.all_factories().cloned().collect::<Vec<_>>();
         let pairs = catalog_pairs();
+        let mut verified: Vec<FactoryConfig> = Vec::new();
 
         for factory in &factories {
+            // 2026-08-29 manifest venue verification (SC-15): a seed factory
+            // without deployed code is unavailable — it is never probed,
+            // never published to `chakra:factories`, and its pools never
+            // quote (NO_ROUTE). Chakra never automatically reseeds it.
+            if factory.is_seed {
+                match self.http.eth_get_code(&factory.address).await {
+                    // Code is present: non-empty hex with at least one
+                    // non-zero byte (`0x0`/`0x00...0` = no code).
+                    Ok(code)
+                        if code.len() > 2
+                            && code[2..].bytes().any(|b| b != b'0') =>
+                    {
+                        verified.push(factory.clone());
+                    }
+                    Ok(_) => {
+                        warn!(
+                            address = %factory.address,
+                            source = %factory.source,
+                            "manifest venue has no bytecode — marked unavailable"
+                        );
+                        continue;
+                    }
+                    Err(e) => {
+                        warn!(
+                            address = %factory.address,
+                            source = %factory.source,
+                            error = %e,
+                            "manifest venue verification failed — marked unavailable"
+                        );
+                        continue;
+                    }
+                }
+            } else {
+                // Discovery-only factories are never auto-enabled; keep them
+                // out of the verified set (owner `addFactory` gates quotes).
+                verified.push(factory.clone());
+            }
             for (token_a, token_b) in &pairs {
                 match factory.dex_type.as_str() {
                     "xyk" => {
@@ -431,6 +473,7 @@ impl EvmRunner {
             guard.sources = sources.clone();
             guard.clmm_pools = clmm_pools;
         }
+        *self.verified_factories.write().unwrap() = verified;
         self.refresh_index().await;
         if self.watch.is_some() {
             self.sync_watch().await;
@@ -471,9 +514,14 @@ impl EvmRunner {
                 .map(ClmmPoolRefSnapshot::from_pool)
                 .collect::<Vec<_>>(),
         );
+        // 2026-08-29 (SC-15): only verified manifest venues are published to
+        // `chakra:factories` — a venue that failed startup verification stays
+        // unavailable and yields NO_ROUTE (never auto-reseeded).
         let factories = self
-            .config
-            .all_factories()
+            .verified_factories
+            .read()
+            .unwrap()
+            .iter()
             .map(|f| FactoryRecord::new(&f.address, &f.dex_type, &f.source))
             .collect::<Vec<_>>();
         let publish = BootstrapPublish {
@@ -1244,6 +1292,11 @@ mod tests {
         let usdc_word = format!("{:0>64}", &USDC[2..]);
         let eurc_word = format!("{:0>64}", &EURC[2..]);
         let (url, _server) = spawn_fixture_rpc(move |method, params| {
+            match method {
+                // Manifest venue verification (SC-15): the seed factory has code.
+                "eth_getCode" => return Ok(json!("0x60")),
+                _ => {}
+            }
             assert_eq!(method, "eth_call");
             assert_eq!(params[0]["to"], XYK_FACTORY);
             let data = params[0]["data"].as_str().unwrap();
@@ -1554,7 +1607,12 @@ mod tests {
     /// cirBTC pairs) and finds nothing when the factory has no pools.
     #[tokio::test]
     async fn discovery_with_no_pools_probes_catalog_and_finds_zero() {
-        let (url, _server) = spawn_fixture_rpc(|_method, _params| Ok(json!(word(0))));
+        let (url, _server) = spawn_fixture_rpc(|method, _params| {
+            match method {
+                "eth_getCode" => Ok(json!("0x60")), // verified venue
+                _ => Ok(json!(word(0))), // no pool for any pair
+            }
+        });
         let client = EvmRpcClient::single(&url).unwrap();
         let config = EvmConfig {
             seed_factories: vec![FactoryConfig::parse(&format!("{XYK_FACTORY}:xyk"), true).unwrap()],
@@ -1568,5 +1626,37 @@ mod tests {
         }));
         let mut runner = EvmRunner::new(config, client, shared, None);
         assert_eq!(runner.discover_once().await.unwrap(), 0);
+    }
+
+    /// SC-15 (2026-08-29): a manifest venue whose factory has no bytecode is
+    /// marked unavailable — it is never probed, never published, and yields
+    /// zero pools (the API then returns NO_ROUTE; never auto-reseeded).
+    #[tokio::test]
+    async fn discovery_marks_bytecode_less_seed_factory_unavailable() {
+        let (url, _server) = spawn_fixture_rpc(|method, _params| {
+            match method {
+                // No code at the seed factory → verification fails.
+                "eth_getCode" => Ok(json!("0x")),
+                other => Err(json!(format!("unexpected method {other}"))),
+            }
+        });
+        let client = EvmRpcClient::single(&url).unwrap();
+        let config = EvmConfig {
+            seed_factories: vec![FactoryConfig::parse(&format!("{XYK_FACTORY}:xyk"), true).unwrap()],
+            ws_enabled: false,
+            ..Default::default()
+        };
+        let shared = Arc::new(RwLock::new(WorkerShared {
+            sources: Vec::new(),
+            clmm_pools: Vec::new(),
+        }));
+        let mut runner = EvmRunner::new(config, client, shared.clone(), None);
+        let found = runner.discover_once().await.unwrap();
+        assert_eq!(found, 0, "unverified venue must not produce pools");
+        assert_eq!(
+            runner.verified_factories.read().unwrap().len(),
+            0,
+            "unverified venue must not be in the published factory set"
+        );
     }
 }
