@@ -11,7 +11,12 @@ import {
 } from 'react';
 import { useWallet } from '@/lib/wallet-context';
 import { CHAKRA_API_URL } from '@/lib/aggregator';
-import { USDC_ERC20_ADDRESS, EURC_ADDRESS, NATIVE_USDC_KEY } from '@/lib/decimals';
+import {
+  CIRBTC_ADDRESS,
+  USDC_ERC20_ADDRESS,
+  EURC_ADDRESS,
+  NATIVE_USDC_KEY,
+} from '@/lib/decimals';
 
 export interface AccountBalancesState {
   /** ERC-20 balances keyed by lowercase token address (never native). */
@@ -74,6 +79,7 @@ export function AccountBalancesProvider({ children }: { children: ReactNode }) {
         if (key === NATIVE_USDC_KEY) continue;
         if (key === 'usdc') next[USDC_ERC20_ADDRESS] = BigInt(raw || '0');
         else if (key === 'eurc') next[EURC_ADDRESS] = BigInt(raw || '0');
+        else if (key === 'cirbtc') next[CIRBTC_ADDRESS] = BigInt(raw || '0');
         else next[key] = BigInt(raw || '0');
       }
       setBalances(next);

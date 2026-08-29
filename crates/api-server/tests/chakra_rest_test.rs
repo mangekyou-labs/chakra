@@ -34,7 +34,7 @@ use {
     tower::ServiceExt,
 };
 
-const MBTC: &str = "0x1111111111111111111111111111111111111111";
+const CIRBTC: &str = "0xf0C4a4CE82A5746AbAAd9425360Ab04fbBA432BF";
 const XYK_POOL_UE: &str = "0x0000000000000000000000000000000000000001";
 const STABLE_POOL_UE: &str = "0x0000000000000000000000000000000000000002";
 const XYK_POOL_UM: &str = "0x0000000000000000000000000000000000000003";
@@ -72,7 +72,7 @@ fn chakra_snapshot() -> MarketSnapshot {
                     },
                     TradingPairSnapshot {
                         token_a: USDC_ERC20.to_string(),
-                        token_b: MBTC.to_string(),
+                        token_b: CIRBTC.to_string(),
                         pool_address: XYK_POOL_UM.to_string(),
                         fee_bps: 30,
                         dex_type: "xyk".to_string(),
@@ -113,7 +113,7 @@ async fn seed_pool_state(pools: &MemoryPoolStateStore) {
                 "chakra-xyk",
                 XYK_POOL_UM,
                 USDC_ERC20,
-                MBTC,
+                &CIRBTC.to_lowercase(),
                 30,
                 50_000_000_000,
                 100_000_000,
@@ -154,7 +154,7 @@ async fn test_app_with_pools(
     }
 
     let engine = QuoteEngine::new(PathFinderConfig::default(), SplitConfig::default());
-    engine.update_from_chakra_snapshot(&chakra_snapshot(), MBTC).await;
+    engine.update_from_chakra_snapshot(&chakra_snapshot()).await;
     let state = AppState::from_backends(
         config,
         Some(snapshot_store.clone() as Arc<dyn market_snapshot::store::SnapshotStore>),
@@ -162,8 +162,7 @@ async fn test_app_with_pools(
         Some(snapshot_store.clone()),
         Some(pool_store.clone()),
         evm_rpc_url.map(|url| Arc::new(dex_adapters::evm_rpc::EvmRpcClient::single(&url).unwrap())),
-        MBTC.to_string(),
-        Some(("chakra-api-1".to_string(), Arc::new(engine))),
+                Some(("chakra-api-1".to_string(), Arc::new(engine))),
     )
     .await;
 
@@ -300,9 +299,9 @@ async fn tokens_lists_frozen_catalog_only_with_decimals() {
     let eurc = by_symbol["EURC"];
     assert_eq!(eurc["address"], EURC.to_ascii_lowercase());
     assert_eq!(eurc["decimals"], 6);
-    let mbtc = by_symbol["mBTC"];
-    assert_eq!(mbtc["address"], MBTC);
-    assert_eq!(mbtc["decimals"], 8);
+    let cirbtc = by_symbol["cirBTC"];
+    assert_eq!(cirbtc["address"], CIRBTC.to_ascii_lowercase());
+    assert_eq!(cirbtc["decimals"], 8);
 
     assert!(
         tokens
@@ -350,7 +349,7 @@ async fn quote_hydrates_chakra_snapshot_routes() {
     // USDC→mBTC routes via the xy=k venue.
     let (status, body) = get(
         &router,
-        &format!("/api/v1/quote?token_in={USDC_ERC20}&token_out={MBTC}&amount_in=1000000"),
+        &format!("/api/v1/quote?token_in={USDC_ERC20}&token_out={CIRBTC}&amount_in=1000000"),
     )
     .await;
     assert_eq!(status, StatusCode::OK);
@@ -417,7 +416,7 @@ async fn quote_emits_explicit_per_hop_dex_type_fee_factory() {
     // USDC→mBTC xyk route.
     let (status, body) = get(
         &router,
-        &format!("/api/v1/quote?token_in={USDC_ERC20}&token_out={MBTC}&amount_in=1000000"),
+        &format!("/api/v1/quote?token_in={USDC_ERC20}&token_out={CIRBTC}&amount_in=1000000"),
     )
     .await;
     assert_eq!(status, StatusCode::OK);
@@ -575,7 +574,7 @@ async fn balances_never_sum_erc20_and_native_usdc() {
     assert_eq!(body["data"]["native_usdc"], "99000000000000000000");
     assert_eq!(body["data"]["usdc"], "1234567890", "must never sum the two encodings");
     assert!(body["data"].get("eurc").is_some());
-    assert!(body["data"].get("mbtc").is_some());
+    assert!(body["data"].get("cirbtc").is_some());
 }
 
 // ─── 7. 429 + CORS ──────────────────────────────────────────────────────────
@@ -818,8 +817,7 @@ async fn ready_and_clmm_only_snapshot_quotes_and_builds() {
         Some(snapshot_store.clone()),
         Some(pool_store.clone()),
         Some(Arc::new(dex_adapters::evm_rpc::EvmRpcClient::single(&url).unwrap())),
-        MBTC.to_string(),
-        None,
+                None,
     )
     .await;
     let router = build_router(state, RateLimitState::from_env());

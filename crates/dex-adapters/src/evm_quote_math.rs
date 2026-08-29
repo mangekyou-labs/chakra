@@ -8,10 +8,29 @@
 //!   no `transferFrom`) — validated against forge-probed on-chain vectors.
 //! - xylo: XyloNet stableswap (A=200, 4 bps **fee-on-output**, `swap` pulls
 //!   via `transferFrom`) — `calculateSwap` port, pinned to live RPC vectors.
+//! - presto: Presto normalized hub (USDC pathUSD, 997/1000, 18 dp
+//!   normalization) — exact `ArcHubAMMNormalized.getQuote` port.
 //! - clmm: Uniswap V3 fixed-point math; hops with `coverage.is_complete=false`
 //!   must be skipped by the caller (QuoteEngine policy).
 
 use market_snapshot::pool_state_store::StablePoolStateValue;
+
+/// Normalized hub AMM fee (Presto `ArcHubAMMNormalized`): 30 bps on input.
+pub const PRESTO_FEE_BPS: u32 = 30;
+
+/// Presto spoke leg quote (2026-08-29): the hub routes USDC (pathUSD) ↔ spoke
+/// with 997/1000 on the raw reserves. For equal 6-dp pairs the 18 dp
+/// normalization cancels exactly, so this matches the on-chain
+/// `ArcHubAMMNormalized.getQuote` byte-for-byte.
+pub fn presto_spoke_quote(reserve_in: u128, reserve_out: u128, amount_in: u128) -> u128 {
+    if reserve_in == 0 || reserve_out == 0 || amount_in == 0 {
+        return 0;
+    }
+    let amount_with_fee = amount_in * 997;
+    let numerator = amount_with_fee * reserve_out;
+    let denominator = (reserve_in * 1000) + amount_with_fee;
+    numerator / denominator
+}
 
 /// XyloNet `calculateSwap` port: stableswap output with **fee on output**.
 ///
@@ -320,5 +339,31 @@ mod tests {
         let gross = xylo_gross(XYLO_RESERVE_USDC, XYLO_RESERVE_EURC, 1_000_000);
         let out = xylo_quote(XYLO_RESERVE_USDC, XYLO_RESERVE_EURC, 1_000_000);
         assert_eq!(out, gross - gross * 4 / 10_000);
+    }
+
+    #[test]
+    fn presto_matches_normalized_hub_formula_both_directions() {
+        // USDC (path) → EURC: 997/1000 on the raw reserves (6 dp cancels).
+        let usdc_to_eurc = presto_spoke_quote(200_000_000_000, 200_000_000_000, 1_000_000);
+        let expected_ue = 1_000_000u128 * 997 * 200_000_000_000
+            / (200_000_000_000 * 1000 + 1_000_000 * 997);
+        assert_eq!(usdc_to_eurc, expected_ue, "USDC→EURC must match 997/1000");
+
+        // EURC → USDC: reverse spoke leg, same formula.
+        let eurc_to_usdc = presto_spoke_quote(200_000_000_000, 200_000_000_000, 1_000_000);
+        let expected_eu = 1_000_000u128 * 997 * 200_000_000_000
+            / (200_000_000_000 * 1000 + 1_000_000 * 997);
+        assert_eq!(eurc_to_usdc, expected_eu, "EURC→USDC must match 997/1000");
+    }
+
+    #[test]
+    fn presto_three_sizes_and_guards() {
+        for amount in [1_000u128, 1_000_000, 1_000_000_000] {
+            let out = presto_spoke_quote(200_000_000_000, 200_000_000_000, amount);
+            assert!(out > 0 && out < amount, "size {amount} out of range: {out}");
+        }
+        assert_eq!(presto_spoke_quote(200_000_000_000, 200_000_000_000, 0), 0);
+        assert_eq!(presto_spoke_quote(0, 200_000_000_000, 1_000), 0);
+        assert_eq!(presto_spoke_quote(200_000_000_000, 0, 1_000), 0);
     }
 }

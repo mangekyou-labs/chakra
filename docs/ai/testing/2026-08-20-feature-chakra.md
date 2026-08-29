@@ -49,11 +49,11 @@ cd packages/frontend && npm test
 ### PathFinder (`crates/router-engine`)
 
 - [x] Direct USDC→EURC finds seeded xy=k and stable pools (SC-1) — `usdc_to_eurc_finds_both_seeded_xyk_and_stable_pools` (2 direct pools; sources `chakra-xyk` + `chakra-stable`) (2026-08-25, T4.1)
-- [x] USDC→mBTC finds xy=k and CLMM (SC-1) — `usdc_to_mbtc_finds_xyk_and_clmm` (2 direct pools; CLMM via `clmm_pool_refs`) (2026-08-25, T4.1)
-- [x] EURC→mBTC finds direct and/or 2-hop via USDC (SC-1) — `eurc_to_mbtc_finds_direct_and_two_hop_via_usdc` (direct xyk + 2-hop through ERC-20 USDC) (2026-08-25, T4.1)
+- [x] USDC→cirBTC finds xy=k and CLMM (SC-1) — `usdc_to_cirbtc_finds_xyk_and_clmm` (2 direct pools; CLMM via `clmm_pool_refs`) (2026-08-25, T4.1; renamed from mBTC in the 2026-08-29 catalog rebaseline)
+- [x] EURC→cirBTC finds direct and/or 2-hop via USDC (SC-1) — `eurc_to_cirbtc_finds_direct_and_two_hop_via_usdc` (direct xyk + 2-hop through ERC-20 USDC) (2026-08-25, T4.1)
 - [x] `max_hops=1` excludes multi-hop — `max_hops_one_excludes_multi_hop` (2026-08-25, T4.1)
 - [x] Unknown token or same in/out yields empty candidates — `unknown_token_or_same_in_out_yields_empty_candidates` (2026-08-25, T4.1)
-- [x] Discovered pool whose token is outside {USDC, EURC, mBTC} is unused (catalog freeze) — `non_catalog_pool_is_unused` (graph token count 0) (2026-08-25, T4.1)
+- [x] Discovered pool whose token is outside {USDC, EURC, cirBTC} is unused (catalog freeze) — `non_catalog_pool_is_unused` (graph token count 0) (2026-08-25, T4.1)
 - [x] Native USDC is not a graph node (SC-12) — `graph_nodes` / `is_native_usdc_encoding` (T1.2) + **`native_usdc_encoding_is_not_a_graph_node`** (PathFinder drops `native_usdc` and `0x000…0` pairs) (2026-08-25, T4.1)
 - [x] `PathFinderConfig::default()` is Chakra-correct: `max_hops=3`, bridge = ERC-20 USDC `0x3600…0000` (`TokenId::Contract`), never XLM/Classic — `default_config_is_chakra_arc_three_hops_with_erc20_usdc_bridge` (2026-08-25, T4.1)
 - [x] Snapshot loader honors the catalog freeze — `pairs_from_chakra_snapshot` filter + `update_from_chakra_snapshot` used by every case above (2026-08-25, T4.1)
@@ -63,10 +63,10 @@ cd packages/frontend && npm test
 - [x] xy=k constant-product matches a hand-computed fixture — `evm_quote_math::xyk_matches_aggregator_997_formula` pins the exact `Aggregator._xykFormula` expression (2026-08-25, T3.2)
 - [x] Stableswap (`A=100`) USDC/EURC low-impact quote vs xy=k higher impact (feeds SC-2) — `evm_quote_math::stable_deeper_than_xyk_for_low_impact_swap` (2026-08-25, T3.2)
 - [x] QuoteEngine hydrates `chakra-stable` from Redis and quotes with `evm_quote_math::stable_quote` (never generic 9970/10000 / xy=k) — `quote_hydrates_chakra_stable_and_uses_evm_math` pins the T3.2 on-chain vector `999_550_535` at 1_000e6, single `chakra-stable` route, `protocol_fee_bps=0` (2026-08-25, T4.2)
-- [x] `chakra-xyk` quotes use the EVM 997/1000 `xyk_quote` + integer `price_impact_bps` — same test covers dispatch; `usdc_to_mbtc_output_is_in_mbtc_8dp_atomic_units` pins the exact venue output (2026-08-25, T4.2)
+- [x] `chakra-xyk` quotes use the EVM 997/1000 `xyk_quote` + integer `price_impact_bps` — same test covers dispatch; `usdc_to_cirbtc_output_is_in_cirbtc_8dp_atomic_units` pins the exact venue output (2026-08-25, T4.2)
 - [x] CLMM quote with complete tick coverage — `chakra_clmm_quotes_when_complete_and_skips_when_incomplete` (`chakra-clmm` allowlisted at QuoteEngine; `amount_out > 0` with complete coverage) (2026-08-25, T4.2)
 - [x] CLMM hop skipped when `coverage.is_complete=false` — enforced at Redis publish (`should_publish_clmm_to_redis`) + bootstrap incomplete-CLMM test + **QuoteEngine `chakra-clmm` skip** (same test, 2026-08-25, T3.1/T4.2)
-- [x] Token decimals 6 vs 8 applied correctly (USDC vs mBTC) — `usdc_to_mbtc_output_is_in_mbtc_8dp_atomic_units`: 1_000e6 USDC → `xyk_quote(50_000e6, 1e8, 1_000e6)` exact atomic mBTC output (~1.95e6, 8 dp range, never 18 dp wei) (2026-08-25, T4.2)
+- [x] Token decimals 6 vs 8 applied correctly (USDC vs cirBTC) — `usdc_to_cirbtc_output_is_in_cirbtc_8dp_atomic_units`: 1_000e6 USDC → `xyk_quote(50_000e6, 1e8, 1_000e6)` exact atomic cirBTC output (~1.95e6, 8 dp range, never 18 dp wei) (2026-08-25, T4.2; renamed from mBTC in the 2026-08-29 catalog rebaseline)
 - [x] Mixing native 18 dp into `amount_in` is rejected (SC-12) — `native_usdc_encoding_is_rejected_as_swap_amount`: `native_usdc` / `0x000…0` as token_in **or** token_out → empty route, zero output, `protocol_fee_bps=0` (2026-08-25, T4.2)
 - [x] XyloNet stableswap (`A=200`, 4 bps fee-on-output) quote matches live RPC `calculateSwap` vectors — `evm_quote_math::tests::xylo_matches_live_rpc_calculate_swap_vectors` (pins `1e6 USDC→EURC = 865542` and `1e6 EURC→USDC = 1154419`) + `xylo_quote_guards_bad_inputs_and_fee_is_on_output` (2026-08-28, T-XYLO)
 - [x] QuoteEngine routes small size to `chakra-stable` and capacity size to `xylo` — `quote_engine::tests::{xylo_loses_to_chakra_stable_at_small_size,xylo_wins_at_chakra_capacity_sizes}` (2026-08-28, T-XYLO)
@@ -85,7 +85,7 @@ cd packages/frontend && npm test
 
 - [x] ERC-20 USDC 6 dp parse/format (`decimals.rs`, 2026-08-20)
 - [x] Native USDC 18 dp parse/format never used as swap amount (SC-12) — native is not a graph node / catalog token
-- [x] mBTC 8 dp parse/format (catalog decimals = 8)
+- [x] cirBTC 8 dp parse/format (catalog decimals = 8; renamed from mBTC in the 2026-08-29 catalog rebaseline)
 - [x] Reject float / scientific notation on the wire
 
 ### Solidity Aggregator (Foundry)
@@ -98,7 +98,7 @@ cd packages/frontend && npm test
 - [x] Permit2 missing / bad signature reverts — `test_permit2_bad_signature_reverts` (`InvalidSignature`); `test_permit2_spender_mismatch_reverts` (2026-08-25)
 - [x] ABI round-trip: API-style hex feed with correct selector + Permit2Pull encoding — `test_api_hex_empty_sig_succeeds` (low-level `agg.call` with `abi.encodeWithSelector(0x2e3be0c1, ...)`, empty-signature path; verifies Rust encoder output decodes on-chain) (2026-08-26, T4.4)
 - [x] Permit2 `signature.length == 0` succeeds when AllowanceTransfer allowance is already sufficient — `test_permit2_empty_signature_skips_permit` (`permitCalls == 0`); signed path `test_permit2_signature_grants_allowance` (`permitCalls == 1`) (2026-08-25)
-- [x] Aggregator token balances return to 0 after success and after revert (leftover sweep) — `_assertCatalogZero` on every success + revert path (USDC/EURC/mBTC) (2026-08-25)
+- [x] Aggregator token balances return to 0 after success and after revert (leftover sweep) — `_assertCatalogZero` on every success + revert path (USDC/EURC/**cirBTC**) (2026-08-25; cirBTC replaces mBTC 2026-08-29)
 - [x] `msg.value` non-zero reverts in v1 (SC-12) — `test_splitSwap_rejects_value` (low-level call + `!ok`); `test_receive_eth_reverts`/`test_fallback_eth_reverts` decode `DirectEth` (2026-08-25)
 - [x] `deadline` in the past reverts — `test_deadline_past_reverts` (2026-08-25)
 - [x] Protocol fee not taken (output matches quote math minus venue fees only) (SC-13) — xyk single-hop `amountOut == 997/1000 formula` exactly; split bounded by `xyk leg + ≥699e6 stable leg` (2026-08-25)
@@ -112,14 +112,45 @@ cd packages/frontend && npm test
 - [x] mBTC / venues never read `block.prevrandao` (always 0 on Arc) — `grep -R prevrandao src venues`: no hits (2026-08-24); re-checked with `test script` added: no hits (2026-08-25).
 - [x] Mixed solc routing: `auto_detect_solc` + `compilation_restrictions` — `src/**`, `test/**`, `script/**` = `0.8.30`/`prague`; `venues/uniswap-v2/**` = `0.5.16`/`istanbul`; `venues/uniswap-v3/**` = `0.7.6`/`istanbul` (replaces the single global `solc = "0.8.30"` from T1.1). Tests/scripts never import V2/V3 sources; they deploy via `VendorDeployer` hex bytecodes and talk through 0.8.30 interfaces (2026-08-24).
 
-### Seeded venues
+### Canonical venues (2026-08-29 rebaseline)
 
-- [x] V2 pair swap/mint/burn — `XykFactory.t.sol`, 8 cases: createPair for all three pairs, token0<token1 sort, mint→reserves, transfer-in then `swap(..., "")`, burn, 30 bps fee vs no-fee counterfactual (2026-08-24). Seeded fixtures: USDC/EURC 10_000e6 each, USDC/mBTC 50_000e6/1e8 (conceptually; tests mint per-case), EURC/mBTC pair created.
+**Contract tests (Foundry, TDD red/green):**
+
+- [ ] Catalog enforcement: a hop whose token is outside {USDC, EURC, cirBTC} reverts; the aggregator sweep covers USDC/EURC/cirBTC (SC-14).
+- [ ] Unauthorized venues: Presto hub not allowlisted reverts; Xylo router not atomically paired reverts; UnitFlow factory not allowlisted reverts.
+- [ ] Xylo approval cleanup: after a router hop, the aggregator's Xylo allowance is reset to 0 (no retained dust approvals).
+- [ ] Presto approval cleanup: after a hub hop, the aggregator's Presto allowance is reset to 0.
+- [ ] Deadline revert: Xylo/Presto hops honor the request `deadline` (past → `Expired`).
+- [ ] Slippage revert: `minAmountOut` too high → `SlippageExceeded`, no reserve change.
+- [ ] UnitFlow fee: XYK hop output matches the factory's configured fee (30 bps), not a hardcoded 997/1000.
+- [ ] Multihop execution: USDC → EURC → cirBTC atomic success; revert is atomic (no balance change).
+- [ ] No retained token dust: aggregator balances of USDC/EURC/cirBTC are 0 after success and after revert.
+- [ ] Shared-pool split rejection: a split whose sub-routes reuse the same pool reverts (or is rejected before encode).
+
+**Adapter parity tests (Rust):**
+
+- [ ] Xylo quote vs the on-chain `calculateSwap` view function, both directions, three sizes (amplification hydrated from on-chain pool params, not hardcoded A).
+- [ ] Presto quote vs the hub's published view formula, both directions, three sizes.
+- [ ] UnitFlow V2.5 quote vs `getAmountsOut`, both directions, three sizes, 30 bps pinned.
+
+**Integration tests (Rust):**
+
+- [ ] USDC/EURC candidates from both Xylo and Presto.
+- [ ] EURC/cirBTC through UnitFlow V2.5.
+- [ ] Atomic USDC → EURC → cirBTC routing.
+- [ ] Deterministic Xylo/Presto split without shared downstream pools.
+- [ ] Graceful degradation: an external venue that is empty, stale, paused, or removed becomes unavailable and yields `NO_ROUTE` (never a hidden fallback, never auto-reseeded).
+
+### Fixture venues (chain-31337 only, 2026-08-29 rebaseline)
+
+The owned XYK/stable/CLMM deployments and mBTC are **deterministic local fixtures only** — never deployed by the Arc operator workflow. `XykFactory.t.sol` and `ClmmPool.t.sol` keep their mBTC-pair cases as local fixtures; `MockBtc.t.sol` remains the mBTC fixture contract.
+
+- [x] V2 pair swap/mint/burn — `XykFactory.t.sol`, 8 cases: createPair for all three pairs, token0<token1 sort, mint→reserves, transfer-in then `swap(..., "")`, burn, 30 bps fee vs no-fee counterfactual (2026-08-24). Fixture pairs: USDC/EURC 10_000e6 each, USDC/mBTC 50_000e6/1e8 (local fixtures only), EURC/mBTC pair created.
 - [x] Stableswap 2-token exchange — `StableSwap.t.sol`, 16 cases
 - [x] StableSwap custody: deposit proof + index bounds + reserve tracking — `StableSwap.t.sol` 6 new cases (2026-08-26, T5.1/T2.3): `test_exchange_without_deposit_reverts` (no-deposit drain reverts), `test_exchange_rejects_index_out_of_range` (i/j ≥ 2 → IndexOutOfRange), `test_exchange_reverts_when_declared_amount_exceeds_actual_deposit` (50e6 in, declare 100e6 → InsufficientInput), `test_reserves_updated_after_exchange` (reserve0/1 track swap), `test_reserves_updated_after_remove_liquidity` (reserve0/1 track remove), `test_exchange_excess_deposit_not_consumed` (2000e6 in, declare 1000e6 → reserve tracks declared). `seedLiquidity` stores reserve0/1; `removeLiquidity` decrements. `exchange` reverts IndexOutOfRange / InsufficientInput. Full suite: `forge test -vv` → 73/73 pass, exit 0.
  (10 original + 6 custody): `createPool`/`getPool` both orderings, duplicate-pool revert, `exchange` 0→1 and 1→0, `minDy` revert, same-index/zero-amount revert, 4 bps fee, and 1_000e6 USDC on the 200_000e6-per-side stable pool > same swap on the 10_000e6 xy=k pair (2026-08-24).
-- [x] CLMM swap in-range — `ClmmPool.t.sol`, 5 cases: `createPool(USDC, mBTC, 3000)` + `initialize` + `slot0`, in-range `mint` on tick-multiple-of-60 full range (L=1e12, both tokens owed), `swap` zeroForOne and oneForZero with callback, 5 bps pool absent (2026-08-24).
-- [x] mBTC ERC-20 8 decimals — Foundry `MockBtcTest` (2026-08-20). Live Arcscan deploy still pending operator broadcast.
+- [x] CLMM swap in-range — `ClmmPool.t.sol`, 5 cases: `createPool(USDC, mBTC, 3000)` + `initialize` + `slot0`, in-range `mint` on tick-multiple-of-60 full range (L=1e12, both tokens owed), `swap` zeroForOne and oneForZero with callback, 5 bps pool absent (2026-08-24). **Fixture-only** (USDC/mBTC pair never deployed on Arc).
+- [x] mBTC ERC-20 8 decimals — Foundry `MockBtcTest` (2026-08-20). **Fixture-only**: the Arc operator workflow no longer deploys mBTC; the canonical catalog uses cirBTC.
 
 **Local seeded-venue suite (2026-08-24, worktree):** `forge test -vv` → 29 passed / 0 failed (Placeholder 1, MockBtc 5, XykFactory 8, StableSwap 10, ClmmPool 5). Live Arc seed (readable on-chain reserves) remains **blocked** — no operator key in this environment; same reason as T2.1.
 
@@ -174,7 +205,7 @@ cd packages/frontend && npm test
 - [x] `/build_tx` emits `PermitSingle` typed data (AllowanceTransfer) with `verifyingContract` = Permit2 + spender = aggregator when the Permit2 allowance is insufficient — `build_tx_requires_typed_data_when_permit2_allowance_insufficient` (2026-08-25, T4.4)
 - [x] `/build_tx` empty aggregator config → `NOT_READY` (503) — `build_tx_not_ready_when_aggregator_unconfigured` (2026-08-25, T4.4)
 - [x] Envelope `{success,data,error}` on quote / build_tx / tokens / balances; `price_impact_bps` integer (no float `price_impact`) — `quote_errors_use_envelope_with_code_and_no_float_impact` (2026-08-25, T4.3)
-- [x] `/tokens` lists **only** USDC, EURC, mBTC with correct decimals (catalog freeze; SC-1, SC-12) — `tokens_lists_frozen_catalog_only_with_decimals` (2026-08-25, T4.3)
+- [x] `/tokens` lists **only** USDC, EURC, cirBTC with correct decimals (catalog freeze; SC-1, SC-12, SC-14) — `tokens_lists_frozen_catalog_only_with_decimals` (2026-08-25, T4.3; cirBTC replaces mBTC 2026-08-29)
 - [x] `/balances` returns catalog ERC-20 via **Multicall3** and a separate `native_usdc` field; the two USDC encodings are **never summed**; swap USDC is the ERC-20 figure only — `balances_never_sum_erc20_and_native_usdc` (fixture Multicall3 aggregate3; 99e18 native) (2026-08-25, T4.3)
 - [x] API/worker RPC is public `rpc.testnet.arc.io` (or documented failovers); tests **fail** if config points at Canteen `$RPC` / `rpc.testnet.arc-node.thecanteenapp.com` — **worker side covered** (2026-08-25, T3.3: `EvmConfig::from_env` + policy tests); API side wires the same policy in T4.3 — `config_rejects_canteen_and_invented_alchemy_urls` (2026-08-25, T4.3)
 - [x] `/ready` is 200 only when `chakra:snapshot:current` exists **and** ≥1 `chakra:pool:*` key is present (SC-5) — superseded by the checked scenario above (2026-08-25, T3.1)

@@ -86,6 +86,10 @@ impl SplitOptimizer {
     /// `quoted_paths`: paths with quotes at the full input amount (used to rank
     /// them). `quote_fn`: function to get output for a path at a specific
     /// input amount.
+    ///
+    /// 2026-08-29: paths that share a pool cannot both execute (a split must
+    /// not double-count the same downstream liquidity), so conflicting paths
+    /// are reduced to the best-output one before optimization.
     pub async fn optimize<F, Fut>(
         &self,
         quoted_paths: &[QuotedPath],
@@ -107,6 +111,22 @@ impl SplitOptimizer {
         // Sort by output (best first)
         let mut sorted: Vec<&QuotedPath> = quoted_paths.iter().collect();
         sorted.sort_by(|a, b| b.quote.amount_out.cmp(&a.quote.amount_out));
+
+        // Shared-pool reduction: keep the best-output path per pool so no two
+        // sub-routes in a split reuse the same pool (SC-2 2026-08-29).
+        let mut kept: Vec<&QuotedPath> = Vec::with_capacity(sorted.len());
+        for candidate in sorted {
+            let shares_pool = kept.iter().any(|k| {
+                k.path
+                    .pool_addresses
+                    .iter()
+                    .any(|p| candidate.path.pool_addresses.contains(p))
+            });
+            if !shares_pool {
+                kept.push(candidate);
+            }
+        }
+        let sorted: Vec<&QuotedPath> = kept;
 
         let best_single = sorted[0];
         let best_single_out = best_single.quote.amount_out;
@@ -1139,6 +1159,36 @@ mod tests {
             route.debug.as_ref().and_then(|d| d.split_rejected_reason.as_deref()),
             Some("not_enough_paths")
         );
+    }
+
+    /// 2026-08-29: two paths that share a pool cannot both execute — the
+    /// optimizer keeps only the best-output path, so the split is refused.
+    #[tokio::test]
+    async fn test_shared_pool_paths_are_reduced_to_best_single() {
+        let optimizer = SplitOptimizer::new(SplitConfig::default());
+        let mut p1 = test_path("one");
+        let mut p2 = test_path("two");
+        // Both routes use the SAME downstream pool (e.g. the same UnitFlow pair).
+        p2.pool_addresses = vec!["pool-one".to_string()];
+        p2.sources = vec!["unitflow-v25".to_string()];
+        let q1 = test_quote(&p1, 1_000, 980, 30);
+        let q2 = test_quote(&p2, 1_000, 990, 30); // p2 is "better" but shares the pool
+        let quoted_paths = vec![
+            QuotedPath { path: p1.clone(), quote: q1 },
+            QuotedPath { path: p2.clone(), quote: q2 },
+        ];
+
+        let route = optimizer
+            .optimize(&quoted_paths, 1_000, 50, None, |path, amount| {
+                let path = path.clone();
+                async move { Some(test_quote(&path, amount, amount.saturating_sub(10), 30)) }
+            })
+            .await;
+
+        // One sub-order only (never a split over a shared pool).
+        assert!(!route.is_split, "shared-pool split must be refused");
+        assert_eq!(route.sub_orders.len(), 1, "only the best single path survives");
+        assert_eq!(route.sub_orders[0].path.pool_addresses, vec!["pool-one"]);
     }
 
     #[tokio::test]

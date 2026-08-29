@@ -1,5 +1,10 @@
 /** Swap token catalog for Chakra (native USDC never a swap token — SC-12). */
-import { EURC_ADDRESS, USDC_ERC20_ADDRESS, isNativeSwapToken } from '@/lib/decimals';
+import {
+  CIRBTC_ADDRESS,
+  EURC_ADDRESS,
+  USDC_ERC20_ADDRESS,
+  isNativeSwapToken,
+} from '@/lib/decimals';
 
 export interface SwapToken {
   address: string;
@@ -8,7 +13,7 @@ export interface SwapToken {
   decimals: number;
 }
 
-/** Hardcoded fallback catalog when `/tokens` is down. */
+/** Hardcoded fallback catalog when `/tokens` is down (2026-08-29: USDC/EURC/cirBTC). */
 export const FALLBACK_SWAP_TOKENS: SwapToken[] = [
   {
     address: USDC_ERC20_ADDRESS,
@@ -21,6 +26,12 @@ export const FALLBACK_SWAP_TOKENS: SwapToken[] = [
     symbol: 'EURC',
     name: 'Euro Coin',
     decimals: 6,
+  },
+  {
+    address: CIRBTC_ADDRESS,
+    symbol: 'cirBTC',
+    name: 'Circle BTC',
+    decimals: 8,
   },
 ];
 

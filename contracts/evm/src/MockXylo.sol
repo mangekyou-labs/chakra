@@ -99,3 +99,41 @@ contract MockXyloFactory {
         return allPools.length;
     }
 }
+
+/// @notice XyloNet router test double mirroring the documented exact-input
+///      interface: `swapExactTokensForTokens(amountIn, minOut, path, to,
+///      deadline)` pulls the input from the caller and routes through the
+///      factory's pool (single-hop paths only in v1).
+contract MockXyloRouter {
+    MockXyloFactory public immutable factory;
+
+    error UnknownPair();
+    error Expired();
+
+    constructor(MockXyloFactory _factory) {
+        factory = _factory;
+    }
+
+    function swapExactTokensForTokens(
+        uint256 amountIn,
+        uint256 minAmountOut,
+        address[] calldata path,
+        address to,
+        uint256 deadline
+    ) external returns (uint256[] memory amounts) {
+        if (block.timestamp > deadline) revert Expired();
+        if (path.length != 2) revert UnknownPair();
+        address poolAddr = factory.getPool(path[0], path[1]);
+        if (poolAddr == address(0)) revert UnknownPair();
+        MockXyloPool pool = MockXyloPool(poolAddr);
+
+        MockErc20(path[0]).transferFrom(msg.sender, address(this), amountIn);
+        MockErc20(path[0]).approve(address(pool), amountIn);
+        uint256 amountOut = pool.swap(path[0], path[1], amountIn, minAmountOut, address(this), deadline);
+        MockErc20(path[1]).transfer(to, amountOut);
+
+        amounts = new uint256[](2);
+        amounts[0] = amountIn;
+        amounts[1] = amountOut;
+    }
+}

@@ -18,12 +18,12 @@ fn collect_pool_refs(paths: &[Path]) -> (Vec<(String, String)>, Vec<(String, Str
     for path in paths {
         for (source, pool_address) in path.sources.iter().zip(path.pool_addresses.iter()) {
             match source.as_str() {
-                "chakra-xyk" => {
+                // 2026-08-29: UnitFlow V2.5 is an XYK-family venue.
+                "chakra-xyk" | "unitflow-v25" => {
                     xyk.insert((source.clone(), pool_address.clone()));
                 }
-                // T-XYLO: the Xylo pool state lives in the stable bucket
-                // (StablePoolStateValue with A=200).
-                "chakra-stable" | "xylo" => {
+                // T-XYLO + Presto: state lives in the stable bucket.
+                "chakra-stable" | "xylo" | "xylo-stable" | "presto-hub" => {
                     stable.insert((source.clone(), pool_address.clone()));
                 }
                 "chakra-clmm" => {

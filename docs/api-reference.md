@@ -17,7 +17,7 @@ http://127.0.0.1:8080/api/v1
 | --- | --- | --- |
 | `GET` | `/api/v1/quote` | Quote a single, multi-hop, or split route (integer `price_impact_bps`) |
 | `POST` | `/api/v1/build_tx` | Encode `splitSwap` calldata for a quote |
-| `GET` | `/api/v1/tokens` | Frozen catalog (USDC, EURC, mBTC) |
+| `GET` | `/api/v1/tokens` | Frozen catalog (USDC, EURC, cirBTC) |
 | `GET` | `/api/v1/balances?account=0x…` | ERC-20 balances via Multicall3 + separate `native_usdc` (never summed) |
 | `GET` | `/api/v1/health` | Process liveness (rate-limit exempt) |
 | `GET` | `/api/v1/ready` | Snapshot + pool-state readiness (rate-limit exempt) |

@@ -8,12 +8,14 @@ use std::collections::HashSet;
 pub const USDC_ERC20: &str = "0x3600000000000000000000000000000000000000";
 /// Arc testnet EURC (6 decimals).
 pub const EURC: &str = "0x89B50855Aa3bE2F677cD6303Cec089B5F319D72a";
+/// Arc testnet canonical cirBTC (8 decimals, Presto/App Kit canonical address).
+pub const CIRBTC: &str = "0xf0C4a4CE82A5746AbAAd9425360Ab04fbBA432BF";
 /// Native gas encoding — not a catalog swap token.
 pub const NATIVE_USDC: &str = "native_usdc";
 
 pub const USDC_DECIMALS: u8 = 6;
 pub const EURC_DECIMALS: u8 = 6;
-pub const MBTC_DECIMALS: u8 = 8;
+pub const CIRBTC_DECIMALS: u8 = 8;
 pub const NATIVE_USDC_DECIMALS: u8 = 18;
 
 /// 1 ERC-20 USDC atomic = 1e12 wei (6 vs 18 dp).
@@ -28,8 +30,9 @@ pub struct CatalogToken {
     pub decimals: u8,
 }
 
-/// v1 PathFinder catalog: ERC-20 USDC, EURC, mBTC. Native USDC is excluded.
-pub fn v1_catalog(mbtc_address: &str) -> Vec<CatalogToken> {
+/// v1 PathFinder catalog: ERC-20 USDC, EURC, cirBTC (canonical curated,
+/// 2026-08-29). Native USDC is excluded.
+pub fn v1_catalog() -> Vec<CatalogToken> {
     vec![
         CatalogToken {
             symbol: "USDC",
@@ -42,16 +45,18 @@ pub fn v1_catalog(mbtc_address: &str) -> Vec<CatalogToken> {
             decimals: EURC_DECIMALS,
         },
         CatalogToken {
-            symbol: "mBTC",
-            address: mbtc_address.to_string(),
-            decimals: MBTC_DECIMALS,
+            symbol: "cirBTC",
+            address: CIRBTC.to_string(),
+            decimals: CIRBTC_DECIMALS,
         },
     ]
 }
 
-pub fn is_catalog_swap_token(address: &str, mbtc_address: &str) -> bool {
+pub fn is_catalog_swap_token(address: &str) -> bool {
     let a = address.to_ascii_lowercase();
-    a == USDC_ERC20.to_ascii_lowercase() || a == EURC.to_ascii_lowercase() || a == mbtc_address.to_ascii_lowercase()
+    a == USDC_ERC20.to_ascii_lowercase()
+        || a == EURC.to_ascii_lowercase()
+        || a == CIRBTC.to_ascii_lowercase()
 }
 
 pub fn is_native_usdc_encoding(token: &str) -> bool {
@@ -61,8 +66,8 @@ pub fn is_native_usdc_encoding(token: &str) -> bool {
 }
 
 /// Native USDC must never be a graph node.
-pub fn graph_nodes(mbtc_address: &str) -> HashSet<String> {
-    v1_catalog(mbtc_address)
+pub fn graph_nodes() -> HashSet<String> {
+    v1_catalog()
         .into_iter()
         .map(|t| t.address.to_ascii_lowercase())
         .collect()
@@ -94,31 +99,29 @@ pub fn usdc_max_atomic(erc20_balance_6dp: u128, gas_cost_wei: u128) -> u128 {
 mod tests {
     use super::*;
 
-    const MBTC: &str = "0x1111111111111111111111111111111111111111";
-
     #[test]
-    fn catalog_is_three_erc20_tokens() {
-        let cat = v1_catalog(MBTC);
+    fn catalog_is_three_canonical_tokens() {
+        let cat = v1_catalog();
         assert_eq!(cat.len(), 3);
         assert_eq!(cat[0].decimals, 6);
         assert_eq!(cat[1].decimals, 6);
         assert_eq!(cat[2].decimals, 8);
-        assert!(is_catalog_swap_token(USDC_ERC20, MBTC));
-        assert!(is_catalog_swap_token(EURC, MBTC));
-        assert!(is_catalog_swap_token(MBTC, MBTC));
+        assert_eq!(cat[2].symbol, "cirBTC");
+        assert!(is_catalog_swap_token(USDC_ERC20));
+        assert!(is_catalog_swap_token(EURC));
+        assert!(is_catalog_swap_token(CIRBTC));
+        // mBTC is no longer in the catalog (SC-14).
+        assert!(!is_catalog_swap_token("0x1111111111111111111111111111111111111111"));
     }
 
     #[test]
     fn native_usdc_is_not_a_graph_node() {
-        let nodes = graph_nodes(MBTC);
+        let nodes = graph_nodes();
         assert!(!nodes.contains(&NATIVE_USDC.to_string()));
         assert!(!nodes.contains(&"0x0000000000000000000000000000000000000000".to_string()));
         assert!(is_native_usdc_encoding(NATIVE_USDC));
-        assert!(!is_catalog_swap_token(NATIVE_USDC, MBTC));
-        assert!(!is_catalog_swap_token(
-            "0x0000000000000000000000000000000000000000",
-            MBTC
-        ));
+        assert!(!is_catalog_swap_token(NATIVE_USDC));
+        assert!(!is_catalog_swap_token("0x0000000000000000000000000000000000000000"));
     }
 
     #[test]

@@ -96,7 +96,7 @@ pub struct SubRouteData {
     pub fraction_bps: u32,
 }
 
-fn parse_token(token: &str, mbtc: &str) -> Result<String, ApiError> {
+fn parse_token(token: &str) -> Result<String, ApiError> {
     let token = token.trim().to_ascii_lowercase();
     if token.is_empty() {
         return Err(ApiError::new(ApiErrorCode::InvalidParams, "token must not be empty"));
@@ -107,7 +107,7 @@ fn parse_token(token: &str, mbtc: &str) -> Result<String, ApiError> {
             "native USDC is gas only — never a swap token (SC-12)",
         ));
     }
-    if !catalog::is_catalog_swap_token_with(&token, mbtc) {
+    if !catalog::is_catalog_swap_token(&token) {
         return Err(ApiError::new(
             ApiErrorCode::UnknownToken,
             format!("unknown token: {token}"),
@@ -129,12 +129,11 @@ fn parse_amount_in(raw: &str) -> Result<u128, ApiError> {
 
 pub async fn get_quote(State(state): State<AppState>, Query(params): Query<QuoteQuery>) -> impl IntoResponse {
     let start_time = std::time::Instant::now();
-    let mbtc = state.mbtc_address.clone();
-    let token_in = match parse_token(params.token_in.as_deref().unwrap_or_default(), &mbtc) {
+    let token_in = match parse_token(params.token_in.as_deref().unwrap_or_default()) {
         Ok(t) => t,
         Err(error) => return err_response_code(StatusCode::BAD_REQUEST, error),
     };
-    let token_out = match parse_token(params.token_out.as_deref().unwrap_or_default(), &mbtc) {
+    let token_out = match parse_token(params.token_out.as_deref().unwrap_or_default()) {
         Ok(t) => t,
         Err(error) => return err_response_code(StatusCode::BAD_REQUEST, error),
     };
@@ -277,7 +276,8 @@ pub struct TokensData {
 }
 
 pub async fn list_tokens(State(state): State<AppState>) -> impl IntoResponse {
-    let tokens = catalog::catalog_swap_tokens_with(&state.mbtc_address)
+    let _ = &state;
+    let tokens = catalog::catalog_swap_tokens()
         .into_iter()
         .map(|t| TokenInfo {
             symbol: t.symbol.to_string(),
@@ -306,7 +306,7 @@ pub async fn get_balances(State(state): State<AppState>, Query(query): Query<Bal
             Json(Envelope::<Value>::err(ApiErrorCode::NotReady, "EVM RPC not configured")),
         );
     };
-    match evm_balances::fetch_balances(rpc, &account, &state.mbtc_address).await {
+    match evm_balances::fetch_balances(rpc, &account).await {
         Ok(balances) => (StatusCode::OK, Json(Envelope::ok(serde_json::Value::Object(balances)))),
         Err(error) => (
             StatusCode::BAD_GATEWAY,
@@ -434,7 +434,7 @@ pub async fn build_tx(State(state): State<AppState>, Json(body): Json<BuildTxReq
         return err_response(ApiErrorCode::InvalidParams, "user must be a 0x-prefixed EVM address");
     }
     for token in [&body.token_in, &body.token_out] {
-        if let Err(error) = parse_token(token, &state.mbtc_address) {
+        if let Err(error) = parse_token(token) {
             return err_response_code(StatusCode::BAD_REQUEST, error);
         }
     }

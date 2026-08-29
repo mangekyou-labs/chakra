@@ -25,7 +25,7 @@ if (!quote.success) throw new Error(quote.error?.message);
 // T4.7: use the server-owned per-hop dex_types[] (no source-string heuristics)
 function toSteps(subRoute) {
   return subRoute.pool_addresses.map((pool, i) => ({
-    dex_type: subRoute.dex_types[i], // 'xyk' | 'stable' | 'clmm' | 'xylo'
+    dex_type: subRoute.dex_types[i], // 'xyk' | 'stable' | 'clmm' | 'xylo' | 'presto'
     pool_address: pool,
     token_in: subRoute.path[i],
     token_out: subRoute.path[i + 1],

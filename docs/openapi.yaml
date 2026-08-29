@@ -3,7 +3,7 @@ info:
   title: Chakra API
   description: |
     Chakra — Arc testnet DEX aggregator. Quotes and unsigned `splitSwap`
-    calldata across the frozen catalog (ERC-20 USDC, EURC, mBTC) over
+    calldata across the frozen catalog (ERC-20 USDC, EURC, cirBTC) over
     allowlisted venues (xy=k, stableswap, CLMM).
 
     **Rate limits:** 10 req/s per IP. `/health` and `/ready` are exempt.
@@ -59,7 +59,7 @@ paths:
       tags: [tokens]
       summary: Frozen catalog
       description: |
-        Exactly USDC (6 dp), EURC (6 dp), mBTC (8 dp). Native USDC is never a
+        Exactly USDC (6 dp), EURC (6 dp), cirBTC (8 dp). Native USDC is never a
         swap token (SC-12) and is absent.
       responses:
         '200':
@@ -212,7 +212,7 @@ components:
       schema:
         type: string
         example: '1000000'
-      description: Atomic amount (unsigned decimal integer). USDC/EURC 6 dp; mBTC 8 dp.
+      description: Atomic amount (unsigned decimal integer). USDC/EURC 6 dp; cirBTC 8 dp.
   schemas:
     ApiError:
       type: object
@@ -355,7 +355,7 @@ components:
           description: 'Per-hop DEX type — server-owned hop identity (T4.7). Length == pool_addresses.'
           items:
             type: string
-            enum: [xyk, stable, clmm, xylo]
+            enum: [xyk, stable, clmm, xylo, presto]
           example: [stable]
         hop_fees:
           type: array
@@ -384,7 +384,7 @@ components:
           type: object
           additionalProperties:
             type: string
-          description: '`usdc`/`eurc`/`mbtc` are ERC-20 6/6/8 dp; `native_usdc` is 18 dp gas — never summed'
+          description: '`usdc`/`eurc`/`cirbtc` are ERC-20 6/6/8 dp; `native_usdc` is 18 dp gas — never summed'
           example:
             usdc: '1234567890'
             eurc: '0'
@@ -424,7 +424,7 @@ components:
       properties:
         dex_type:
           type: string
-          enum: [xyk, stable, clmm, xylo]
+          enum: [xyk, stable, clmm, xylo, presto]
         pool_address:
           type: string
         token_in:

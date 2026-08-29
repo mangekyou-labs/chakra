@@ -44,6 +44,8 @@ pub enum DexType {
     /// XyloNet stableswap (T-XYLO) — appended, never inserted (on-chain enum
     /// values must stay stable).
     Xylo,
+    /// Presto normalized hub (2026-08-29) — appended after Xylo.
+    Presto,
 }
 
 impl DexType {
@@ -53,6 +55,7 @@ impl DexType {
             "stable" => Some(Self::Stable),
             "clmm" => Some(Self::Clmm),
             "xylo" => Some(Self::Xylo),
+            "presto" => Some(Self::Presto),
             _ => None,
         }
     }
@@ -63,6 +66,7 @@ impl DexType {
             Self::Stable => 1,
             Self::Clmm => 2,
             Self::Xylo => 3,
+            Self::Presto => 4,
         }
     }
 }
@@ -103,10 +107,10 @@ fn encode_sub_route(sub: &BuildTxSubRoute, snapshot: &MarketSnapshot) -> Result<
     Ok(out)
 }
 
-/// Venue fee in bps: xy=k 30, stable 4, clmm 30, xylo 4 (frozen).
+/// Venue fee in bps: xy=k 30, stable 4, clmm 30, xylo 4, presto 30 (frozen).
 fn step_fee_bps(dex_type: DexType) -> u32 {
     match dex_type {
-        DexType::Xyk | DexType::Clmm => 30,
+        DexType::Xyk | DexType::Clmm | DexType::Presto => 30,
         DexType::Stable | DexType::Xylo => 4,
     }
 }
@@ -365,6 +369,7 @@ fn dex_type_name(dex_type: DexType) -> &'static str {
         DexType::Stable => "stable",
         DexType::Clmm => "clmm",
         DexType::Xylo => "xylo",
+        DexType::Presto => "presto",
     }
 }
 

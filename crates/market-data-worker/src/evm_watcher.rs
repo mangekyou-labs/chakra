@@ -65,15 +65,18 @@ impl FactoryConfig {
             .split_once(':')
             .context("factory tuple must be address:dex_type")?;
         let dex_type = dex_type.to_ascii_lowercase();
-        if !matches!(dex_type.as_str(), "xyk" | "stable" | "clmm" | "xylo") {
-            bail!("unknown factory dex_type {dex_type:?} (expected xyk|stable|clmm|xylo)");
+        if !matches!(dex_type.as_str(), "xyk" | "stable" | "clmm" | "xylo" | "presto") {
+            bail!("unknown factory dex_type {dex_type:?} (expected xyk|stable|clmm|xylo|presto)");
         }
-        let source = if dex_type == "xylo" {
-            "xylo".to_string()
-        } else if is_seed {
-            format!("chakra-{dex_type}")
-        } else {
-            format!("discovered:{dex_type}")
+        // 2026-08-29 canonical source ids: xylo → xylo-stable, presto → presto-hub;
+        // seeded unitflow/xyk factories → unitflow-v25 / chakra-xyk.
+        let source = match dex_type.as_str() {
+            "xylo" => "xylo-stable".to_string(),
+            "presto" => "presto-hub".to_string(),
+            "xyk" if is_seed => "chakra-xyk".to_string(),
+            "stable" if is_seed => "chakra-stable".to_string(),
+            "clmm" if is_seed => "chakra-clmm".to_string(),
+            _ => format!("discovered:{dex_type}"),
         };
         Ok(Self {
             address: normalize_evm_address(address),
@@ -93,7 +96,6 @@ pub struct EvmConfig {
     pub ws_urls: Vec<String>,
     pub ws_enabled: bool,
     pub redis_url: Option<String>,
-    pub mbtc_address: Option<String>,
     pub seed_factories: Vec<FactoryConfig>,
     pub discovery_factories: Vec<FactoryConfig>,
     pub poll_interval: Duration,
@@ -109,7 +111,6 @@ impl Default for EvmConfig {
             ws_urls: vec![ARC_RPC_WS.to_string()],
             ws_enabled: true,
             redis_url: None,
-            mbtc_address: None,
             seed_factories: Vec::new(),
             discovery_factories: Vec::new(),
             poll_interval: Duration::from_millis(500),
@@ -187,7 +188,6 @@ impl EvmConfig {
             ws_urls,
             ws_enabled,
             redis_url,
-            mbtc_address: env_var("CHAKRA_MBTC_ADDRESS").filter(|s| !s.is_empty()),
             seed_factories,
             discovery_factories,
             poll_interval: Duration::from_millis(poll_ms),
@@ -205,17 +205,14 @@ impl EvmConfig {
     }
 }
 
-/// Catalog pairs Discovery probes each factory with. mBTC pairs are only
-/// probed when an mBTC address is configured (else `getPair` would be called
-/// with an empty address).
-pub fn catalog_pairs(mbtc_address: &str) -> Vec<(String, String)> {
-    let mut pairs = vec![(USDC_ERC20.to_string(), EURC.to_string())];
-    if !mbtc_address.is_empty() {
-        let mbtc = mbtc_address.to_string();
-        pairs.push((USDC_ERC20.to_string(), mbtc.clone()));
-        pairs.push((EURC.to_string(), mbtc));
-    }
-    pairs
+/// Catalog pairs Discovery probes each factory with. cirBTC pairs are always
+/// probed (canonical address, 2026-08-29).
+pub fn catalog_pairs() -> Vec<(String, String)> {
+    vec![
+        (USDC_ERC20.to_string(), EURC.to_string()),
+        (USDC_ERC20.to_string(), market_snapshot::decimals::CIRBTC.to_string()),
+        (EURC.to_string(), market_snapshot::decimals::CIRBTC.to_string()),
+    ]
 }
 
 /// CLMM fees probed during discovery: 3000 (30 bps) required, 500 (5 bps) optional.
@@ -295,7 +292,7 @@ impl EvmRunner {
         let mut sources_stable: Vec<(String, TradingPairSnapshot)> = Vec::new();
         let mut clmm_pools: Vec<ClmmPoolSnapshot> = Vec::new();
         let factories = self.config.all_factories().cloned().collect::<Vec<_>>();
-        let pairs = catalog_pairs(self.config.mbtc_address.as_deref().unwrap_or(""));
+        let pairs = catalog_pairs();
 
         for factory in &factories {
             for (token_a, token_b) in &pairs {
@@ -980,7 +977,7 @@ mod tests {
 
     const USDC: &str = "0x3600000000000000000000000000000000000000";
     const EURC: &str = "0x89B50855Aa3bE2F677cD6303Cec089B5F319D72a";
-    const MBTC: &str = "0x1111111111111111111111111111111111111111";
+    const CIRBTC: &str = "0xf0C4a4CE82A5746AbAAd9425360Ab04fbBA432BF";
     const POOL: &str = "0x2222222222222222222222222222222222222222";
     const XYK_FACTORY: &str = "0x3333333333333333333333333333333333333333";
 
@@ -1142,10 +1139,13 @@ mod tests {
         assert_eq!(discovered.source, "discovered:stable");
         assert!(!discovered.is_seed);
         assert!(FactoryConfig::parse("0xABCD:clmm", true).is_ok());
+        // 2026-08-29 canonical source ids.
         let xylo_seed = FactoryConfig::parse("0xABCD:xylo", true).unwrap();
-        assert_eq!(xylo_seed.source, "xylo");
+        assert_eq!(xylo_seed.source, "xylo-stable");
         let xylo_disc = FactoryConfig::parse("0xABCD:xylo", false).unwrap();
-        assert_eq!(xylo_disc.source, "xylo");
+        assert_eq!(xylo_disc.source, "xylo-stable");
+        let presto = FactoryConfig::parse("0xABCD:presto", true).unwrap();
+        assert_eq!(presto.source, "presto-hub");
         assert!(FactoryConfig::parse("0xABCD:liquidity-pool", true).is_err());
         assert!(FactoryConfig::parse("no-colon", true).is_err());
     }
@@ -1178,7 +1178,7 @@ mod tests {
         std::env::set_var("CHAKRA_CHAIN_ID", "5042002");
         std::env::set_var("CHAKRA_SEED_FACTORIES", "0xAAA:xyk,0xBBB:stable");
         std::env::set_var("CHAKRA_DISCOVERY_FACTORIES", "0xCCC:clmm");
-        std::env::set_var("CHAKRA_MBTC_ADDRESS", MBTC);
+        std::env::set_var("CHAKRA_MBTC_ADDRESS", CIRBTC);
         std::env::set_var("CHAKRA_EVM_POLL_INTERVAL_MS", "250");
 
         let config = EvmConfig::from_env().unwrap();
@@ -1189,7 +1189,7 @@ mod tests {
         assert_eq!(config.seed_factories.len(), 2);
         assert_eq!(config.seed_factories[0].source, "chakra-xyk");
         assert_eq!(config.discovery_factories[0].source, "discovered:clmm");
-        assert_eq!(config.mbtc_address.as_deref(), Some(MBTC));
+
         assert_eq!(config.poll_interval.as_millis(), 250);
 
         for (name, value) in original {
@@ -1256,7 +1256,6 @@ mod tests {
         let client = EvmRpcClient::single(&url).unwrap();
         let config = EvmConfig {
             seed_factories: vec![FactoryConfig::parse(&format!("{XYK_FACTORY}:xyk"), true).unwrap()],
-            mbtc_address: Some(MBTC.to_string()),
             ws_enabled: false,
             ..Default::default()
         };
@@ -1308,7 +1307,6 @@ mod tests {
         let client = EvmRpcClient::single(&url).unwrap();
         let config = EvmConfig {
             seed_factories: vec![FactoryConfig::parse(&format!("{XYK_FACTORY}:xyk"), true).unwrap()],
-            mbtc_address: Some(MBTC.to_string()),
             ws_enabled: false,
             poll_interval: std::time::Duration::from_millis(200),
             ..Default::default()
@@ -1552,9 +1550,10 @@ mod tests {
         assert_eq!(addresses.len(), 1);
     }
 
-    /// Sanity: discovery does not touch mBTC pairs when mBTC is unset.
+    /// Sanity: discovery probes the canonical catalog pairs (USDC/EURC and
+    /// cirBTC pairs) and finds nothing when the factory has no pools.
     #[tokio::test]
-    async fn discovery_without_mbtc_only_probes_usdc_eurc() {
+    async fn discovery_with_no_pools_probes_catalog_and_finds_zero() {
         let (url, _server) = spawn_fixture_rpc(|_method, _params| Ok(json!(word(0))));
         let client = EvmRpcClient::single(&url).unwrap();
         let config = EvmConfig {
@@ -1562,7 +1561,7 @@ mod tests {
             ws_enabled: false,
             ..Default::default()
         };
-        // mbtc_address = None → catalog pairs collapse to USDC/EURC only.
+        // The canonical catalog (USDC/EURC/cirBTC) is always probed.
         let shared = Arc::new(RwLock::new(WorkerShared {
             sources: Vec::new(),
             clmm_pools: Vec::new(),

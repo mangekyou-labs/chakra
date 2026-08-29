@@ -31,9 +31,10 @@ describe('filterSwapTokens', () => {
     expect(result.map((t) => t.symbol)).toEqual(['USDC', 'EURC']);
   });
 
-  it('falls back to the hardcoded USDC+EURC catalog when the API row is missing', () => {
+  it('falls back to the hardcoded USDC+EURC+cirBTC catalog when the API row is missing', () => {
     const result = filterSwapTokens([]);
-    expect(result.map((t) => t.symbol)).toEqual(['USDC', 'EURC']);
+    expect(result.map((t) => t.symbol)).toEqual(['USDC', 'EURC', 'cirBTC']);
     expect(result[0].decimals).toBe(6);
+    expect(result[2].decimals).toBe(8);
   });
 });

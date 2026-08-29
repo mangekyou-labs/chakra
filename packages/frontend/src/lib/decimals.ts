@@ -4,12 +4,14 @@
 export const USDC_ERC20_ADDRESS = '0x3600000000000000000000000000000000000000';
 /** EURC (6 dp). */
 export const EURC_ADDRESS = '0x89B50855Aa3bE2F677cD6303Cec089B5F319D72a';
+/** Canonical cirBTC (8 dp, 2026-08-29 catalog rebaseline). */
+export const CIRBTC_ADDRESS = '0xf0C4a4CE82A5746AbAAd9425360Ab04fbBA432BF';
 /** Native USDC (18 dp) is gas only — never a swap token. */
 export const NATIVE_USDC_KEY = 'native_usdc';
 
 export const USDC_DECIMALS = 6;
 export const EURC_DECIMALS = 6;
-export const MBTC_DECIMALS = 8;
+export const CIRBTC_DECIMALS = 8;
 export const NATIVE_USDC_DECIMALS = 18;
 
 /** 1 ERC-20 USDC atomic = 1e12 wei (6 vs 18 dp). */
@@ -39,9 +41,9 @@ export function isNativeSwapToken(address: string): boolean {
   return a === NATIVE_USDC_KEY || a === 'eth' || a === '0x0000000000000000000000000000000000000000';
 }
 
-/** Format an ERC-20 atomic (6 dp) without floats or scientific notation. */
-export function formatErc20(atomic: string | bigint): string {
-  return formatAtomic(atomic, 6);
+/** Format an ERC-20 atomic with the token's decimals (default 6). */
+export function formatErc20(atomic: string | bigint, decimals: number = 6): string {
+  return formatAtomic(atomic, decimals);
 }
 
 /** Format native USDC atomic (18 dp) without floats or scientific notation. */

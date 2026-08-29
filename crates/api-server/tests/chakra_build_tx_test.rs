@@ -90,7 +90,7 @@ fn split_swap_calldata_matches_solidity_abi_for_nested_routes() {
     assert_eq!(encoded, expected);
 }
 
-const MBTC: &str = "0x1111111111111111111111111111111111111111";
+const CIRBTC: &str = "0xf0C4a4CE82A5746AbAAd9425360Ab04fbBA432BF";
 const XYK_POOL_UE: &str = "0x0000000000000000000000000000000000000001";
 const STABLE_POOL_UE: &str = "0x0000000000000000000000000000000000000002";
 const AGGREGATOR: &str = "0x00000000000000000000000000000000000000aa";
@@ -286,7 +286,7 @@ async fn test_app(rpc_url: Option<String>) -> Router {
     seed_pools(&pool_store).await;
 
     let engine = QuoteEngine::new(PathFinderConfig::default(), SplitConfig::default());
-    engine.update_from_chakra_snapshot(&chakra_snapshot(), MBTC).await;
+    engine.update_from_chakra_snapshot(&chakra_snapshot()).await;
 
     let state = AppState::from_backends(
         config,
@@ -295,8 +295,7 @@ async fn test_app(rpc_url: Option<String>) -> Router {
         Some(snapshot_store),
         Some(pool_store),
         rpc_url.map(|url| Arc::new(dex_adapters::evm_rpc::EvmRpcClient::single(&url).unwrap())),
-        MBTC.to_string(),
-        None,
+                None,
     )
     .await;
     build_router(state, RateLimitState::from_env())
@@ -659,7 +658,7 @@ async fn build_tx_not_ready_when_aggregator_unconfigured() {
     let pool_store = Arc::new(MemoryPoolStateStore::new());
     seed_pools(&pool_store).await;
     let engine = QuoteEngine::new(PathFinderConfig::default(), SplitConfig::default());
-    engine.update_from_chakra_snapshot(&chakra_snapshot(), MBTC).await;
+    engine.update_from_chakra_snapshot(&chakra_snapshot()).await;
     let state = AppState::from_backends(
         config,
         Some(snapshot_store.clone() as Arc<dyn market_snapshot::store::SnapshotStore>),
@@ -667,8 +666,7 @@ async fn build_tx_not_ready_when_aggregator_unconfigured() {
         Some(snapshot_store),
         Some(pool_store),
         Some(Arc::new(dex_adapters::evm_rpc::EvmRpcClient::single(&url).unwrap())),
-        MBTC.to_string(),
-        None,
+                None,
     )
     .await;
     let router = build_router(state, RateLimitState::from_env());
@@ -730,7 +728,7 @@ async fn build_tx_rejects_pool_from_non_allowlisted_factory() {
         .unwrap();
 
     let engine = QuoteEngine::new(PathFinderConfig::default(), SplitConfig::default());
-    engine.update_from_chakra_snapshot(&two_factory_snapshot(), MBTC).await;
+    engine.update_from_chakra_snapshot(&two_factory_snapshot()).await;
 
     let state = AppState::from_backends(
         config,
@@ -739,8 +737,7 @@ async fn build_tx_rejects_pool_from_non_allowlisted_factory() {
         Some(snapshot_store),
         Some(pool_store),
         Some(Arc::new(dex_adapters::evm_rpc::EvmRpcClient::single(&url).unwrap())),
-        MBTC.to_string(),
-        None,
+                None,
     )
     .await;
     let router = build_router(state, RateLimitState::from_env());
@@ -829,7 +826,7 @@ async fn build_tx_rejects_wrong_fee_for_clmm_pool() {
         .unwrap();
 
     let engine = QuoteEngine::new(PathFinderConfig::default(), SplitConfig::default());
-    engine.update_from_chakra_snapshot(&clmm_snapshot(), MBTC).await;
+    engine.update_from_chakra_snapshot(&clmm_snapshot()).await;
 
     let state = AppState::from_backends(
         config,
@@ -838,8 +835,7 @@ async fn build_tx_rejects_wrong_fee_for_clmm_pool() {
         Some(snapshot_store),
         Some(pool_store),
         Some(Arc::new(dex_adapters::evm_rpc::EvmRpcClient::single(&url).unwrap())),
-        MBTC.to_string(),
-        None,
+                None,
     )
     .await;
     let router = build_router(state, RateLimitState::from_env());
@@ -871,7 +867,7 @@ async fn build_tx_accepts_correct_fee_for_clmm_pool() {
         .unwrap();
 
     let engine = QuoteEngine::new(PathFinderConfig::default(), SplitConfig::default());
-    engine.update_from_chakra_snapshot(&clmm_snapshot(), MBTC).await;
+    engine.update_from_chakra_snapshot(&clmm_snapshot()).await;
 
     let state = AppState::from_backends(
         config,
@@ -880,8 +876,7 @@ async fn build_tx_accepts_correct_fee_for_clmm_pool() {
         Some(snapshot_store),
         Some(pool_store),
         Some(Arc::new(dex_adapters::evm_rpc::EvmRpcClient::single(&url).unwrap())),
-        MBTC.to_string(),
-        None,
+                None,
     )
     .await;
     let router = build_router(state, RateLimitState::from_env());
@@ -907,7 +902,7 @@ async fn build_tx_encodes_step_fee_not_hardcoded_30() {
         .unwrap();
 
     let engine = QuoteEngine::new(PathFinderConfig::default(), SplitConfig::default());
-    engine.update_from_chakra_snapshot(&clmm_snapshot(), MBTC).await;
+    engine.update_from_chakra_snapshot(&clmm_snapshot()).await;
 
     let state = AppState::from_backends(
         config,
@@ -916,8 +911,7 @@ async fn build_tx_encodes_step_fee_not_hardcoded_30() {
         Some(snapshot_store),
         Some(pool_store),
         Some(Arc::new(dex_adapters::evm_rpc::EvmRpcClient::single(&url).unwrap())),
-        MBTC.to_string(),
-        None,
+                None,
     )
     .await;
     let router = build_router(state, RateLimitState::from_env());
@@ -1011,7 +1005,7 @@ async fn build_tx_omit_fee_encodes_snapshot_clmm_fee_not_default() {
         .unwrap();
 
     let engine = QuoteEngine::new(PathFinderConfig::default(), SplitConfig::default());
-    engine.update_from_chakra_snapshot(&clmm_5bps_snapshot(), MBTC).await;
+    engine.update_from_chakra_snapshot(&clmm_5bps_snapshot()).await;
 
     let state = AppState::from_backends(
         config,
@@ -1020,8 +1014,7 @@ async fn build_tx_omit_fee_encodes_snapshot_clmm_fee_not_default() {
         Some(snapshot_store),
         Some(pool_store),
         Some(Arc::new(dex_adapters::evm_rpc::EvmRpcClient::single(&url).unwrap())),
-        MBTC.to_string(),
-        None,
+                None,
     )
     .await;
     let router = build_router(state, RateLimitState::from_env());
@@ -1066,7 +1059,7 @@ async fn build_tx_encodes_and_validates_5bps_clmm_tier() {
         .unwrap();
 
     let engine = QuoteEngine::new(PathFinderConfig::default(), SplitConfig::default());
-    engine.update_from_chakra_snapshot(&clmm_5bps_snapshot(), MBTC).await;
+    engine.update_from_chakra_snapshot(&clmm_5bps_snapshot()).await;
 
     let state = AppState::from_backends(
         config,
@@ -1075,8 +1068,7 @@ async fn build_tx_encodes_and_validates_5bps_clmm_tier() {
         Some(snapshot_store),
         Some(pool_store),
         Some(Arc::new(dex_adapters::evm_rpc::EvmRpcClient::single(&url).unwrap())),
-        MBTC.to_string(),
-        None,
+                None,
     )
     .await;
     let router = build_router(state, RateLimitState::from_env());

@@ -70,7 +70,7 @@ describe('recent-swaps', () => {
     addRecentSwap(CHAIN_ID, ADDR, {
       txHash: '0x222',
       tokenIn: 'EURC',
-      tokenOut: 'mBTC',
+      tokenOut: 'cirBTC',
       amountIn: '5000',
       amountOut: '100',
       isSplit: true,

@@ -60,16 +60,15 @@ fn aggregate3_balance_of_calldata(tokens: &[CatalogToken], account: &str) -> Str
 }
 
 /// Fetch catalog ERC-20 balances via Multicall3 + a separate `native_usdc`.
-/// Returns `{usdc, eurc, mbtc?, native_usdc}` with string values.
+/// Returns `{usdc, eurc, cirbtc, native_usdc}` with string values.
 pub async fn fetch_balances(
     rpc: &EvmRpcClient,
     account: &str,
-    mbtc_address: &str,
 ) -> Result<serde_json::Map<String, Value>> {
     let mut out = serde_json::Map::new();
     let account = account.to_ascii_lowercase();
 
-    let tokens: Vec<CatalogToken> = catalog::catalog_swap_tokens_with(mbtc_address);
+    let tokens: Vec<CatalogToken> = catalog::catalog_swap_tokens();
     let calldata = aggregate3_balance_of_calldata(&tokens, &account);
     let result = rpc.eth_call(MULTICALL3, &calldata).await?;
 

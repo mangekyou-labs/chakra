@@ -86,7 +86,7 @@ export interface TokenInfo {
     decimals: number;
 }
 export interface BalancesResult {
-    /** ERC-20 balances keyed by symbol (usdc/eurc/mbtc). */
+    /** ERC-20 balances keyed by symbol (usdc/eurc/cirbtc). */
     erc20: Record<string, string>;
     /** Native USDC (18 dp) — gas only, never summed with ERC-20. */
     nativeUsdc: string;

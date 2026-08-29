@@ -182,7 +182,8 @@ impl StablePoolStateValue {
 
 /// Allowlisted venue factory (must match the on-chain aggregator allowlist
 /// before a pool is quoted). Source id: `"chakra-xyk"` | `"chakra-stable"` |
-/// `"chakra-clmm"` | `"discovered:<label>"`.
+/// `"chakra-clmm"` | `"xylo-stable"` | `"presto-hub"` | `"unitflow-v25"` |
+/// `"discovered:<label>"`.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct FactoryRecord {
     pub address: String,
@@ -196,6 +197,54 @@ impl FactoryRecord {
             address: address.into(),
             dex_type: dex_type.into(),
             source: source.into(),
+        }
+    }
+}
+
+/// Presto normalized hub state (2026-08-29): the hub routes every spoke
+/// through a `pathUSD` reserve. For each user token, the hub holds a raw
+/// token reserve and a raw pathUSD reserve; quotes normalize to 18 dp,
+/// apply the 997/1000 fee, and denormalize back.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct PrestoHubState {
+    pub source: String,
+    pub hub_address: String,
+    /// The hub's pathUSD token (USDC on Arc).
+    pub path_usd: String,
+    /// Path USD decimals (USDC = 6 on Arc).
+    pub path_usd_decimals: u8,
+    /// Per-spoke user-token reserves (raw units), keyed by lowercased token.
+    #[serde(default)]
+    pub token_reserves: std::collections::HashMap<String, u128>,
+    /// Per-spoke pathUSD reserves (raw units), keyed by lowercased user token.
+    #[serde(default)]
+    pub path_reserves: std::collections::HashMap<String, u128>,
+    /// Venue fee in bps (Presto = 30 bps per the published hub formula).
+    pub fee_bps: u32,
+    /// Unix millis when worker last wrote this key (`0` = legacy / unknown).
+    #[serde(default)]
+    pub updated_at_ms: u64,
+}
+
+impl PrestoHubState {
+    pub fn redis_key(source: &str, hub_address: &str) -> String {
+        format!("{STABLE_KEY_PREFIX}:{source}:{hub_address}")
+    }
+
+    pub fn pool_key(source: &str, hub_address: &str) -> String {
+        format!("{source}:{hub_address}")
+    }
+
+    pub fn new(source: impl Into<String>, hub_address: impl Into<String>, path_usd: impl Into<String>, path_usd_decimals: u8, fee_bps: u32) -> Self {
+        Self {
+            source: source.into(),
+            hub_address: hub_address.into(),
+            path_usd: path_usd.into(),
+            path_usd_decimals,
+            token_reserves: Default::default(),
+            path_reserves: Default::default(),
+            fee_bps,
+            updated_at_ms: now_ms(),
         }
     }
 }

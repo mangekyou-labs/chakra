@@ -87,7 +87,6 @@ async fn cold_state_no_store_returns_no_store_error() {
         None,
         None,
         None,
-        String::new(),
         None,
     )
     .await;
@@ -109,7 +108,6 @@ async fn cold_state_empty_store_returns_snapshot_load_error() {
         Some(mem_snap),
         None,
         None,
-        String::new(),
         None,
     )
     .await;
@@ -134,7 +132,6 @@ async fn engine_for_version_builds_after_publish() {
         Some(mem_snap.clone()),
         Some(mem_pool),
         None,
-        String::new(),
         None,
     )
     .await;
@@ -160,7 +157,6 @@ async fn unchanged_version_returns_cached_engine() {
         Some(mem_snap.clone()),
         Some(mem_pool),
         None,
-        String::new(),
         None,
     )
     .await;
@@ -174,7 +170,7 @@ async fn unchanged_version_returns_cached_engine() {
 /// Best-effort engine returns None on cold start, Some after publish.
 #[tokio::test]
 async fn best_effort_engine_cold_start_none() {
-    let state = AppState::from_backends(minimal_config(), None, None, None, None, None, String::new(), None).await;
+    let state = AppState::from_backends(minimal_config(), None, None, None, None, None, None).await;
 
     assert!(state.best_effort_engine().await.is_none());
 }
@@ -182,7 +178,7 @@ async fn best_effort_engine_cold_start_none() {
 /// Ready returns None on cold start with no store.
 #[tokio::test]
 async fn ready_returns_none_on_cold_start() {
-    let state = AppState::from_backends(minimal_config(), None, None, None, None, None, String::new(), None).await;
+    let state = AppState::from_backends(minimal_config(), None, None, None, None, None, None).await;
 
     assert!(state.ready().await.is_none());
 }
@@ -190,7 +186,7 @@ async fn ready_returns_none_on_cold_start() {
 /// Loaded version is None on cold start.
 #[tokio::test]
 async fn loaded_version_none_on_cold_start() {
-    let state = AppState::from_backends(minimal_config(), None, None, None, None, None, String::new(), None).await;
+    let state = AppState::from_backends(minimal_config(), None, None, None, None, None, None).await;
 
     assert!(state.loaded_version().await.is_none());
 }

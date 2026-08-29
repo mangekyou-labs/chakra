@@ -136,7 +136,7 @@ pub(crate) fn coalesce_touched_into_tasks(touched: HashSet<PoolRef>) -> Vec<Fetc
     for pool in touched {
         match pool.source.as_str() {
             // Arc venues (seed = chakra-*, discovered factories = discovered:*).
-            "chakra-xyk" | "discovered:xyk" => tasks.push(FetchTask::EvmXyk {
+            "chakra-xyk" | "discovered:xyk" | "unitflow-v25" => tasks.push(FetchTask::EvmXyk {
                 pool_address: pool.pool_address,
             }),
             "chakra-stable" | "discovered:stable" => tasks.push(FetchTask::EvmStable {
@@ -145,8 +145,14 @@ pub(crate) fn coalesce_touched_into_tasks(touched: HashSet<PoolRef>) -> Vec<Fetc
             "chakra-clmm" | "discovered:clmm" => tasks.push(FetchTask::EvmClmm {
                 pool_address: pool.pool_address,
             }),
-            // T-XYLO: the pinned XyloNet USDC/EURC pool (source `xylo`).
-            "xylo" | "discovered:xylo" | "chakra-xylo" => tasks.push(FetchTask::EvmXylo {
+            // T-XYLO: the pinned XyloNet USDC/EURC pool (source `xylo-stable`).
+            "xylo" | "xylo-stable" | "discovered:xylo" | "chakra-xylo" => {
+                tasks.push(FetchTask::EvmXylo {
+                    pool_address: pool.pool_address,
+                })
+            }
+            // Presto hub spokes are fetched as stable-family state (2026-08-29).
+            "presto-hub" | "discovered:presto" => tasks.push(FetchTask::EvmStable {
                 pool_address: pool.pool_address,
             }),
             other => {
