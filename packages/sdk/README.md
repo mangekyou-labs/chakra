@@ -43,7 +43,7 @@ const tx = await client.buildTx({
 |--------|------|-------------|
 | `isHealthy()` | `GET /health` | Liveness (rate-limit exempt) |
 | `isReady()` | `GET /ready` | Snapshot current AND ≥1 pool key |
-| `listTokens()` | `GET /tokens` | Frozen catalog USDC/EURC/mBTC |
+| `listTokens()` | `GET /tokens` | Frozen catalog USDC/EURC/cirBTC |
 | `quote()` | `GET /quote` | Best route; `slippage_bps` integer |
 | `buildTx()` | `POST /build_tx` | splitSwap calldata + Permit2 typed data |
 | `getBalances()` | `GET /balances` | ERC-20 + separate `native_usdc` (never summed) |
@@ -65,7 +65,7 @@ const tx = await client.buildTx({
 |-------|---------|----------|
 | USDC  | `0x3600000000000000000000000000000000000000` | 6 |
 | EURC  | `0x89b50855aa3be2f677cd6303cec089b5f319d72a` | 6 |
-| mBTC  | from `/tokens` | 8 |
+| cirBTC | canonical `0xf0C4…32BF` | 8 |
 
 Native USDC (18 dp) is gas only — never a swap token. `getBalances` returns
 `{ erc20, nativeUsdc }` and never sums the two encodings.

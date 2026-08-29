@@ -14,12 +14,19 @@ import {IUniswapV2Pair} from "./interfaces/IUniswapV2Pair.sol";
 import {IUniswapV3Factory} from "./interfaces/IUniswapV3Factory.sol";
 import {IUniswapV3Pool} from "./interfaces/IUniswapV3Pool.sol";
 import {IStableSwap} from "./interfaces/IStableSwap.sol";
-import {IXyloFactory, IXyloPool} from "./interfaces/IXyloNet.sol";
+import {IXyloFactory, IXyloPool, IXyloRouter} from "./interfaces/IXyloNet.sol";
+import {IPrestoHub} from "./interfaces/IPrestoHub.sol";
 
 /// @title Aggregator — atomic splitSwap over allowlisted venues with Permit2 pull.
 /// @notice Non-upgradeable. Factory allowlist gates every hop; Permit2
 ///      AllowanceTransfer pulls exact amountIn; leftover catalog tokens are
 ///      swept to msg.sender and asserted 0 by the Foundry suite.
+/// @dev 2026-08-29 canonical curated rebaseline:
+///      - catalog is USDC / EURC / cirBTC (mBTC removed from the Arc path)
+///      - DexType.Presto appended (4)
+///      - atomic Xylo factory/router pairs (router exact-input execution)
+///      - Presto hub allowlist
+///      - per-XYK-factory fees (UnitFlow V2.5 = 30 bps)
 contract Aggregator is Ownable, Pausable, ReentrancyGuard {
     using SafeERC20 for IERC20;
 
@@ -27,7 +34,8 @@ contract Aggregator is Ownable, Pausable, ReentrancyGuard {
         Xyk,
         Stable,
         Clmm,
-        Xylo
+        Xylo,
+        Presto
     }
 
     struct Hop {
@@ -65,6 +73,7 @@ contract Aggregator is Ownable, Pausable, ReentrancyGuard {
     error ZeroAmount();
     error InvalidRoutes();
     error PoolNotFromFactory();
+    error RouterNotConfigured();
     error PermitSpenderMismatch();
     error SlippageExceeded(uint256 got, uint256 min);
     error CallbackSenderMismatch();
@@ -73,6 +82,7 @@ contract Aggregator is Ownable, Pausable, ReentrancyGuard {
 
     uint256 internal constant V2_FEE_NUM = 997;
     uint256 internal constant V2_FEE_DEN = 1000;
+    uint24 internal constant DEFAULT_XYK_FEE_BPS = 30;
     // Uniswap V3 sqrt-price bounds (same constants as the V3 core).
     uint160 internal constant MIN_SQRT_RATIO = 4295128739;
     uint160 internal constant MAX_SQRT_RATIO = 1461446703485210103287273052203988822378723970341;
@@ -80,7 +90,7 @@ contract Aggregator is Ownable, Pausable, ReentrancyGuard {
     address public immutable permit2;
     address public immutable usdc;
     address public immutable eurc;
-    address public immutable mbtc;
+    address public immutable cirbtc;
 
     mapping(address => bool) public isFactory;
     mapping(address => DexType) public factoryDexType;
@@ -88,11 +98,21 @@ contract Aggregator is Ownable, Pausable, ReentrancyGuard {
     mapping(address => uint256) internal factoryIndex;
     mapping(address => bool) public allowedStablePools;
 
-    constructor(address _permit2, address _usdc, address _eurc, address _mbtc) Ownable(msg.sender) {
+    /// @notice Atomic Xylo factory → router pair. A Xylo hop only executes if
+    ///      the factory's pool is allowlisted AND the router is configured.
+    mapping(address => address) public xyloRouterForFactory;
+    /// @notice Presto hub allowlist (the hub is the hop target; no factory).
+    mapping(address => bool) public isPrestoHub;
+    /// @notice Per-XYK-factory fee in bps; 0 means the default 30 bps.
+    mapping(address => uint24) public factoryFeeBps;
+
+    constructor(address _permit2, address _usdc, address _eurc, address _cirbtc)
+        Ownable(msg.sender)
+    {
         permit2 = _permit2;
         usdc = _usdc;
         eurc = _eurc;
-        mbtc = _mbtc;
+        cirbtc = _cirbtc;
     }
 
     // ─── Admin ────────────────────────────────────────────────
@@ -130,6 +150,32 @@ contract Aggregator is Ownable, Pausable, ReentrancyGuard {
         delete isFactory[factory];
         delete factoryIndex[factory];
         delete factoryDexType[factory];
+        delete xyloRouterForFactory[factory];
+        delete factoryFeeBps[factory];
+    }
+
+    /// @notice Set (or clear with address(0)) the Xylo router for a factory.
+    ///      Atomic pair: a Xylo hop cannot execute unless both the factory is
+    ///      allowlisted as Xylo and this router is set.
+    function setXyloRouter(address factory, address router) external onlyOwner {
+        if (factory == address(0)) revert ZeroAddress();
+        xyloRouterForFactory[factory] = router;
+    }
+
+    /// @notice Set the per-XYK-factory fee in bps (0 restores the 30 bps default).
+    function setFactoryFee(address factory, uint24 feeBps) external onlyOwner {
+        if (factory == address(0)) revert ZeroAddress();
+        factoryFeeBps[factory] = feeBps;
+    }
+
+    /// @notice Allowlist a Presto hub (the hub itself is the hop target).
+    function addPrestoHub(address hub) external onlyOwner {
+        if (hub == address(0)) revert ZeroAddress();
+        isPrestoHub[hub] = true;
+    }
+
+    function removePrestoHub(address hub) external onlyOwner {
+        delete isPrestoHub[hub];
     }
 
     /// @notice Owner-side pool allowlist for stable venues (no Uniswap-style getPair).
@@ -179,7 +225,7 @@ contract Aggregator is Ownable, Pausable, ReentrancyGuard {
             uint256 hopIn = sub.amountIn;
             Hop[] calldata hops = sub.hops;
             for (uint256 h = 0; h < hops.length; h++) {
-                hopIn = _executeHop(hops[h], hopIn);
+                hopIn = _executeHop(hops[h], hopIn, deadline);
             }
         }
 
@@ -205,6 +251,8 @@ contract Aggregator is Ownable, Pausable, ReentrancyGuard {
         if (tokenIn == tokenOut) revert SameToken();
         if (amountIn == 0) revert ZeroAmount();
         if (routes.length == 0) revert InvalidRoutes();
+        // Catalog enforcement (SC-14): only USDC / EURC / cirBTC are routable.
+        if (!_isCatalogToken(tokenIn) || !_isCatalogToken(tokenOut)) revert InvalidRoutes();
 
         uint256 sum;
         for (uint256 r = 0; r < routes.length; r++) {
@@ -218,13 +266,38 @@ contract Aggregator is Ownable, Pausable, ReentrancyGuard {
                 }
                 if (hops[h].tokenIn == hops[h].tokenOut) revert InvalidRoutes();
                 if (h > 0 && hops[h].tokenIn != hops[h - 1].tokenOut) revert InvalidRoutes();
+                if (!_isCatalogToken(hops[h].tokenIn) || !_isCatalogToken(hops[h].tokenOut)) {
+                    revert InvalidRoutes();
+                }
             }
             if (hops[hops.length - 1].tokenOut != tokenOut) revert InvalidRoutes();
         }
         if (sum != amountIn) revert InvalidRoutes();
+        _rejectSharedPools(routes);
     }
 
-    /// @notice Pre-flight: every hop's pool must belong to an allowlisted factory.
+    /// @notice A split whose sub-routes reuse the same pool is invalid: two
+    ///      paths cannot independently overestimate the same downstream
+    ///      liquidity (2026-08-29).
+    function _rejectSharedPools(SubRoute[] calldata routes) internal pure {
+        for (uint256 r = 0; r < routes.length; r++) {
+            Hop[] calldata hops = routes[r].hops;
+            for (uint256 h = 0; h < hops.length; h++) {
+                for (uint256 r2 = r + 1; r2 < routes.length; r2++) {
+                    Hop[] calldata hops2 = routes[r2].hops;
+                    for (uint256 h2 = 0; h2 < hops2.length; h2++) {
+                        if (hops[h].pool == hops2[h2].pool) revert InvalidRoutes();
+                    }
+                }
+            }
+        }
+    }
+
+    function _isCatalogToken(address token) internal view returns (bool) {
+        return token == usdc || token == eurc || token == cirbtc;
+    }
+
+    /// @notice Pre-flight: every hop's pool must belong to an allowlisted venue.
     function _verifyPools(SubRoute[] calldata routes) internal view {
         for (uint256 r = 0; r < routes.length; r++) {
             Hop[] calldata hops = routes[r].hops;
@@ -254,14 +327,24 @@ contract Aggregator is Ownable, Pausable, ReentrancyGuard {
             }
         } else if (hop.dexType == DexType.Xylo) {
             // Xylo factory membership: `getPool(address,address)` (not Uni V2
-            // `getPair`, not the Chakra stable factory).
+            // `getPair`, not the Chakra stable factory). Membership first,
+            // then the atomic router requirement: a pool from an allowlisted
+            // Xylo factory without a configured router is
+            // `RouterNotConfigured`; a pool from no allowlisted factory is
+            // `PoolNotFromFactory`.
+            bool matched = false;
             for (uint256 i = 0; i < factoryList.length; i++) {
                 address factory = factoryList[i];
                 if (factoryDexType[factory] != DexType.Xylo) continue;
                 if (IXyloFactory(factory).getPool(hop.tokenIn, hop.tokenOut) == hop.pool) {
-                    return;
+                    matched = true;
+                    if (xyloRouterForFactory[factory] != address(0)) return;
                 }
             }
+            if (matched) revert RouterNotConfigured();
+        } else if (hop.dexType == DexType.Presto) {
+            // Presto: the hub itself is the hop target (no factory).
+            if (isPrestoHub[hop.pool]) return;
         } else {
             for (uint256 i = 0; i < factoryList.length; i++) {
                 address factory = factoryList[i];
@@ -289,7 +372,12 @@ contract Aggregator is Ownable, Pausable, ReentrancyGuard {
     }
 
     /// @notice Execute one allowlisted hop; returns the hop's output amount.
-    function _executeHop(Hop calldata hop, uint256 amountIn) internal returns (uint256 amountOut) {
+    ///      `deadline` is the user-supplied request deadline (honored by the
+    ///      Xylo router and Presto hub executions).
+    function _executeHop(Hop calldata hop, uint256 amountIn, uint256 deadline)
+        internal
+        returns (uint256 amountOut)
+    {
         if (hop.dexType == DexType.Xyk) {
             return _xykOut(hop, amountIn);
         }
@@ -297,13 +385,17 @@ contract Aggregator is Ownable, Pausable, ReentrancyGuard {
             return _stableOut(hop, amountIn);
         }
         if (hop.dexType == DexType.Xylo) {
-            return _xyloOut(hop, amountIn);
+            return _xyloOut(hop, amountIn, deadline);
+        }
+        if (hop.dexType == DexType.Presto) {
+            return _prestoOut(hop, amountIn, deadline);
         }
         return _clmmOut(hop, amountIn);
     }
 
-    /// @notice xy=k: pre-transfer tokenIn, compute 997/1000 output from reserves,
-    ///         request exactly that output from swap with empty callback data.
+    /// @notice xy=k: pre-transfer tokenIn, compute output from reserves with
+    ///      the factory's configured fee (default 30 bps), request exactly
+    ///      that output from swap with empty callback data.
     function _xykOut(Hop calldata hop, uint256 amountIn) internal returns (uint256 amountOut) {
         IUniswapV2Pair pair = IUniswapV2Pair(hop.pool);
         address token0 = pair.token0();
@@ -312,11 +404,26 @@ contract Aggregator is Ownable, Pausable, ReentrancyGuard {
         bool inIsToken0 = hop.tokenIn == token0;
         uint256 reserveIn = inIsToken0 ? uint256(r0) : uint256(r1);
         uint256 reserveOut = inIsToken0 ? uint256(r1) : uint256(r0);
-        amountOut =
-            (amountIn * V2_FEE_NUM * reserveOut) / (reserveIn * V2_FEE_DEN + amountIn * V2_FEE_NUM);
+
+        uint24 feeBps = _xykFeeFor(hop);
+        uint256 feeNum = 10_000 - feeBps;
+        amountOut = (amountIn * feeNum * reserveOut) / (reserveIn * 10_000 + amountIn * feeNum);
 
         IERC20(hop.tokenIn).safeTransfer(hop.pool, amountIn);
         pair.swap(inIsToken0 ? 0 : amountOut, inIsToken0 ? amountOut : 0, address(this), "");
+    }
+
+    /// @notice Resolve the per-XYK-factory fee (0 = default 30 bps).
+    function _xykFeeFor(Hop calldata hop) internal view returns (uint24) {
+        for (uint256 i = 0; i < factoryList.length; i++) {
+            address factory = factoryList[i];
+            if (factoryDexType[factory] != DexType.Xyk) continue;
+            if (IUniswapV2Factory(factory).getPair(hop.tokenIn, hop.tokenOut) == hop.pool) {
+                uint24 fee = factoryFeeBps[factory];
+                return fee == 0 ? DEFAULT_XYK_FEE_BPS : fee;
+            }
+        }
+        return DEFAULT_XYK_FEE_BPS;
     }
 
     /// @notice Stable: pre-transfer tokenIn, then exchange (pool has no transferFrom).
@@ -328,18 +435,64 @@ contract Aggregator is Ownable, Pausable, ReentrancyGuard {
         dy = pool.exchange(i, j, amountIn, 0);
     }
 
-    /// @notice Xylo: the pool pulls via `transferFrom`, so approve exactly
-    ///         `amountIn`, call `swap(tokenIn, tokenOut, amountIn, 0,
-    ///         address(this), deadline)`, then reset the allowance to 0.
-    function _xyloOut(Hop calldata hop, uint256 amountIn) internal returns (uint256 amountOut) {
-        IXyloPool pool = IXyloPool(hop.pool);
+    /// @notice Xylo: the router pulls via `transferFrom`, so approve exactly
+    ///      `amountIn` to the configured router, call the router's exact-input
+    ///      `swapExactTokensForTokens` with the request deadline and the
+    ///      aggregator as recipient, then reset the allowance and return the
+    ///      post-call balance delta.
+    function _xyloOut(Hop calldata hop, uint256 amountIn, uint256 deadline)
+        internal
+        returns (uint256 amountOut)
+    {
+        address router = _xyloRouterFor(hop);
+        if (router == address(0)) revert RouterNotConfigured();
         address tokenIn = hop.tokenIn;
+
+        uint256 before = IERC20(hop.tokenOut).balanceOf(address(this));
+        IERC20(tokenIn).forceApprove(router, amountIn);
+        address[] memory path = new address[](2);
+        path[0] = tokenIn;
+        path[1] = hop.tokenOut;
+        IXyloRouter(router).swapExactTokensForTokens(amountIn, 0, path, address(this), deadline);
+        uint256 remaining = IERC20(tokenIn).allowance(address(this), router);
+        if (remaining > 0) {
+            IERC20(tokenIn).forceApprove(router, 0);
+        }
+        amountOut = IERC20(hop.tokenOut).balanceOf(address(this)) - before;
+    }
+
+    /// @notice Resolve the atomically configured router for a Xylo hop.
+    function _xyloRouterFor(Hop calldata hop) internal view returns (address) {
+        for (uint256 i = 0; i < factoryList.length; i++) {
+            address factory = factoryList[i];
+            if (factoryDexType[factory] != DexType.Xylo) continue;
+            address router = xyloRouterForFactory[factory];
+            if (router == address(0)) continue;
+            if (IXyloFactory(factory).getPool(hop.tokenIn, hop.tokenOut) == hop.pool) {
+                return router;
+            }
+        }
+        return address(0);
+    }
+
+    /// @notice Presto: exact temporary approval to the allowlisted hub, call
+    ///      `swap(tokenIn, tokenOut, amountIn, 0, deadline)`, reset the
+    ///      allowance, and return the post-call balance delta.
+    function _prestoOut(Hop calldata hop, uint256 amountIn, uint256 deadline)
+        internal
+        returns (uint256 amountOut)
+    {
+        IPrestoHub hub = IPrestoHub(hop.pool);
+        address tokenIn = hop.tokenIn;
+
+        uint256 before = IERC20(hop.tokenOut).balanceOf(address(this));
         IERC20(tokenIn).forceApprove(hop.pool, amountIn);
-        amountOut = pool.swap(tokenIn, hop.tokenOut, amountIn, 0, address(this), block.timestamp);
+        hub.swap(tokenIn, hop.tokenOut, amountIn, 0, deadline);
         uint256 remaining = IERC20(tokenIn).allowance(address(this), hop.pool);
         if (remaining > 0) {
             IERC20(tokenIn).forceApprove(hop.pool, 0);
         }
+        amountOut = IERC20(hop.tokenOut).balanceOf(address(this)) - before;
     }
 
     /// @notice CLMM: exact-in swap; callback pays the pool. Returns output from deltas.
@@ -387,7 +540,7 @@ contract Aggregator is Ownable, Pausable, ReentrancyGuard {
     function _sweepCatalogTo(address to) internal {
         _sweepToken(usdc, to);
         _sweepToken(eurc, to);
-        _sweepToken(mbtc, to);
+        _sweepToken(cirbtc, to);
     }
 
     function _sweepToken(address token, address to) internal {

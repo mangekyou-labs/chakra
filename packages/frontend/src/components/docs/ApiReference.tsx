@@ -108,7 +108,7 @@ export function ApiReference() {
         <Endpoint
           method="GET"
           path="/api/v1/tokens"
-          description="Frozen catalog: ERC-20 USDC (6 dp), EURC (6 dp), mBTC (8 dp). Native USDC is never listed."
+          description="Frozen catalog: ERC-20 USDC (6 dp), EURC (6 dp), cirBTC (8 dp). Native USDC is never listed."
           tryIt={<PingTryIt path="/api/v1/tokens" />}
         />
 

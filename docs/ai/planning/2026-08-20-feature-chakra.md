@@ -8,10 +8,10 @@ date: 2026-08-20
 
 # Project Planning & Task Breakdown
 
-**Product:** Chakra  
-**Feature key:** `chakra`  
-**Branch:** `feature-chakra`  
-**Worktree:** `.worktrees/feature-chakra`  
+**Product:** Chakra
+**Feature key:** `chakra`
+**Branch:** `feature-chakra`
+**Worktree:** `.worktrees/feature-chakra`
 **Status:** Phase 5 execute batch (2026-08-28): T-XYLO-SRC (TDD fix for Xylo source string), T-XYLO (Solidity DexType.Xylo, Foundry suite 81/81, xylo_quote pinned, market-data-worker hydrate/engine/build_tx), T5.2 redeploy on Arc testnet (Aggregator `0xEa1b2C24bd41163590960F8e40afe6cb4CC92006` with Xylo allowlisted, codesize 22258, paused=false), Render deployment (`6d9cc78`), and hosted smoke tests are **DONE and live**. 1e6 USDC→EURC routes `chakra-stable`; 5e6 capacity size routes `xylo`; `/build_tx` `to` targets the new aggregator. Live liquidity re-seed (T2.1–T2.4) remains a separate blocked track.
 **Sources:** requirements (reviewed), design (reviewed), testing docs dated 2026-08-20.
 
@@ -23,13 +23,13 @@ Every testing scenario is owned by at least one task below. Wallet/chain/Permit2
 
 - [x] **M0 — Docs freeze:** Phase 2 requirements review + Phase 3 design review. No code. **Done 2026-08-20.**
 - [x] **M1 — Repo foundation:** Drop Arc-only surface from this branch; Foundry + Rust workspace + env + `arcTestnet`. **Done 2026-08-20 (T1.1, T1.2).**
-- [ ] **M2 — Venues & tokens:** mBTC, xy=k / stable / CLMM factories, seed liquidity on Arc testnet.
-- [ ] **M3 — Worker + Redis:** Bootstrap, discovery, WS + poll, `chakra:` keys.
+- [ ] **M2 — Canonical venues & catalog:** USDC/EURC/cirBTC catalog, Xylo/Presto/UnitFlow V2.5 manifest + adapters, fixture-only mocks (replaces the old mBTC/seed track).
+- [ ] **M3 — Worker + Redis:** Bootstrap, discovery, WS + poll, `chakra:` keys, venue verification.
 - [ ] **M4 — Router + API:** PathFinder, QuoteEngine, SplitOptimizer, REST, OpenAPI.
-- [x] **M5 — Aggregator:** Solidity `splitSwap` + Permit2, Foundry tests, deploy. **Done 2026-08-28 (T5.1, T5.2).**
+- [x] **M5 — Aggregator:** Solidity `splitSwap` + Permit2, Foundry tests, deploy. **Done 2026-08-28 (T5.1, T5.2) — to be redeployed for the new enum/admin surface.**
 - [ ] **M6 — Swap UI:** Next.js dense pro terminal, EIP-6963, decimals, route legs.
 - [x] **M7 — SDK + integrator docs:** TypeScript SDK, 30-min walkthrough. **Done 2026-08-28 (T7.1, T7.2).**
-- [ ] **M8 — Public deploy:** Vercel UI + hosted API/worker/Redis. **T8.1 + T8.2 done 2026-08-28** (public smoke URLs in task entries); M8 closes when T7.2/T9.x use the hosted stack.
+- [ ] **M8 — Public deploy:** Vercel UI + hosted API/worker/Redis. **T8.1 + T8.2 done 2026-08-28** (public smoke URLs in task entries); M8 closes when the re-verified stack uses the new catalog/venues.
 - [ ] **M9 — Evidence + QA:** Split benchmark (T9.2), latency p95 (T9.5), and SDK walkthrough (T7.2) done; venue matrix (T9.1), UI audit (T9.8), and index (T9.7) partial; on-chain split (T9.3), MetaMask QA (T9.4), and live WS proof (T9.6) open / externally gated.
 
 ## Task Breakdown
@@ -38,183 +38,180 @@ Each task: **outcome**, **deps**, **validation**, **tests**. Status: not started
 
 ### M0 — Docs (this phase and next)
 
-- [x] **T0.1** Phase 2 requirements review  
-  **Outcome:** Requirements doc reviewed; catalog freeze, USDC duality, SC-4/5/10/11 tightenings locked. No open product questions.  
-  **Deps:** none.  
-  **Validation:** Reviewer sign-off; no open product questions.  
+- [x] **T0.1** Phase 2 requirements review
+  **Outcome:** Requirements doc reviewed; catalog freeze, USDC duality, SC-4/5/10/11 tightenings locked. No open product questions.
+  **Deps:** none.
+  **Validation:** Reviewer sign-off; no open product questions.
   **Tests:** n/a. **Done 2026-08-20.**
 
-- [x] **T0.2** Phase 3 design review  
-  **Outcome:** Design accepted vs requirements. Factory allowlist, Permit2 AllowanceTransfer, `build_tx` encoder, leftover/deadline, envelope/`price_impact_bps`, CORS, discovery env, CLMM 30 bps required, gas `/1e12` MAX formula, localStorage schemas locked. Full `~/.arc-canteen/context/AGENTS.md` index classified file-by-file (applied vs excluded): public RPC not Canteen `$RPC`, Multicall3 never-sum balances, 1 confirmation, Prague/`prevrandao=0`, documented failovers only (no invented Alchemy URL), App Kit Send/Bridge/Swap/Unified Balance out, CCTP V2 suite + USYC/Entitlements/Teller + Gateway + FxEscrow + Memo + Multicall3From never called.  
-  **Deps:** T0.1.  
-  **Validation:** Architecture, API, Permit2, decimals, non-goals consistent. Coverage matrix in design.  
+- [x] **T0.2** Phase 3 design review
+  **Outcome:** Design accepted vs requirements. Factory allowlist, Permit2 AllowanceTransfer, `build_tx` encoder, leftover/deadline, envelope/`price_impact_bps`, CORS, discovery env, CLMM 30 bps required, gas `/1e12` MAX formula, localStorage schemas locked. Full `~/.arc-canteen/context/AGENTS.md` index classified file-by-file (applied vs excluded): public RPC not Canteen `$RPC`, Multicall3 never-sum balances, 1 confirmation, Prague/`prevrandao=0`, documented failovers only (no invented Alchemy URL), App Kit Send/Bridge/Swap/Unified Balance out, CCTP V2 suite + USYC/Entitlements/Teller + Gateway + FxEscrow + Memo + Multicall3From never called.
+  **Deps:** T0.1.
+  **Validation:** Architecture, API, Permit2, decimals, non-goals consistent. Coverage matrix in design.
   **Tests:** n/a. **Done 2026-08-20.**
 
 ### M1 — Foundation
 
-- [x] **T1.1** Workspace rewrite skeleton  
-  **Outcome:** `feature-chakra` Cargo workspace builds worker/api/router/adapters/snapshot only; Arc contracts and arb/limit/indexer excluded from default build; Foundry `contracts/evm` init (aggregator + `venues/` for vendored Uniswap cores) with `solc = "0.8.30"` and `evm_version = "prague"`; Redis prefix constant `chakra:`; `.env.example` with `CHAKRA_RPC_HTTP=https://rpc.testnet.arc.io`, `CHAKRA_RPC_WS=wss://rpc.testnet.arc.io`, documented failovers (Blockdaemon HTTP; dRPC HTTP/WS; QuickNode HTTP/WS — **no** Alchemy URL, **no** Canteen `$RPC`), chain id `5042002`, `CHAKRA_SEED_FACTORIES`, `CHAKRA_CORS_ORIGINS`, `NEXT_PUBLIC_CHAKRA_API_URL`.  
-  **Deps:** T0.2.  
-  **Validation:** `cargo check` on kept crates; `forge --version`; gitignore `.env*`; `foundry.toml` prague/0.8.30.  
+- [x] **T1.1** Workspace rewrite skeleton
+  **Outcome:** `feature-chakra` Cargo workspace builds worker/api/router/adapters/snapshot only; Arc contracts and arb/limit/indexer excluded from default build; Foundry `contracts/evm` init (aggregator + `venues/` for vendored Uniswap cores) with `solc = "0.8.30"` and `evm_version = "prague"`; Redis prefix constant `chakra:`; `.env.example` with `CHAKRA_RPC_HTTP=https://rpc.testnet.arc.io`, `CHAKRA_RPC_WS=wss://rpc.testnet.arc.io`, documented failovers (Blockdaemon HTTP; dRPC HTTP/WS; QuickNode HTTP/WS — **no** Alchemy URL, **no** Canteen `$RPC`), chain id `5042002`, `CHAKRA_SEED_FACTORIES`, `CHAKRA_CORS_ORIGINS`, `NEXT_PUBLIC_CHAKRA_API_URL`.
+  **Deps:** T0.2.
+  **Validation:** `cargo check` on kept crates; `forge --version`; gitignore `.env*`; `foundry.toml` prague/0.8.30.
   **Tests:** compile-only. **Done 2026-08-20.** `cargo check --workspace` exit 0; `forge test` Placeholder; Redis prefix `chakra:`.
 
-- [x] **T1.2** Decimal + chain primitives  
-  **Outcome:** Shared types: frozen catalog (ERC-20 USDC, EURC, mBTC), 6/8/18 dp helpers, one-balance/two-encoding USDC, reject native as swap token, `msg.value`=0.  
-  **Deps:** T1.1.  
-  **Validation:** unit tests pass.  
+- [x] **T1.2** Decimal + chain primitives
+  **Outcome:** Shared types: frozen catalog (ERC-20 USDC, EURC, mBTC), 6/8/18 dp helpers, one-balance/two-encoding USDC, reject native as swap token, `msg.value`=0.
+  **Deps:** T1.1.
+  **Validation:** unit tests pass.
   **Tests:** Decimal helpers; native not a graph node; USDC MAX helper `ceil(gas_wei / 1e12) × 1.25` with 100_000 floor (SC-12). **Done 2026-08-20.** `cargo test -p market-snapshot decimals`.
 
-### M2 — Venues & tokens
+### M2 — Canonical venues & catalog (2026-08-29 rebaseline)
 
-- [ ] **T2.1** Deploy mBTC (8 dp) + seed mint  
-  **Outcome:** ERC-20 on Arc testnet; address in config; **owner mint only** for seed liquidity and QA wallets. No public mBTC faucet; users buy mBTC via swap.  
-  **Deps:** T1.1.  
-  **Validation:** Arcscan token page; `decimals()==8`.  
-  **Tests:** Foundry ERC-20; seeded venues list.  
-  **Progress 2026-08-20:** `MockBtc.sol` + `MockBtc.t.sol` — 5 tests pass (`decimals==8`, name/symbol, owner mint, non-owner revert, no public faucet). `DeployMockBtc.s.sol` + `CHAKRA_MBTC_ADDRESS` in `.env.example`. **Blocked:** broadcast to Arc — no `PRIVATE_KEY` / `.env` in this session. Do not pass `--private-key` on the CLI.  
-  **Reconcile 2026-08-28:** **deployed** (live mBTC at `0xbf5a25…ECbdF` in `docs/arc-testnet-manifest.json`), **under-seeded** — live V2 mBTC pools hold dust-class reserves (~1.96e6/1962). Seed to documented sizes is operator-gated.
+**Supersedes T2.1–T2.4 (mBTC + Chakra-owned seed liquidity).** The old tasks are historical; mBTC and the owned XYK/stable/CLMM deployments now exist only as deterministic chain-31337 fixtures and are never deployed by the Arc operator workflow.
 
-- [ ] **T2.2** Deploy xy=k factory/pairs and seed USDC/EURC, USDC/mBTC, EURC/mBTC (30 bps)  
-  **Deps:** T2.1.  
-  **Validation:** Reserves readable on-chain.  
-  **Tests:** V2 swap/mint/burn unit tests.  
-  **Progress 2026-08-24:** **local complete / live blocked.** Vendored v2-core `v1.0.1` → `contracts/evm/venues/uniswap-v2/` (GPL-3.0-or-later); V2 factory deployed in Foundry tests via `VendorDeployer` hex (`bytecodes/v2-factory.hex`) + `IUniswapV2Factory` 0.8.30 interface. `XykFactory.t.sol` 8/8 green. `DeployXyk.s.sol` compile-only. Live broadcast + `CHAKRA_XYK_FACTORY` blocked (no key).  
-  **Reconcile 2026-08-28:** **deployed, under-seeded** — USDC/EURC pair `0x201cd9…a590` holds ~1.96e6 each (**below** `MIN_XYK_RESERVE_atomic unitsS` → never quotes); USDC/mBTC `0x36b7ab…36d7` and EURC/mBTC `0x1ac3c4…8af1` hold dust. Re-seed to 10_000e6 (UE) / 50_000e6+1e8 (mBTC pairs) is operator-gated.
+- [ ] **T2.1** Catalog rebaseline: USDC/EURC/cirBTC
+  **Outcome:** Frozen catalog is exactly ERC-20 USDC (`0x3600…0000`, 6 dp), EURC (`0x89B5…D72a`, 6 dp), cirBTC (canonical Arc, 8 dp). mBTC removed from `/tokens`, `/balances`, PathFinder nodes, and the aggregator sweep; cirBTC replaces it at 8 decimals. WUSDC excluded. cirBTC is acquired via the route itself (USDC → EURC → cirBTC); no prefunded target balance required for canaries.
+  **Deps:** T1.1.
+  **Validation:** `/tokens` lists exactly the three canonical tokens; `cargo test` catalog/decimals suites green; aggregator sweeps cirBTC not mBTC.
+  **Tests:** Unit + Foundry catalog enforcement; no mBTC anywhere on the Arc path.
 
-- [ ] **T2.3** Deploy stableswap USDC/EURC (`A=100`, 4 bps), deeper than xy=k  
-  **Deps:** T2.1.  
-  **Validation:** Documented depth vs xy=k (feeds SC-2).  
-  **Tests:** Stableswap exchange unit tests.  
-  **Progress 2026-08-24:** **local complete / live blocked.** Original Apache-2.0 `src/stable/StableSwap.sol` + `StableSwapFactory.sol` (not vendored); invariant/Newton ported from `crates/dex-adapters/src/stable_math.rs`, fee **4 bps on input**, `exchange` has **no `transferFrom`** (aggregator pre-transfers). `StableSwap.t.sol` 10/10 green incl. depth test (1_000e6 on 200k stable > same swap on 10k xy=k, 20× depth). `DeployStable.s.sol` compile-only. Live broadcast + `CHAKRA_STABLE_FACTORY` blocked.
-  **Custody fix 2026-08-26 (T5.1/T2.3):** `StableSwap.t.sol` 16/16 green (10 original + 6 custody). `exchange` now uses stored reserves (`reserve0`/`reserve1`) instead of live balances; reverts `IndexOutOfRange` (i/j > 1), `InsufficientInput` (actualIn < amount), `ZeroAmount` (no deposit). `seedLiquidity` stores reserves; `removeLiquidity` decrements. `forge test -vv` 73/73. **Local complete; live blocked** — no operator key for broadcast.  
-  **Reconcile 2026-08-28:** **deployed, under-seeded** — stable USDC/EURC `0xE4A881…CB02` holds ~3.92e6 each (documented target 200_000e6); 180k USDC drains the pool (`price_impact_bps: 9999`, no split). Re-seed to 200_000e6 per side is operator-gated.
+- [ ] **T2.2** XyloNet integration (xylo-stable)
+  **Outcome:** Source id `xylo-stable`; manifest factory `0x60EDeFB094B84BBC6430cc130B358A43Ba1979e2`, router `0x73742278c31a76dBb0D2587d03ef92E6E2141023`, pool `0x3DF3966F5138143dce7a9cFDdC2c0310ce083BB1`. Atomic owner config of factory/router pair; router exact-input `swapExactTokensForTokens` with request deadline, aggregator recipient, post-call balance delta. Quote from hydrated on-chain pool parameters (amplification read from the pool, not hardcoded).
+  **Deps:** T2.1, T5.1.
+  **Validation:** Adapter parity vs `calculateSwap` view functions; Foundry router hop test.
+  **Tests:** See testing doc (Xylo parity both directions × 3 sizes; approval cleanup; deadline/slippage reverts).
 
-- [ ] **T2.4** Deploy CLMM factory/pool USDC/mBTC **30 bps required** (5 bps optional extra venue) and seed in-range liquidity  
-  **Deps:** T2.1.  
-  **Validation:** slot0 + liquidity on-chain for 30 bps.  
-  **Tests:** CLMM in-range swap unit tests.  
-  **Progress 2026-08-24:** **local complete / live blocked.** Vendored v3-core `v1.0.0` → `contracts/evm/venues/uniswap-v3/` (**BSL 1.1**, upstream true license — plan draft's "GPL-2.0-or-later" applies to later tags); V3 pool via `VendorDeployer` hex + `IUniswapV3Pool`. `ClmmPool.t.sol` 5/5 green after two fixes: V3 `swap` interface must use **`int256 amountSpecified`** (selectors differ; all swaps reverted in opaque bytecode), and full-range position must use **L=1e12** (L=1 made oneForZero output round to 0 USDC). `createPool(USDC,mBTC,3000)` exact-in swap both directions via callback; 5 bps pool absent. `DeployClmm.s.sol` compile-only. Tight-in-range + live broadcast + `CHAKRA_CLMM_FACTORY` blocked.  
-  **Reconcile 2026-08-28:** **deployed, under-seeded / incomplete** — 30 bps pool `0xe431ff…4cb5` has tiny/incomplete ticks (skip-if-incomplete → no `chakra-clmm` edge → USDC↔mBTC `NO_ROUTE`). Tight in-range re-seed + complete tick/bitmap so Redis publish is not skipped: operator-gated.
+- [ ] **T2.3** Presto integration (presto-hub)
+  **Outcome:** Source id `presto-hub`; hub `0x5794a8284A29493871Fbfa3c4f343D42001424D6` allowlisted, restricted to USDC/EURC discovery. Execution `swap(tokenIn, tokenOut, amountIn, 0, deadline)` with exact temporary approval, allowance reset, post-call balance delta. Quote from Presto's published normalized hub formula.
+  **Deps:** T2.1, T5.1.
+  **Validation:** Adapter parity vs hub view function; Foundry hub hop test; USDC/EURC candidates only.
+  **Tests:** See testing doc.
 
-- [x] **T2.5** Factory discovery scan  
-  **Outcome:** Worker reads `CHAKRA_SEED_FACTORIES` + optional `CHAKRA_DISCOVERY_FACTORIES`. Script/adapter probes those factories for `PairCreated`/`PoolCreated`; record none-or-addresses in docs. **Do not auto-allowlist** discovered factories on the aggregator. Owner `addFactory` is required before quotes use them. Seeded venues remain canonical. Extra tokens stay out of the v1 catalog.  
-  **Deps:** T2.2–T2.4.  
-  **Validation:** Written scan result.  
-  **Tests:** discovery parser unit tests with fixture logs.  
-  **Done 2026-08-28:** Scanner updated with full $\le 10,000$ block window pagination from `fromBlock` to `latest`, 8/8 unit tests pass (`scripts/test_discovery_scan.py`), and live execution across seeded factories (`0x0c812E5D...:xyk`, `0x77Ce21FD...:stable`, `0xf6dEa9e6...:clmm`) discovered all 5 deployed pools (V2 USDC/EURC `0x201c...`, V2 USDC/mBTC `0x36b7...`, V2 EURC/mBTC `0x1ac3...`, Stableswap USDC/EURC `0xe4a8...`, and CLMM USDC/mBTC `0xe431...` 30 bps) with 0 errors and zero allowlist mutations.
+- [ ] **T2.4** UnitFlow V2.5 integration (unitflow-v25)
+  **Outcome:** Source id `unitflow-v25`; factory `0xd67F63A4F26a497b364d1C82e6747Aec8B5743a5`, canonical EURC/cirBTC pair `0x268DC75517EaFc6e0D52666639529e5DAB8c9200`, 30 bps. Quoted via existing XYK state/math. Split plans that reuse a pool are rejected.
+  **Deps:** T2.1, T5.1.
+  **Validation:** Adapter parity vs `getAmountsOut` (both directions × 3 sizes); 30 bps fee pinned.
+  **Tests:** See testing doc (UnitFlow fee calculation, shared-pool split rejection).
+
+- [x] **T2.5** Factory discovery scan
+  **Outcome:** Worker reads `CHAKRA_SEED_FACTORIES` + optional `CHAKRA_DISCOVERY_FACTORIES`. Script/adapter probes those factories for `PairCreated`/`PoolCreated`; record none-or-addresses in docs. **Do not auto-allowlist** discovered factories on the aggregator. Owner `addFactory` is required before quotes use them. **Watchlist venues (Lunex, UnitFlow V3, AchSwap/Arc Swap, Synthra) are recorded as promotion candidates, never silently enabled.**
+  **Deps:** T2.2–T2.4.
+  **Validation:** Written scan result.
+  **Tests:** discovery parser unit tests with fixture logs.
+  **Done 2026-08-28:** Scanner updated with full $\le 10,000$ block window pagination from `fromBlock` to `latest`, 8/8 unit tests pass (`scripts/test_discovery_scan.py`), live execution across the manifest factories. Re-validated for the new venue manifest during the 2026-08-29 rebaseline.
 
 ### M3 — Worker + Redis
 
-- [x] **T3.1** Snapshot schema + Redis store with `chakra:` keys  
-  **Deps:** T1.1, T2.2–T2.4 addresses (locally satisfiable; no live addresses needed).  
-  **Validation:** Keys visible in redis-cli after bootstrap; `/ready` predicate provable offline.  
-  **Tests:** Worker bootstrap integration (prefix, snapshot, pool keys).  
+- [x] **T3.1** Snapshot schema + Redis store with `chakra:` keys
+  **Deps:** T1.1, T2.2–T2.4 addresses (locally satisfiable; no live addresses needed).
+  **Validation:** Keys visible in redis-cli after bootstrap; `/ready` predicate provable offline.
+  **Tests:** Worker bootstrap integration (prefix, snapshot, pool keys).
   **Done 2026-08-25 (local, no live Arc):** `chakra:` key constants + schema (`dex_type`/`factory`, `StablePoolStateValue`, `FactoryRecord`), `PoolStateStore` stable batch + `chakra:factories`, ready helper (`cluster_ready`/`memory_ready`), no-RPC bootstrap publisher (`bootstrap.rs`), defaults flipped to `chakra:snapshot:events`. `cargo test -p market-snapshot` 36/36 (incl. real-Redis ready + bootstrap tests), full `cargo test --workspace` green, lint clean. Live Redis keys on Arc still blocked (no operator key) — the Redis-key visibility validation happens against local `redis-server` in tests.
 
-- [x] **T3.2** Adapters: xy=k, stable, CLMM fetch + local math port  
-  **Deps:** T3.1.  
-  **Validation:** Fixture quotes match Foundry/math.  
-  **Tests:** QuoteEngine xy=k / stable / CLMM; CLMM skip if coverage incomplete.  
+- [x] **T3.2** Adapters: xy=k, stable, CLMM fetch + local math port
+  **Deps:** T3.1.
+  **Validation:** Fixture quotes match Foundry/math.
+  **Tests:** QuoteEngine xy=k / stable / CLMM; CLMM skip if coverage incomplete.
   **Done 2026-08-25 (local math port, no live RPC):** `dex-adapters::evm_quote_math` — `xyk_quote` (V2 997/1000, matches `Aggregator._xykFormula`), `stable_quote` (A=100, 4 bps fee-on-input, no transferFrom, Newton `D`+`y` port matching `StableSwap.sol` **exactly** — validated against 3 sequential on-chain vectors captured from a forge script probe of the deployed math: 999550535 / 999451582 / 999352602), `price_impact_bps` (integer bps). CLMM: no new on-chain math in T3.2 — the existing `clmm_math` fixed-point engine stays; the skip-if-incomplete policy is already enforced at publish (`should_publish_clmm_to_redis`) and QuoteEngine. `cargo test -p dex-adapters evm_quote_math` 6/6, workspace green, lint clean. Full adapter fetch (WS/poll) is T3.3.
 
-- [ ] **T3.3** Arc WS log watcher + HTTP poll fallback + fetch pipeline  
-  **Outcome:** `eth_subscribe` logs on **public** `CHAKRA_RPC_WS` (fail over to documented WS URLs). Inclusion = final — write Redis on first receipt, no extra confirmations. Subscribe to factory/pool events, not native USDC sends (no ERC-20 `Transfer` on plain native send).  
-  **Deps:** T3.2.  
-  **Validation:** On-chain swap → Redis pool key updates **≤ 5 s** after inclusion (SC-11).  
-  **Tests:** SC-11 WS path; poll fallback with WS disabled.  
-  **Progress 2026-08-25:** **local complete / live blocked.** `dex-adapters::{evm_rpc,evm_logs,evm_fetch}` — thin JSON-RPC client (`eth_blockNumber`/`eth_call`/`eth_getLogs`, URL failover) + **RPC URL policy** (Canteen `rpc.testnet.arc-node.thecanteenapp.com` and Alchemy rejected; only public Arc + Blockdaemon HTTP / dRPC/QuickNode HTTP+WS allowed), keccak topic0 decoder for V2/V3/stableswap touch + creation events (ERC-20 `Transfer` never a touch; 12-address never-call table), `eth_call` hydrators (`getReserves`/`balanceOf`/`slot0`+`liquidity`, CLMM publish still completeness-gated), pool index now indexes `0x` addresses. `market-data-worker::{evm_watcher,fetch_pipeline,worker}` — `EvmConfig::from_env` (CHAKRA env; `CHAKRA_REDIS_URL`→store, `SNAPSHOT_REDIS_*` override), `publish_bootstrap` at start (empty factories allowed; ready stays false until ≥1 pool key), `eth_subscribe "logs"` watcher with failover+reconnect and address-filter refresh on new pools, `eth_getLogs` poll fallback (~0.5 s, catch-up cap), discovery ~600 s over catalog pairs only (no full-market sweep), one extended fetch pipeline (EvmXyk/EvmStable/EvmClmm + `set_stable_batch`), worker mode defaults to Arc (Arc loop kept for legacy env). SC-11 proven locally: `poll_refreshes_pool_store_after_fixture_swap_within_5s` (< 5 s to store update) + real tungstenite WS server test. **Live on-chain swap → Redis ≤ 5 s stays T9.6** (no operator key; never Canteen `$RPC`), so the box stays `- [ ]` — same local complete / live blocked pattern as T2.x.
+- [ ] **T3.3** Arc WS log watcher + HTTP poll fallback + fetch pipeline
+  **Outcome:** `eth_subscribe` logs on **public** `CHAKRA_RPC_WS` (fail over to documented WS URLs). Inclusion = final — write Redis on first receipt, no extra confirmations. Subscribe to factory/pool events, not native USDC sends (no ERC-20 `Transfer` on plain native send).
+  **Deps:** T3.2.
+  **Validation:** On-chain swap → Redis pool key updates **≤ 5 s** after inclusion (SC-11).
+  **Tests:** SC-11 WS path; poll fallback with WS disabled.
+  **Progress 2026-08-25:** **local complete / live blocked.** `dex-adapters::{evm_rpc,evm_logs,evm_fetch}` — thin JSON-RPC client (`eth_blockNumber`/`eth_call`/`eth_getLogs`, URL failover) + **RPC URL policy** (Canteen `rpc.testnet.arc-node.thecanteenapp.com` and Alchemy rejected; only public Arc + Blockdaemon HTTP / dRPC/QuickNode HTTP+WS allowed), keccak topic0 decoder for V2/V3/stableswap touch + creation events (ERC-20 `Transfer` never a touch; 12-address never-call table), `eth_call` hydrators (`getReserves`/`balanceOf`/`slot0`+`liquidity`, CLMM publish still completeness-gated), pool index now indexes `0x` addresses. `market-data-worker::{evm_watcher,fetch_pipeline,worker}` — `EvmConfig::from_env` (CHAKRA env; `CHAKRA_REDIS_URL`→store, `SNAPSHOT_REDIS_*` override), `publish_bootstrap` at start (empty factories allowed; ready stays false until ≥1 pool key), `eth_subscribe "logs"` watcher with failover+reconnect and address-filter refresh on new pools, `eth_getLogs` poll fallback (~0.5 s, catch-up cap), discovery ~600 s over catalog pairs only (no full-market sweep), one extended fetch pipeline (EvmXyk/EvmStable/EvmClmm + `set_stable_batch`), worker mode defaults to Arc (Arc loop kept for legacy env). SC-11 proven locally: `poll_refreshes_pool_store_after_fixture_swap_within_5s` (< 5 s to store update) + real tungstenite WS server test. **2026-08-29 rebaseline:** venue verification added at startup (bytecode, canonical token endpoints, factory membership, nonzero reserves, probe quote); failed venues become unavailable and yield `NO_ROUTE`; no auto-reseed. Xylo (`xylo-stable`), Presto (`presto-hub`), and UnitFlow V2.5 (`unitflow-v25`) are manifest sources with stable ids through snapshot, API, SDK, and UI.
 
 ### M4 — Router + API
 
-- [x] **T4.1** PathFinder BFS on Arc graph (`MAX_HOPS=3`)  
-  **Deps:** T3.1–T3.2.  
-  **Validation:** Candidates for three pairs.  
-  **Tests:** PathFinder unit (SC-1); `max_hops=1`; unknown token.  
+- [x] **T4.1** PathFinder BFS on Arc graph (`MAX_HOPS=3`)
+  **Deps:** T3.1–T3.2.
+  **Validation:** Candidates for three pairs.
+  **Tests:** PathFinder unit (SC-1); `max_hops=1`; unknown token.
   **Done 2026-08-25 (local, no live RPC):** `PathFinderConfig::default()` fixed for Chakra — `max_hops=3`, bridge = ERC-20 USDC (`0x3600…0000`) via `TokenId::Contract` (old default bridged Arc Native + Classic USDC). New `pairs_from_chakra_snapshot` (sources + `clmm_pool_refs` → router pairs, filtered by `decimals::graph_nodes(mbtc)` — catalog freeze + native-encoding exclusion) and `PathFinder::update_from_chakra_snapshot`. `cargo test -p router-engine` **37/37** (8 new: USDC→EURC finds xyk+stable; USDC→mBTC finds xyk+clmm; EURC→mBTC direct + 2-hop via USDC; `max_hops=1`; unknown/same-token empty; non-catalog pool unused; native USDC not a node; Chakra default). SplitOptimizer/QuoteEngine untouched (T4.2). Validation is topological → box flipped; no live RPC involvement.
 
-- [x] **T4.2** SplitOptimizer (Brent, thresholds, `protocol_fee_bps=0`) + QuoteEngine EVM wiring  
-  **Deps:** T4.1, T3.2.  
-  **Validation:** Documented USDC/EURC size → `is_split=true` and better than single (SC-2).  
-  **Tests:** All SplitOptimizer unit cases; fee=0 (SC-13).  
+- [x] **T4.2** SplitOptimizer (Brent, thresholds, `protocol_fee_bps=0`) + QuoteEngine EVM wiring
+  **Deps:** T4.1, T3.2.
+  **Validation:** Documented USDC/EURC size → `is_split=true` and better than single (SC-2).
+  **Tests:** All SplitOptimizer unit cases; fee=0 (SC-13).
   **Done 2026-08-25 (local, no live RPC):** `protocol_fee_bps=0` on `OptimalRoute` (SC-13) + `max_splits=1` lock; `QuoteHydration.stable_pools` + `chakra-stable`/`chakra-xyk` EVM dispatch (`evm_quote_math` 997/1000 + A=100 stable, vector `999_550_535` pinned); `chakra-clmm` allowlisted (skip-if-incomplete kept); SC-12 native-encoding guard; USDC 6 dp vs mBTC 8 dp atomic pin. **SC-2 documented deviation:** at `180_000e6` the engine refuses the split — the ~0.7% xy=k leg fails the locked `max_leg_rate_deviation_bps=500` filter (marginal rate 17× the diluted full-size quote) and the 5 bps floor; single `chakra-stable` is returned (best execution). No size passes both on the T2.3 seeds (brute-force to 2e12). Fix deferred to T4.3/T9.2 (relax filter or deepen xy=k seed). `cargo test -p router-engine` **44/44**, `cargo test -p api-server` 40/40, workspace green, lint clean.
   **Update 2026-08-26:** The EURC fixture casing and allocated-size re-quote now make this fixture return a split. T4.2's local routing behavior remains implemented; independent split-filter safety and checked-in SC-2 evidence remain open under T9.2.
 
-- [x] **T4.3** REST: `/quote`, `/build_tx`, `/tokens`, `/balances`, `/health`, `/ready` + OpenAPI  
-  **Outcome:** Envelope `{success,data,error}` with `error.code`; integer `price_impact_bps`; `/ready` = snapshot current **and** ≥1 pool key; 10 req/s/IP (health/ready exempt); CORS `CHAKRA_CORS_ORIGINS`. `GET /balances` batches catalog ERC-20 `balanceOf` via **Multicall3** and returns a separate `native_usdc` field; **never sum** the two USDC encodings.  
-  **Deps:** T4.2, T5.1 ABI (can stub `to` until aggregator deploy).  
-  **Validation:** Local curl flow; `/ready` 503 on empty Redis.  
-  **Tests:** API integration suite; 429; CORS; balances native vs ERC-20 never-sum (SC-12).  
+- [x] **T4.3** REST: `/quote`, `/build_tx`, `/tokens`, `/balances`, `/health`, `/ready` + OpenAPI
+  **Outcome:** Envelope `{success,data,error}` with `error.code`; integer `price_impact_bps`; `/ready` = snapshot current **and** ≥1 pool key; 10 req/s/IP (health/ready exempt); CORS `CHAKRA_CORS_ORIGINS`. `GET /balances` batches catalog ERC-20 `balanceOf` via **Multicall3** and returns a separate `native_usdc` field; **never sum** the two USDC encodings.
+  **Deps:** T4.2, T5.1 ABI (can stub `to` until aggregator deploy).
+  **Validation:** Local curl flow; `/ready` 503 on empty Redis.
+  **Tests:** API integration suite; 429; CORS; balances native vs ERC-20 never-sum (SC-12).
   **Done 2026-08-28:** Production CLMM loader path verified: T4.6 wired `build_engine_from_snapshot` over `snapshot.clmm_pool_refs`, and integration test `ready_and_clmm_only_snapshot_quotes_and_builds` in `crates/api-server/tests/chakra_rest_test.rs` verifies `/ready` 200 OK, `/quote` for CLMM pool emitting explicit hop metadata, and `/build_tx` producing valid `splitSwap` calldata targeting deployed aggregator (`0xEa1b2C24bd41163590960F8e40afe6cb4CC92006`) with `value: "0"`.
 
-- [x] **T4.4** `build_tx` calldata encoder for `splitSwap` + Permit2 typed-data payload (done locally 2026-08-28)  
-  **Outcome:** Encoder **not** a re-quoter. Validate continuity, amount sum, snapshot/factory membership. RPC: `paused()`, ERC-20 allowance→Permit2, Permit2 `allowance`. Omit typed data when allowance already sufficient. `value` always `"0"`.  
-  **Deps:** T4.3, T5.1.  
-  **Validation:** Decode matches quote sub-routes; mutated routes → `ROUTE_INVALID`; paused → `PAUSED`.  
-  **Tests:** `/build_tx` integration.  
-  **Progress 2026-08-25:** The local validator, response envelope, paused check, typed-data response, and fixture tests are present.  
+- [x] **T4.4** `build_tx` calldata encoder for `splitSwap` + Permit2 typed-data payload (done locally 2026-08-28)
+  **Outcome:** Encoder **not** a re-quoter. Validate continuity, amount sum, snapshot/factory membership. RPC: `paused()`, ERC-20 allowance→Permit2, Permit2 `allowance`. Omit typed data when allowance already sufficient. `value` always `"0"`.
+  **Deps:** T4.3, T5.1.
+  **Validation:** Decode matches quote sub-routes; mutated routes → `ROUTE_INVALID`; paused → `PAUSED`.
+  **Tests:** `/build_tx` integration.
+  **Progress 2026-08-25:** The local validator, response envelope, paused check, typed-data response, and fixture tests are present.
   **Done 2026-08-26:** All three Critical ABI findings resolved. (a) `SPLIT_SWAP_SIGNATURE` corrected to canonical 7-arg form → selector `0x2e3be0c1`; (b) `encode_permit2_pull` emits 6-word PermitSingle + offset + sig (was 20 zero words); (c) `permit2_allowance` uses Permit2 `0x927da105` (was ERC-20 `0xdd62ed3e`). Foundry round-trip test `test_api_hex_empty_sig_succeeds` verifies contract-decodable calldata. 74 Foundry + 25 Cargo tests green.
   **Done 2026-08-28 (local):** Selector `0x2e3be0c1` and Permit2 packing verified. Encoder writes array length then inlined static `Hop`s; tests pin a `cast calldata` fixture. 12 build_tx integration tests green. Needs Phase 7 re-verify, not more encoder work unless verification fails.
 
-- [x] **T4.5** QuoteEngine factory skip (done 2026-08-28)  
-  **Outcome:** QuoteEngine skips pools whose factory is not in `chakra:factories`. Matches `build_tx.rs` policy: empty factories → accept legacy; non-empty + pool factory missing → skip; allowlisted factory → quote.  
-  **Deps:** T4.2.  
-  **Validation:** `cargo test -p router-engine` green; workspace green.  
-  **Tests:** 3 unit tests in `quote_engine.rs`.  
+- [x] **T4.5** QuoteEngine factory skip (done 2026-08-28)
+  **Outcome:** QuoteEngine skips pools whose factory is not in `chakra:factories`. Matches `build_tx.rs` policy: empty factories → accept legacy; non-empty + pool factory missing → skip; allowlisted factory → quote.
+  **Deps:** T4.2.
+  **Validation:** `cargo test -p router-engine` green; workspace green.
+  **Tests:** 3 unit tests in `quote_engine.rs`.
   **Progress 2026-08-26:** Three `t45_*` unit tests are green, but keep T4.5 open. `pool_hydrate.rs` loads factories only in a legacy module that the active API does not export; active `hydrate.rs` leaves `QuoteHydration.factories` empty. The gate accepts/rejects by DEX source alone and never compares the current pool address/factory pair, so the “unlisted factory” test is a source-presence false positive rather than exact pool-factory membership. Wire factory records into the active hydration path and test two pools of the same source under different factories.
   **Done 2026-08-28:** `QuoteHydration.factories` restored (was stripped), `hydrate.rs` wires `store.fetch_factories()` into it, and the three `t45_*` tests assert exact factory membership (allowlisted quotes, unlisted skipped, empty-list legacy accepted).
 
 - [x] **T4.6** Preserve CLMM topology, factory, and fee through worker → snapshot → production API → `/build_tx` (done 2026-08-28)
-  **Outcome:** Production engine construction consumes `clmm_pool_refs`; every CLMM ref retains its factory and fee tier; `/quote` and `/build_tx` agree on the same pool identity; required 30 bps is supported and optional discovered 5 bps is either represented correctly or explicitly excluded before routing.  
-  **Deps:** T3.3, T4.3, T4.5.  
-  **Validation:** Load a worker-shaped production snapshot in which CLMM exists only in `clmm_pool_refs`; quote the CLMM venue, enforce exact factory membership, then build with the preserved fee.  
-  **Tests:** Production snapshot-loader regression; 30/5 bps fee propagation; same-source allowed/denied factories; no quote-to-build topology loss.  
-  **Done 2026-08-28 (local):** `BuildTxStep.fee_bps: Option<u32>`; `validate_hop` checks submitted fee vs snapshot `ClmmPoolRefSnapshot.fee_bps`; encoder uses step fee, falls back to `step_fee_bps()`. 3 CLMM fee tests: wrong fee rejected, correct fee accepted, encoded fee matches step.  
-  **Remainder (out of batch):** omit-fee encoding should take the snapshot fee (currently venue default); 5 bps encode test.  
+  **Outcome:** Production engine construction consumes `clmm_pool_refs`; every CLMM ref retains its factory and fee tier; `/quote` and `/build_tx` agree on the same pool identity; required 30 bps is supported and optional discovered 5 bps is either represented correctly or explicitly excluded before routing.
+  **Deps:** T3.3, T4.3, T4.5.
+  **Validation:** Load a worker-shaped production snapshot in which CLMM exists only in `clmm_pool_refs`; quote the CLMM venue, enforce exact factory membership, then build with the preserved fee.
+  **Tests:** Production snapshot-loader regression; 30/5 bps fee propagation; same-source allowed/denied factories; no quote-to-build topology loss.
+  **Done 2026-08-28 (local):** `BuildTxStep.fee_bps: Option<u32>`; `validate_hop` checks submitted fee vs snapshot `ClmmPoolRefSnapshot.fee_bps`; encoder uses step fee, falls back to `step_fee_bps()`. 3 CLMM fee tests: wrong fee rejected, correct fee accepted, encoded fee matches step.
+  **Remainder (out of batch):** omit-fee encoding should take the snapshot fee (currently venue default); 5 bps encode test.
   **Done 2026-08-28 (remainder):** omitted `fee_bps` now encodes the **snapshot** CLMM fee (not the venue default) via `encode_sub_route(snapshot)`; 5 bps tier is representable end-to-end — `build_tx_omit_fee_encodes_snapshot_clmm_fee_not_default` (omitted fee → 5) and `build_tx_encodes_and_validates_5bps_clmm_tier` (explicit 5 accepted/encoded; 30 rejected). Production `build_engine_from_snapshot` consumes `clmm_pool_refs` (T4.3 reconciliation) so the live CLMM venue survives worker → snapshot → engine.
 
 - [x] **T4.7** Make route metadata explicit and validate exact hop identity (done 2026-08-28)
-  **Outcome:** Quote output carries per-hop DEX type and fee metadata rather than requiring UI/SDK source-string heuristics. `/build_tx` verifies that every submitted hop's token pair, DEX type, factory, and fee match the referenced snapshot pool before producing calldata.  
-  **Deps:** T4.4, T4.6, T7.1.  
-  **Validation:** UI and SDK pass through server-owned route metadata without reconstructing it; invalid token/type/factory/fee combinations return `ROUTE_INVALID`.  
-  **Tests:** Mismatched pool tokens, wrong DEX type, wrong fee tier, same-source/different-factory, and valid xyk/stable/CLMM routes.  
+  **Outcome:** Quote output carries per-hop DEX type and fee metadata rather than requiring UI/SDK source-string heuristics. `/build_tx` verifies that every submitted hop's token pair, DEX type, factory, and fee match the referenced snapshot pool before producing calldata.
+  **Deps:** T4.4, T4.6, T7.1.
+  **Validation:** UI and SDK pass through server-owned route metadata without reconstructing it; invalid token/type/factory/fee combinations return `ROUTE_INVALID`.
+  **Tests:** Mismatched pool tokens, wrong DEX type, wrong fee tier, same-source/different-factory, and valid xyk/stable/CLMM routes.
   **Status:** **DONE 2026-08-28 (local).** `Path` carries per-hop `dex_types[]`/`fee_bps[]`/`factories[]` (graph edges → path finder → quote); `SubRouteData` emits `dex_types`, `hop_fees`, `hop_factories` (length == `pool_addresses`); SDK + UI `quoteSubRoutesToSteps` consume server fields with a short joined-source deprecation path; `BuildTxCodeSample` + `qa.wallet` spec use `dex_types`; OpenAPI + `docs/api-reference.md` document the shape (extensible — `xylo` allowed without reopening). `/build_tx` exact hop identity (tokens/dex type/factory/fee) was already in place (T4.4/T4.6). Tests: API integration `quote_emits_explicit_per_hop_dex_type_fee_factory`, engine `test_paths_carry_per_hop_dex_type_fee_factory`, SDK mapper (server-precedence + legacy fallback + fee passthrough).
 
-- [x] **T-XYLO** Scoped XyloNet hop (DONE 2026-08-28; redeployed and verified live)  
-  **Outcome:** XyloNet USDC/EURC (`0x3DF3966F…BB1`, factory `0x60EDeFB0…9e2`, A=200, 4 bps fee-on-output, `swap` pulls via `transferFrom`) as a scoped v1 hop. New `DexType.Xylo` (enum value 3, appended). Aggregator redeploy (bytecode change) + owner `addFactory(xylo)` broadcast to Arc testnet. Hosted Render worker + API verified live.  
-  **Deps:** T4.7 (done), T5.1 (done).  
-  **Validation:** Live `/api/v1/quote` 1e6 USDC→EURC prefers `chakra-stable` (996915); 5e6 capacity size routes `dex_types: ["xylo"]`; USDC→mBTC returns honest `NO_ROUTE`. `/build_tx` returns `to: 0xea1b2c24bd41163590960f8e40afe6cb4cc92006`.  
-  **Tests:** Foundry 81/81 pass (5 Aggregator Xylo tests); `xylo_quote` pinned to live same-block `calculateSwap` vectors (865542/1154419); engine small-size prefers chakra-stable, capacity-size routes xylo.  
+- [x] **T-XYLO** Scoped XyloNet hop (DONE 2026-08-28; redeployed and verified live)
+  **Outcome:** XyloNet USDC/EURC (`0x3DF3966F…BB1`, factory `0x60EDeFB0…9e2`, A=200, 4 bps fee-on-output, `swap` pulls via `transferFrom`) as a scoped v1 hop. New `DexType.Xylo` (enum value 3, appended). Aggregator redeploy (bytecode change) + owner `addFactory(xylo)` broadcast to Arc testnet. Hosted Render worker + API verified live.
+  **Deps:** T4.7 (done), T5.1 (done).
+  **Validation:** Live `/api/v1/quote` 1e6 USDC→EURC prefers `chakra-stable` (996915); 5e6 capacity size routes `dex_types: ["xylo"]`; USDC→mBTC returns honest `NO_ROUTE`. `/build_tx` returns `to: 0xea1b2c24bd41163590960f8e40afe6cb4cc92006`.
+  **Tests:** Foundry 81/81 pass (5 Aggregator Xylo tests); `xylo_quote` pinned to live same-block `calculateSwap` vectors (865542/1154419); engine small-size prefers chakra-stable, capacity-size routes xylo.
   **Done 2026-08-28:** `IXyloNet.sol` interface; `Aggregator.sol` `DexType.Xylo` + `_xyloOut` + `_assertPool` Xylo arm; `MockXylo.sol` test double; Foundry 81/81. Rust: `evm_quote_math::xylo_quote` pinned to RPC vectors; worker `EvmXylo` task + `fetch_xylo_state` + `FactoryConfig::parse` source string fix (`xylo`); QuoteEngine dispatch + hydrate; `build_tx` `DexType::Xylo` (u8 3, fee 4); SDK/frontend route legs; live broadcast + Render deploy.
 
 ### M5 — Aggregator
 
 - [x] **T5.1** `Aggregator.sol` Ownable + Pausable + ReentrancyGuard + Permit2 AllowanceTransfer + `splitSwap` (done 2026-08-28, deployed in T5.2)
-  **Outcome:** Factory allowlist (`addFactory` / `getPair`/`getPool`); stable pool allowlist; hop min 0; total `minAmountOut`; `deadline`; non-payable; leftover sweep to user then 0 invariant; V3 callback sender check; `Swap` event; owner `rescueTokens`. Vendor Uniswap V2/V3 under `contracts/evm/venues/` with upstream LICENSE; original stableswap Apache-2.0.  
-  **Deps:** T2.2–T2.4.  
-  **Validation:** Foundry suite green; leftover=0; fake-pool hop reverts.  
-  **Tests:** All Solidity aggregator cases (SC-4 analog, SC-12 value=0, SC-13 fee=0, allowlist, callback spoof).  
-  **Progress 2026-08-25:** The aggregator implementation and 39-test Foundry suite are present; live broadcast still needs the operator key and real venue addresses.  
+  **Outcome:** Factory allowlist (`addFactory` / `getPair`/`getPool`); stable pool allowlist; hop min 0; total `minAmountOut`; `deadline`; non-payable; leftover sweep to user then 0 invariant; V3 callback sender check; `Swap` event; owner `rescueTokens`. Vendor Uniswap V2/V3 under `contracts/evm/venues/` with upstream LICENSE; original stableswap Apache-2.0.
+  **Deps:** T2.2–T2.4.
+  **Validation:** Foundry suite green; leftover=0; fake-pool hop reverts.
+  **Tests:** All Solidity aggregator cases (SC-4 analog, SC-12 value=0, SC-13 fee=0, allowlist, callback spoof).
+  **Progress 2026-08-25:** The aggregator implementation and 39-test Foundry suite are present; live broadcast still needs the operator key and real venue addresses.
   **Custody fix 2026-08-26 (T5.1/T2.3):** StableSwap stored-reserve custody complete. `exchange` measures actualIn via `balanceOf - reserveIn`, reverts ZeroAmount/InsufficientInput/IndexOutOfRange. 6 custody tests added. Full Foundry suite 73/73. T5.1 stays `[ ]` (live deploy is T5.2). Aggregator stable-hop pre-transfer + `exchange(i,j,amount,0)` still works — 39 Aggregator tests pass.
 
-- [x] **T5.2** Deploy aggregator to Arc testnet; config addresses (DONE 2026-08-28)  
-  **Outcome:** Broadcast via Foundry script `scripts/arc-operator.sh` on **public** `CHAKRA_RPC_HTTP` (`https://rpc.testnet.arc.io`). Key loaded from `~/.arc-canteen/wallet.yaml` by wrapper without CLI exposure.  
-  **Deps:** T5.1, T-XYLO.  
-  **Validation:** On-chain codesize 22258 chars (11128 bytes), owner `0x12E266744f6d25D372000e066eCc0DF5a752276d`, `paused() == false`, `factoryDexType(xylo) == 3`.  
-  **Tests:** On-chain cast calls and hosted `/build_tx` `to` matching `0xEa1b2C24bd41163590960F8e40afe6cb4CC92006`.  
+- [x] **T5.2** Deploy aggregator to Arc testnet; config addresses (DONE 2026-08-28; **redeploy pending for the 2026-08-29 rebaseline**)
+  **Outcome:** Broadcast via Foundry script `scripts/arc-operator.sh` on **public** `CHAKRA_RPC_HTTP` (`https://rpc.testnet.arc.io`). Key loaded from `~/.arc-canteen/wallet.yaml` by wrapper without CLI exposure.
+  **Deps:** T5.1, T-XYLO.
+  **Validation:** On-chain codesize, owner, `paused() == false`, `factoryDexType` allowlist (Xyk=0, Stable=1, Clmm=2, Xylo=3, Presto=4).
+  **Tests:** On-chain cast calls and hosted `/build_tx` `to` matching the deployed aggregator.
   **Done 2026-08-28:** Redeployed Aggregator at `0xEa1b2C24bd41163590960F8e40afe6cb4CC92006` (tx `0x4cef6ba6e6d7132a7517666b2ce6c1ab7f5ae882ca9c80bb82ad9658ab71a22d`) with all 4 factories allowlisted (Xyk=0, Stable=1, Clmm=2, Xylo=3). `docs/arc-testnet-manifest.json`, `render.yaml`, and `.env.example` updated.
+  **Rebaseline 2026-08-29:** The operator rollout is **one aggregator deployment plus venue registration** — no token, factory, pool, or liquidity deployment. The new non-upgradeable aggregator drops the `mbtc` immutable for canonical `cirbtc`, sweeps cirBTC instead of mBTC, and adds the Presto hub allowlist + atomic Xylo factory/router config + per-XYK-factory fees. After local verification, stop before broadcasting; deployment is separately authorized.
 ### M6 — Swap UI
 
-- [x] **T6.1** wagmi/viem `arcTestnet`, EIP-6963 connect, `wallet_addEthereumChain` / switch `5042002`  
-  **Outcome:** `nativeCurrency` USDC 18 dp; chainId `0x4CEF52`; rpc `https://rpc.testnet.arc.io`; explorer `https://testnet.arcscan.app`. Do not invent a custom chain definition. If the wallet still labels native as ETH, UI copy still says USDC.  
-  **Deps:** T1.1.  
-  **Validation:** Connect + wrong-chain block.  
-  **Tests:** Chain-gate unit; e2e injected wrong-chain; ETH-display copy.  
+- [x] **T6.1** wagmi/viem `arcTestnet`, EIP-6963 connect, `wallet_addEthereumChain` / switch `5042002`
+  **Outcome:** `nativeCurrency` USDC 18 dp; chainId `0x4CEF52`; rpc `https://rpc.testnet.arc.io`; explorer `https://testnet.arcscan.app`. Do not invent a custom chain definition. If the wallet still labels native as ETH, UI copy still says USDC.
+  **Deps:** T1.1.
+  **Validation:** Connect + wrong-chain block.
+  **Tests:** Chain-gate unit; e2e injected wrong-chain; ETH-display copy.
   **Done 2026-08-25 (see Phase 6 summary):** wagmi 3.7.6 + viem 2.55.19 + @tanstack/react-query; EIP-6963 injected connector via wagmi root `injected`; `arcTestnet` from `wagmi/chains`; `ARC_ADD_CHAIN_PARAMS` for `wallet_addEthereumChain`; Arc wallet deps removed (see T6.2 for the full Arc drop).
 
-- [x] **T6.2** Swap workspace: tokens, amount, % chips, slippage 0.5%, quote panel (legs, impact from `price_impact_bps`, fee 0), dense pro-terminal visual  
-  **Deps:** T4.3, T6.1.  
-  **Validation:** Desktop + mobile layout; numbers use token decimals; USDC MAX uses `/1e12` buffer; quote debounce 250 ms / refresh 5 s. Direct `NEXT_PUBLIC_CHAKRA_API_URL` (no Next rewrite).  
-  **Tests:** Chips/slippage/formatters/MAX-buffer unit; manual UX checklist.  
+- [x] **T6.2** Swap workspace: tokens, amount, % chips, slippage 0.5%, quote panel (legs, impact from `price_impact_bps`, fee 0), dense pro-terminal visual
+  **Deps:** T4.3, T6.1.
+  **Validation:** Desktop + mobile layout; numbers use token decimals; USDC MAX uses `/1e12` buffer; quote debounce 250 ms / refresh 5 s. Direct `NEXT_PUBLIC_CHAKRA_API_URL` (no Next rewrite).
+  **Tests:** Chips/slippage/formatters/MAX-buffer unit; manual UX checklist.
   **Done 2026-08-25 (see Phase 6 summary):** focused swap app; Arc routes deleted; quote-only (send disabled — T6.3).
 
 - [ ] **T6.3** Permit2 approve + sign + send + Arcscan + recent swaps + unaudited warning (local correctness + live UI verified; on-chain wallet send pending)
@@ -228,10 +225,10 @@ Each task: **outcome**, **deps**, **validation**, **tests**. Status: not started
   **Status 2026-08-28 (live UI verified; on-chain wallet send pending):** Hosted Vercel UI (`https://chakra-arc-dex.vercel.app`) verified on desktop (1280x800) and mobile (375x667) viewports with live API connectivity. Local frontend unit tests 66/66 green. Live on-chain swap via browser wallet remains open pending user/faucet funded MetaMask connection on Arc testnet (chain 5042002); CLI cast bypass forbidden by plan.
 ### M7 — SDK + docs
 
-- [x] **T7.1** TypeScript SDK `quote` + `buildTx`  
-  **Deps:** T4.3.  
-  **Validation:** Example script against local API.  
-  **Tests:** SDK unit; OpenAPI example (SC-6).  
+- [x] **T7.1** TypeScript SDK `quote` + `buildTx`
+  **Deps:** T4.3.
+  **Validation:** Example script against local API.
+  **Tests:** SDK unit; OpenAPI example (SC-6).
   **Done 2026-08-25 (see Phase 6 summary):** `ChakraClient` rewrite; quote/buildTx/getBalances/listTokens/isHealthy/isReady; `user` field; slips `slippage_bps`; envelope `.code` errors; example skips when API down. OpenAPI `user` added to `BuildTxRequest`.
 
 - [x] **T7.2** Integrator 30-minute walkthrough (done 2026-08-28)
@@ -244,40 +241,40 @@ Each task: **outcome**, **deps**, **validation**, **tests**. Status: not started
   **Done 2026-08-28 (clean clone + hosted API):** Followed integrator guide from a fresh clone of `https://github.com/mangekyou-labs/chakra.git`. Tested hosted API health/readiness, built SDK, and executed quote-build example against `https://chakra-api-0a5i.onrender.com`. Quote returned 996915 (`chakra-stable`) and `/build_tx` returned calldata (selector `0x2e3be0c1`, `to: 0xEa1b2C24bd41163590960F8e40afe6cb4CC92006`) with PermitSingle EIP-712 typed data. Walkthrough completed in 6 seconds (gate ≤ 30 minutes). Evidence recorded in `docs/evidence/chakra-t72-walkthrough.json`.
 ### M8 — Public deploy
 
-- [x] **T8.1** Host Redis + worker + API; public `/health` + `/ready` + `/quote` (done 2026-08-28)  
-  **Deps:** T3.3, T4.3, T5.2.  
-  **Validation:** Public URLs including `/ready` (SC-5).  
-  **Tests:** Public health/ready/quote smoke.  
+- [x] **T8.1** Host Redis + worker + API; public `/health` + `/ready` + `/quote` (done 2026-08-28)
+  **Deps:** T3.3, T4.3, T5.2.
+  **Validation:** Public URLs including `/ready` (SC-5).
+  **Tests:** Public health/ready/quote smoke.
   **Done 2026-08-28:** Render service `chakra-api` at `https://chakra-api-0a5i.onrender.com` (Docker, free, Oregon) + `chakra-redis` KV. Worker runs `evm_watcher::run_arc` (WS + poll + discovery). Smoke: `/health` 200; `/ready` 200 `ready:true` with `snapshot_id`; `/quote` USDC→EURC 1e6 → 996915 via `chakra-stable`; `/tokens` catalog. Redis holds snapshot + 4 pool keys. Fixed `COUNTKEYS`→`SCAN` in `cluster_ready` (`128ff47`).
 
-- [x] **T8.2** Vercel UI pointed at public API (done 2026-08-28)  
-  **Outcome:** `NEXT_PUBLIC_CHAKRA_API_URL` to the public API origin. **No** Next.js rewrite proxy for quote/build. CORS origin included in `CHAKRA_CORS_ORIGINS`.  
-  **Deps:** T6.3, T8.1.  
-  **Validation:** Public UI URL.  
-  **Tests:** SC-3 against public URL (also T9.4).  
+- [x] **T8.2** Vercel UI pointed at public API (done 2026-08-28)
+  **Outcome:** `NEXT_PUBLIC_CHAKRA_API_URL` to the public API origin. **No** Next.js rewrite proxy for quote/build. CORS origin included in `CHAKRA_CORS_ORIGINS`.
+  **Deps:** T6.3, T8.1.
+  **Validation:** Public UI URL.
+  **Tests:** SC-3 against public URL (also T9.4).
   **Done 2026-08-28:** Project `chakra-arc-dex` on Vercel, static export, production `https://chakra-arc-dex.vercel.app`. `NEXT_PUBLIC_CHAKRA_API_URL=https://chakra-api-0a5i.onrender.com` baked at build; CORS verified (`access-control-allow-origin`). SSO deployment protection disabled. This batch's UI check (page loads + quotes against public API) passes; full MetaMask QA remains T9.4.
 
 ### M9 — Evidence + QA
 
-- [ ] **T9.1** Venue comparison matrix ≥3 pairs × ≥3 sizes (partial / live 3-pair routing open)  
-  **Deps:** T4.3, T8.1.  
-  **Validation:** File in `docs/evidence/chakra-t91-venue-matrix.json`.  
-  **Tests:** SC-8.  
+- [ ] **T9.1** Venue comparison matrix ≥3 pairs × ≥3 sizes (partial / live 3-pair routing open)
+  **Deps:** T4.3, T8.1.
+  **Validation:** File in `docs/evidence/chakra-t91-venue-matrix.json`.
+  **Tests:** SC-8.
   **Done 2026-08-28 (partial):** Evaluated 15 matrix points across 5 pairs (USDC↔EURC, USDC↔mBTC, EURC↔mBTC, mBTC↔USDC) and 3 sizes each against live hosted API (`https://chakra-api-0a5i.onrender.com`). Reclassified envelope errors: USDC↔EURC pairs are routable across stable and xylo; mBTC pairs exhibit the testnet dust/incomplete tick gap. Evidence recorded in `docs/evidence/chakra-t91-venue-matrix.json`. Complete live 3-pair routing remains gated on T2.1–T2.4 liquidity re-seed.
-- [x] **T9.2** Split vs single-path benchmark + documented split size (done 2026-08-28)  
-  **Deps:** T4.2, T9.1.  
-  **Validation:** `is_split=true` and higher output recorded (SC-2, SC-8).  
-  **Tests:** SC-2, SC-8.  
+- [x] **T9.2** Split vs single-path benchmark + documented split size (done 2026-08-28)
+  **Deps:** T4.2, T9.1.
+  **Validation:** `is_split=true` and higher output recorded (SC-2, SC-8).
+  **Tests:** SC-2, SC-8.
   **Done 2026-08-28:** Live benchmark of 5e6 USDC→EURC proves split route yields 4,680,269 atomic units (~4.680269 EURC) vs 4,296,582 atomic units (~4.296582 EURC) for best single route (xylo), delivering **+383,687 atomic units (~+0.383687 EURC / +893.01 bps / +8.93%)** improvement for the user. Evidence recorded in `docs/evidence/chakra-t92-split-benchmark.json`.
-- [x] **T9.3** On-chain **split** swap (≥2 sub-routes in one tx); Arcscan URL (DONE 2026-08-28, live)  
-  **Deps:** T5.2, T6.3 or cast.  
-  **Validation:** `https://testnet.arcscan.app/tx/…` shows split execution. Multi-hop single-path is extra, not a substitute (SC-4).  
-  **Tests:** SC-4.  
+- [x] **T9.3** On-chain **split** swap (≥2 sub-routes in one tx); Arcscan URL (DONE 2026-08-28, live)
+  **Deps:** T5.2, T6.3 or cast.
+  **Validation:** `https://testnet.arcscan.app/tx/…` shows split execution. Multi-hop single-path is extra, not a substitute (SC-4).
+  **Tests:** SC-4.
   **Done 2026-08-28 (live):** Broadcast 5e6 USDC→EURC split via `/build_tx` calldata (empty-sig Permit2 path, allowance pre-set via `IAllowanceTransfer.approve` + ERC-20 `approve`). Tx `0x42e85916ade38b87ef0440ef71d8f3330075ecf2a481247dc2ac33376b287fa8` (block 59271873, status 1, gas 344,674): 3 sub-routes — 2× xylo (1,263,225→1,074,649 and 385,400→327,598) + 1× chakra-stable (3,351,375→3,262,608) — aggregator `Swap` event `isSplit=1`, 4,674,618 EURC credited to operator. **Note:** `forge script --skip-simulation` was needed (local sim reverts on Arc USDC system precompile `0x1800…0000`; on-chain path works — `cast estimate` gas 74826 ok). `ExecuteSplitSwap.s.sol` run via `arc-operator.sh` requires `--skip-simulation`; the raw `/build_tx` calldata uses the empty-signature permit path (allowance pre-set) so no EIP-712 splice is needed for operator broadcast.
 
-- [x] **T9.4 CLI-first MetaMask wallet QA (DONE 2026-08-28, live)**  
-  **Outcome:** Disposable persistent Chromium profile (dAppwright) exercised with Playwright CLI on Arc testnet.  
-  **Deps:** T6.3, running `DAPP_URL` (T8.2 or `npm run dev`).  
+- [x] **T9.4 CLI-first MetaMask wallet QA (DONE 2026-08-28, live)**
+  **Outcome:** Disposable persistent Chromium profile (dAppwright) exercised with Playwright CLI on Arc testnet.
+  **Deps:** T6.3, running `DAPP_URL` (T8.2 or `npm run dev`).
   **Validation evidence:**
   - `qa:wallet:validate` / `qa:wallet:setup` / `qa:wallet:cleanup` logs
   - Extension-loaded snapshot; chain ID `0x4CEF52` (5042002)
@@ -286,32 +283,32 @@ Each task: **outcome**, **deps**, **validation**, **tests**. Status: not started
   - Named-session isolation
   - Artifact scan with **no** seed, password, or private key
   - Operator notes in `docs/qa-playwright-metamask.md` (Arc testnet, not Flare/Coston2)
-  **Tests:** All MetaMask harness checkboxes (SC-3, SC-7, SC-13).  
+  **Tests:** All MetaMask harness checkboxes (SC-3, SC-7, SC-13).
   **Do not** treat injected EIP-1193 smokes as a substitute.
   **Done 2026-08-28 (live):** `swap-critical-path` exit 0 (38.3 s) against local fixed build (`DAPP_URL=http://localhost:3000`, hosted API baked). On-chain tx `0xa630da3c842d7613ebbbd4d8f66749892a4e42c510933e0e1c3f4966907ef0dd` (block 59292405, status 1, gas 263,480): QA wallet `0xc603C3…dCE76` → aggregator, 1e6 USDC → 864,471 EURC (xylo, `isSplit=0` at 1.0 size), Swap event + Permit2 pull logs. Full sequence: mnemonic bootstrap → connect+approve → header-menu network switch (MetaMask notification popup Confirm driven directly — dAppwright `addNetwork`/`confirmNetworkSwitch` are broken on MetaMask 13.17: stub `confirmNetworkSwitch`, stale selectors in `addNetwork`) → 1.0 USDC → EURC quote (Route/Protocol fee 0%) → Swap → unaudited ack → ERC-20 approve confirm → Permit2 sign (skipped, allowance pre-set) → splitSwap confirm → `Swap confirmed!` banner → Arcscan `.app` link → `chakra:recent-swaps:5042002:{addr}` localStorage. Artifact scan: no seed words in `output/playwright/`. **Fixes found during run:** (a) token default race — FALLBACK_SWAP_TOKENS mixed-case `EURC_ADDRESS` vs lowercased catalog made `tokenOut` null and unmounted the Buy selector (case-insensitive address match in SwapCard + TokenSelector); (b) `qa:wallet` npm scripts resolved `../scripts/` to `packages/scripts/` (moved to `qa/wallet/`); (c) `qa.wallet.config.ts` now `process.loadEnvFile` on `packages/frontend/.env`.
 
-- [x] **T9.5** Quote p95 &lt; 500 ms after warm Redis, measured at the API process (done 2026-08-28)  
-  **Deps:** T8.1.  
-  **Validation:** Checked-in latency table excluding client RTT (SC-10).  
-  **Tests:** Performance section.  
+- [x] **T9.5** Quote p95 &lt; 500 ms after warm Redis, measured at the API process (done 2026-08-28)
+  **Deps:** T8.1.
+  **Validation:** Checked-in latency table excluding client RTT (SC-10).
+  **Tests:** Performance section.
   **Done 2026-08-28:** API-boundary timer (`start_time.elapsed().as_millis()`) implemented in `crates/api-server/src/handlers.rs` (commit `d3f8c79`) and deployed to Render (`dep-da8jk6cs728c73bvdrb0`). 100-sample live benchmark against the deployed revision records server compute p95 = **23 ms** (min 9 ms, avg 13.16 ms, median 11 ms, p90 18 ms, max 74 ms), well within the 500 ms gate. Evidence recorded in `docs/evidence/chakra-t95-quote-latency.json`.
 
-- [ ] **T9.6** Worker refresh measurement after live swap (local complete / live proof open)  
-  **Deps:** T3.3, T9.3.  
-  **Validation:** Redis write **≤ 5 s** after inclusion (SC-11).  
-  **Tests:** SC-11 test `poll_refreshes_pool_store_after_fixture_swap_within_5s`.  
+- [ ] **T9.6** Worker refresh measurement after live swap (local complete / live proof open)
+  **Deps:** T3.3, T9.3.
+  **Validation:** Redis write **≤ 5 s** after inclusion (SC-11).
+  **Tests:** SC-11 test `poll_refreshes_pool_store_after_fixture_swap_within_5s`.
   **Progress 2026-08-28:** Local test `poll_refreshes_pool_store_after_fixture_swap_within_5s` is green. Live testnet measurement on included swap remains open following T9.3.
 
-- [ ] **T9.7** Coverage report + API/SDK smoke + grant-style evidence pack index (in progress / partial)  
-  **Deps:** T9.1–T9.6, T7.2.  
-  **Validation:** Pack complete vs requirements done bar.  
-  **Tests:** Reporting section; SC-5, SC-6, SC-8, SC-9.  
+- [ ] **T9.7** Coverage report + API/SDK smoke + grant-style evidence pack index (in progress / partial)
+  **Deps:** T9.1–T9.6, T7.2.
+  **Validation:** Pack complete vs requirements done bar.
+  **Tests:** Reporting section; SC-5, SC-6, SC-8, SC-9.
   **Progress 2026-08-28:** Master Evidence Pack Index created in `docs/evidence/README.md` cataloging SC-1 through SC-13, live contract coordinates, endpoint status, and artifact links. Closes when T9.3, T9.4, and T9.6 live items complete.
 
-- [ ] **T9.8** Manual UX + a11y + second wallet spot-check (partial / in progress)  
-  **Deps:** T6.3, T8.2.  
-  **Validation:** Manual testing checklist ticked.  
-  **Tests:** Manual testing section.  
+- [ ] **T9.8** Manual UX + a11y + second wallet spot-check (partial / in progress)
+  **Deps:** T6.3, T8.2.
+  **Validation:** Manual testing checklist ticked.
+  **Tests:** Manual testing section.
   **Progress 2026-08-28:** Audited live UI on desktop (1280×800) and mobile (375×667) viewports. Unaudited status banner, keyboard accessibility, token selectors, slippage settings, recent swaps storage, and color contrast verified (`docs/evidence/chakra-t98-manual-ux-a11y.json`). Second-wallet (Rabby/Coinbase) and live on-chain confirm remain open pending browser wallet extension.
 ## Testing scenario coverage
 
@@ -325,7 +322,11 @@ Each task: **outcome**, **deps**, **validation**, **tests**. Status: not started
 | API integration | T4.3, T4.4, T4.6, T4.7 |
 | Worker Redis / WS / SC-11 | T3.1, T3.3, T9.6 |
 | Solidity aggregator (allowlist, leftover, Permit2) | T5.1 |
-| Seeded venues | T2.2–T2.4 |
+| Canonical venues (Xylo/Presto/UnitFlow) | T2.2–T2.4 |
+| Catalog / SC-14 (USDC/EURC/cirBTC only) | T2.1, T4.3, T5.1, T6.2 |
+| Venue verification / SC-15 | T3.3, T2.5 |
+| Promotion watchlist / SC-16 | T2.5 |
+| Shared-pool split rejection | T2.4, T4.2 |
 | SDK / OpenAPI / SC-6, SC-9 | T7.1, T7.2, T9.7 |
 | Injected e2e (insufficient alone) | T6.1 |
 | UI localStorage / pause / Permit2 skip-sign | T6.3 |
@@ -340,7 +341,7 @@ Each task: **outcome**, **deps**, **validation**, **tests**. Status: not started
 
 ```text
 T0.1 → T0.2 → T1.1 → T1.2
-                 └→ T2.1 → T2.2 / T2.3 / T2.4 → T2.5
+                  └→ T2.1 → T2.2 / T2.3 / T2.4 → T2.5
 T2.* + T1.1 → T3.1 → T3.2 → T3.3
 T3.2 → T4.1 → T4.2 → T4.3 → T4.4
 T3.3 + T4.3 + T4.5 → T4.6 → T4.7
@@ -357,6 +358,8 @@ T5.2 + T6.3 → T9.3 → T9.6
 T8.1 → T9.5
 T9.* + T7.2 → T9.7
 ```
+
+**2026-08-29 rebaseline:** T2.1–T2.4 are the canonical venue/catalog tasks (not mBTC/seed). T5.2 is one aggregator redeploy + venue registration — no token/factory/pool/liquidity deployment.
 
 **External:** Arc testnet RPC/WS; Circle faucet; Permit2 predeploy; Vercel account; a VPS/Redis host; MetaMask + dAppwright; funded test wallet (never committed).
 
@@ -384,9 +387,12 @@ M2–M5 can overlap (venues vs worker vs aggregator) once addresses are known.
 
 | Risk | Mitigation |
 |------|------------|
-| No organic Arc DEX factories | Hybrid seed is the product; discovery is best-effort (T2.5) |
-| CLMM tick coverage incomplete | Skip hop; seed a tight in-range position (T2.4) |
-| Split optimizer never fires | Seed thin xy=k vs deep stable USDC/EURC; T9.2 is a gate |
+| No organic Arc DEX liquidity | Canonical curated manifest (XyloNet, Presto, UnitFlow V2.5) with documented integration packs; watchlist candidates for promotion; no reseeding gate |
+| Testnet liquidity depletes or resets | Honest NO_ROUTE / thinner quotes; persistent Arc Testnet liquidity warning; small test amounts + realistic slippage (Circle guidance) |
+| External venue stale/paused/removed | Startup venue verification (bytecode, endpoints, membership, reserves, probe quote); failed venue → unavailable, never auto-reseeded |
+| Shared-pool double-counting in splits | Split plans reusing a pool are rejected |
+| CLMM tick coverage incomplete | Skip hop; seed a tight in-range position (fixture-only on chain-31337) |
+| Split optimizer never fires | Xylo + Presto + stable candidates; deterministic local execution proof + faucet-sized canaries |
 | Dual USDC decimals bug | T1.2 + Foundry `msg.value==0` + UI formatters; SC-12 |
 | WS unreliable | Poll fallback (T3.3) |
 | Permit2 UX friction | Guided approve-once; harness covers it (T9.4) |
@@ -403,7 +409,7 @@ M2–M5 can overlap (venues vs worker vs aggregator) once addresses are known.
 ## Resources Needed
 
 - Arc testnet RPC/WS (public `https://rpc.testnet.arc.io` / `wss://rpc.testnet.arc.io`; failovers Blockdaemon HTTP, dRPC HTTP/WS, QuickNode HTTP/WS). **Not** Canteen `$RPC`.
-- Circle faucet USDC/EURC
+- Circle faucet USDC/EURC (faucet-sized canaries only; no reseeding gate)
 - Operator wallet (`~/.arc-canteen/wallet.yaml` or dedicated deployer env/keystore — never `--private-key` in CI)
 - Redis (local + hosted)
 - Foundry (`solc 0.8.30`, prague), Rust toolchain, Node 20+
@@ -411,6 +417,7 @@ M2–M5 can overlap (venues vs worker vs aggregator) once addresses are known.
 - Playwright CLI, Chromium, MetaMask test profile (dAppwright)
 - Arc / Circle skills: `~/.arc-canteen/context/AGENTS.md` (full index) and `docs/circlefin-skills/{use-arc,use-usdc}.md`
 - Design/UX skills at M6: `frontend-design-guidelines`, `design-taste`, `number-formatting`, `brand-design`
+- Canonical venue integration packs: XyloNet (`github.com/Panchu11/xylonet-public/tree/main/integration-pack`), Presto (`github.com/Emperoar07/Presto`), UnitFlow V2.5 (`docs.unitflow.finance/docs/dev/contracts`)
 
 ## Next actions after this plan
 
@@ -865,7 +872,7 @@ Ran 40 tests for test/Aggregator.t.sol:AggregatorTest
 Suite result: ok. 40 passed; 0 failed; 0 skipped; finished in 153.13ms (13.32ms CPU time)
 
 Ran 5 test suites in 155.98ms (369.12ms CPU time): 74 tests passed, 0 failed, 0 skipped (74 total tests) → 74/74
-- 
+-
 running 47 tests
 test path_finder::tests::default_config_is_chakra_arc_three_hops_with_erc20_usdc_bridge ... ok
 test path_finder::tests::includes_Arc venue_edges_in_routing_graph ... ok
@@ -921,7 +928,7 @@ test result: ok. 47 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; fin
 running 0 tests
 
 test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s → 47/47
-- 
+-
 running 9 tests
 test rate_limit::tests::health_and_ready_are_exempt_paths ... ok
 test rate_limit::tests::loopback_is_rate_limit_exempt ... ok

@@ -5,7 +5,12 @@ import { useQuery } from '@tanstack/react-query';
 import { useEffect, useRef, useState } from 'react';
 import { CHAKRA_API_URL } from '@/lib/aggregator';
 import { FALLBACK_SWAP_TOKENS, filterSwapTokens } from '@/lib/swap-tokens';
-import { USDC_ERC20_ADDRESS, EURC_ADDRESS, NATIVE_USDC_KEY } from '@/lib/decimals';
+import {
+  CIRBTC_ADDRESS,
+  USDC_ERC20_ADDRESS,
+  EURC_ADDRESS,
+  NATIVE_USDC_KEY,
+} from '@/lib/decimals';
 
 const ARC_RPC_URL = 'https://rpc.testnet.arc.io';
 
@@ -84,6 +89,8 @@ export function useBalanceQuery(address: string | null) {
           next[USDC_ERC20_ADDRESS] = BigInt(raw || '0');
         } else if (key === 'eurc') {
           next[EURC_ADDRESS] = BigInt(raw || '0');
+        } else if (key === 'cirbtc') {
+          next[CIRBTC_ADDRESS] = BigInt(raw || '0');
         } else {
           next[key] = BigInt(raw || '0');
         }

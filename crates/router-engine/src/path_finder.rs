@@ -41,11 +41,11 @@ impl Default for PathFinderConfig {
 }
 
 /// Build router `TradingPair`s from a Chakra topology snapshot, honoring the
-/// v1 catalog freeze (`decimals::graph_nodes(mbtc)`): pools whose tokens are
-/// outside {USDC, EURC, mBTC} are unused, and native USDC encodings are never
-/// nodes.
-pub fn pairs_from_chakra_snapshot(snapshot: &MarketSnapshot, mbtc_address: &str) -> Vec<TradingPair> {
-    let nodes = market_snapshot::decimals::graph_nodes(mbtc_address);
+/// v1 catalog freeze (`decimals::graph_nodes()`): pools whose tokens are
+/// outside {USDC, EURC, cirBTC} are unused, and native USDC encodings are
+/// never nodes.
+pub fn pairs_from_chakra_snapshot(snapshot: &MarketSnapshot) -> Vec<TradingPair> {
+    let nodes = market_snapshot::decimals::graph_nodes();
     let mut pairs = Vec::new();
     for source in &snapshot.sources {
         for pair in &source.pairs {
@@ -99,10 +99,12 @@ pub fn pairs_from_chakra_snapshot(snapshot: &MarketSnapshot, mbtc_address: &str)
 /// stamped `dex_type`). Unknown sources default to `xyk` — the pre-T3.1
 /// default.
 fn dex_type_for_source(source: &str) -> String {
-    if source == "chakra-stable" {
+    if source == "chakra-stable" || source == "xylo-stable" {
         "stable".to_string()
     } else if source == "chakra-clmm" {
         "clmm".to_string()
+    } else if source == "presto-hub" {
+        "presto".to_string()
     } else {
         "xyk".to_string()
     }
@@ -168,9 +170,9 @@ impl PathFinder {
     /// Update the graph from a Chakra topology snapshot (`MarketSnapshot`),
     /// replacing every source's edges. Pairs outside the v1 catalog are
     /// dropped (`pairs_from_chakra_snapshot`).
-    pub fn update_from_chakra_snapshot(&mut self, snapshot: &MarketSnapshot, mbtc_address: &str) {
+    pub fn update_from_chakra_snapshot(&mut self, snapshot: &MarketSnapshot) {
         let mut by_source: std::collections::BTreeMap<String, Vec<TradingPair>> = Default::default();
-        for pair in pairs_from_chakra_snapshot(snapshot, mbtc_address) {
+        for pair in pairs_from_chakra_snapshot(snapshot) {
             by_source.entry(pair.source.clone()).or_default().push(pair);
         }
         for (source, pairs) in by_source {
@@ -271,11 +273,10 @@ mod tests {
     use {super::*, crate::types::TokenId};
 
     use market_snapshot::{
-        decimals::{EURC, USDC_ERC20},
+        decimals::{CIRBTC, EURC, USDC_ERC20},
         ClmmPoolRefSnapshot, MarketSnapshot, SourceSnapshot, TradingPairSnapshot,
     };
 
-    const MBTC: &str = "0x1111111111111111111111111111111111111111";
     const OTHER: &str = "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
     const XYK_POOL_UE: &str = "0x0000000000000000000000000000000000000001";
     const STABLE_POOL_UE: &str = "0x0000000000000000000000000000000000000002";
@@ -312,8 +313,8 @@ mod tests {
                     source: "chakra-xyk".to_string(),
                     pairs: vec![
                         pair(USDC_ERC20, EURC, XYK_POOL_UE, "xyk", "chakra-xyk"),
-                        pair(USDC_ERC20, MBTC, XYK_POOL_UM, "xyk", "chakra-xyk"),
-                        pair(EURC, MBTC, XYK_POOL_EM, "xyk", "chakra-xyk"),
+                        pair(USDC_ERC20, CIRBTC, XYK_POOL_UM, "xyk", "chakra-xyk"),
+                        pair(EURC, CIRBTC, XYK_POOL_EM, "xyk", "chakra-xyk"),
                     ],
                 },
                 SourceSnapshot {
@@ -326,7 +327,7 @@ mod tests {
 
     fn finder_with(snapshot: &MarketSnapshot) -> PathFinder {
         let mut finder = PathFinder::new(PathFinderConfig::default());
-        finder.update_from_chakra_snapshot(snapshot, MBTC);
+        finder.update_from_chakra_snapshot(snapshot);
         finder
     }
 
@@ -350,13 +351,13 @@ mod tests {
             source: "chakra-clmm".to_string(),
             pool_address: CLMM_POOL_UM.to_string(),
             token0: USDC_ERC20.to_string(),
-            token1: MBTC.to_string(),
+            token1: CIRBTC.to_string(),
             fee_bps: 30,
             tick_spacing: 60,
             factory: "factory-clmm".to_string(),
         }]);
         let finder = finder_with(&snapshot);
-        let paths = finder.find_paths(&token(USDC_ERC20), &token(MBTC));
+        let paths = finder.find_paths(&token(USDC_ERC20), &token(CIRBTC));
         let direct: Vec<_> = paths.iter().filter(|p| p.hops == 1).collect();
         assert_eq!(direct.len(), 2, "USDC→mBTC should have xyk + clmm direct pools");
         let mut sources: Vec<&str> = direct.iter().map(|p| p.sources[0].as_str()).collect();
@@ -367,7 +368,7 @@ mod tests {
     #[test]
     fn eurc_to_mbtc_finds_direct_and_two_hop_via_usdc() {
         let finder = finder_with(&chakra_snapshot());
-        let paths = finder.find_paths(&token(EURC), &token(MBTC));
+        let paths = finder.find_paths(&token(EURC), &token(CIRBTC));
         assert!(paths.iter().any(|p| p.hops == 1), "direct EURC→mBTC xyk pool");
         assert!(paths.iter().any(|p| p.hops == 2), "2-hop EURC→USDC→mBTC");
         let two_hop = paths.iter().find(|p| p.hops == 2).unwrap();
@@ -377,7 +378,7 @@ mod tests {
     #[test]
     fn max_hops_one_excludes_multi_hop() {
         let finder = finder_with(&chakra_snapshot());
-        let paths = finder.find_paths_with_limits(&token(EURC), &token(MBTC), 1, 50, 0);
+        let paths = finder.find_paths_with_limits(&token(EURC), &token(CIRBTC), 1, 50, 0);
         assert!(!paths.is_empty());
         assert!(
             paths.iter().all(|p| p.hops == 1),

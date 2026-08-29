@@ -42,7 +42,6 @@ pub struct AppState {
     /// Chakra EVM RPC (never contacted by `/quote`; used by `/balances` and
     /// `/build_tx`).
     pub evm_rpc: Option<Arc<dex_adapters::evm_rpc::EvmRpcClient>>,
-    pub mbtc_address: String,
 }
 
 impl AppState {
@@ -57,7 +56,6 @@ impl AppState {
         let evm_rpc = Some(Arc::new(dex_adapters::evm_rpc::EvmRpcClient::single(
             &config.chakra_rpc_http,
         )?));
-        let mbtc_address = crate::catalog::mbtc_address();
 
         // Build an initial empty engine.
         // Cluster mode: try to load snapshot from Redis at startup.
@@ -102,7 +100,6 @@ impl AppState {
             memory_snapshot: None,
             memory_pool: None,
             evm_rpc,
-            mbtc_address,
         })
     }
 
@@ -117,7 +114,6 @@ impl AppState {
         memory_snapshot: Option<Arc<MemorySnapshotStore>>,
         memory_pool: Option<Arc<MemoryPoolStateStore>>,
         evm_rpc: Option<Arc<dex_adapters::evm_rpc::EvmRpcClient>>,
-        mbtc_address: String,
         pre_loaded_engine: Option<(String, Arc<router_engine::QuoteEngine>)>,
     ) -> Self {
         Self {
@@ -132,7 +128,6 @@ impl AppState {
             memory_snapshot,
             memory_pool,
             evm_rpc,
-            mbtc_address,
         }
     }
 

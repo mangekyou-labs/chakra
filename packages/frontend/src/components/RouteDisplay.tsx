@@ -8,9 +8,14 @@ const DEX_LABELS: Record<string, string> = {
   xyk: 'xy=k',
   stable: 'Stable',
   clmm: 'CLMM',
+  xylo: 'Xylo',
+  presto: 'Presto',
   'chakra-xyk': 'xy=k',
   'chakra-stable': 'Stable',
   'chakra-clmm': 'CLMM',
+  'xylo-stable': 'Xylo',
+  'presto-hub': 'Presto',
+  'unitflow-v25': 'UnitFlow',
 };
 
 function dexLabel(dex: string): string {

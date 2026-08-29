@@ -12,6 +12,7 @@ date: 2026-08-20
 **Feature key:** `chakra`  
 **Workspace:** `.worktrees/feature-chakra` (`feature-chakra`)  
 **Phase:** 5 continuation (2026-08-28) — T4.3 (production CLMM loader + quote/build_tx test covered & closed), T2.5 (discovery scanner updated with Arc testnet block windowing & executed), T9.8 (WCAG AA contrast raised to >= 4.5:1, verified with red/green vitest & playwright-cli DOM re-audit), T9.4 (real dAppwright MetaMask harness implemented in swap-critical-path.spec.ts, setup/validate scripts updated, docs/qa-playwright-metamask.md added, skip verified).
+**Rebaseline (2026-08-29):** canonical curated strategy — catalog is USDC/EURC/cirBTC; XyloNet/Presto/UnitFlow V2.5 manifest venues; mBTC and owned mocks are chain-31337 fixtures only; no reseeding gate. See the requirements/design/planning/testing amendments in the same pass.
 
 ## Development Setup
 
@@ -517,6 +518,59 @@ Everything runs on fixture RPC/WS servers and a **memory store** in tests (SC-11
 - **`cd packages/sdk` (T7.1, 2026-08-25): `npm test` 12 passed / 0 failed** (6 new client tests: quote params incl. no `prefer_arc`/percent slippage, bps parse, buildTx `user` + steps body, 2-hop step mapper, envelope `.code` error, isHealthy path); `npm run build` (tsc) exit 0; `npx tsx examples/quote-build.ts` → `example not executed — API not up` (no local API running — no SC-6 live claim).
 - `npx ai-devkit@latest lint --feature chakra` (2026-08-25, after T6.1/T7.1/T6.2): all checks passed.
 - Live Arc broadcasts for T2.1–T2.5/T5.2 all **blocked** (no operator key in this environment; never `--private-key` on CLI); live SC-11 WS→Redis proof is **T9.6**.
+
+## Canonical curated rebaseline (2026-08-29)
+
+### Catalog: USDC / EURC / cirBTC
+
+- `mBTC` is removed from the public release path. The frozen catalog is exactly ERC-20 USDC (`0x3600…0000`, 6 dp), EURC (`0x89B5…D72a`, 6 dp), and canonical **cirBTC** (8 dp).
+- `MockBtc.sol` (mBTC) and all Chakra-owned XYK/stable/CLMM deployments remain in the repo **only** as deterministic chain-31337 fixtures for local Foundry/engine tests. The Arc operator workflow (`Deploy.s.sol`, `Seed.s.sol`, `arc-operator.sh`) can no longer deploy them; deploy scripts are restricted to the aggregator + venue registration.
+- The aggregator's `mbtc` immutable and sweep target are replaced by canonical `cirbtc` (constructor arg + `_sweepCatalogTo`). The Foundry invariant `_assertCatalogZero` covers USDC/EURC/cirBTC.
+- `/tokens` and `/balances` serve cirBTC at 8 decimals; PathFinder graph nodes are {USDC, EURC, cirBTC}; native USDC encodings never become nodes.
+- cirBTC has no faucet and no Chakra mint: acquire it via the route itself (e.g. USDC → EURC → cirBTC). Canaries do not require a prefunded target-token balance.
+
+### Venue manifest (default-on)
+
+| Source id | Venue | Addresses | Scope |
+|-----------|-------|-----------|-------|
+| `xylo-stable` | XyloNet | factory `0x60EDeFB094B84BBC6430cc130B358A43Ba1979e2`, router `0x73742278c31a76dBb0D2587d03ef92E6E2141023`, pool `0x3DF3966F5138143dce7a9cFDdC2c0310ce083BB1` | USDC/EURC stable pool |
+| `presto-hub` | Presto | hub `0x5794a8284A29493871Fbfa3c4f343D42001424D6` | USDC/EURC discovery only |
+| `unitflow-v25` | UnitFlow V2.5 | factory `0xd67F63A4F26a497b364d1C82e6747Aec8B5743a5`, pair `0x268DC75517EaFc6e0D52666639529e5DAB8c9200` | EURC/cirBTC, 30 bps |
+
+Watchlist (promotion candidates, never silently enabled): Lunex, UnitFlow V3, AchSwap/Arc Swap, Synthra. Excluded: LiftUp (artificial), Curve WUSDC wrapper, LI.FI (meta-aggregator). No healthy direct USDC/cirBTC venue exists — Chakra routes that pair atomically as USDC → EURC → cirBTC.
+
+### Solidity aggregator surface
+
+- `enum DexType { Xyk, Stable, Clmm, Xylo, Presto }` — **Xylo=3 and Presto=4 appended**; Xyk=0, Stable=1, Clmm=2 preserved. The Rust ABI encoder emits raw uint8 indices.
+- `Hop{pool, dexType, tokenIn, tokenOut, fee}` shape preserved (static 5-word tuple → 160 bytes/hop in the tail).
+- Owner config additions:
+  - `setXyloRouter(address factory, address router)` — atomic Xylo factory/router pair; Xylo hops execute via the router's exact-input `swapExactTokensForTokens(amountIn, 0, path, address(this), deadline)` with the **request deadline**, aggregator recipient, then a post-call balance delta (no `calculateSwap`-style pool ABI in the execution path).
+  - `addPrestoHub(address hub)` / `removePrestoHub` — hub allowlist; Presto hops call `swap(tokenIn, tokenOut, amountIn, 0, deadline)` with exact temporary approval + allowance reset + post-call balance delta.
+  - `setFactoryFee(address factory, uint24 feeBps)` — per-XYK-factory fee (UnitFlow V2.5 = 30 bps); `_xykOut` uses the factory's configured fee instead of a hardcoded 997/1000.
+- Sweep: `_sweepCatalogTo` covers USDC, EURC, cirBTC. New non-upgradeable deploy (constructor drops `mbtc` for `cirbtc`).
+
+### Quote math / adapters
+
+- `xylo_quote`: keep the `calculateSwap` port but read the **amplification from hydrated on-chain pool parameters** (fetch `amp`/`A` from the pool at hydrate time) rather than hardcoding A=200 from the documentation.
+- `presto_quote`: Presto's published **normalized hub formula** (normalized balances × hub invariant), new in `evm_quote_math`.
+- `unitflow-v25`: reuse existing XYK state/math with the factory fee (30 bps); parity-pinned against `getAmountsOut`.
+- Split optimizer: reject any split plan whose sub-routes **share a pool** (prevent two paths from independently overestimating the same downstream UnitFlow liquidity).
+
+### Worker / discovery / API
+
+- Worker manifest sources: `xylo-stable`, `presto-hub`, `unitflow-v25` (stable ids through snapshot → API → SDK → UI).
+- Startup discovery verifies each manifest venue: bytecode presence, canonical token endpoints, factory membership, nonzero reserves, and a successful probe quote. Failed venues become unavailable → `NO_ROUTE`; **never auto-reseeded**.
+- `/tokens`, `/balances`, OpenAPI, SDK types, and UI route legs all use cirBTC (8 dp) and the stable source ids; REST request shapes are preserved.
+- WUSDC and any other wrapper identity are excluded from v1.
+
+### Verification gates (fresh, 2026-08-29)
+
+- `npx ai-devkit@latest lint --feature chakra`
+- `forge test -vv` (contracts/evm)
+- `cargo test --workspace` (+ `--features api-server/test-fixture` for API integration)
+- Frontend `npm test` / `npm run typecheck` / `npm run build`
+- SDK `npm test` / `npm run build`
+- `git diff --check`
 
 ### Phase 5 Xylo + Aggregator Redeploy + Hosted Verification (2026-08-28)
 

@@ -75,7 +75,8 @@ fn reserves_for_edge(token_in: &TokenId, token_out: &TokenId, hydrated: &XykPool
 pub struct QuoteHydration {
     pub xyk_pools: HashMap<String, XykPoolStateValue>,
     pub clmm_pools: HashMap<String, SnapshotClmmQuoteState>,
-    /// Chakra stableswap pools keyed by `source:pool_address`.
+    /// Chakra stableswap pools keyed by `source:pool_address`. The Xylo and
+    /// Presto spoke state also lives here (stable-family venues).
     pub stable_pools: HashMap<String, StablePoolStateValue>,
     /// Allowlisted venue factories (from `chakra:factories`). Empty list =
     /// accept legacy unstamped pools.
@@ -251,11 +252,11 @@ impl QuoteEngine {
     /// Update the engine from a Chakra topology snapshot (T4.2 test helper;
     /// API wiring is T4.3). Pairs outside the v1 catalog are dropped by
     /// `pairs_from_chakra_snapshot`; each source's edges keep their real
-    /// source name (`chakra-xyk`, `chakra-stable`, …) so hop dispatch and
-    /// hydration keys match.
-    pub async fn update_from_chakra_snapshot(&self, snapshot: &MarketSnapshot, mbtc_address: &str) {
+    /// source name (`chakra-xyk`, `xylo-stable`, `presto-hub`, …) so hop
+    /// dispatch and hydration keys match.
+    pub async fn update_from_chakra_snapshot(&self, snapshot: &MarketSnapshot) {
         let mut by_source: std::collections::BTreeMap<String, Vec<TradingPair>> = Default::default();
-        for pair in crate::path_finder::pairs_from_chakra_snapshot(snapshot, mbtc_address) {
+        for pair in crate::path_finder::pairs_from_chakra_snapshot(snapshot) {
             by_source.entry(pair.source.clone()).or_default().push(pair);
         }
         for (source, pairs) in by_source {
@@ -579,9 +580,11 @@ impl QuoteEngine {
                 )
             } else if source == "chakra-stable" {
                 self.local_stable_quote(token_in, token_out, current_amount, pool_address, source, hydration)
-            } else if source == "xylo" {
+            } else if matches!(source.as_str(), "xylo" | "xylo-stable") {
                 self.local_xylo_quote(token_in, token_out, current_amount, pool_address, source, hydration)
-            } else if source == "chakra-xyk" {
+            } else if source == "presto-hub" {
+                self.local_presto_quote(token_in, token_out, current_amount, pool_address, source, hydration)
+            } else if matches!(source.as_str(), "chakra-xyk" | "unitflow-v25") {
                 self.local_evm_xyk_quote(token_in, token_out, current_amount, pool_address, source, hydration)
             } else {
                 self.local_quote(
@@ -804,6 +807,56 @@ impl QuoteEngine {
         })
     }
 
+    /// Presto hub hop (2026-08-29): `presto_quote` (normalized hub formula,
+    /// 997/1000 pathUSD routing) on the hydrated spoke reserves. The hub is
+    /// restricted to USDC/EURC discovery. Presto spoke state is stored in
+    /// the stable bucket (StablePoolStateValue with A=1 marker).
+    fn local_presto_quote(
+        &self,
+        token_in: &TokenId,
+        token_out: &TokenId,
+        amount_in: u128,
+        pool_address: &str,
+        source: &str,
+        hydration: Option<&QuoteHydration>,
+    ) -> Option<dex_adapters::AdapterQuote> {
+        let state = hydration?
+            .stable_pools
+            .get(&QuoteHydration::stable_pool_key(source, pool_address))?;
+        let (reserve_in, reserve_out) = if token_in.canonical().eq_ignore_ascii_case(&state.token_a)
+            && token_out.canonical().eq_ignore_ascii_case(&state.token_b)
+        {
+            (state.balance_a, state.balance_b)
+        } else if token_in.canonical().eq_ignore_ascii_case(&state.token_b)
+            && token_out.canonical().eq_ignore_ascii_case(&state.token_a)
+        {
+            (state.balance_b, state.balance_a)
+        } else {
+            return None;
+        };
+        // Presto pathUSD routing: USDC is the path; spoke legs are
+        // 997/1000 on the raw reserves (equal 6-dp decimals cancel).
+        let amount_out = dex_adapters::evm_quote_math::presto_spoke_quote(
+            reserve_in,
+            reserve_out,
+            amount_in,
+        );
+        if amount_out == 0 {
+            return None;
+        }
+        let spot_out = amount_in;
+        let price_impact_bps = if spot_out > amount_out {
+            ((spot_out - amount_out) * 10_000 / spot_out) as u32
+        } else {
+            0
+        };
+        Some(dex_adapters::AdapterQuote {
+            amount_out,
+            fee_bps: state.fee_bps,
+            price_impact_bps,
+        })
+    }
+
     /// Chakra xy=k hop: Uniswap V2 997/1000 (`evm_quote_math::xyk_quote`) on
     /// the hydrated reserves, with integer price impact.
     fn local_evm_xyk_quote(
@@ -963,7 +1016,7 @@ mod tests {
         }
     }
 
-    const MBTC: &str = "0x1111111111111111111111111111111111111111";
+    const CIRBTC: &str = "0xf0C4a4CE82A5746AbAAd9425360Ab04fbBA432BF";
     const XYK_POOL_UE: &str = "0x0000000000000000000000000000000000000001";
     const STABLE_POOL_UE: &str = "0x0000000000000000000000000000000000000002";
     const XYK_POOL_UM: &str = "0x0000000000000000000000000000000000000003";
@@ -993,7 +1046,7 @@ mod tests {
                         },
                         TradingPairSnapshot {
                             token_a: USDC_ERC20.to_string(),
-                            token_b: MBTC.to_string(),
+                            token_b: CIRBTC.to_string(),
                             pool_address: XYK_POOL_UM.to_string(),
                             fee_bps: 30,
                             dex_type: "xyk".to_string(),
@@ -1024,7 +1077,7 @@ mod tests {
         clmm: Option<(String, SnapshotClmmQuoteState)>,
     ) -> OptimalRoute {
         let engine = QuoteEngine::new(PathFinderConfig::default(), SplitConfig::default());
-        engine.update_from_chakra_snapshot(&chakra_snapshot(), MBTC).await;
+        engine.update_from_chakra_snapshot(&chakra_snapshot()).await;
 
         let mut xyk = HashMap::new();
         xyk.insert(
@@ -1045,7 +1098,7 @@ mod tests {
                 "chakra-xyk",
                 XYK_POOL_UM,
                 USDC_ERC20,
-                MBTC,
+                CIRBTC,
                 30,
                 50_000_000_000,
                 100_000_000,
@@ -1100,7 +1153,7 @@ mod tests {
     #[tokio::test]
     async fn quote_hydrates_chakra_stable_and_uses_evm_math() {
         let engine = QuoteEngine::new(PathFinderConfig::default(), SplitConfig::default());
-        engine.update_from_chakra_snapshot(&chakra_snapshot(), MBTC).await;
+        engine.update_from_chakra_snapshot(&chakra_snapshot()).await;
 
         let stable = StablePoolStateValue::new(
             "chakra-stable",
@@ -1161,7 +1214,7 @@ mod tests {
     async fn sc2_180k_split_beats_single_stable() {
         const SPLIT_AMOUNT: u128 = 180_000_000_000; // 180_000e6 (SC-2 documented size)
         let engine = QuoteEngine::new(PathFinderConfig::default(), SplitConfig::default());
-        engine.update_from_chakra_snapshot(&chakra_snapshot(), MBTC).await;
+        engine.update_from_chakra_snapshot(&chakra_snapshot()).await;
 
         // Use lowercased EURC to match the pathfinder's normalization
         let eurc_lower = EURC.to_lowercase();
@@ -1405,12 +1458,11 @@ mod tests {
         }
     }
 
-    /// SC-12 / T1.2: USDC (6 dp) → mBTC (8 dp) output is in mBTC atomic units
+    /// SC-12 / T1.2: USDC (6 dp) → cirBTC (8 dp) output is in cirBTC atomic units
     /// (8 dp range), never 18 dp native wei or 6 dp USDC. The seeded xy=k pool
-    /// is 50_000e6 USDC / 1e8 mBTC (≈1 USDC = 1 mBTC nominal).
+    /// is 50_000e6 USDC / 1e8 cirBTC (≈1 USDC = 1 cirBTC nominal).
     #[tokio::test]
-    async fn usdc_to_mbtc_output_is_in_mbtc_8dp_atomic_units() {
-        const MBTC: &str = "0x1111111111111111111111111111111111111111";
+    async fn usdc_to_cirbtc_output_is_in_cirbtc_8dp_atomic_units() {
         let engine = QuoteEngine::new(PathFinderConfig::default(), SplitConfig::default());
         engine
             .update_pairs_from_cache(
@@ -1419,7 +1471,7 @@ mod tests {
                     "chakra-xyk",
                     "pool-um",
                     USDC_ERC20,
-                    MBTC,
+                    CIRBTC,
                     50_000_000_000, // 50_000e6 USDC
                     100_000_000,    // 1e8 mBTC
                 )],
@@ -1432,7 +1484,7 @@ mod tests {
                     "chakra-xyk",
                     "pool-um",
                     USDC_ERC20,
-                    MBTC,
+                    CIRBTC.to_ascii_lowercase(),
                     30,
                     50_000_000_000,
                     100_000_000,
@@ -1443,7 +1495,7 @@ mod tests {
 
         let request = RouteRequest {
             token_in: token(USDC_ERC20),
-            token_out: token(MBTC),
+            token_out: token(CIRBTC),
             amount_in: 1_000_000_000, // 1_000e6 USDC (6 dp)
             slippage_bps: Some(50),
             max_hops: Some(1),
@@ -1493,10 +1545,10 @@ mod tests {
     ) -> TradingPair {
         TradingPair {
             token_a: TokenId::Contract {
-                address: token_a.to_string(),
+                address: token_a.to_ascii_lowercase(),
             },
             token_b: TokenId::Contract {
-                address: token_b.to_string(),
+                address: token_b.to_ascii_lowercase(),
             },
             source: source.to_string(),
             pool_address: pool.to_string(),
@@ -1770,7 +1822,7 @@ mod tests {
                         },
                         TradingPairSnapshot {
                             token_a: USDC_ERC20.to_string(),
-                            token_b: MBTC.to_string(),
+                            token_b: CIRBTC.to_string(),
                             pool_address: XYK_POOL_UM.to_string(),
                             fee_bps: 30,
                             dex_type: "xyk".to_string(),
@@ -1801,7 +1853,7 @@ mod tests {
     async fn t45_allowlisted_stable_factory_still_quotes() {
         let engine = QuoteEngine::new(PathFinderConfig::default(), SplitConfig::default());
         engine
-            .update_from_chakra_snapshot(&chakra_snapshot_with_factories(), MBTC)
+            .update_from_chakra_snapshot(&chakra_snapshot_with_factories())
             .await;
         let hydration = QuoteHydration {
             stable_pools: HashMap::from([(
@@ -1853,7 +1905,7 @@ mod tests {
     async fn t45_unlisted_factory_pool_is_skipped() {
         let engine = QuoteEngine::new(PathFinderConfig::default(), SplitConfig::default());
         engine
-            .update_from_chakra_snapshot(&chakra_snapshot_with_factories(), MBTC)
+            .update_from_chakra_snapshot(&chakra_snapshot_with_factories())
             .await;
         let hydration = QuoteHydration {
             xyk_pools: HashMap::from([(
@@ -1904,7 +1956,7 @@ mod tests {
     #[tokio::test]
     async fn t45_empty_factories_still_quotes_legacy_pools() {
         let engine = QuoteEngine::new(PathFinderConfig::default(), SplitConfig::default());
-        engine.update_from_chakra_snapshot(&chakra_snapshot(), MBTC).await;
+        engine.update_from_chakra_snapshot(&chakra_snapshot()).await;
         let hydration = QuoteHydration {
             xyk_pools: HashMap::from([(
                 QuoteHydration::xyk_pool_key("chakra-xyk", XYK_POOL_UE),
@@ -2045,7 +2097,7 @@ mod tests {
     #[tokio::test]
     async fn xylo_loses_to_chakra_stable_at_small_size() {
         let engine = QuoteEngine::new(PathFinderConfig::default(), SplitConfig::default());
-        engine.update_from_chakra_snapshot(&xylo_snapshot(), MBTC).await;
+        engine.update_from_chakra_snapshot(&xylo_snapshot()).await;
 
         let request = RouteRequest {
             token_in: token(USDC_ERC20),
@@ -2077,7 +2129,7 @@ mod tests {
     #[tokio::test]
     async fn xylo_wins_at_chakra_capacity_sizes() {
         let engine = QuoteEngine::new(PathFinderConfig::default(), SplitConfig::default());
-        engine.update_from_chakra_snapshot(&xylo_snapshot(), MBTC).await;
+        engine.update_from_chakra_snapshot(&xylo_snapshot()).await;
 
         // Chakra stable has 200_000e6 per side; 4_500_000e6 USDC in drains
         // more than half its EURC side (capacity-bound). Xylo has 613_508e6

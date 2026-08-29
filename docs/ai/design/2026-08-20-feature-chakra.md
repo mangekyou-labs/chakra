@@ -266,10 +266,10 @@ Do **not** point production worker/API at the Canteen `$RPC` proxy. Do **not** i
 |--------|------------------|----------|------|
 | USDC (ERC-20) | `0x3600000000000000000000000000000000000000` | 6 | Swap token. ERC-20 `transfer`/`approve`/`transferFrom` move the **same** native balance. Circle-recommended interface for app balances. |
 | EURC | `0x89B50855Aa3bE2F677cD6303Cec089B5F319D72a` | 6 | Swap token |
-| mBTC | Deployed ERC-20 (Chakra) | 8 | Seeded volatile. **No public faucet.** Users buy mBTC via swap. Owner mints for seed liquidity and QA wallets only. |
+| cirBTC | Canonical Arc ERC-20 (App Kit cirBTC) | 8 | Swap token. **No faucet, no Chakra mint** — acquired via the route itself (e.g. USDC → EURC → cirBTC). |
 | Native USDC | Arc native value | 18 | Gas only. Same economic balance as ERC-20 USDC, different encoding. **Never** a PathFinder node. Aggregator `msg.value` = 0. |
 
-v1 PathFinder catalog and `GET /tokens` are **exactly** ERC-20 USDC, EURC, mBTC. Discovery may record other pools; they are unused unless both tokens are in this catalog.
+v1 PathFinder catalog and `GET /tokens` are **exactly** ERC-20 USDC, EURC, cirBTC. Discovery may record other pools; they are unused unless both tokens are in this catalog. **WUSDC and any other wrapper identity are excluded from v1.** mBTC and all Chakra-owned mock pools exist only as deterministic chain-31337 fixtures and are never deployed by the Arc operator workflow.
 
 Amounts on the wire are **decimal strings of atomic units** (no floats, no scientific notation). UI parses human input with the token’s decimals only.
 
@@ -301,6 +301,8 @@ Gas estimate at send time: `eth_feeHistory` (preferred) or `eth_gasPrice`, then 
 | `chakra:factories` | Allowlisted factories `{address, dex_type, source}` — **must match** on-chain aggregator allowlist before a pool is quoted |
 | `chakra:snapshot:events` | Pub/Sub for snapshot hot-reload |
 
+`xylo` pools live under `chakra:pool:stable:xylo-stable:{pool}` (Xylo is a stableswap-family venue); `presto` under `chakra:pool:stable:presto-hub:{pool}`; `unitflow` under `chakra:pool:xyk:unitflow-v25:{pool}` (XYK family).
+
 ### Graph vs state
 
 | Layer | Contents | Update cadence |
@@ -312,14 +314,22 @@ CLMM hops with `coverage.is_complete=false` are skipped by QuoteEngine (same pol
 
 ### Discovery bootstrap
 
-The worker **cannot** find factories from an empty chain. Factories are configured:
+The worker **cannot** find factories from an empty chain. Venues are **manifested** (canonical curated, not discovered-then-enabled):
 
 | Env | Purpose |
 |-----|---------|
-| `CHAKRA_SEED_FACTORIES` | Required. `address:xyk\|stable\|clmm` tuples for Chakra-deployed factories. Always quoted once on-chain allowlisted (done in `Deploy.s.sol`). |
-| `CHAKRA_DISCOVERY_FACTORIES` | Optional extra factory addresses to watch for `PairCreated` / `PoolCreated`. **Not auto-routed.** Owner must `addFactory` on the aggregator and the worker must refresh `chakra:factories` before quotes use those pools. |
+| `CHAKRA_SEED_FACTORIES` | Required. `address:dex_type` tuples for the canonical venues: XyloNet factory, Presto hub, UnitFlow V2.5 factory (plus optional fixture factories for local runs). The aggregator allowlist and the worker manifest must match. |
+| `CHAKRA_DISCOVERY_FACTORIES` | Optional extra factory addresses to watch for `PairCreated` / `PoolCreated`. **Not auto-routed.** Owner must `addFactory` on the aggregator and the worker must refresh `chakra:factories` before quotes use those pools. Watchlist venues (Lunex, UnitFlow V3, AchSwap/Arc Swap, Synthra) are recorded as promotion candidates and are **never** silently enabled. |
 
-T2.5 records a scan result (none-or-addresses). Extra tokens stay out of `/tokens` and the UI.
+Manifest venue defaults (2026-08-29 venue decision):
+
+| Source id | Venue | Addresses | Scope |
+|-----------|-------|-----------|-------|
+| `xylo-stable` | XyloNet | factory `0x60EDeFB094B84BBC6430cc130B358A43Ba1979e2`, router `0x73742278c31a76dBb0D2587d03ef92E6E2141023`, pool `0x3DF3966F5138143dce7a9cFDdC2c0310ce083BB1` | USDC/EURC stable pool |
+| `presto-hub` | Presto | hub `0x5794a8284A29493871Fbfa3c4f343D42001424D6` | USDC/EURC discovery only |
+| `unitflow-v25` | UnitFlow V2.5 | factory `0xd67F63A4F26a497b364d1C82e6747Aec8B5743a5` | Canonical EURC/cirBTC pair `0x268DC75517EaFc6e0D52666639529e5DAB8c9200` |
+
+Startup discovery **verifies** each manifest venue before it can quote: bytecode presence, canonical token endpoints, factory membership, nonzero reserves, and a successful probe quote. A failed venue becomes **unavailable** (yields `NO_ROUTE`); Chakra never automatically reseeds a failed venue.
 
 ### Route types (API + engine)
 
@@ -353,14 +363,14 @@ Per-hop `minAmountOut` is **0**. Only the route-total `minimum_output` is enforc
 Permit2 **AllowanceTransfer** (not `SignatureTransfer` / witness). User approves ERC-20 → Permit2 once; each swap may sign a `PermitSingle` granting the aggregator an exact-amount, short-lived allowance.
 
 ```solidity
-enum DexType { Xyk, Stable, Clmm, Xylo } // Xylo appended (T-XYLO), never inserted
+enum DexType { Xyk, Stable, Clmm, Xylo, Presto } // Xylo=3, Presto=4 appended, never inserted
 
 struct Hop {
     address pool;
     DexType dexType;
     address tokenIn;
     address tokenOut;
-    uint24 fee;          // CLMM fee tier; 0 otherwise
+    uint24 fee;          // CLMM fee tier; XYK factory fee; 0 otherwise
 }
 
 struct SubRoute {
@@ -388,6 +398,8 @@ function splitSwap(
 
 `splitSwap` is **non-payable**. `receive()` / `fallback()` revert. Native USDC is never swap input.
 
+For Xylo, `pool` identifies the verified stable pool; for Presto, it identifies the allowlisted hub. The owner configures: atomic Xylo factory/router pairs, the Presto hub allowlist, and per-XYK-factory fees (UnitFlow V2.5 configured at 30 bps).
+
 `PermitSingle` fields (Uniswap Permit2):
 
 | Field | v1 lock |
@@ -413,41 +425,46 @@ function splitSwap(
 7. Execute each sub-route. Intermediate and final hop recipients are **the aggregator** (v1 simplicity; leftover accounting is then local).
    - **Xyk:** `tokenIn.transfer(pool, amount); pool.swap(amount0Out, amount1Out, address(this), "")` — empty data, no callback. `amountOut` from on-chain `getReserves` + V2 formula (0 per-hop min).
    - **Stable:** `tokenIn.transfer(pool, amount); IStableSwap(pool).exchange(i, j, amount, 0)`.
-   - **Xylo (T-XYLO):** `tokenIn.forceApprove(pool, amount); IXyloPool(pool).swap(tokenIn, tokenOut, amount, 0, address(this), block.timestamp)` then reset the allowance to 0. The Xylo `swap` **pulls via `transferFrom`** — do **not** wrap it as `IStableSwap.exchange` (different custody + selector). Factory membership via `IXyloFactory(factory).getPool(tokenIn, tokenOut) == pool` (not Uni V2 `getPair`, not the Chakra stable factory).
+   - **Xylo (T-XYLO, dexType 3):** `tokenIn.forceApprove(pool, amount); IXyloPool(pool).swap(tokenIn, tokenOut, amount, 0, address(this), block.timestamp)` then reset the allowance to 0. The Xylo `swap` **pulls via `transferFrom`** — do **not** wrap it as `IStableSwap.exchange` (different custody + selector). Factory membership via `IXyloFactory(factory).getPool(tokenIn, tokenOut) == pool` (not Uni V2 `getPair`, not the Chakra stable factory). **Owner configures the Xylo factory/router pair atomically** (`setXyloRouter(factory, router)`), and the aggregator calls the **router's exact-input `swapExactTokensForTokens`** with the request `deadline`, aggregator as recipient, then verifies a post-call balance delta. Xylo pool quoting uses **hydrated on-chain pool parameters** (amplification from the pool, not the documentation's hardcoded value).
+   - **Presto (dexType 4):** `swap(tokenIn, tokenOut, amountIn, 0, deadline)` on the allowlisted hub — exact temporary approval, allowance reset after the call, post-call balance delta. Quoting uses Presto's published **normalized hub formula**. Presto is restricted to USDC/EURC discovery.
+   - **UnitFlow V2.5 (dexType 0 / Xyk family):** quoted with existing XYK state/math at the factory's configured fee (30 bps). `pool_addresses` must be unique across a split plan — **a split whose sub-routes reuse a pool is rejected** (two paths cannot independently overestimate the same downstream UnitFlow liquidity).
    - **Clmm:** `pool.swap(address(this), zeroForOne, int256(amount), sqrtPriceLimit, data)` with `uniswapV3SwapCallback` paying the pool. Callback **must** require `msg.sender` is `getPool` of an allowlisted CLMM factory. Do not put `nonReentrant` on the callback.
 8. `amountOut = tokenOut.balanceOf(this) - tokenOutBalanceBefore`. `require(amountOut >= minAmountOut)`.
 9. Transfer **all** `tokenOut` balance to `msg.sender`.
 10. Sweep any remaining `tokenIn` and other catalog tokens on the aggregator to `msg.sender`.
-11. Invariant after success: aggregator balances of USDC, EURC, and mBTC are 0. Same after revert (atomicity). Foundry asserts this.
+11. Invariant after success: aggregator balances of USDC, EURC, and cirBTC are 0. Same after revert (atomicity). Foundry asserts this.
 12. Emit `Swap(sender, tokenIn, tokenOut, amountIn, amountOut, isSplit)` where `isSplit = routes.length > 1`.
 
 Owner-only:
 
 - `pause` / `unpause`
-- `addFactory(address factory, DexType)` / `removeFactory(address)`
+- `addFactory(address factory, DexType)` / `removeFactory(address)` — including per-XYK-factory fee config (`setFactoryFee(factory, feeBps)`; UnitFlow V2.5 = 30 bps)
+- `setXyloRouter(address factory, address router)` / remove — atomic Xylo factory/router pair
+- `addPrestoHub(address hub)` / `removePrestoHub(address)` — Presto hub allowlist (restricted to USDC/EURC discovery)
 - `addStablePool(address pool)` / `removeStablePool(address)` (stableswap has no Uniswap-style `getPair`)
 - `rescueTokens(address token, address to, uint256 amount)` — testnet recovery of forced/stuck ERC-20; **not** a fee skim. Never called in the swap path.
 
-### Seeded liquidity (guaranteed venues)
+### Manifest venues (canonical curated)
 
-Deploy our own factories so splits are real even if organic Arc DEX TVL is ~0.
+No Chakra-owned liquidity on the public release path. The owned XYK/stable/CLMM deployments and mBTC exist only as **deterministic chain-31337 fixtures** for local tests and can never be deployed by the Arc operator workflow.
 
-| Venue | Implementation | Seed pools | Params |
-|-------|----------------|------------|--------|
-| `chakra-xyk` | Vendored Uniswap V2 core Factory + Pair | USDC/EURC, USDC/mBTC, EURC/mBTC | 30 bps |
-| `chakra-stable` | Original 2-token StableSwap (Apache-2.0) | USDC/EURC, **≥20×** xy=k depth | `A=100`, 4 bps |
-| `chakra-clmm` | Vendored Uniswap V3 core Factory + Pool | USDC/mBTC **30 bps required**; 5 bps optional extra venue | 30 bps (5 bps optional) |
-| `xylo` (T-XYLO) | Organic XyloNet stableswap (Arc), `getPool(address,address)` factory | USDC/EURC (pinned; USDC/USYC stays out of catalog) | `A=200`, 4 bps **fee on output**, `swap` pulls via `transferFrom` |
+| Venue | Source id | DexType | Quote source | Execution |
+|-------|-----------|---------|--------------|-----------|
+| XyloNet stable pool | `xylo-stable` | 3 (Xylo) | Hydrated on-chain pool params (amplification read from the pool) + `calculateSwap` port | Router exact-input `swapExactTokensForTokens` via atomic factory/router pair, request `deadline`, aggregator recipient, post-call balance delta |
+| Presto hub | `presto-hub` | 4 (Presto) | Published normalized hub formula | `swap(tokenIn, tokenOut, amountIn, 0, deadline)` on allowlisted hub, exact temporary approval, allowance reset, post-call balance delta |
+| UnitFlow V2.5 | `unitflow-v25` | 0 (Xyk) | Existing XYK state/math at factory fee (30 bps) | Standard V2-style hop; split plans may not reuse the same pool |
 
-Seed sizes must make **split-better-than-single** true at a documented notional (see testing). Discovery adapters may watch third-party factories; they never replace the seeded set, never auto-allowlist on the aggregator, and extra tokens stay out of the v1 catalog.
+Venue fees: Xylo 4 bps (on output, from the pool's own parameters), Presto per hub formula, UnitFlow V2.5 = 30 bps.
 
 ### Venue licensing
 
 | Code | License | Location |
 |------|---------|----------|
-| Aggregator, mBTC, original stableswap, scripts, Rust, UI, SDK | Apache-2.0 (repo LICENSE) | `contracts/evm/{aggregator,tokens,stable}/`, crates, packages |
+| Aggregator, original stableswap, scripts, Rust, UI, SDK | Apache-2.0 (repo LICENSE) | `contracts/evm/{aggregator,tokens,stable}/`, crates, packages |
 | Uniswap V2 core | GPL-3.0-or-later | `contracts/evm/venues/uniswap-v2/` + upstream `LICENSE` |
-| Uniswap V3 core | GPL-2.0-or-later | `contracts/evm/venues/uniswap-v3/` + upstream `LICENSE` |
+| Uniswap V3 core | BSL-1.1 (v1.0.0 tag) | `contracts/evm/venues/uniswap-v3/` + upstream `LICENSE` |
+
+Mock venues (`MockBtc` mBTC, MockXylo, owned XYK/stable/CLMM fixtures) are Apache-2.0 and exist **only** for deterministic chain-31337 local tests — never deployable by the Arc operator workflow.
 
 Do not relicense Uniswap sources. Do not copy GPL files into Apache-only paths. `README` notes the mixed-license tree. **Do not write original V2/V3 cores** just to dodge GPL — vendored battle-tested cores are the security choice.
 
@@ -653,7 +670,7 @@ Focused swap app. Rewrite the existing Next.js shell in place (drop wallet / tru
 | Permit2 + send | Unaudited-ack modal once; read `paused()` before send; approve Permit2 if `required_approvals`; sign typed data only if present; send `splitSwap` with `value: 0n` and `maxFeePerGas ≥ 20 gwei` from `eth_feeHistory`/`eth_gasPrice` |
 | Status | Pending → confirmed on **first receipt** (`waitForTransactionReceipt` confirmations = 1; deterministic finality, no extra confirmations); Arcscan URL `https://testnet.arcscan.app/tx/{hash}`; append recent-swaps localStorage (max 20) |
 | Decimal helpers | `formatErc20(amount, decimals)` vs `formatNativeUsdc(wei)`. Swap USDC balances use 6 dp; gas labeled separately at 18 dp |
-| Empty funds | Circle faucet link (Arc Testnet, USDC and EURC). mBTC: copy that the token is bought via swap, not fauceted |
+| Empty funds | Circle faucet link (Arc Testnet, USDC and EURC). cirBTC: copy that the token is acquired via swap (e.g. USDC → EURC → cirBTC), not fauceted |
 
 `wallet_addEthereumChain` params (must match viem `arcTestnet`):
 
@@ -714,13 +731,13 @@ Circle App Kit Swap, Gateway, CCTP, Modular Wallets, SCP event monitors, oracles
 | Decision | Choice | Alternatives | Why |
 |----------|--------|--------------|-----|
 | Architecture | Port Chakra Rust router + Redis | App Kit wrap; TS-only router | Proven split math; App Kit is closed; TS rewrite would re-bug the optimizer |
-| Venues | Hybrid seed + discover | Discover-only; seed-only | Organic Arc DEX TVL is unreliable; seeds make splits demoable; discovery keeps the product honest if factories appear |
+| Venues | Canonical curated manifest (XyloNet, Presto, UnitFlow V2.5) | Discover-only; seed-only | Real external liquidity; no Chakra-owned venues; watchlist candidates recorded, never silently enabled |
 | Token pull | Permit2 AllowanceTransfer `PermitSingle` | Raw `approve` aggregator; EIP-2612 only; `PermitWitnessTransferFrom` | Locked in Q&A; predeployed; approve-once to Permit2; exact-amount short-lived aggregator allowance. Witness is a follow-on, not v1 — factory allowlist + `minAmountOut` + leftover close the drain |
 | Aggregator security | On-chain **factory allowlist** + `getPair`/`getPool` before every hop | Trust `build_tx` calldata; signed quotes | Permit2 + user-supplied pool is a drain if a fake pair is called. Off-chain validation is necessary but not sufficient |
 | Aggregator upgrade | Ownable + pausable, non-upgradeable | UUPS proxy | Testnet; pause is enough; redeploy if ABI changes |
 | Protocol fee | 0 bps | 1–5 bps | Locked; quote and on-chain must match |
 | Wallet | EIP-6963 injected first | Modular / passkey | Locked non-goal for AA |
-| Split policy | Chakra thresholds + Brent | Always split; always single | Avoid dust splits; only split when impact or competitiveness warrants |
+| Split policy | Chakra thresholds + Brent; **reject split plans reusing a pool** | Always split; always single | Avoid dust splits; only split when impact or competitiveness warrants; never double-count one pool's liquidity |
 | Hop mins | 0 per hop; total `minAmountOut` only | Per-hop mins | Same as Chakra; rounding across hops otherwise false-reverts |
 | `build_tx` | Encode + validate client `sub_routes` | Re-quote on build | Same as Chakra; UI owns the quote the trader accepted |
 | Freshness | WS logs + poll fallback | Poll-only (0.1 s) | Arc has WebSockets; poll covers WS drops |
@@ -728,12 +745,12 @@ Circle App Kit Swap, Gateway, CCTP, Modular Wallets, SCP event monitors, oracles
 | CLMM seed | **30 bps required**; 5 bps optional | 5 bps only; both required | 30 bps is the volatile default; 5 bps is extra split surface if seed time allows |
 | CLMM incomplete ticks | Skip hop | RPC hydrate ticks on quote | Same as Chakra; keep quotes correct |
 | UI surface | Focused swap | Full terminal with portfolio | Locked; density is visual, not extra products |
-| Catalog | Freeze 3 tokens | Grow `/tokens` from discovery; include cirBTC | Demoable faucet story; extra tokens stay unused |
+| Catalog | Freeze 3 canonical tokens (USDC, EURC, cirBTC) | Grow `/tokens` from discovery; include mBTC (Chakra-owned) | Canonical Arc token set; no Chakra-owned liquidity; cirBTC via route; extra tokens stay unused |
 | Quote firmness | Indicative + `minAmountOut` | Firm/RFQ quotes | No inventory/MM; on-chain min out is the guarantee |
 | Price impact wire type | Integer `price_impact_bps` | Float `price_impact: 0.12` | 0.12 is ambiguous (ratio vs percent vs bps) |
 | Discovery | Env factory lists; owner allowlist before quote | On-chain factory registry crawl from zero; auto-allowlist | No Arc factory registry. Auto-allowlist would undo the drain protection |
-| Venue source | Vendor Uniswap V2/V3 cores; original stableswap | Write original AMMs; wrap App Kit | Battle-tested swap math; GPL confined to `venues/`; stableswap stays Apache |
-| mBTC distribution | Owner mint for seed/QA; users buy via swap | Public faucet | Avoid a second faucet story; Circle already faucets USDC/EURC |
+| Venue source | Vendor Uniswap V2/V3 cores; original stableswap (fixtures) | Write original AMMs; wrap App Kit | Battle-tested swap math; GPL confined to `venues/`; stableswap stays Apache |
+| cirBTC distribution | Acquired via the route itself (USDC → EURC → cirBTC) | Public faucet; Chakra mint | No second faucet story; no Chakra-owned token on Arc; Circle already faucets USDC/EURC |
 | Recent swaps | `localStorage` per chain+address, max 20 | Server indexer | Requirements lock; no global leaderboard |
 | API access from UI | Direct `NEXT_PUBLIC_CHAKRA_API_URL` + CORS | Next rewrite proxy | Rate-limit by real IP; fewer hops |
 | Rate limit | 10 req/s/IP; health/ready exempt | Partner keys; global limiter | Port Chakra anonymous limit; partner keys are a non-goal |
@@ -771,7 +788,7 @@ Worker writes the touched pool’s Redis key **≤ 5 s** after the swapping tran
 
 Arc USDC is **one economic balance** with two encodings (Circle `use-usdc`: native gas 18 dp, ERC-20 6 dp). There is no wrap/unwrap.
 
-- PathFinder nodes are ERC-20 catalog addresses only (USDC, EURC, mBTC).
+- PathFinder nodes are ERC-20 catalog addresses only (USDC, EURC, cirBTC).
 - QuoteEngine uses each token’s `decimals` from the catalog. Swap USDC always uses the ERC-20 interface.
 - Native value is never `amount_in`. Aggregator `msg.value` is 0.
 - UI: two formatters, `formatErc20(amount, decimals)` and `formatNativeUsdc(wei)`. Swap USDC balances use 6 dp; gas is labeled separately at 18 dp. One on-screen USDC number for the swap balance (ERC-20). Never add encodings.
@@ -832,20 +849,23 @@ Arc USDC is **one economic balance** with two encodings (Circle `use-usdc`: nati
 
 | Requirements item | Design coverage |
 |-------------------|-----------------|
-| Best execution xy=k + stable + CLMM | Hybrid seeded venues + PathFinder/QuoteEngine/SplitOptimizer |
+| Best execution xy=k + stable + CLMM + Xylo + Presto | Curated manifest venues + PathFinder/QuoteEngine/SplitOptimizer |
 | Quote p95 &lt; 500 ms (SC-10) | Local math, Redis MGET, no RPC on `/quote`; NFR Performance |
 | Atomic `splitSwap` / `minAmountOut` | Aggregator execution rules; hop min = 0; total min only |
 | Dense pro-terminal UX | Frontend component table; visual direction deferred to implementation |
 | Public REST + OpenAPI + TS SDK | API Design; SDK component |
 | Public testnet deploy | Vercel UI + hosted API/worker/Redis; vendor deferred |
 | Grant-style evidence | NFR Compliance; testing/planning own the pack |
-| Hybrid discover + seed | Seed table + `CHAKRA_DISCOVERY_FACTORIES` + owner allowlist |
+| Hybrid discover + seed | Replaced 2026-08-29: canonical curated manifest (XyloNet, Presto, UnitFlow V2.5) + watchlist; mocks are chain-31337 fixtures only |
 | Freshness ≤ 5 s (SC-11) | Event watcher |
 | 0 protocol fee (SC-13) | `protocol_fee_bps: 0`; no fee take on-chain |
 | Permit2 | AllowanceTransfer `PermitSingle`; skip-if-allowance |
 | Rewrite on `feature-chakra` | Stack / repo decision |
 | EIP-6963 + MetaMask QA of record | Wallet gate; `arcTestnet`; Playwright CLI in testing |
-| Catalog USDC/EURC/mBTC only (SC-1) | Tokens table; PathFinder filter |
+| Catalog USDC/EURC/cirBTC only (SC-1) | Tokens table; PathFinder filter |
+| No Chakra-owned liquidity (SC-14) | Manifest venues only; mocks never deployable on Arc |
+| Venue verification (SC-15) | Startup discovery: bytecode, endpoints, membership, reserves, probe quote; NO_ROUTE on failure |
+| Promotion watchlist (SC-16) | Lunex, UnitFlow V3, AchSwap/Arc Swap, Synthra recorded; never silently enabled |
 | USDC MAX gas buffer (SC-12) | `/ 1e12` formula |
 | `msg.value = 0` (SC-12) | Non-payable `splitSwap` |
 | Recent swaps local | localStorage schema |
@@ -854,9 +874,9 @@ Arc USDC is **one economic balance** with two encodings (Circle `use-usdc`: nati
 | Pause control | Ownable + UI `paused()` + `PAUSED` error |
 | Unaudited warning | localStorage ack |
 | Rate limit 429 | 10 req/s/IP |
-| No wrap/unwrap / no App Kit / no cirBTC | Non-goals honored; catalog freeze; App Kit Swap tokens explicitly unused |
+| No wrap/unwrap / no App Kit | Non-goals honored; catalog freeze; WUSDC excluded |
 | Arc Canteen full index | Source audit table; EVM Prague / 1-conf / Multicall3 / public RPC |
-| SC-2 / SC-4 split | Deep stable vs thin xy=k; `isSplit = routes.length > 1` |
+| SC-2 / SC-4 split | Xylo + Presto + stable candidates; shared-pool split rejection; `isSplit = routes.length > 1` |
 | SC-3 UI critical path | Execute sequence + frontend table |
 | SC-6 / SC-9 SDK walkthrough | SDK + dropped vs Chakra list |
 

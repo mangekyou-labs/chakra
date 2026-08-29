@@ -102,7 +102,7 @@ export interface TokenInfo {
 }
 
 export interface BalancesResult {
-  /** ERC-20 balances keyed by symbol (usdc/eurc/mbtc). */
+  /** ERC-20 balances keyed by symbol (usdc/eurc/cirbtc). */
   erc20: Record<string, string>;
   /** Native USDC (18 dp) — gas only, never summed with ERC-20. */
   nativeUsdc: string;
@@ -144,9 +144,12 @@ export function quoteSubRoutesToSteps(subRoute: SubRoute): BuildTxStep[] {
 
 function venueToDexType(venue: string): string {
   const v = venue.toLowerCase();
-  if (v === 'chakra-stable' || v === 'stable') return 'stable';
+  if (v === 'chakra-stable' || v === 'stable' || v === 'xylo-stable' || v === 'xylo') {
+    return 'stable';
+  }
   if (v === 'chakra-clmm' || v === 'clmm') return 'clmm';
-  if (v === 'xylo') return 'xylo';
+  if (v === 'presto-hub' || v === 'presto') return 'presto';
+  if (v === 'unitflow-v25') return 'xyk';
   return 'xyk';
 }
 

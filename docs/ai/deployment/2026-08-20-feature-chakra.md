@@ -50,14 +50,21 @@ lives in the local worktree `.env` (`RENDER_API_KEY`, git-ignored).
 | `CHAKRA_CHAIN_ID` | `5042002` |
 | `CHAKRA_CORS_ORIGINS` | `https://chakra-arc-dex.vercel.app,http://localhost:3000` |
 | `CHAKRA_LISTEN_ADDR` | `0.0.0.0:10000` |
-| `CHAKRA_AGGREGATOR` | `0xEa1b2C24bd41163590960F8e40afe6cb4CC92006` |
-| `CHAKRA_MBTC_ADDRESS` | `0xbf5a25D7070FaACAe309D66D05372a6b212ECbdF` |
-| `CHAKRA_SEED_FACTORIES` | `0x0c812E5D55D767533c8E4783D33b28EA825b4D8e:xyk,0x77Ce21FDAAea40Fd94aCf65fF3220A0A7Db7D690:stable,0xf6dEa9e6dfE392aaBE366240db4839709572fa69:clmm,0x60EDeFB094B84BBC6430cc130B358A43Ba1979e2:xylo` |
-| `CHAKRA_DISCOVERY_FACTORIES` | same four factories |
+| `CHAKRA_AGGREGATOR` | `0xEa1b2C24bd41163590960F8e40afe6cb4CC92006` (redeploy pending for the 2026-08-29 surface) |
+| `CHAKRA_CIRBTC_ADDRESS` | `0xf0C4a4CE82A5746AbAAd9425360Ab04fbBA432BF` |
+| `CHAKRA_XYLO_ROUTER` | `0x73742278c31a76dBb0D2587d03ef92E6E2141023` |
+| `CHAKRA_PRESTO_HUB` | `0x5794a8284A29493871Fbfa3c4f343D42001424D6` |
+| `CHAKRA_UNITFLOW_FACTORY` | `0xd67F63A4F26a497b364d1C82e6747Aec8B5743a5` |
+| `CHAKRA_SEED_FACTORIES` | `0x60EDeFB094B84BBC6430cc130B358A43Ba1979e2:xylo,0x5794a8284A29493871Fbfa3c4f343D42001424D6:presto,0xd67F63A4F26a497b364d1C82e6747Aec8B5743a5:xyk` |
+| `CHAKRA_DISCOVERY_FACTORIES` | same three manifest factories |
 | `CHAKRA_EVM_WS_ENABLED` | `true` |
 
 Worker reads `CHAKRA_REDIS_URL` / `CHAKRA_RPC_*`; `SNAPSHOT_*` remain legacy overrides.
-Factory tuples are `address:dex_type` (`xyk|stable|clmm`) — bare addresses fail parse.
+Factory tuples are `address:dex_type` (`xyk|stable|clmm|xylo|presto`) — bare addresses fail parse.
+Source ids: `xylo` → `xylo-stable`, `presto` → `presto-hub`, seeded `xyk` → `unitflow-v25` (manifest
+order) or `chakra-xyk`. The 2026-08-29 operator rollout is **one aggregator deployment plus venue
+registration** — no token, factory, pool, or liquidity deployment. After local verification, stop
+before broadcasting; deployment is separately authorized.
 
 ### Vercel env (chakra-arc-dex, production)
 

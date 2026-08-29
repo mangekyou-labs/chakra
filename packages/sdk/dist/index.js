@@ -38,12 +38,15 @@ export function quoteSubRoutesToSteps(subRoute) {
 }
 function venueToDexType(venue) {
     const v = venue.toLowerCase();
-    if (v === 'chakra-stable' || v === 'stable')
+    if (v === 'chakra-stable' || v === 'stable' || v === 'xylo-stable' || v === 'xylo') {
         return 'stable';
+    }
     if (v === 'chakra-clmm' || v === 'clmm')
         return 'clmm';
-    if (v === 'xylo')
-        return 'xylo';
+    if (v === 'presto-hub' || v === 'presto')
+        return 'presto';
+    if (v === 'unitflow-v25')
+        return 'xyk';
     return 'xyk';
 }
 function slippageToBps(slippage, slippageBps) {

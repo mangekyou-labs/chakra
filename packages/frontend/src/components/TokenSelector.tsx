@@ -13,7 +13,7 @@ export function TokenIcon({ token, size = 28 }: { token: Token; size?: number })
   const colors: Record<string, string> = {
     USDC: '#2775CA',
     EURC: '#2B6CB0',
-    MBTC: '#F7931A',
+    CIRBTC: '#F7931A',
   };
   const bg = colors[token.symbol.toUpperCase()] ?? '#6B7280';
   return (
@@ -172,7 +172,7 @@ export function TokenSelector({
                       </div>
                       {bal !== null && bal > BigInt(0) && (
                         <div className="text-xs text-[var(--text-secondary)] tabular-nums shrink-0 font-[family-name:var(--font-mono)]">
-                          {formatErc20(bal)}
+                          {formatErc20(bal, token.decimals)}
                         </div>
                       )}
                       {token.address === selected.address && (
@@ -207,6 +207,8 @@ export function TokenSelector({
 }
 
 function tokenUnavailableNote(search: string): string | null {
-  if (search.trim().toLowerCase().includes('mbtc')) return 'Buy mBTC via swap';
+  const q = search.trim().toLowerCase();
+  if (q.includes('mbtc')) return 'mBTC is a local fixture — use cirBTC';
+  if (q.includes('cirbtc')) return 'cirBTC is acquired via swap (e.g. USDC → EURC → cirBTC)';
   return null;
 }

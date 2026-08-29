@@ -7,6 +7,7 @@ import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {Pausable} from "@openzeppelin/contracts/utils/Pausable.sol";
 import {MockErc20} from "../src/MockErc20.sol";
 import {MockBtc} from "../src/MockBtc.sol";
+import {MockCirBtc} from "../src/MockCirBtc.sol";
 import {MockPermit2} from "./MockPermit2.sol";
 import {Aggregator} from "../src/Aggregator.sol";
 import {IUniswapV2Factory} from "../src/interfaces/IUniswapV2Factory.sol";
@@ -15,17 +16,21 @@ import {IUniswapV3Factory} from "../src/interfaces/IUniswapV3Factory.sol";
 import {IUniswapV3Pool} from "../src/interfaces/IUniswapV3Pool.sol";
 import {StableSwapFactory} from "../src/stable/StableSwapFactory.sol";
 import {StableSwap} from "../src/stable/StableSwap.sol";
-import {MockXyloFactory, MockXyloPool} from "../src/MockXylo.sol";
+import {MockXyloFactory, MockXyloPool, MockXyloRouter} from "../src/MockXylo.sol";
+import {MockPrestoHub} from "../src/MockPrestoHub.sol";
 import {IAllowanceTransfer} from "../src/interfaces/IAllowanceTransfer.sol";
 
 /// @notice T5.1 — Aggregator splitSwap: pause, validation, ETH, factory allowlist,
-///      Permit2, xyk/stable/clmm hops, leftover-0, rescue, never-call.
+///      Permit2, xyk/stable/clmm/xylo/presto hops, leftover-0, rescue, never-call.
+/// @dev 2026-08-29 rebaseline: catalog is USDC/EURC/cirBTC; Xylo executes via
+///      the atomically configured router; Presto executes on the hub.
 contract AggregatorTest is Test, VendorDeployer {
     Aggregator internal agg;
     MockPermit2 internal permit2;
     MockErc20 internal usdc;
     MockErc20 internal eurc;
-    MockBtc internal mbtc;
+    MockCirBtc internal cirbtc;
+    MockBtc internal mbtc; // chain-31337 fixture only
 
     // Deployer == owner (test contract).
     address internal user = address(0xBEEF);
@@ -35,6 +40,8 @@ contract AggregatorTest is Test, VendorDeployer {
     StableSwapFactory internal stableFactory;
     IUniswapV3Factory internal clmmFactory;
     MockXyloFactory internal xyloFactory;
+    MockXyloRouter internal xyloRouter;
+    MockPrestoHub internal prestoHub;
 
     uint256 internal constant XYK_SEED = 10_000e6;
     uint256 internal constant STABLE_SEED = 200_000e6;
@@ -61,9 +68,10 @@ contract AggregatorTest is Test, VendorDeployer {
         permit2 = new MockPermit2();
         usdc = new MockErc20("USD Coin", "USDC");
         eurc = new MockErc20("Euro Coin", "EURC");
+        cirbtc = new MockCirBtc();
         mbtc = new MockBtc();
 
-        agg = new Aggregator(address(permit2), address(usdc), address(eurc), address(mbtc));
+        agg = new Aggregator(address(permit2), address(usdc), address(eurc), address(cirbtc));
 
         // Venue factories: xyk = V2 hex, stable = original, clmm = V3 hex.
         address xykAddr =
@@ -73,6 +81,8 @@ contract AggregatorTest is Test, VendorDeployer {
         address clmmAddr = _deployFromHexFile("bytecodes/v3-factory.hex");
         clmmFactory = IUniswapV3Factory(clmmAddr);
         xyloFactory = new MockXyloFactory();
+        xyloRouter = new MockXyloRouter(xyloFactory);
+        prestoHub = new MockPrestoHub(address(usdc));
     }
 
     /// @dev V3 pool calls back the minter with the owed amounts (T2.4 fixture).
@@ -82,11 +92,11 @@ contract AggregatorTest is Test, VendorDeployer {
         IUniswapV3Pool pool = IUniswapV3Pool(msg.sender);
         if (amount0Owed > 0) {
             if (pool.token0() == address(usdc)) usdc.transfer(msg.sender, amount0Owed);
-            else mbtc.transfer(msg.sender, amount0Owed);
+            else cirbtc.transfer(msg.sender, amount0Owed);
         }
         if (amount1Owed > 0) {
             if (pool.token1() == address(usdc)) usdc.transfer(msg.sender, amount1Owed);
-            else mbtc.transfer(msg.sender, amount1Owed);
+            else cirbtc.transfer(msg.sender, amount1Owed);
         }
     }
 
@@ -455,21 +465,22 @@ contract AggregatorTest is Test, VendorDeployer {
     // ─── 8. Multi-hop (EURC via USDC), atomic ───────────────────
 
     function test_multi_hop_eurc_via_usdc_success() public {
-        (address pairEurcUsdc, address pairUsdcMbtc, uint256 expectedOut) = _prepareMultiHop();
+        (address pairEurcUsdc, address pairUsdcCirbtc, uint256 expectedOut) = _prepareMultiHop();
 
         Aggregator.SubRoute[] memory routes = new Aggregator.SubRoute[](1);
         routes[0].amountIn = 1000e6;
         routes[0].hops = new Aggregator.Hop[](2);
         routes[0].hops[0] = _hop(pairEurcUsdc, Aggregator.DexType.Xyk, address(eurc), address(usdc));
-        routes[0].hops[1] = _hop(pairUsdcMbtc, Aggregator.DexType.Xyk, address(usdc), address(mbtc));
+        routes[0].hops[1] =
+            _hop(pairUsdcCirbtc, Aggregator.DexType.Xyk, address(usdc), address(cirbtc));
 
         vm.expectEmit(true, true, true, true, address(agg));
-        emit Aggregator.Swap(user, address(eurc), address(mbtc), 1000e6, expectedOut, false);
+        emit Aggregator.Swap(user, address(eurc), address(cirbtc), 1000e6, expectedOut, false);
 
         vm.prank(user);
         uint256 amountOut = agg.splitSwap(
             address(eurc),
-            address(mbtc),
+            address(cirbtc),
             1000e6,
             expectedOut,
             block.timestamp,
@@ -478,23 +489,24 @@ contract AggregatorTest is Test, VendorDeployer {
         );
 
         assertEq(amountOut, expectedOut, "multi-hop output mismatch");
-        assertEq(mbtc.balanceOf(user), expectedOut, "user mBTC mismatch");
+        assertEq(cirbtc.balanceOf(user), expectedOut, "user cirBTC mismatch");
         _assertCatalogZero();
     }
 
     function test_multi_hop_min_revert_is_atomic() public {
-        (address pairEurcUsdc, address pairUsdcMbtc, uint256 expectedOut) = _prepareMultiHop();
+        (address pairEurcUsdc, address pairUsdcCirbtc, uint256 expectedOut) = _prepareMultiHop();
 
         Aggregator.SubRoute[] memory routes = new Aggregator.SubRoute[](1);
         routes[0].amountIn = 1000e6;
         routes[0].hops = new Aggregator.Hop[](2);
         routes[0].hops[0] = _hop(pairEurcUsdc, Aggregator.DexType.Xyk, address(eurc), address(usdc));
-        routes[0].hops[1] = _hop(pairUsdcMbtc, Aggregator.DexType.Xyk, address(usdc), address(mbtc));
+        routes[0].hops[1] =
+            _hop(pairUsdcCirbtc, Aggregator.DexType.Xyk, address(usdc), address(cirbtc));
 
         (uint112 a0, uint112 a1,) = IUniswapV2Pair(pairEurcUsdc).getReserves();
-        (uint112 b0, uint112 b1,) = IUniswapV2Pair(pairUsdcMbtc).getReserves();
+        (uint112 b0, uint112 b1,) = IUniswapV2Pair(pairUsdcCirbtc).getReserves();
         uint256 userEurcBefore = eurc.balanceOf(user);
-        uint256 userMbtcBefore = mbtc.balanceOf(user);
+        uint256 userCirbtcBefore = cirbtc.balanceOf(user);
 
         vm.prank(user);
         vm.expectRevert(
@@ -504,7 +516,7 @@ contract AggregatorTest is Test, VendorDeployer {
         );
         agg.splitSwap(
             address(eurc),
-            address(mbtc),
+            address(cirbtc),
             1000e6,
             expectedOut + 1,
             block.timestamp,
@@ -514,9 +526,9 @@ contract AggregatorTest is Test, VendorDeployer {
 
         _assertCatalogZero();
         assertEq(eurc.balanceOf(user), userEurcBefore, "user EURC moved on revert");
-        assertEq(mbtc.balanceOf(user), userMbtcBefore, "user mBTC changed on revert");
+        assertEq(cirbtc.balanceOf(user), userCirbtcBefore, "user cirBTC changed on revert");
         (uint112 a2, uint112 a3,) = IUniswapV2Pair(pairEurcUsdc).getReserves();
-        (uint112 b2, uint112 b3,) = IUniswapV2Pair(pairUsdcMbtc).getReserves();
+        (uint112 b2, uint112 b3,) = IUniswapV2Pair(pairUsdcCirbtc).getReserves();
         assertEq(uint256(a2), uint256(a0), "pair1 reserve0 changed");
         assertEq(uint256(a3), uint256(a1), "pair1 reserve1 changed");
         assertEq(uint256(b2), uint256(b0), "pair2 reserve0 changed");
@@ -573,20 +585,20 @@ contract AggregatorTest is Test, VendorDeployer {
         IUniswapV3Pool pool = _prepareClmm();
 
         Aggregator.Hop memory h =
-            _hop(address(pool), Aggregator.DexType.Clmm, address(usdc), address(mbtc));
+            _hop(address(pool), Aggregator.DexType.Clmm, address(usdc), address(cirbtc));
         h.fee = 3000;
         Aggregator.SubRoute[] memory routes = _singleHopRoute(h, 100e6);
 
         vm.expectEmit(true, true, true, false, address(agg));
-        emit Aggregator.Swap(user, address(usdc), address(mbtc), 100e6, 0, false);
+        emit Aggregator.Swap(user, address(usdc), address(cirbtc), 100e6, 0, false);
 
         vm.prank(user);
         uint256 amountOut = agg.splitSwap(
-            address(usdc), address(mbtc), 100e6, 0, block.timestamp, routes, _emptyPermit()
+            address(usdc), address(cirbtc), 100e6, 0, block.timestamp, routes, _emptyPermit()
         );
 
-        assertTrue(amountOut > 0, "no mBTC received");
-        assertEq(mbtc.balanceOf(user), amountOut, "user mBTC mismatch");
+        assertTrue(amountOut > 0, "no cirBTC received");
+        assertEq(cirbtc.balanceOf(user), amountOut, "user cirBTC mismatch");
         _assertCatalogZero();
     }
 
@@ -599,7 +611,7 @@ contract AggregatorTest is Test, VendorDeployer {
 
     function test_clmm_callback_non_allowlisted_pool_reverts() public {
         IUniswapV3Pool pool = _prepareClmm();
-        FakePool fake = new FakePool(address(usdc), address(mbtc), 3000, agg);
+        FakePool fake = new FakePool(address(usdc), address(cirbtc), 3000, agg);
         // fake pools as msg.sender and decoded pool — must fail the allowlist check.
         vm.expectRevert(Aggregator.CallbackPoolNotAllowlisted.selector);
         fake.spoof();
@@ -629,11 +641,12 @@ contract AggregatorTest is Test, VendorDeployer {
         agg.rescueTokens(address(usdc), alice, 100e6);
     }
 
-    // ─── 10b. Xylo hop (T-XYLO) ────────────────────────────────
+    // ─── 10b. Xylo hop (T-XYLO, router execution 2026-08-29) ───
 
     /// @dev Seed a catalog USDC/EURC Xylo pool (deep, off-peg reserves like
-    ///      the live venue), allowlist the Xylo factory, fund the user, and
-    ///      return the pool + the venue-only output (fee on output, 4 bps).
+    ///      the live venue), allowlist the Xylo factory + atomically configure
+    ///      its router, fund the user, and return the pool + the venue-only
+    ///      output (fee on output, 4 bps).
     function _prepareXyloSwap(uint256 amountIn)
         internal
         returns (MockXyloPool pool, uint256 expectedOut)
@@ -648,6 +661,7 @@ contract AggregatorTest is Test, VendorDeployer {
         eurc.approve(address(xyloFactory), type(uint256).max);
         address poolAddr = xyloFactory.createPool(address(usdc), address(eurc), r0, r1);
         agg.addFactory(address(xyloFactory), Aggregator.DexType.Xylo);
+        agg.setXyloRouter(address(xyloFactory), address(xyloRouter));
 
         pool = MockXyloPool(poolAddr);
         uint256 reserveIn = pool.token0() == address(usdc) ? r0 : r1;
@@ -660,8 +674,9 @@ contract AggregatorTest is Test, VendorDeployer {
         _grantMockAllowance(address(usdc), uint160(amountIn));
     }
 
-    /// @dev T-XYLO happy path: approve + `swap(...)` with `to = aggregator`.
-    function test_xylo_hop_succeeds_via_transferfrom_swap() public {
+    /// @dev T-XYLO happy path: router exact-input swap with the request
+    ///      deadline; the aggregator's router allowance is reset to 0.
+    function test_xylo_hop_succeeds_via_router() public {
         (MockXyloPool pool, uint256 expectedOut) = _prepareXyloSwap(1000e6);
 
         Aggregator.Hop memory h =
@@ -676,9 +691,32 @@ contract AggregatorTest is Test, VendorDeployer {
         assertEq(amountOut, expectedOut, "venue-only Xylo math violated");
         assertEq(eurc.balanceOf(user), expectedOut, "user did not receive output");
         assertEq(pool.swapCount(), 1, "Xylo swap must have executed");
-        // The aggregator's approval to the pool is reset to 0 (no dangling allowance).
-        assertEq(usdc.allowance(address(agg), address(pool)), 0, "allowance must reset to 0");
+        // The aggregator's approval to the router is reset to 0 (no dangling allowance).
+        assertEq(
+            usdc.allowance(address(agg), address(xyloRouter)), 0, "router allowance must reset to 0"
+        );
         _assertCatalogZero();
+    }
+
+    /// @dev T-XYLO: without the atomic router config the hop reverts.
+    function test_xylo_hop_without_router_config_reverts() public {
+        uint256 r0 = 9_323_185e6;
+        uint256 r1 = 613_516e6;
+        usdc.mint(address(this), r0);
+        eurc.mint(address(this), r1);
+        usdc.approve(address(xyloFactory), type(uint256).max);
+        eurc.approve(address(xyloFactory), type(uint256).max);
+        address poolAddr = xyloFactory.createPool(address(usdc), address(eurc), r0, r1);
+        agg.addFactory(address(xyloFactory), Aggregator.DexType.Xylo);
+        // No setXyloRouter call.
+
+        Aggregator.Hop memory h =
+            _hop(poolAddr, Aggregator.DexType.Xylo, address(usdc), address(eurc));
+        Aggregator.SubRoute[] memory routes = _singleHopRoute(h, 1000e6);
+        vm.expectRevert(Aggregator.RouterNotConfigured.selector);
+        agg.splitSwap(
+            address(usdc), address(eurc), 1000e6, 0, block.timestamp, routes, _emptyPermit()
+        );
     }
 
     /// @dev T-XYLO: an unknown Xylo factory (not allowlisted) reverts.
@@ -690,6 +728,7 @@ contract AggregatorTest is Test, VendorDeployer {
         eurc.approve(address(rogueFactory), type(uint256).max);
         address roguePool = rogueFactory.createPool(address(usdc), address(eurc), 1e6, 1e6);
         agg.addFactory(address(xyloFactory), Aggregator.DexType.Xylo);
+        agg.setXyloRouter(address(xyloFactory), address(xyloRouter));
 
         Aggregator.Hop memory h =
             _hop(roguePool, Aggregator.DexType.Xylo, address(usdc), address(eurc));
@@ -712,6 +751,7 @@ contract AggregatorTest is Test, VendorDeployer {
         usycToken.approve(address(xyloFactory), type(uint256).max);
         address usycPool = xyloFactory.createPool(address(usdc), address(usycToken), 1e6, 1e6);
         agg.addFactory(address(xyloFactory), Aggregator.DexType.Xylo);
+        agg.setXyloRouter(address(xyloFactory), address(xyloRouter));
         // Clean up the 1 USDC seed so the catalog-zero invariant stays valid
         // (the pool holds USDC out of the aggregator's reach, but the test
         // contract's approval is spent — the pool balance is irrelevant to
@@ -741,6 +781,7 @@ contract AggregatorTest is Test, VendorDeployer {
         eurc.approve(address(xyloFactory), type(uint256).max);
         address poolAddr = xyloFactory.createPool(address(usdc), address(eurc), 9_323_185e6, 613_516e6);
         agg.addFactory(address(xyloFactory), Aggregator.DexType.Xylo);
+        agg.setXyloRouter(address(xyloFactory), address(xyloRouter));
 
         // Xylo factory is NOT allowlisted as Stable → PoolNotFromFactory.
         Aggregator.Hop memory h =
@@ -760,6 +801,7 @@ contract AggregatorTest is Test, VendorDeployer {
         eurc.approve(address(xyloFactory), type(uint256).max);
         address poolAddr = xyloFactory.createPool(address(usdc), address(eurc), 9_323_185e6, 613_516e6);
         agg.addFactory(address(xyloFactory), Aggregator.DexType.Xylo);
+        agg.setXyloRouter(address(xyloFactory), address(xyloRouter));
         agg.removeFactory(address(xyloFactory));
 
         Aggregator.Hop memory h =
@@ -769,6 +811,158 @@ contract AggregatorTest is Test, VendorDeployer {
         agg.splitSwap(
             address(usdc), address(eurc), 1000e6, 0, block.timestamp, routes, _emptyPermit()
         );
+    }
+
+    // ─── 10c. Presto hub hop (2026-08-29) ─────────────────────
+
+    /// @dev Seed a Presto hub spoke (USDC path + EURC spoke), allowlist the
+    ///      hub, fund the user, return the venue-only expected output.
+    function _preparePrestoSwap(uint256 amountIn)
+        internal
+        returns (uint256 expectedOut)
+    {
+        uint256 spokeUsdc = 500_000e6;
+        uint256 spokeEurc = 200_000e6;
+        usdc.mint(address(this), spokeUsdc + spokeEurc); // path + spoke funding
+        eurc.mint(address(this), spokeEurc);
+        usdc.approve(address(prestoHub), type(uint256).max);
+        eurc.approve(address(prestoHub), type(uint256).max);
+        prestoHub.seedPair(address(eurc), spokeEurc, spokeEurc);
+        agg.addPrestoHub(address(prestoHub));
+
+        expectedOut = prestoHub.getQuote(address(usdc), address(eurc), amountIn);
+
+        _fundUser(address(usdc), amountIn);
+        _userApproveMockPermit2(address(usdc), type(uint256).max);
+        _grantMockAllowance(address(usdc), uint160(amountIn));
+    }
+
+    /// @dev Presto happy path: hub swap with the request deadline; the
+    ///      aggregator's hub allowance is reset to 0.
+    function test_presto_hop_succeeds_via_hub() public {
+        uint256 expectedOut = _preparePrestoSwap(1000e6);
+
+        Aggregator.Hop memory h =
+            _hop(address(prestoHub), Aggregator.DexType.Presto, address(usdc), address(eurc));
+        Aggregator.SubRoute[] memory routes = _singleHopRoute(h, 1000e6);
+
+        vm.prank(user);
+        uint256 amountOut = agg.splitSwap(
+            address(usdc), address(eurc), 1000e6, expectedOut, block.timestamp, routes, _emptyPermit()
+        );
+
+        assertEq(amountOut, expectedOut, "venue-only Presto math violated");
+        assertEq(eurc.balanceOf(user), expectedOut, "user did not receive output");
+        assertEq(prestoHub.swapCount(), 1, "Presto swap must have executed");
+        assertEq(
+            usdc.allowance(address(agg), address(prestoHub)), 0, "hub allowance must reset to 0"
+        );
+        _assertCatalogZero();
+    }
+
+    /// @dev Presto: a hub that is not allowlisted reverts.
+    function test_presto_hop_unknown_hub_reverts() public {
+        MockPrestoHub rogueHub = new MockPrestoHub(address(usdc));
+        usdc.mint(address(this), 2e6);
+        eurc.mint(address(this), 1e6);
+        usdc.approve(address(rogueHub), type(uint256).max);
+        eurc.approve(address(rogueHub), type(uint256).max);
+        rogueHub.seedPair(address(eurc), 1e6, 1e6);
+        // No addPrestoHub.
+
+        Aggregator.Hop memory h =
+            _hop(address(rogueHub), Aggregator.DexType.Presto, address(usdc), address(eurc));
+        Aggregator.SubRoute[] memory routes = _singleHopRoute(h, 100e6);
+        vm.expectRevert(Aggregator.PoolNotFromFactory.selector);
+        agg.splitSwap(
+            address(usdc), address(eurc), 100e6, 0, block.timestamp, routes, _emptyPermit()
+        );
+    }
+
+    /// @dev Presto: `removePrestoHub` gates hops.
+    function test_removePrestoHub_gates_hops() public {
+        uint256 expectedOut = _preparePrestoSwap(1000e6);
+        agg.removePrestoHub(address(prestoHub));
+
+        Aggregator.Hop memory h =
+            _hop(address(prestoHub), Aggregator.DexType.Presto, address(usdc), address(eurc));
+        Aggregator.SubRoute[] memory routes = _singleHopRoute(h, 1000e6);
+        vm.expectRevert(Aggregator.PoolNotFromFactory.selector);
+        agg.splitSwap(
+            address(usdc), address(eurc), 1000e6, expectedOut, block.timestamp, routes, _emptyPermit()
+        );
+    }
+
+    // ─── 9b. Catalog enforcement, per-factory fees, shared-pool splits ───
+
+    /// @dev 2026-08-29: a hop whose token is outside the frozen catalog
+    ///      {USDC, EURC, cirBTC} must not execute (SC-14). The aggregator
+    ///      rejects the unknown token at validation (never reaches the venue).
+    function test_catalog_enforcement_rejects_out_of_catalog_token() public {
+        MockErc20 outside = new MockErc20("Outside", "OUT");
+        (address pair, ) = _prepareXykSwap(1000e6);
+        _grantMockAllowance(address(usdc), 1000e6);
+
+        // tokenOut = OUT is not in the catalog — the hop is invalid.
+        Aggregator.Hop memory h = _hop(pair, Aggregator.DexType.Xyk, address(usdc), address(outside));
+        Aggregator.SubRoute[] memory routes = _singleHopRoute(h, 1000e6);
+        vm.prank(user);
+        vm.expectRevert(Aggregator.InvalidRoutes.selector);
+        agg.splitSwap(
+            address(usdc), address(outside), 1000e6, 0, block.timestamp, routes, _emptyPermit()
+        );
+        _assertCatalogZero();
+    }
+
+    /// @dev 2026-08-29: per-XYK-factory fee config is settable and the hop
+    ///      executes when the configured fee matches the pair's built-in fee
+    ///      (UnitFlow V2.5 = 30 bps). A 30 bps explicit config produces the
+    ///      same venue output as the default and leaves no dust.
+    function test_xyk_factory_fee_is_configurable() public {
+        (address pair, ) = _prepareXykSwap(1000e6);
+        _grantMockAllowance(address(usdc), 1000e6);
+        agg.setFactoryFee(address(xykFactory), 30); // same as the pair's built-in 30 bps
+
+        IUniswapV2Pair p = IUniswapV2Pair(pair);
+        bool usdcIsToken0 = p.token0() == address(usdc);
+        (uint112 r0, uint112 r1,) = p.getReserves();
+        uint256 reserveIn = usdcIsToken0 ? uint256(r0) : uint256(r1);
+        uint256 reserveOut = usdcIsToken0 ? uint256(r1) : uint256(r0);
+        // 30 bps = 997/1000, identical to the default and the pair's internal fee.
+        uint256 expectedOut = (1000e6 * 997 * reserveOut) / (reserveIn * 1000 + 1000e6 * 997);
+        assertEq(agg.factoryFeeBps(address(xykFactory)), 30, "fee getter mismatch");
+
+        Aggregator.Hop memory h = _hop(pair, Aggregator.DexType.Xyk, address(usdc), address(eurc));
+        Aggregator.SubRoute[] memory routes = _singleHopRoute(h, 1000e6);
+
+        vm.prank(user);
+        uint256 amountOut = agg.splitSwap(
+            address(usdc), address(eurc), 1000e6, expectedOut, block.timestamp, routes, _emptyPermit()
+        );
+        assertEq(amountOut, expectedOut, "per-factory fee math violated");
+        _assertCatalogZero();
+    }
+
+    /// @dev 2026-08-29: a split whose sub-routes reuse the same pool is
+    ///      rejected (two paths cannot independently overestimate the same
+    ///      downstream liquidity). The aggregator reverts InvalidRoutes.
+    function test_split_reuses_pool_reverts() public {
+        (address xykPair, ) = _prepareSplit();
+
+        Aggregator.SubRoute[] memory routes = new Aggregator.SubRoute[](2);
+        routes[0].amountIn = 600e6;
+        routes[0].hops = new Aggregator.Hop[](1);
+        routes[0].hops[0] = _hop(xykPair, Aggregator.DexType.Xyk, address(usdc), address(eurc));
+        routes[1].amountIn = 400e6;
+        routes[1].hops = new Aggregator.Hop[](1);
+        routes[1].hops[0] = _hop(xykPair, Aggregator.DexType.Xyk, address(usdc), address(eurc));
+
+        vm.prank(user);
+        vm.expectRevert(Aggregator.InvalidRoutes.selector);
+        agg.splitSwap(
+            address(usdc), address(eurc), 1000e6, 0, block.timestamp, routes, _emptyPermit()
+        );
+        _assertCatalogZero();
     }
 
     // ─── 12. Never-call table ─────────────────────────────────
@@ -857,7 +1051,7 @@ contract AggregatorTest is Test, VendorDeployer {
     function _assertCatalogZero() internal view {
         assertEq(usdc.balanceOf(address(agg)), 0, "USDC leftover");
         assertEq(eurc.balanceOf(address(agg)), 0, "EURC leftover");
-        assertEq(mbtc.balanceOf(address(agg)), 0, "mBTC leftover");
+        assertEq(cirbtc.balanceOf(address(agg)), 0, "cirBTC leftover");
     }
 
     function _seedXykPair(address tokenA, address tokenB, uint256 amountA, uint256 amountB)
@@ -895,13 +1089,13 @@ contract AggregatorTest is Test, VendorDeployer {
         MockErc20(token).transfer(to, amount);
     }
 
-    /// @dev Seed EURC/USDC + USDC/mBTC pairs, allowlist xyk, fund user with EURC.
+    /// @dev Seed EURC/USDC + USDC/cirBTC pairs, allowlist xyk, fund user with EURC.
     function _prepareMultiHop()
         internal
-        returns (address pairEurcUsdc, address pairUsdcMbtc, uint256 expectedOut)
+        returns (address pairEurcUsdc, address pairUsdcCirbtc, uint256 expectedOut)
     {
         pairEurcUsdc = _seedXykPair(address(eurc), address(usdc), XYK_SEED, XYK_SEED);
-        pairUsdcMbtc = _seedXykPair(address(usdc), address(mbtc), 50_000e6, 1e8);
+        pairUsdcCirbtc = _seedXykPair(address(usdc), address(cirbtc), 50_000e6, 1e8);
         agg.addFactory(address(xykFactory), Aggregator.DexType.Xyk);
 
         _fundUser(address(eurc), 1000e6);
@@ -909,7 +1103,7 @@ contract AggregatorTest is Test, VendorDeployer {
         _grantMockAllowance(address(eurc), 1000e6);
 
         uint256 out1 = _xykFormula(IUniswapV2Pair(pairEurcUsdc), address(eurc), 1000e6);
-        expectedOut = _xykFormula(IUniswapV2Pair(pairUsdcMbtc), address(usdc), out1);
+        expectedOut = _xykFormula(IUniswapV2Pair(pairUsdcCirbtc), address(usdc), out1);
     }
 
     /// @dev Seed thin xyk + deep stable USDC/EURC, allowlist both, fund user with USDC.
@@ -926,12 +1120,12 @@ contract AggregatorTest is Test, VendorDeployer {
 
     /// @dev Full-range L=1e12 CLMM pool (T2.4 fixture), allowlisted, user funded.
     function _prepareClmm() internal returns (IUniswapV3Pool pool) {
-        address poolAddr = clmmFactory.createPool(address(usdc), address(mbtc), 3000);
+        address poolAddr = clmmFactory.createPool(address(usdc), address(cirbtc), 3000);
         pool = IUniswapV3Pool(poolAddr);
         pool.initialize(792281625142643375935439503360); // sqrtPriceX96 = 10 * 2^96 (P=100)
 
         usdc.mint(address(this), 100_000e6);
-        mbtc.mint(address(this), 100_000e8);
+        cirbtc.mint(address(this), 100_000e8);
         pool.mint(alice, -887220, 887220, 1e12, "");
 
         agg.addFactory(address(clmmFactory), Aggregator.DexType.Clmm);
@@ -941,7 +1135,10 @@ contract AggregatorTest is Test, VendorDeployer {
     }
 
     function _mintAndTransferXyk(address token, address to, uint256 amount) internal {
-        if (token == address(mbtc)) {
+        if (token == address(cirbtc)) {
+            cirbtc.mint(address(this), amount);
+            cirbtc.transfer(to, amount);
+        } else if (token == address(mbtc)) {
             mbtc.mint(address(this), amount);
             mbtc.transfer(to, amount);
         } else {
@@ -973,7 +1170,9 @@ contract AggregatorTest is Test, VendorDeployer {
     }
 
     function _fundUser(address token, uint256 amount) internal {
-        if (token == address(mbtc)) {
+        if (token == address(cirbtc)) {
+            cirbtc.mint(user, amount);
+        } else if (token == address(mbtc)) {
             mbtc.mint(user, amount);
         } else {
             MockErc20(token).mint(user, amount);
@@ -982,7 +1181,9 @@ contract AggregatorTest is Test, VendorDeployer {
 
     function _userApproveMockPermit2(address token, uint256 amount) internal {
         vm.prank(user);
-        if (token == address(mbtc)) {
+        if (token == address(cirbtc)) {
+            cirbtc.approve(address(permit2), amount);
+        } else if (token == address(mbtc)) {
             mbtc.approve(address(permit2), amount);
         } else {
             MockErc20(token).approve(address(permit2), amount);
