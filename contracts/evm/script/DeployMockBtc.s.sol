@@ -4,7 +4,10 @@ pragma solidity ^0.8.30;
 import {Script, console} from "forge-std/Script.sol";
 import {MockBtc} from "../src/MockBtc.sol";
 
-/// Deploy mBTC on Arc testnet. Do not pass --private-key on the CLI in CI.
+/// Deploy mBTC on Arc testnet. **FIXTURE-ONLY / HISTORICAL (2026-08-29
+/// rebaseline)** — the Arc operator workflow never deploys mBTC; the
+/// canonical catalog uses cirBTC. Chain-31337 local fixtures only.
+/// Do not pass --private-key on the CLI in CI.
 /// Use FOUNDRY_ETH_RPC_URL + a keystore / env loaded from gitignored .env.
 contract DeployMockBtc is Script {
     function run() external {

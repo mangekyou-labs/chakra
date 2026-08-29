@@ -42,7 +42,7 @@ cd packages/frontend && npm test
 - [x] WS `eth_subscribe` + notification forwards the log — `evm_watcher::tests::ws_subscription_forwards_log_notification` + `parse_subscription_log_extracts_log` (2026-08-25)
 - [x] Poll with empty topology does not RPC `eth_getLogs` — `evm_watcher::tests::poll_with_empty_topology_keeps_cursor_warm_without_logs` (2026-08-25)
 - [x] Created-pool log (`PairCreated`) upserts topology; later `Swap` on the new pool resolves through the refreshed index — `created_pool_log_upserts_topology_and_later_swap_touches` (2026-08-25)
-- [x] Discovery probes catalog pairs only (`getPair`/`getPool`), skips mBTC until `CHAKRA_MBTC_ADDRESS`, and never sweeps the market — `discovery_finds_catalog_xyk_pair_from_fixture_factory` / `discovery_without_mbtc_only_probes_usdc_eurc` (2026-08-25)
+- [x] Discovery probes catalog pairs only (`getPair`/`getPool`) — USDC/EURC, USDC/cirBTC, EURC/cirBTC — and never sweeps the market — `discovery_finds_catalog_xyk_pair_from_fixture_factory` / `discovery_without_mbtc_only_probes_usdc_eurc` (2026-08-25)
 - [x] Never-call addresses are never in the WS watch list — `watch_addresses_filter_never_call_and_keep_0x` (2026-08-25)
 - [x] Fetch pipeline coalesces `chakra-*` / `discovered:*` / `xylo` sources into EVM tasks — `fetch_pipeline::tests::coalesce_maps_evm_chakra_sources_to_evm_tasks` + `evm_watcher::tests::factory_tuple_parse_accepts_seed_and_discovery` (pins `source == "xylo"` for xylo seed and discovery) (2026-08-28)
 
@@ -91,7 +91,7 @@ cd packages/frontend && npm test
 ### Solidity Aggregator (Foundry)
 
 - [x] Single-hop xy=k swap succeeds; user receives ≥ `minAmountOut` — `test_single_hop_xyk_success` (exact 997/1000 venue output, `Swap` event `isSplit=false`) (2026-08-25)
-- [x] Multi-hop EURC via USDC succeeds atomically — `test_multi_hop_eurc_via_usdc_success` (EURC→USDC→mBTC chained xyk) + atomic revert `test_multi_hop_min_revert_is_atomic` (2026-08-25)
+- [x] Multi-hop EURC via USDC succeeds atomically — `test_multi_hop_eurc_via_usdc_success` (EURC→USDC→cirBTC chained xyk) + atomic revert `test_multi_hop_min_revert_is_atomic` (2026-08-25; fixture pairs only)
 - [x] Split across stable + xy=k succeeds; both pools’ reserves change (SC-4 unit analog) — `test_split_thin_xyk_plus_deep_stable` (700e6 stable + 300e6 thin xyk; both reserve sets move; `isSplit=true`) (2026-08-25)
 - [x] `minAmountOut` too high reverts; no reserve change — `test_minAmountOut_too_high_reverts` (reserves + user balances unchanged) (2026-08-25)
 - [x] Paused aggregator reverts — `test_owner_pause_blocks_splitSwap` (+ `test_owner_unpause_restores`) (2026-08-25)
@@ -109,7 +109,7 @@ cd packages/frontend && npm test
 - [x] Per-hop min is 0; only total `minAmountOut` is checked — no per-hop min in Hop/SubRoute or execution; single total check at settle (2026-08-25)
 - [x] Owner `rescueTokens` works; non-owner cannot — `test_rescueTokens_owner`/`test_rescueTokens_non_owner_reverts` (2026-08-25)
 - [x] `addFactory` / `removeFactory` gate hops — `test_addFactory_onlyOwner`, fake-pool/removeFactory reverts (2026-08-25)
-- [x] mBTC / venues never read `block.prevrandao` (always 0 on Arc) — `grep -R prevrandao src venues`: no hits (2026-08-24); re-checked with `test script` added: no hits (2026-08-25).
+- [x] Fixture venues never read `block.prevrandao` (always 0 on Arc) — `grep -R prevrandao src venues`: no hits (2026-08-24); re-checked with `test script` added: no hits (2026-08-25).
 - [x] Mixed solc routing: `auto_detect_solc` + `compilation_restrictions` — `src/**`, `test/**`, `script/**` = `0.8.30`/`prague`; `venues/uniswap-v2/**` = `0.5.16`/`istanbul`; `venues/uniswap-v3/**` = `0.7.6`/`istanbul` (replaces the single global `solc = "0.8.30"` from T1.1). Tests/scripts never import V2/V3 sources; they deploy via `VendorDeployer` hex bytecodes and talk through 0.8.30 interfaces (2026-08-24).
 
 ### Canonical venues (2026-08-29 rebaseline)
@@ -195,7 +195,7 @@ The owned XYK/stable/CLMM deployments and mBTC are **deterministic local fixture
 - [x] Worker bootstrap publishes snapshot + pool keys with `chakra:` prefix — `bootstrap::tests` (memory + real local `redis-server`): snapshot loads back, `chakra:pool:xyk|stable|clmm:{source}:{pool}` fetchable, `chakra:factories` readable, version event published, `cluster_ready` true after publish (2026-08-25, T3.1)
 - [x] API `/ready` is false before snapshot; true after (SC-5) — `ready_is_503_until_snapshot_and_pool_exist` (2026-08-25, T4.3)
 - [x] `/ready` predicate: 200 only when `chakra:snapshot:current` exists **and** ≥1 `chakra:pool:*` key — `ready::tests::cluster_ready_*` (real Redis) + `memory_ready_*` (2026-08-25, T3.1; HTTP handler shape still T4.3)
-- [x] `/quote` after Redis hydrate returns routes for all three pairs (SC-1) — `quote_hydrates_chakra_snapshot_routes` (USDC→EURC via stable, USDC→mBTC via xyk; 1_000e6 vector `999_550_535` pinned) (2026-08-25, T4.3)
+- [x] `/quote` after Redis hydrate returns routes for all three pairs (SC-1) — `quote_hydrates_chakra_snapshot_routes` (USDC→EURC via stable, USDC→cirBTC via xyk; 1_000e6 vector `999_550_535` pinned) (2026-08-25, T4.3; pair renamed in the 2026-08-29 rebaseline)
 - [ ] `/quote` split case returns `is_split=true` at documented size (SC-2) — **documented deviation**: at `180_000e6` the engine honestly returns single `chakra-stable` (`sc2_180k_is_not_split_and_single_stable_wins` locks this); a real split case waits for the T9.2 rate-filter/seed decision
 - [x] T4.4 selector fix: `selectors_match_contract_abis` now pins canonical 7-arg signature → `0x2e3be0c1` (was `0xcc03a3bc`); `encode_permit2_pull` emits 6-word PermitSingle struct + offset (was 20 zero words); `permit2_allowance` uses Permit2 `0x927da105` 3-arg selector (was ERC-20 `0xdd62ed3e`); fixtures updated to dispatch on `0x927da105` (2026-08-26, T4.4)
 - [x] `/build_tx` calldata decodes to `splitSwap` with matching `minAmountOut` and sub-routes — `build_tx_encodes_split_swap_with_matching_route` (full ABI decode: head, routes, hops, pool/dexType/tokenIn/tokenOut/fee; selector `0x2e3be0c1`) (2026-08-25, T4.4)
@@ -246,7 +246,7 @@ Network: **Arc testnet** `chainId` 5042002 (`0x4CEF52`). Disposable persistent C
   - `/ready` → 200 `{"status":"ready","ready":true,"snapshot_id":"snapshot-…"}`
   - `/quote` (1e6 USDC→EURC) → 200 `expected_output: 996915` via `chakra-stable` (`dex_types: ["stable"]`)
   - `/quote` (5e6 USDC→EURC) → 200 split execution (`is_split: true`, 4680269 total, xylo legs + `chakra-stable`)
-  - `/quote` (1e6 USDC→mBTC) → 200 honest `NO_ROUTE` error
+  - `/quote` (1e6 USDC→cirBTC) → 200 honest `NO_ROUTE` error (no healthy direct USDC/cirBTC venue; routed as USDC → EURC → cirBTC)
   - `/build_tx` (1e6 & 5e6) → 200 with `to: "0xea1b2c24bd41163590960f8e40afe6cb4cc92006"` targeting new aggregator
 - [x] On-chain **split** (≥2 sub-routes in one tx) on `testnet.arcscan.app`; multi-hop single-path is extra, not a substitute (SC-4; **live 2026-08-28** — tx `0x42e85916ade38b87ef0440ef71d8f3330075ecf2a481247dc2ac33376b287fa8`, 3 sub-routes 2×xylo+1×stable, `isSplit=1`, 5e6 USDC→4,674,618 EURC)
 - [ ] Venue matrix ≥3 pairs × ≥3 sizes checked in (SC-8, partial: USDC↔EURC pairs routable across stable and xylo in `docs/evidence/chakra-t91-venue-matrix.json`; live 3-pair routing open pending T2.1–T2.4 re-seed)
@@ -257,21 +257,21 @@ Network: **Arc testnet** `chainId` 5042002 (`0x4CEF52`). Disposable persistent C
 
 ## Test Data
 
-- Foundry fork or Arc testnet: ERC-20 USDC, EURC, deployed mBTC, seeded pools with **documented** depths (thin xy=k USDC/EURC vs deep stable USDC/EURC).
+- Foundry fork or Arc testnet: ERC-20 USDC, EURC, canonical cirBTC, manifest venue pools with live reserves; local fixture pools use the documented depths (thin xy=k USDC/EURC vs deep stable USDC/EURC).
 - Redis fixture snapshot for API tests (no live RPC).
 - Quote fixtures: small size (no split), documented split size, dust size (no route or min out 0 rejected).
-- MetaMask harness wallet: funded from Circle faucet + mBTC mint; keys **never** committed. Prefer env `WALLET_PRIVATE_KEY` injected into dAppwright at setup, gitignored.
+- MetaMask harness wallet: funded from Circle faucet (USDC/EURC; cirBTC acquired via route); keys **never** committed. Prefer env `WALLET_PRIVATE_KEY` injected into dAppwright at setup, gitignored.
 - OpenAPI examples use the three catalog tokens only.
 
-Seed documentation (implementation fills exact amounts):
+Seed documentation (implementation fills exact amounts; all rows are **chain-31337 fixture pools only**, never deployed on Arc by the operator workflow):
 
 | Pool | Tokens | Intent |
 |------|--------|--------|
 | xy=k | USDC/EURC | Thin — high impact |
 | stable | USDC/EURC | Deep — low impact; enables SC-2 |
-| xy=k | USDC/mBTC | Volatile direct |
-| clmm | USDC/mBTC 30 bps | Required second venue for splits; 5 bps optional |
-| xy=k | EURC/mBTC | Hop / direct |
+| xy=k | USDC/cirBTC | Volatile direct (fixture) |
+| clmm | USDC/cirBTC 30 bps | Required second venue for splits; 5 bps optional (fixture) |
+| xy=k | EURC/cirBTC | Hop / direct (fixture) |
 
 ## Test Reporting & Coverage
 
@@ -293,7 +293,7 @@ Seed documentation (implementation fills exact amounts):
 
 ## Performance Testing
 
-- [ ] Warm Redis quote p95 &lt; 500 ms for USDC→EURC and USDC→mBTC at 3 sizes, measured at the API process (SC-10)
+- [ ] Warm Redis quote p95 &lt; 500 ms for USDC→EURC and USDC→cirBTC at 3 sizes, measured at the API process (SC-10)
 - [ ] Split quote still under p95 (Brent ~10 extra math evals, no extra RPC)
 - [ ] Worker: time from included swap tx to Redis key update **≤ 5 s** (SC-11)
 - [ ] No full-market sweep on the hot path (assert discovery interval ≠ hot path)

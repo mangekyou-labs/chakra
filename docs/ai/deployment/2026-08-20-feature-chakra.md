@@ -12,6 +12,54 @@ date: 2026-08-20
 > smoking green. API + worker + Redis on Render (Docker), UI on Vercel (static export).
 > Contracts and seeded pools are on chain ID `5042002` (Arc testnet). Never target Arc
 > mainnet. See requirements and design docs.
+>
+> **Status 2026-08-29 (rebaseline preflight):** Read-only preflight complete — see
+> "Read-only preflight (2026-08-29)" below. The hosted stack still runs the **previous
+> pre-rebaseline revision** (catalog USDC/EURC/mBTC, aggregator `0xEa1b2C…2006`) and is
+> retained for rollback. **Aggregator deployment DONE 2026-08-29 (authorized)** — new
+> non-upgradeable aggregator `0xeb1235…29d8` with cirBTC sweep and all three venues
+> registered; the hosted cutover (worker → snapshot → API/UI) remains **gated on
+> explicit authorization**.
+
+## Read-only preflight (2026-08-29, before any external mutation)
+
+All checks were read-only (no broadcasts, no hosted mutations, no wallet spending):
+
+- **Chain:** `eth_chainId` on `https://rpc.testnet.arc.io` → `0x4cef52` (5042002). ✓
+- **Canonical tokens** (bytecode present, decimals verified via `cast call`):
+  - USDC `0x3600…0000` — decimals 6 ✓
+  - EURC `0x89B5…D72a` — decimals 6 ✓
+  - cirBTC `0xf0C4…32BF` — decimals 8 ✓
+- **Venue bytecode** (all 6 manifest contracts deployed):
+  - Xylo factory `0x60ED…9e2`, router `0x7374…1023`, pool `0x3DF3…BB1` ✓
+  - Presto hub `0x5794…24D6` ✓
+  - UnitFlow factory `0xd67F…745a5`, pair `0x268D…9200` ✓
+- **Factory/hub membership:**
+  - Xylo `getPool(USDC,EURC)` → `0x3DF3…BB1` (matches manifest) ✓
+  - UnitFlow `getPair(EURC,cirBTC)` → `0x268D…9200` (matches manifest) ✓
+- **Reserves (nonzero):**
+  - Xylo pool: 9,430,962,057,482 USDC / 454,267,933,226 EURC ✓
+  - UnitFlow pair: 257,349,752 EURC / 249,850 cirBTC ✓
+- **Quote probes:**
+  - Xylo `getAmplificationParameter()` → 20000 raw (= A=200 after A_PRECISION=100, matches manifest) ✓
+  - Xylo `calculateSwap(1e6 USDC→EURC)` → 780,142 ✓
+- **Previous release (retained for rollback):**
+  - Hosted API `https://chakra-api-0a5i.onrender.com`: `/health` 200, `/ready` 200 ready:true, `/tokens` returns the **pre-rebaseline mBTC catalog** (confirming the old revision is still live), `/quote` USDC→EURC works, cirBTC → `UNKNOWN_TOKEN` (old catalog).
+  - Old aggregator `0xEa1b2C24bd41163590960F8e40afe6cb4CC92006`: `paused()==false`, owner `0x12E2…276d`, codesize 22259 chars.
+
+**No failing venue requires repair** — all manifest venues pass bytecode/membership/reserves/probe checks. Deployment (aggregator) and cutover (worker/API/UI) remain **authorization-gated** per the plan; this preflight does not authorize any broadcast or hosted mutation.
+
+## Aggregator deployment (2026-08-29, authorized)
+
+Broadcast via `scripts/arc-operator.sh --broadcast script script/DeployAggregator.s.sol` (venues registered in the same tx batch; deploy tx `0x663c4614…7261e`, 5 registration calls `0x15101790…` … `0x6ec78bfa…`).
+
+- **New aggregator:** `0xeb12351602c56d47c4ee955193335848952b29d8` (dry-run predicted the same address).
+- On-chain verified: codesize 29745 chars, owner `0x12E266744f6d25D372000e066eCc0DF5a752276d`, `paused()==false`, `cirbtc()==0xf0C4…32BF`, `usdc()==0x3600…0000`, `eurc()==0x89B5…D72a`.
+- Venue registration verified: Xylo factory dexType **3** + router `0x7374…1023` configured; Presto hub allowlisted `true`; UnitFlow factory dexType **0** with `factoryFeeBps == 30`.
+- Old aggregator `0xEa1b2C…2006` left **intact** until the hosted cutover succeeds.
+- `docs/arc-testnet-manifest.json` v2 and `.env.example` updated (`CHAKRA_AGGREGATOR`).
+
+**Remaining gate:** hosted cutover (worker first → verified snapshot → API/UI) — separately authorized.
 
 ## Public URLs (2026-08-28)
 

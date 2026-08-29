@@ -32,7 +32,6 @@ interface IAllowanceTransfer {
     /// @notice Sets allowance for a spender.
     function approve(address token, address spender, uint160 amount, uint48 expiration) external;
 
-
     /// @notice Current AllowanceTransfer allowance for (user, token, spender).
     function allowance(address user, address token, address spender)
         external

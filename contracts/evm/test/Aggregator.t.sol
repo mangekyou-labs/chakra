@@ -685,7 +685,13 @@ contract AggregatorTest is Test, VendorDeployer {
 
         vm.prank(user);
         uint256 amountOut = agg.splitSwap(
-            address(usdc), address(eurc), 1000e6, expectedOut, block.timestamp, routes, _emptyPermit()
+            address(usdc),
+            address(eurc),
+            1000e6,
+            expectedOut,
+            block.timestamp,
+            routes,
+            _emptyPermit()
         );
 
         assertEq(amountOut, expectedOut, "venue-only Xylo math violated");
@@ -779,7 +785,8 @@ contract AggregatorTest is Test, VendorDeployer {
         eurc.mint(address(this), 613_516e6);
         usdc.approve(address(xyloFactory), type(uint256).max);
         eurc.approve(address(xyloFactory), type(uint256).max);
-        address poolAddr = xyloFactory.createPool(address(usdc), address(eurc), 9_323_185e6, 613_516e6);
+        address poolAddr =
+            xyloFactory.createPool(address(usdc), address(eurc), 9_323_185e6, 613_516e6);
         agg.addFactory(address(xyloFactory), Aggregator.DexType.Xylo);
         agg.setXyloRouter(address(xyloFactory), address(xyloRouter));
 
@@ -799,7 +806,8 @@ contract AggregatorTest is Test, VendorDeployer {
         eurc.mint(address(this), 613_516e6);
         usdc.approve(address(xyloFactory), type(uint256).max);
         eurc.approve(address(xyloFactory), type(uint256).max);
-        address poolAddr = xyloFactory.createPool(address(usdc), address(eurc), 9_323_185e6, 613_516e6);
+        address poolAddr =
+            xyloFactory.createPool(address(usdc), address(eurc), 9_323_185e6, 613_516e6);
         agg.addFactory(address(xyloFactory), Aggregator.DexType.Xylo);
         agg.setXyloRouter(address(xyloFactory), address(xyloRouter));
         agg.removeFactory(address(xyloFactory));
@@ -817,10 +825,7 @@ contract AggregatorTest is Test, VendorDeployer {
 
     /// @dev Seed a Presto hub spoke (USDC path + EURC spoke), allowlist the
     ///      hub, fund the user, return the venue-only expected output.
-    function _preparePrestoSwap(uint256 amountIn)
-        internal
-        returns (uint256 expectedOut)
-    {
+    function _preparePrestoSwap(uint256 amountIn) internal returns (uint256 expectedOut) {
         uint256 spokeUsdc = 500_000e6;
         uint256 spokeEurc = 200_000e6;
         usdc.mint(address(this), spokeUsdc + spokeEurc); // path + spoke funding
@@ -848,7 +853,13 @@ contract AggregatorTest is Test, VendorDeployer {
 
         vm.prank(user);
         uint256 amountOut = agg.splitSwap(
-            address(usdc), address(eurc), 1000e6, expectedOut, block.timestamp, routes, _emptyPermit()
+            address(usdc),
+            address(eurc),
+            1000e6,
+            expectedOut,
+            block.timestamp,
+            routes,
+            _emptyPermit()
         );
 
         assertEq(amountOut, expectedOut, "venue-only Presto math violated");
@@ -889,7 +900,13 @@ contract AggregatorTest is Test, VendorDeployer {
         Aggregator.SubRoute[] memory routes = _singleHopRoute(h, 1000e6);
         vm.expectRevert(Aggregator.PoolNotFromFactory.selector);
         agg.splitSwap(
-            address(usdc), address(eurc), 1000e6, expectedOut, block.timestamp, routes, _emptyPermit()
+            address(usdc),
+            address(eurc),
+            1000e6,
+            expectedOut,
+            block.timestamp,
+            routes,
+            _emptyPermit()
         );
     }
 
@@ -900,11 +917,12 @@ contract AggregatorTest is Test, VendorDeployer {
     ///      rejects the unknown token at validation (never reaches the venue).
     function test_catalog_enforcement_rejects_out_of_catalog_token() public {
         MockErc20 outside = new MockErc20("Outside", "OUT");
-        (address pair, ) = _prepareXykSwap(1000e6);
+        (address pair,) = _prepareXykSwap(1000e6);
         _grantMockAllowance(address(usdc), 1000e6);
 
         // tokenOut = OUT is not in the catalog — the hop is invalid.
-        Aggregator.Hop memory h = _hop(pair, Aggregator.DexType.Xyk, address(usdc), address(outside));
+        Aggregator.Hop memory h =
+            _hop(pair, Aggregator.DexType.Xyk, address(usdc), address(outside));
         Aggregator.SubRoute[] memory routes = _singleHopRoute(h, 1000e6);
         vm.prank(user);
         vm.expectRevert(Aggregator.InvalidRoutes.selector);
@@ -919,7 +937,7 @@ contract AggregatorTest is Test, VendorDeployer {
     ///      (UnitFlow V2.5 = 30 bps). A 30 bps explicit config produces the
     ///      same venue output as the default and leaves no dust.
     function test_xyk_factory_fee_is_configurable() public {
-        (address pair, ) = _prepareXykSwap(1000e6);
+        (address pair,) = _prepareXykSwap(1000e6);
         _grantMockAllowance(address(usdc), 1000e6);
         agg.setFactoryFee(address(xykFactory), 30); // same as the pair's built-in 30 bps
 
@@ -937,7 +955,13 @@ contract AggregatorTest is Test, VendorDeployer {
 
         vm.prank(user);
         uint256 amountOut = agg.splitSwap(
-            address(usdc), address(eurc), 1000e6, expectedOut, block.timestamp, routes, _emptyPermit()
+            address(usdc),
+            address(eurc),
+            1000e6,
+            expectedOut,
+            block.timestamp,
+            routes,
+            _emptyPermit()
         );
         assertEq(amountOut, expectedOut, "per-factory fee math violated");
         _assertCatalogZero();
@@ -947,7 +971,7 @@ contract AggregatorTest is Test, VendorDeployer {
     ///      rejected (two paths cannot independently overestimate the same
     ///      downstream liquidity). The aggregator reverts InvalidRoutes.
     function test_split_reuses_pool_reverts() public {
-        (address xykPair, ) = _prepareSplit();
+        (address xykPair,) = _prepareSplit();
 
         Aggregator.SubRoute[] memory routes = new Aggregator.SubRoute[](2);
         routes[0].amountIn = 600e6;

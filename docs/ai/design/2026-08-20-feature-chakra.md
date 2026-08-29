@@ -12,8 +12,22 @@ status: reviewed
 **Product:** Chakra (Arc testnet DEX aggregator)
 **Feature key:** `chakra`
 **Status:** Phase 3 **reviewed** 2026-08-20 against reviewed requirements `docs/ai/requirements/2026-08-20-feature-chakra.md`. Implementation notes belong in `dev-implementation`. Do not treat this file as permission to write product code.
+**Rebaseline:** 2026-08-29 — design reconciled and **reapproved as blocking task T0.3** after the canonical curated venue/catalog rebaseline (see "Rebaseline conformance" below). Commits `aa28cda` and `671f478` are treated as implementation awaiting this conformance, not work to repeat.
 
 Chakra ports Chakra’s routing architecture to Arc EVM. Topology (pairs, pool IDs, fees) is separate from live state (reserves / ticks). `chakra-market-data-worker` is the **single Redis writer**. `chakra-api-server` is stateless: each `/quote` reloads the last snapshot, MGETs pool state, runs PathFinder → QuoteEngine → SplitOptimizer locally, and never holds user keys. `/build_tx` is an **encoder and validator of the client’s `sub_routes`**, not a re-quoter. The API never sends a transaction; the wallet does.
+
+Chakra retains Chakra's event-driven pool-state model ([pool-state-architecture](https://github.com/Chakra/Arc-dex-agg/blob/main/docs/pool-state-architecture.md)): **exactly one worker writes Redis**; APIs hydrate candidate pools and quote locally; **touched** pools refresh through WS/poll; and discovery performs **reconciliation** (topology rebuild over the manifest factory lists) rather than a periodic full-market refresh.
+
+## Rebaseline conformance (2026-08-29, T0.3)
+
+Normative Chakra policy after the canonical curated rebaseline:
+
+1. **Catalog is exactly USDC, EURC, and cirBTC** — ERC-20 USDC (`0x3600…0000`, 6 dp), EURC (`0x89B5…D72a`, 6 dp), canonical cirBTC (`0xf0C4…32BF`, 8 dp). mBTC and every Chakra-owned token/pool/venue exist only as **deterministic chain-31337 local fixtures**; the Arc operator workflow never deploys them.
+2. **Default venues are `xylo-stable`, `presto-hub`, and `unitflow-v25`** (canonical curated manifest). No Chakra-owned Arc liquidity, token, pool, or venue deployments — ever.
+3. **Discovery/watchlist results never enter routing or the aggregator allowlist automatically.** Watchlist venues (Lunex, UnitFlow V3, AchSwap/Arc Swap, Synthra) are recorded as promotion candidates; owner `addFactory` is required before any pool quotes.
+4. **Xylo execution is defined exclusively through its configured router** (`swapExactTokensForTokens` on the atomically configured factory→router pair, request `deadline`, aggregator recipient, post-call balance delta). Distinguish: Xylo **factory/router authorization** (`setXyloRouter`), Presto **hub authorization** (`addPrestoHub` allowlist), and UnitFlow **factory membership** (XYK factory allowlist + per-factory fee).
+5. **`/ready` stays compatible**: current snapshot **and** ≥1 usable pool. Degraded/per-venue availability is exposed through startup logs and evidence, never by changing the public endpoint shape.
+6. **Staged Arc rollout/rollback** follows [Chakra aggregator deployment](https://github.com/Chakra/Arc-dex-agg/blob/main/docs/aggregator-deployment.md): worker first → verified snapshot → API readiness → traffic cutover, retaining the previous release/config for rollback.
 
 ## Architecture Overview
 
@@ -200,7 +214,7 @@ Circle’s Arc `llms.txt` instruction “use App Kit for bridging, swaps, and un
 | `use-gateway`, `gateway/**`, App Kit Unified Balance (`app-kit/unified-balance.md`, `app-kit/quickstarts/unified-balance-deposit-and-spend.md`, `app-kit/concepts/unified-balance-fees.md`) | No cross-chain unified USDC. Gateway skill’s `access-usdc-crosschain.md` is **not** in the Canteen mirror. |
 | `bridge-stablecoin`, `cctp/**`, `bridge-kit.md`, App Kit Bridge (`app-kit/bridge.md`, `app-kit/quickstarts/bridge-tokens-across-blockchains.md`, `app-kit/concepts/bridge-fees.md`, `app-kit/references/bridge-error-recovery.md`) | No bridging. Domain 26 recorded so we do not route through TokenMessenger. |
 | `use-smart-contract-platform`, `contracts/**`, `arc/tutorials/deploy-contracts.md`, `interact-with-contracts.md`, `monitor-contract-events.md` | Deploy and events via Foundry + Arc WS, not Circle SCP + webhooks + Circle API keys. |
-| App Kit landing + Swap (`app-kit.md`, `app-kit/swap.md`, `app-kit/quickstarts/swap-tokens-*.md`, `app-kit/concepts/swap-fees.md`) | Closed venue. Requires a Circle **kit key**. Arc testnet Swap tokens are USDC / EURC / **cirBTC** — cirBTC is **not** in the catalog; mBTC is ours. |
+| App Kit landing + Swap (`app-kit.md`, `app-kit/swap.md`, `app-kit/quickstarts/swap-tokens-*.md`, `app-kit/concepts/swap-fees.md`) | Closed venue. Requires a Circle **kit key**. Arc testnet Swap tokens are USDC / EURC / **cirBTC** — cirBTC **is** the canonical catalog token (2026-08-29); mBTC is fixture-only. |
 | App Kit Send (`app-kit/send.md`, `app-kit/quickstarts/send-tokens-same-chain.md`) | Wallet-to-wallet via App Kit, not Chakra. Transfers go through wagmi/viem + Permit2 + aggregator. |
 | App Kit install / adapters / SDK (`app-kit/tutorials/{installation,adapter-setups}.md`, `app-kit/references/{sdk-reference,supported-blockchains}.md`) | Kit SDK unused. Supported-blockchains is the source of the cirBTC / kit-key facts, not a Chakra catalog. |
 | Agent Stack (`agent-stack/**`), `build/agentic-economy.md`, `arc/tutorials/register-your-first-ai-agent.md`, `arc/tutorials/create-your-first-erc-8183-job.md`, `arc-escrow` | Human-operated swap app. Agent Wallets chain id `ARC-TESTNET` is unused. (`build/payments`, `build/ecommerce` are linked upstream, **not** in the mirror.) |
@@ -223,7 +237,7 @@ Canonical live indexes: `docs.arc.io/llms.txt` and `developers.circle.com/llms.t
 ### Arc EVM compatibility (must not violate)
 
 - **Finality:** a tx is pending or final. Worker writes Redis on inclusion. UI `waitForTransactionReceipt` with **1 confirmation**.
-- **`block.prevrandao`:** always `0`. Do not use it for mBTC mint, seed, or anything else.
+- **`block.prevrandao`:** always `0`. Do not use it for any mint, seed, or anything else (fixture venues never read it).
 - **Timestamps:** `deadline` still uses `block.timestamp`. Do not assume strictly increasing timestamps across consecutive blocks.
 - **`SELFDESTRUCT`:** not allowed during deployment (do not write such constructors).
 - **EIP-4844 blobs:** disabled; unused.
@@ -266,7 +280,7 @@ Do **not** point production worker/API at the Canteen `$RPC` proxy. Do **not** i
 |--------|------------------|----------|------|
 | USDC (ERC-20) | `0x3600000000000000000000000000000000000000` | 6 | Swap token. ERC-20 `transfer`/`approve`/`transferFrom` move the **same** native balance. Circle-recommended interface for app balances. |
 | EURC | `0x89B50855Aa3bE2F677cD6303Cec089B5F319D72a` | 6 | Swap token |
-| cirBTC | Canonical Arc ERC-20 (App Kit cirBTC) | 8 | Swap token. **No faucet, no Chakra mint** — acquired via the route itself (e.g. USDC → EURC → cirBTC). |
+| cirBTC | Canonical Arc ERC-20 (`0xf0C4…32BF`) | 8 | Swap token. **No faucet, no Chakra mint** — acquired via the route itself (e.g. USDC → EURC → cirBTC). |
 | Native USDC | Arc native value | 18 | Gas only. Same economic balance as ERC-20 USDC, different encoding. **Never** a PathFinder node. Aggregator `msg.value` = 0. |
 
 v1 PathFinder catalog and `GET /tokens` are **exactly** ERC-20 USDC, EURC, cirBTC. Discovery may record other pools; they are unused unless both tokens are in this catalog. **WUSDC and any other wrapper identity are excluded from v1.** mBTC and all Chakra-owned mock pools exist only as deterministic chain-31337 fixtures and are never deployed by the Arc operator workflow.
@@ -637,7 +651,7 @@ Response `data`:
 
 | Method | Path | Purpose |
 |--------|------|---------|
-| `GET` | `/api/v1/tokens` | Frozen v1 catalog only: USDC, EURC, mBTC (address, symbol, decimals, logo URI) |
+| `GET` | `/api/v1/tokens` | Frozen v1 catalog only: USDC, EURC, cirBTC (address, symbol, decimals, logo URI) |
 | `GET` | `/api/v1/balances?account=0x…` | ERC-20 balances for catalog tokens (6/8 dp) via **Multicall3**. Separate field `native_usdc` (18 dp `eth_getBalance`). **Never sum** the two USDC encodings. |
 | `GET` | `/api/v1/health` | Process liveness. Always 200 if the process can answer. |
 | `GET` | `/api/v1/ready` | **200** iff `chakra:snapshot:current` exists **and** ≥1 `chakra:pool:*` key is present. Else **503**. |
@@ -702,10 +716,10 @@ Binaries: `chakra-market-data-worker`, `chakra-api-server`.
 
 - `Aggregator.sol` — Ownable, Pausable, ReentrancyGuard, **no proxy / not upgradeable**
 - `contracts/evm/venues/uniswap-v2/` and `uniswap-v3/` — vendored cores + upstream LICENSE
-- Original stableswap + mBTC under Apache-2.0
+- Original stableswap + mBTC fixture under Apache-2.0 (chain-31337 fixtures only)
 - `foundry.toml`: `solc = "0.8.30"`, `evm_version = "prague"` (Arc EVM target; the deploy tutorial only shows `pragma ^0.8.30`). Contracts `pragma solidity ^0.8.30`.
-- Scripts: `Deploy.s.sol` (venues, aggregator, `addFactory`, seed allowlist), `Seed.s.sol` (liquidity + mBTC mint to owner/QA). CREATE2 via Arachnid factory is optional. Broadcast via env/keystore — **not** `forge create --private-key` in CI or hosted deploy.
-- Tests: see testing doc — leftover 0, factory allowlist drain attempt, Permit2 skip-if-allowance, `msg.value != 0` revert, pause, deadline, V3 callback spoof. Never use `block.prevrandao` in mBTC or venues.
+- Scripts: **operator workflow restricted to `DeployAggregator.s.sol` (one non-upgradeable aggregator deploy + venue registration)**. `Deploy.s.sol` (owned venues, mBTC, liquidity) and `Seed.s.sol` (liquidity + mBTC mint) are **fixture-only / historical** — never part of the Arc workflow. CREATE2 via Arachnid factory is optional. Broadcast via env/keystore — **not** `forge create --private-key` in CI or hosted deploy.
+- Tests: see testing doc — leftover 0, factory allowlist drain attempt, Permit2 skip-if-allowance, `msg.value != 0` revert, pause, deadline, V3 callback spoof. Never use `block.prevrandao` in fixture venues.
 
 ### TypeScript SDK (`packages/sdk`)
 
@@ -745,7 +759,7 @@ Circle App Kit Swap, Gateway, CCTP, Modular Wallets, SCP event monitors, oracles
 | CLMM seed | **30 bps required**; 5 bps optional | 5 bps only; both required | 30 bps is the volatile default; 5 bps is extra split surface if seed time allows |
 | CLMM incomplete ticks | Skip hop | RPC hydrate ticks on quote | Same as Chakra; keep quotes correct |
 | UI surface | Focused swap | Full terminal with portfolio | Locked; density is visual, not extra products |
-| Catalog | Freeze 3 canonical tokens (USDC, EURC, cirBTC) | Grow `/tokens` from discovery; include mBTC (Chakra-owned) | Canonical Arc token set; no Chakra-owned liquidity; cirBTC via route; extra tokens stay unused |
+| Catalog | Freeze 3 canonical tokens (USDC, EURC, cirBTC) | Grow `/tokens` from discovery; include mBTC (Chakra-owned) | Canonical Arc token set; no Chakra-owned liquidity; cirBTC via route; mBTC fixture-only; extra tokens stay unused |
 | Quote firmness | Indicative + `minAmountOut` | Firm/RFQ quotes | No inventory/MM; on-chain min out is the guarantee |
 | Price impact wire type | Integer `price_impact_bps` | Float `price_impact: 0.12` | 0.12 is ambiguous (ratio vs percent vs bps) |
 | Discovery | Env factory lists; owner allowlist before quote | On-chain factory registry crawl from zero; auto-allowlist | No Arc factory registry. Auto-allowlist would undo the drain protection |
@@ -759,7 +773,7 @@ Circle App Kit Swap, Gateway, CCTP, Modular Wallets, SCP event monitors, oracles
 | Confirmations | 1 = final | Wait N blocks | Malachite deterministic finality |
 | Balances | Multicall3 ERC-20 + separate native gas field | Sum native+ERC-20; Circle SCP | Duality pitfall is double-counting |
 | Quotes | Local AMM math from Redis | Chainlink/Pyth/Stork | Oracle prices are not pool execution prices |
-| Circle wallets / App Kit / CCTP / Gateway / SCP | Out | Wrap App Kit Swap; Modular Wallets | Locked non-goals; App Kit Swap on Arc testnet is USDC/EURC/cirBTC, not mBTC |
+| Circle wallets / App Kit / CCTP / Gateway / SCP | Out | Wrap App Kit Swap; Modular Wallets | Locked non-goals; App Kit Swap on Arc testnet is USDC/EURC/cirBTC — the canonical catalog, but still a closed venue |
 
 ### Split optimizer (unchanged algorithm)
 
@@ -837,7 +851,7 @@ Arc USDC is **one economic balance** with two encodings (Circle `use-usdc`: nati
 - Accessibility: keyboard connect, labeled inputs, not color-only impact.
 - Number formatting per `number-formatting` skill at implementation.
 - Recent swaps: this wallet, this browser, this chain, max 20.
-- mBTC has no faucet CTA; USDC/EURC empty state links Circle faucet.
+- cirBTC has no faucet CTA and no Chakra mint; USDC/EURC empty state links Circle faucet. mBTC is a chain-31337 fixture only, never a UI token.
 
 ### Compliance / rollout
 
@@ -897,22 +911,24 @@ Phase 2 already chose architecture A, catalog freeze, and ERC-20 USDC. Phase 3 r
 | Leftover | Ignore; revert on dust; sweep to user | **Sweep to user, then assert 0** |
 | Impact field | Float `price_impact` | **Integer `price_impact_bps`** |
 | UI→API | Next rewrite; direct CORS | **Direct `NEXT_PUBLIC_CHAKRA_API_URL`** |
-| mBTC faucet | Public mint UI; owner-only | **Owner mint seed/QA; users buy via swap** |
+| mBTC faucet | Public mint UI; owner-only | **Owner mint seed/QA; users buy via swap** — **superseded 2026-08-29**: mBTC is fixture-only; cirBTC is acquired via the route itself, never minted |
 
 ## Phase 3 review notes
 
 Reviewed against the design README template (all six sections present) and every goal / story / SC / constraint in the reviewed requirements.
 
-**Validated:** architecture A still holds; hybrid venues; Redis topology vs state; single writer; local math; Brent split; atomic aggregator; EIP-6963; catalog freeze; USDC duality; 0 fee; public REST+SDK.
+**Validated:** architecture A still holds; curated manifest venues; Redis topology vs state; single writer; local math; Brent split; atomic aggregator; EIP-6963; catalog freeze; USDC duality; 0 fee; public REST+SDK.
 
-**Clarified in this review (named assumptions, no remaining product questions):** factory allowlist; Permit2 AllowanceTransfer encoding and skip-if-allowance; `build_tx` encoder + RPC allowance/pause checks; hop execution (V2 empty-data, V3 callback from allowlisted pool, stable `exchange`); leftover sweep + 0 invariant; `deadline`; non-payable; `Swap` event; GPL venue tree; discovery env lists; `/ready` predicate; 10 req/s IP + CORS; no Next rewrite; recent-swaps and unaudited-ack localStorage; quote debounce 250 ms / refresh 5 s; pause pre-check; USDC MAX `/ 1e12` + 1.25× + 0.10 USDC floor; `price_impact_bps`; CLMM 30 bps required; no public mBTC faucet; hop min = 0.
+**Clarified in this review (named assumptions, no remaining product questions):** factory allowlist; Permit2 AllowanceTransfer encoding and skip-if-allowance; `build_tx` encoder + RPC allowance/pause checks; hop execution (V2 empty-data, V3 callback from allowlisted pool, stable `exchange`, Xylo router exact-input, Presto hub `swap`); leftover sweep + 0 invariant; `deadline`; non-payable; `Swap` event; GPL venue tree; discovery env lists; `/ready` predicate; 10 req/s IP + CORS; no Next rewrite; recent-swaps and unaudited-ack localStorage; quote debounce 250 ms / refresh 5 s; pause pre-check; USDC MAX `/ 1e12` + 1.25× + 0.10 USDC floor; `price_impact_bps`; CLMM 30 bps required; no public mBTC faucet (fixture-only); hop min = 0.
+
+**2026-08-29 rebaseline review:** the design was partially aligned after the canonical curated rebaseline. This T0.3 pass reconciles the remaining stale descriptions: mBTC references removed or marked fixture-only, seeded/hybrid live venues removed, Xylo execution defined exclusively through the configured router (distinguishing Xylo factory/router authorization, Presto hub authorization, and UnitFlow factory membership), `/ready` kept compatible with degraded availability exposed via logs/evidence, and a staged Arc rollout/rollback flow added. Commit `aa28cda` (catalog/venues) and `671f478` (Xylo amplification hydration, venue verification, ABI regeneration) conform to this revised design and are treated as implementation awaiting conformance, not work to repeat.
 
 **Arc Canteen full-index addendum (fourth pass closed remaining named pages):** public RPC not Canteen `$RPC`; documented failovers only (no invented Alchemy URL); Multicall3 balances, never sum encodings; 1 confirmation = final; Prague / `prevrandao=0` / shared timestamps; wallets may label native ETH; `eth_feeHistory` + 20 gwei floor; solc `0.8.30`; Foundry `--private-key` local-demo only; Memo/Multicall3From/CCTP V2 suite/Gateway/FxEscrow/USYC+Entitlements+Teller never called; App Kit Swap kit-key + cirBTC unused; App Kit Send/Bridge/Unified Balance unused; Circle wallets/SCP/Agent Stack/oracles/indexers/samples/OpenAPI explicitly out. Every `AGENTS.md` path and every mirrored file classified applied or excluded (inventory counts above).
 
 **Deferred (not design blockers):** exact API/worker/Redis host vendor; whether a third-party factory exists at deploy time (T2.5 scan); whether the optional 5 bps CLMM pool is seeded (30 bps is the gate); whether CREATE2 is used vs Foundry CREATE.
 
-**Not changed:** architecture A; token set; Permit2; 0 fee; non-goals.
+**Not changed:** architecture A; token set (canonical curated USDC/EURC/cirBTC); Permit2; 0 fee; non-goals.
 
 **Task tracing:** `npx ai-devkit@latest task list --name chakra --json` → `error: unknown command 'task'`. Planning file remains the checklist.
 
-Next: `dev-implementation` starting at T1.1, after planning T0.2 is marked done. If implementation finds a requirements gap, return to `dev-requirements`. If a design decision is fundamentally wrong, revise this doc and re-review. Do not implement in this phase.
+**T0.3 closure:** design reconciled and reapproved 2026-08-29; feature-document lint and the design-conformance audit pass (see planning/implementation records). Next: implementation verification at `671f478`, then the local release gate, then the gated Arc rollout.

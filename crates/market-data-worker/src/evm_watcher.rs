@@ -1025,7 +1025,6 @@ mod tests {
 
     const USDC: &str = "0x3600000000000000000000000000000000000000";
     const EURC: &str = "0x89B50855Aa3bE2F677cD6303Cec089B5F319D72a";
-    const CIRBTC: &str = "0xf0C4a4CE82A5746AbAAd9425360Ab04fbBA432BF";
     const POOL: &str = "0x2222222222222222222222222222222222222222";
     const XYK_FACTORY: &str = "0x3333333333333333333333333333333333333333";
 
@@ -1211,7 +1210,6 @@ mod tests {
             "CHAKRA_CHAIN_ID",
             "CHAKRA_SEED_FACTORIES",
             "CHAKRA_DISCOVERY_FACTORIES",
-            "CHAKRA_MBTC_ADDRESS",
             "CHAKRA_EVM_POLL_INTERVAL_MS",
         ]
         .map(|name| (name, std::env::var(name).ok()));
@@ -1226,7 +1224,6 @@ mod tests {
         std::env::set_var("CHAKRA_CHAIN_ID", "5042002");
         std::env::set_var("CHAKRA_SEED_FACTORIES", "0xAAA:xyk,0xBBB:stable");
         std::env::set_var("CHAKRA_DISCOVERY_FACTORIES", "0xCCC:clmm");
-        std::env::set_var("CHAKRA_MBTC_ADDRESS", CIRBTC);
         std::env::set_var("CHAKRA_EVM_POLL_INTERVAL_MS", "250");
 
         let config = EvmConfig::from_env().unwrap();

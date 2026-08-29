@@ -1480,7 +1480,7 @@ mod tests {
                     USDC_ERC20,
                     CIRBTC,
                     50_000_000_000, // 50_000e6 USDC
-                    100_000_000,    // 1e8 mBTC
+                    100_000_000,    // 1e8 cirBTC
                 )],
             )
             .await;
@@ -1514,16 +1514,16 @@ mod tests {
 
         assert_eq!(route.sub_orders.len(), 1);
         let out = route.total_expected_out;
-        assert!(out > 0, "USDC→mBTC must quote");
-        // The seeded pool is 50_000e6 USDC / 1e8 mBTC → spot ≈ 0.002 mBTC/USDC,
-        // so 1_000e6 USDC yields ~1.95e6 mBTC **atomic (8 dp)** units. The
+        assert!(out > 0, "USDC→cirBTC must quote");
+        // The seeded pool is 50_000e6 USDC / 1e8 cirBTC → spot ≈ 0.002 cirBTC/USDC,
+        // so 1_000e6 USDC yields ~1.95e6 cirBTC **atomic (8 dp)** units. The
         // assertion pins the exact 997/1000 venue output and rejects any
         // 18 dp wei-scale (1e18+) or 6 dp misread.
         let expected = dex_adapters::evm_quote_math::xyk_quote(50_000_000_000, 100_000_000, 1_000_000_000);
         assert_eq!(out, expected);
         assert!(
             out < 10_000_000,
-            "mBTC output {out} must stay in 8 dp atomic range (a few mBTC), not 18 dp wei scale"
+            "cirBTC output {out} must stay in 8 dp atomic range (a few cirBTC), not 18 dp wei scale"
         );
         assert_eq!(route.protocol_fee_bps, 0);
     }

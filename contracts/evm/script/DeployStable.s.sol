@@ -5,7 +5,10 @@ import {Script, console} from "forge-std/Script.sol";
 import {StableSwapFactory} from "../src/stable/StableSwapFactory.sol";
 
 /// @notice Deploy StableSwap factory on Arc testnet.
-/// @dev Do not broadcast without PRIVATE_KEY in gitignored env.
+/// @dev **FIXTURE-ONLY / HISTORICAL (2026-08-29 rebaseline)** — the Arc
+///      operator workflow never deploys Chakra-owned factories; use the
+///      canonical curated manifest venues. Chain-31337 local fixtures only.
+///      Do not broadcast without PRIVATE_KEY in gitignored env.
 contract DeployStable is Script {
     function run() external {
         vm.startBroadcast();

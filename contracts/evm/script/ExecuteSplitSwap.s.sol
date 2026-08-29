@@ -18,7 +18,10 @@ contract ExecuteSplitSwap is Script, StdCheats {
     address internal constant DEFAULT_AGGREGATOR = 0xEa1b2C24bd41163590960F8e40afe6cb4CC92006;
 
     function run() external {
-        require(block.chainid == CHAKRA_CHAIN_ID, "ExecuteSplitSwap: chain must be Arc testnet (5042002)");
+        require(
+            block.chainid == CHAKRA_CHAIN_ID,
+            "ExecuteSplitSwap: chain must be Arc testnet (5042002)"
+        );
 
         uint256 pk = vm.envUint("PRIVATE_KEY");
         address operator = vm.addr(pk);
@@ -29,7 +32,10 @@ contract ExecuteSplitSwap is Script, StdCheats {
 
         // Verify selector matches splitSwap: 0x2e3be0c1
         bytes4 selector = bytes4(swapCalldata);
-        require(selector == bytes4(0x2e3be0c1), "Calldata selector mismatch: expected splitSwap (0x2e3be0c1)");
+        require(
+            selector == bytes4(0x2e3be0c1),
+            "Calldata selector mismatch: expected splitSwap (0x2e3be0c1)"
+        );
 
         // Assert zero ETH value requirement
         uint256 callValue = vm.envOr("CHAKRA_CALL_VALUE", uint256(0));
@@ -79,10 +85,12 @@ contract ExecuteSplitSwap is Script, StdCheats {
         }
 
         // 2. Ensure on-chain Permit2 allowance for Aggregator
-        IAllowanceTransfer.Allowance memory p2 = IAllowanceTransfer(PERMIT2).allowance(operator, USDC, aggregator);
+        IAllowanceTransfer.Allowance memory p2 =
+            IAllowanceTransfer(PERMIT2).allowance(operator, USDC, aggregator);
         if (p2.amount < requiredAmount || p2.expiration < block.timestamp + 120) {
             console.log("Setting on-chain Permit2 allowance for Aggregator...");
-            IAllowanceTransfer(PERMIT2).approve(USDC, aggregator, type(uint160).max, uint48(block.timestamp + 86400));
+            IAllowanceTransfer(PERMIT2)
+                .approve(USDC, aggregator, type(uint160).max, uint48(block.timestamp + 86400));
         }
 
         // 3. Execute the exact calldata from /build_tx with value: 0

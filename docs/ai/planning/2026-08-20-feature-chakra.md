@@ -12,7 +12,7 @@ date: 2026-08-20
 **Feature key:** `chakra`
 **Branch:** `feature-chakra`
 **Worktree:** `.worktrees/feature-chakra`
-**Status:** Phase 5 execute batch (2026-08-28): T-XYLO-SRC (TDD fix for Xylo source string), T-XYLO (Solidity DexType.Xylo, Foundry suite 81/81, xylo_quote pinned, market-data-worker hydrate/engine/build_tx), T5.2 redeploy on Arc testnet (Aggregator `0xEa1b2C24bd41163590960F8e40afe6cb4CC92006` with Xylo allowlisted, codesize 22258, paused=false), Render deployment (`6d9cc78`), and hosted smoke tests are **DONE and live**. 1e6 USDC→EURC routes `chakra-stable`; 5e6 capacity size routes `xylo`; `/build_tx` `to` targets the new aggregator. Live liquidity re-seed (T2.1–T2.4) remains a separate blocked track.
+**Status:** Rebaseline execution (2026-08-29): T0.3 design reconciliation **DONE**; local implementation verified at baseline `671f478` (catalog USDC/EURC/cirBTC, Xylo/Presto/UnitFlow manifest, venue verification); operator scripts restricted to one aggregator deploy + venue registration; release gates and gated Arc rollout follow. Previous live surface (Aggregator `0xEa1b2C24bd41163590960F8e40afe6cb4CC92006`, Render, Vercel) is the pre-rebaseline revision retained for rollback.
 **Sources:** requirements (reviewed), design (reviewed), testing docs dated 2026-08-20.
 
 Task tracing via `ai-devkit task` was unavailable in Phase 1 (`unknown command 'task'`). Track progress in this file.
@@ -21,7 +21,7 @@ Every testing scenario is owned by at least one task below. Wallet/chain/Permit2
 
 ## Milestones
 
-- [x] **M0 — Docs freeze:** Phase 2 requirements review + Phase 3 design review. No code. **Done 2026-08-20.**
+- [x] **M0 — Docs freeze:** Phase 2 requirements review + Phase 3 design review. No code. **Done 2026-08-20.** **Rebaseline T0.3 reconciliation Done 2026-08-29.**
 - [x] **M1 — Repo foundation:** Drop Arc-only surface from this branch; Foundry + Rust workspace + env + `arcTestnet`. **Done 2026-08-20 (T1.1, T1.2).**
 - [ ] **M2 — Canonical venues & catalog:** USDC/EURC/cirBTC catalog, Xylo/Presto/UnitFlow V2.5 manifest + adapters, fixture-only mocks (replaces the old mBTC/seed track).
 - [ ] **M3 — Worker + Redis:** Bootstrap, discovery, WS + poll, `chakra:` keys, venue verification.
@@ -49,6 +49,12 @@ Each task: **outcome**, **deps**, **validation**, **tests**. Status: not started
   **Deps:** T0.1.
   **Validation:** Architecture, API, Permit2, decimals, non-goals consistent. Coverage matrix in design.
   **Tests:** n/a. **Done 2026-08-20.**
+
+- [x] **T0.3** Rebaseline design reconciliation and reapproval
+  **Outcome:** Design doc reconciled with the 2026-08-29 canonical curated rebaseline: Chakra event-driven pool-state model retained (one Redis writer, local API quotes, touched-pool WS/poll refresh, discovery as reconciliation); catalog exactly USDC/EURC/cirBTC; default venues `xylo-stable`/`presto-hub`/`unitflow-v25`; no Chakra-owned Arc deployments; discovery/watchlist never auto-routed; Xylo execution exclusively via configured router (factory/router vs Presto hub vs UnitFlow factory authorization distinguished); `/ready` kept compatible with degraded availability via logs/evidence; staged Arc rollout/rollback flow added. Stale mBTC, seeded/hybrid live venues, owner minting, live reseeding, chakra-stable-only, and legacy source-identifier descriptions removed or marked historical. Requirements/planning/testing/implementation records reconciled; feature-document lint rerun.
+  **Deps:** none (blocking task reopened after the rebaseline).
+  **Validation:** Feature-document lint pass; design-conformance audit (catalog, venue identities, authorization, Redis writer model, transaction encoding, operator workflow) matches the revised design.
+  **Tests:** n/a. **Done 2026-08-29 (rebaseline).** Commits `aa28cda` and `671f478` conform and are treated as implementation awaiting conformance.
 
 ### M1 — Foundation
 
@@ -1170,6 +1176,32 @@ After hosting is healthy, run extension-backed MetaMask QA on Arc testnet and th
 2. **T9.3 On-Chain Split Swap:** Requires operator wallet funded with ≥5 USDC (current balance is ~1.036 USDC) to broadcast 5e6 split swap.
 3. **T9.6 Live WS Refresh Proof:** Follows on-chain swap from T9.3.
 4. **T2.1–T2.4 Liquidity Re-seed:** Deepening pools to 200k/10k targets requires Circle faucet funding.
+
+## Local release gate (2026-08-29, rebaseline verification)
+
+**All gates green after the T0.3 reconciliation + audit fixes:**
+
+- AI DevKit base + Chakra feature lint: **pass** (rerun after doc reconciliation).
+- `cargo check --workspace`: **pass** (after `autobins=false`/`autotests=false` on `dex-adapters` — untracked Arc-era `src/bin/*` and `tests/Arc venue_3token_stableswap.rs` no longer break the Arc-only workspace gate; files preserved).
+- `cargo test --workspace --all-targets`: **245 passed / 0 failed** (api-server 17 unit + 14 build_tx + 12 rest + 6 venues + 10 lifecycle; dex-adapters 82; market-data-worker 18; market-snapshot 36; router-engine 49).
+- `cargo fmt --all --check`, `git diff --check`: **pass**.
+- Foundry `forge fmt --check`, `forge build`, `forge test`: **88/88 pass** (Aggregator 52 incl. Xylo router + Presto hub + per-factory fee + shared-pool rejection + cirBTC sweep; StableSwap 16; Xyk 8; Clmm 5; MockBtc 5; MockXylo 2).
+- Frontend: unit **67/67**, `tsc --noEmit` clean, `npm run build` exit 0 (lint 1 pre-existing QA warning).
+- SDK: unit **14/14**, `npm run build` exit 0.
+- Discovery scanner: **8/8**; `bash -n scripts/discovery_scan.sh` pass.
+- Design-conformance audit: catalog exactly USDC/EURC/cirBTC; venue source ids `xylo-stable`/`presto-hub`/`unitflow-v25` through worker → snapshot → engine → build_tx; Xylo factory/router + Presto hub + UnitFlow factory authorization distinct; single-Redis-writer model retained; transaction encoding selector `0x2e3be0c1` with Xylo=3/Presto=4; operator workflow restricted to `DeployAggregator.s.sol` (one deploy + venue registration).
+
+**Audit fixes landed in this pass:**
+
+1. `crates/dex-adapters/Cargo.toml` — `autobins=false` + `autotests=false` (Arc-only crate gate).
+2. `crates/api-server/examples/local_harness.rs` — current `update_from_chakra_snapshot`/`from_backends` signatures; MBTC placeholder removed.
+3. `crates/api-server/tests/chakra_rest_test.rs` — mBTC → cirBTC in 3 assertions.
+4. `crates/dex-adapters/src/token_logo_lists.rs` — mBTC logo entry → canonical cirBTC.
+5. `crates/router-engine/src/path_finder.rs` + `quote_engine.rs` — mBTC-named tests/messages → cirBTC.
+6. `crates/market-data-worker/src/evm_watcher.rs` — removed stale `CHAKRA_MBTC_ADDRESS` test env.
+7. `contracts/evm/script/DeployAggregator.s.sol` — **rewritten**: cirBTC constructor + Xylo factory/router registration + Presto hub allowlist + UnitFlow factory with 30 bps fee (was stale mBTC 4-arg deploy).
+8. `Deploy.s.sol`, `Seed.s.sol`, `DeployMockBtc/Xyk/Stable/Clmm.s.sol` — marked **FIXTURE-ONLY / HISTORICAL**.
+9. **Real bug found by the new test:** `build_tx::step_factory_source` used stale `"xylo"`/`""` source ids → every Xylo/Presto hop would fail factory membership at `/build_tx`. Fixed to canonical `xylo-stable`/`presto-hub`; pinned by new unit test + new integration test `build_tx_encodes_xylo_and_presto_dex_types` (decodes dexType 3 and 4 from calldata).
 
 ## Phase 6 reconciliation (2026-08-28, after Phase 5 Continuation: T4.3, T2.5, T9.8, T9.4)
 

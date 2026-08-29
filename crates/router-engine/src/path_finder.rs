@@ -301,8 +301,8 @@ mod tests {
         }
     }
 
-    /// The seeded Arc topology: thin + deep USDC/EURC, mBTC direct + CLMM,
-    /// EURC→mBTC hop through USDC.
+    /// The seeded Arc topology: thin + deep USDC/EURC, cirBTC direct + CLMM,
+    /// EURC→cirBTC hop through USDC.
     fn chakra_snapshot() -> MarketSnapshot {
         MarketSnapshot::from_sources(
             "chakra-1",
@@ -346,7 +346,7 @@ mod tests {
     }
 
     #[test]
-    fn usdc_to_mbtc_finds_xyk_and_clmm() {
+    fn usdc_to_cirbtc_finds_xyk_and_clmm() {
         let snapshot = chakra_snapshot().with_clmm_pool_refs(vec![ClmmPoolRefSnapshot {
             source: "chakra-clmm".to_string(),
             pool_address: CLMM_POOL_UM.to_string(),
@@ -359,18 +359,18 @@ mod tests {
         let finder = finder_with(&snapshot);
         let paths = finder.find_paths(&token(USDC_ERC20), &token(CIRBTC));
         let direct: Vec<_> = paths.iter().filter(|p| p.hops == 1).collect();
-        assert_eq!(direct.len(), 2, "USDC→mBTC should have xyk + clmm direct pools");
+        assert_eq!(direct.len(), 2, "USDC→cirBTC should have xyk + clmm direct pools");
         let mut sources: Vec<&str> = direct.iter().map(|p| p.sources[0].as_str()).collect();
         sources.sort();
         assert_eq!(sources, vec!["chakra-clmm", "chakra-xyk"]);
     }
 
     #[test]
-    fn eurc_to_mbtc_finds_direct_and_two_hop_via_usdc() {
+    fn eurc_to_cirbtc_finds_direct_and_two_hop_via_usdc() {
         let finder = finder_with(&chakra_snapshot());
         let paths = finder.find_paths(&token(EURC), &token(CIRBTC));
-        assert!(paths.iter().any(|p| p.hops == 1), "direct EURC→mBTC xyk pool");
-        assert!(paths.iter().any(|p| p.hops == 2), "2-hop EURC→USDC→mBTC");
+        assert!(paths.iter().any(|p| p.hops == 1), "direct EURC→cirBTC xyk pool");
+        assert!(paths.iter().any(|p| p.hops == 2), "2-hop EURC→USDC→cirBTC");
         let two_hop = paths.iter().find(|p| p.hops == 2).unwrap();
         assert_eq!(two_hop.tokens[1].canonical(), USDC_ERC20.to_ascii_lowercase());
     }

@@ -15,6 +15,11 @@ import {IUniswapV3Factory} from "../src/interfaces/IUniswapV3Factory.sol";
 import {IUniswapV3Pool} from "../src/interfaces/IUniswapV3Pool.sol";
 
 /// @notice Rerun-aware liquidity seeding for Arc testnet.
+/// @dev **FIXTURE-ONLY / HISTORICAL (2026-08-29 rebaseline).** Seeds
+///      Chakra-owned V2/stable/V3 pools and mints mBTC — the Arc operator
+///      workflow no longer does this (no Chakra-owned liquidity on Arc).
+///      Chain-31337 local fixtures only. The operator workflow is
+///      `DeployAggregator.s.sol` (one aggregator deploy + venue registration).
 /// @dev Prerequisites: Deploy.s.sol must have run; all CHAKRA_* addresses
 ///      must be set.  Idempotent: skips already-funded V2/stable pools and
 ///      matching initialized V3 liquidity.  Aborts on incompatible state.

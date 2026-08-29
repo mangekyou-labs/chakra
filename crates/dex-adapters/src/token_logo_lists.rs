@@ -15,7 +15,7 @@ use {
 const DEFAULT_LIST_URLS: &[&str] = &[];
 
 // Keep this list deliberately small. Every entry is verified against the
-// frozen Arc catalog address (USDC / EURC / mBTC).
+// frozen Arc catalog address (USDC / EURC / cirBTC).
 const VERIFIED_LOGO_OVERRIDES: &[(&str, &str)] = &[
     (
         // USDC (native Arc testnet, 6 dp).
@@ -28,8 +28,8 @@ const VERIFIED_LOGO_OVERRIDES: &[(&str, &str)] = &[
         "https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/ethereum/assets/0x1aBaEA1f7C830bD89Acc67eC4af516284b1bC33c/logo.png",
     ),
     (
-        // mBTC (owner-mint Arc testnet).
-        "0xbf5a25d7070faacae309d66d05372a6b212ecbdf",
+        // cirBTC (canonical Arc testnet, 8 dp; 2026-08-29 rebaseline).
+        "0xf0c4a4ce82a5746abaad9425360ab04fbba432bf",
         "https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/bitcoin/info/logo.png",
     ),
 ];

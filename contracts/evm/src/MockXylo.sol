@@ -79,7 +79,10 @@ contract MockXyloFactory {
     ///      approved this factory. The factory pulls them in and forwards
     ///      them to the pool (the pool's constructor cannot pull from the
     ///      caller directly — its msg.sender during CREATE is itself).
-    function createPool(address tokenA, address tokenB, uint256 r0, uint256 r1) external returns (address) {
+    function createPool(address tokenA, address tokenB, uint256 r0, uint256 r1)
+        external
+        returns (address)
+    {
         MockErc20(tokenA).transferFrom(msg.sender, address(this), r0);
         MockErc20(tokenB).transferFrom(msg.sender, address(this), r1);
         MockXyloPool pool = new MockXyloPool(tokenA, tokenB, r0, r1);
@@ -129,7 +132,8 @@ contract MockXyloRouter {
 
         MockErc20(path[0]).transferFrom(msg.sender, address(this), amountIn);
         MockErc20(path[0]).approve(address(pool), amountIn);
-        uint256 amountOut = pool.swap(path[0], path[1], amountIn, minAmountOut, address(this), deadline);
+        uint256 amountOut =
+            pool.swap(path[0], path[1], amountIn, minAmountOut, address(this), deadline);
         MockErc20(path[1]).transfer(to, amountOut);
 
         amounts = new uint256[](2);

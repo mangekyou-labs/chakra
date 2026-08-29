@@ -1,12 +1,12 @@
 //! Local encode-only API harness for T7.2 / SC-6.
 //!
 //! Starts an in-memory Chakra API on `CHAKRA_LISTEN_ADDR` (default
-//! `127.0.0.1:8080`) with fixture RPC and seeded T2.3 pools. The SDK
+//! `127.0.0.1:8080`) with fixture RPC and seeded fixture pools. The SDK
 //! example `packages/sdk/examples/quote-build.ts` can then complete
 //! `quote` + `build_tx` against this server.
 //!
 //! Usage:
-//!   cargo run -p api-server --example local_harness --features test-fixture
+//!   cargo run -p api-server --example local_harness
 //!
 //! Env overrides:
 //!   CHAKRA_LISTEN_ADDR  — bind address (default 127.0.0.1:8080)
@@ -31,7 +31,6 @@ use {
     std::sync::Arc,
 };
 
-const MBTC: &str = "0x1111111111111111111111111111111111111111";
 const XYK_POOL_UE: &str = "0x0000000000000000000000000000000000000001";
 const STABLE_POOL_UE: &str = "0x0000000000000000000000000000000000000002";
 const XYK_UE_SEED: u128 = 10_000_000_000;
@@ -144,7 +143,7 @@ async fn main() {
 
     // 3. QuoteEngine.
     let engine = QuoteEngine::new(PathFinderConfig::default(), SplitConfig::default());
-    engine.update_from_chakra_snapshot(&chakra_snapshot(), MBTC).await;
+    engine.update_from_chakra_snapshot(&chakra_snapshot()).await;
 
     // 4. AppState + router.
     let config = app_config(&aggregator);
@@ -155,7 +154,6 @@ async fn main() {
         Some(snapshot_store),
         Some(pool_store),
         Some(Arc::new(dex_adapters::evm_rpc::EvmRpcClient::single(&rpc_url).unwrap())),
-        MBTC.to_string(),
         Some(("fixture-v1".to_string(), Arc::new(engine))),
     )
     .await;

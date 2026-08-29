@@ -34,6 +34,8 @@ Foundry tree: `contracts/evm/{src,test,script}` plus Placeholder until T5.1.
 
 ## Implementation Notes
 
+> **Historical note (2026-08-29):** T1.2–T2.4 below describe the pre-rebaseline mBTC/owned-liquidity implementation. The **canonical curated rebaseline supersedes them**: the catalog is USDC/EURC/cirBTC, mBTC and owned XYK/stable/CLMM deployments are chain-31337 fixtures only, and the Arc operator workflow never deploys them. See the "Canonical curated rebaseline (2026-08-29)" section at the end of this file for the normative current surface.
+
 ### T1.1 Workspace skeleton
 
 - Changed Redis key prefixes from `Chakra:` to `chakra:` in `pool_state_store.rs` and default `redis.channel`.

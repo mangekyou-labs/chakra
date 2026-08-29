@@ -5,7 +5,10 @@ import {Script, console} from "forge-std/Script.sol";
 import {VendorDeployer} from "../src/VendorDeployer.sol";
 
 /// @notice Deploy Uniswap V2 xy=k factory on Arc testnet.
-/// @dev Uses VendorDeployer to deploy pre-compiled 0.5.16 bytecode.
+/// @dev **FIXTURE-ONLY / HISTORICAL (2026-08-29 rebaseline)** — the Arc
+///      operator workflow never deploys Chakra-owned factories; use the
+///      canonical curated manifest venues. Chain-31337 local fixtures only.
+///      Uses VendorDeployer to deploy pre-compiled 0.5.16 bytecode.
 ///      Do not broadcast without PRIVATE_KEY in gitignored env.
 contract DeployXyk is Script, VendorDeployer {
     function run() external {

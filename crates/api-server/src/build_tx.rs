@@ -346,7 +346,8 @@ fn step_factory_source(dex_type: &str) -> &'static str {
         "xyk" => "chakra-xyk",
         "stable" => "chakra-stable",
         "clmm" => "chakra-clmm",
-        "xylo" => "xylo",
+        "xylo" => "xylo-stable",
+        "presto" => "presto-hub",
         _ => "",
     }
 }
@@ -617,4 +618,22 @@ pub async fn build_tx_data(
     )?;
 
     Ok((data, deadline, typed_data, required_approvals))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::step_factory_source;
+
+    /// 2026-08-29 rebaseline: the worker stamps `chakra:factories` records
+    /// with the canonical venue source ids. `step_factory_source` must match
+    /// those exact strings or every Xylo/Presto hop fails factory membership.
+    #[test]
+    fn step_factory_source_uses_canonical_venue_source_ids() {
+        assert_eq!(step_factory_source("xyk"), "chakra-xyk");
+        assert_eq!(step_factory_source("stable"), "chakra-stable");
+        assert_eq!(step_factory_source("clmm"), "chakra-clmm");
+        assert_eq!(step_factory_source("xylo"), "xylo-stable");
+        assert_eq!(step_factory_source("presto"), "presto-hub");
+        assert_eq!(step_factory_source("unknown"), "");
+    }
 }

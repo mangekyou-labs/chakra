@@ -70,17 +70,28 @@ contract MockPrestoHub {
         uint8 inDec = decimalsOf(tokenIn);
         uint8 outDec = decimalsOf(tokenOut);
         uint256 inNorm = _normalize(amountIn, inDec);
-        uint256 leg1 = _getAmountOut(inNorm, _normalize(tokenReserves[tokenIn], inDec), _normalize(pathReserves[tokenIn], pathUSDDecimals));
+        uint256 leg1 = _getAmountOut(
+            inNorm,
+            _normalize(tokenReserves[tokenIn], inDec),
+            _normalize(pathReserves[tokenIn], pathUSDDecimals)
+        );
         uint256 pathRaw = _denormalize(leg1, pathUSDDecimals);
         uint256 pathRounded = _normalize(pathRaw, pathUSDDecimals);
-        uint256 leg2 = _getAmountOut(pathRounded, _normalize(pathReserves[tokenOut], pathUSDDecimals), _normalize(tokenReserves[tokenOut], outDec));
+        uint256 leg2 = _getAmountOut(
+            pathRounded,
+            _normalize(pathReserves[tokenOut], pathUSDDecimals),
+            _normalize(tokenReserves[tokenOut], outDec)
+        );
         return _denormalize(leg2, outDec);
     }
 
-    function swap(address tokenIn, address tokenOut, uint256 amountIn, uint256 minAmountOut, uint256 deadline)
-        external
-        returns (uint256 amountOut)
-    {
+    function swap(
+        address tokenIn,
+        address tokenOut,
+        uint256 amountIn,
+        uint256 minAmountOut,
+        uint256 deadline
+    ) external returns (uint256 amountOut) {
         if (block.timestamp > deadline) revert Expired();
         if (tokenIn == tokenOut) revert SameToken();
         if (amountIn == 0) revert ZeroAmount();

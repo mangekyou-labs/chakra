@@ -8,6 +8,11 @@ import {StableSwapFactory} from "../src/stable/StableSwapFactory.sol";
 import {VendorDeployer} from "../src/VendorDeployer.sol";
 
 /// @notice Unified rerun-aware deploy: mBTC → factories → aggregator → allowlist.
+/// @dev **FIXTURE-ONLY / HISTORICAL (2026-08-29 rebaseline).** Deploys
+///      Chakra-owned tokens/factories/pools — the Arc operator workflow no
+///      longer does this. Chain-31337 local fixtures only. The operator
+///      workflow is `DeployAggregator.s.sol` (one aggregator deploy + venue
+///      registration) and nothing else.
 /// @dev Reads existing addresses from env (CHAKRA_MBTC_ADDRESS,
 ///      CHAKRA_XYK_FACTORY, CHAKRA_STABLE_FACTORY, CHAKRA_CLMM_FACTORY,
 ///      CHAKRA_AGGREGATOR) — if non-empty and bytecode matches, the step is

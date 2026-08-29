@@ -289,7 +289,7 @@ async fn tokens_lists_frozen_catalog_only_with_decimals() {
     assert_eq!(body["success"], true);
 
     let tokens = body["data"]["tokens"].as_array().expect("data.tokens array");
-    assert_eq!(tokens.len(), 3, "exactly USDC, EURC, mBTC");
+    assert_eq!(tokens.len(), 3, "exactly USDC, EURC, cirBTC");
     let by_symbol: std::collections::HashMap<&str, &Value> =
         tokens.iter().map(|t| (t["symbol"].as_str().unwrap(), t)).collect();
 
@@ -346,7 +346,7 @@ async fn quote_hydrates_chakra_snapshot_routes() {
     .await;
     assert_eq!(body["data"]["expected_output"], "999550535");
 
-    // USDC→mBTC routes via the xy=k venue.
+    // USDC→cirBTC routes via the xy=k venue.
     let (status, body) = get(
         &router,
         &format!("/api/v1/quote?token_in={USDC_ERC20}&token_out={CIRBTC}&amount_in=1000000"),
@@ -359,7 +359,7 @@ async fn quote_hydrates_chakra_snapshot_routes() {
             .unwrap()
             .iter()
             .any(|r| r["source"].as_str().unwrap().contains("chakra-xyk")),
-        "USDC→mBTC must route via chakra-xyk"
+        "USDC→cirBTC must route via chakra-xyk"
     );
 }
 
@@ -413,7 +413,7 @@ async fn quote_emits_explicit_per_hop_dex_type_fee_factory() {
     assert_eq!(xyk["dex_types"], json!(["xyk"]));
     assert_eq!(xyk["hop_fees"], json!([30]));
 
-    // USDC→mBTC xyk route.
+    // USDC→cirBTC xyk route.
     let (status, body) = get(
         &router,
         &format!("/api/v1/quote?token_in={USDC_ERC20}&token_out={CIRBTC}&amount_in=1000000"),

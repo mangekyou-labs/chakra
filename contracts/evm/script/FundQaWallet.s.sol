@@ -26,14 +26,12 @@ contract FundQaWallet is Script {
     address internal constant USDC_IMPL = 0xC6AD664ac6679F4Ce74e10E91449C93Ec1ae3cA6;
 
     function run() external {
-        require(block.chainid == CHAKRA_CHAIN_ID, "FundQaWallet: chain must be Arc testnet (5042002)");
+        require(
+            block.chainid == CHAKRA_CHAIN_ID, "FundQaWallet: chain must be Arc testnet (5042002)"
+        );
 
         // Mock Arc testnet system precompiles for local forge simulation only.
-        vm.mockCall(
-            BLOCKLIST,
-            abi.encodeWithSignature("isBlocklisted(address)"),
-            abi.encode(false)
-        );
+        vm.mockCall(BLOCKLIST, abi.encodeWithSignature("isBlocklisted(address)"), abi.encode(false));
         vm.mockCall(
             BURN_SYSTEM,
             abi.encodeWithSignature("transfer(address,address,uint256)"),

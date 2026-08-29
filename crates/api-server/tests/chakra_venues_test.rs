@@ -16,7 +16,7 @@ use {
         MarketSnapshot, SourceSnapshot, TradingPairSnapshot,
     },
     router_engine::{path_finder::PathFinderConfig, split_optimizer::SplitConfig, QuoteEngine},
-    serde_json::Value,
+    serde_json::{json, Value},
     std::sync::Arc,
     tower::ServiceExt,
 };
@@ -316,4 +316,138 @@ async fn empty_venue_degrades_to_no_route() {
     // The envelope code is the contract: NO_ROUTE, never a zero output or a
     // hidden fallback venue (SC-15).
     assert_eq!(body["error"]["code"], "NO_ROUTE");
+}
+
+/// `/build_tx` encodes the canonical venue dex types (Xylo=3, Presto=4) with
+/// their venue fees — regression for the 2026-08-29 rebaseline surface.
+#[tokio::test]
+async fn build_tx_encodes_xylo_and_presto_dex_types() {
+    let mut config = app_config();
+    config.chakra_aggregator = "0x00000000000000000000000000000000000000aa".to_string();
+    // Fixture RPC: paused=false, ERC-20→Permit2=0, Permit2→aggregator=0.
+    let (rpc_url, _rpc_handle) = dex_adapters::evm_rpc::fixture::spawn(|method, params| match method {
+        "eth_call" => {
+            let data = params[0]["data"].as_str().unwrap();
+            let sel4 = &data[..10];
+            if sel4 == "0x5c975abb" || sel4 == "0xdd62ed3e" {
+                Ok(json!(
+                    "0x0000000000000000000000000000000000000000000000000000000000000000"
+                ))
+            } else if sel4 == "0x927da105" {
+                Ok(json!("0x000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"))
+            } else {
+                Err(json!(format!("unexpected eth_call selector {sel4}")))
+            }
+        }
+        other => Err(json!(format!("unexpected method {other}"))),
+    });
+    let snapshot_store = Arc::new(MemorySnapshotStore::new());
+    let pool_store = Arc::new(MemoryPoolStateStore::new());
+    snapshot_store
+        .publish_snapshot(&canonical_snapshot())
+        .await
+        .unwrap();
+    seed_pool_state(&pool_store).await;
+    // Factory allowlist records (chakra:factories) for the canonical venues.
+    pool_store
+        .set_factories(&[
+            market_snapshot::pool_state_store::FactoryRecord::new(
+                XYLO_FACTORY,
+                "xylo",
+                "xylo-stable",
+            ),
+            market_snapshot::pool_state_store::FactoryRecord::new(
+                PRESTO_HUB,
+                "presto",
+                "presto-hub",
+            ),
+        ])
+        .await
+        .unwrap();
+    let engine = QuoteEngine::new(PathFinderConfig::default(), SplitConfig::default());
+    engine
+        .update_from_chakra_snapshot(&canonical_snapshot())
+        .await;
+    let state = AppState::from_backends(
+        config,
+        Some(snapshot_store.clone() as Arc<dyn SnapshotStore>),
+        Some(pool_store.clone() as Arc<dyn PoolStateStore>),
+        Some(snapshot_store),
+        Some(pool_store),
+        Some(Arc::new(
+            dex_adapters::evm_rpc::EvmRpcClient::single(&rpc_url).unwrap(),
+        )),
+        Some(("chakra-canonic-1".to_string(), Arc::new(engine))),
+    )
+    .await;
+    let router = build_router(state, RateLimitState::from_env());
+    let body = json!({
+        "user": "0x1111111111111111111111111111111111111111",
+        "token_in": USDC_ERC20.to_ascii_lowercase(),
+        "token_out": EURC.to_ascii_lowercase(),
+        "amount_in": "1000000",
+        "min_amount_out": "990000",
+        "sub_routes": [
+            {
+                "amount_in": "500000",
+                "steps": [{
+                    "dex_type": "xylo",
+                    "pool_address": XYLO_POOL,
+                    "token_in": USDC_ERC20.to_ascii_lowercase(),
+                    "token_out": EURC.to_ascii_lowercase()
+                }]
+            },
+            {
+                "amount_in": "500000",
+                "steps": [{
+                    "dex_type": "presto",
+                    "pool_address": PRESTO_HUB,
+                    "token_in": USDC_ERC20.to_ascii_lowercase(),
+                    "token_out": EURC.to_ascii_lowercase()
+                }]
+            }
+        ]
+    });
+    let response = router
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/api/v1/build_tx")
+                .header("content-type", "application/json")
+                .body(Body::from(body.to_string()))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    let status = response.status();
+    let bytes = axum::body::to_bytes(response.into_body(), 1024 * 1024).await.unwrap();
+    let value: Value = serde_json::from_slice(&bytes).unwrap_or(Value::Null);
+    assert_eq!(status, StatusCode::OK, "build_tx failed: {value}");
+    assert_eq!(value["success"], true);
+    let data = value["data"]["data"].as_str().unwrap();
+    assert!(data.starts_with("0x2e3be0c1"), "must start with splitSwap selector");
+    // Decode: routes[0].hops[0].dexType must be 3 (Xylo) and routes[1].hops[0]
+    // must be 4 (Presto). The head is 7 words; routes offset at word 6.
+    let raw = hex::decode(data.trim_start_matches("0x")).unwrap();
+    let word = |off: usize| -> u128 {
+        let w: [u8; 32] = raw[off..off + 32].try_into().unwrap();
+        u128::from_be_bytes(w[16..].try_into().unwrap())
+    };
+    let routes_offset = word(4 + 5 * 32) as usize + 4;
+    let routes_len = word(routes_offset);
+    assert_eq!(routes_len, 2, "two sub-routes");
+    // routes[i] is SubRoute{amountIn, hopsOffset}: elem i is offset table at
+    // routes_offset+32+32*i.
+    let mut dex_types: Vec<u128> = Vec::new();
+    for i in 0..2 {
+        let elem_off = word(routes_offset + 32 + i * 32) as usize;
+        let route = routes_offset + 32 + elem_off;
+        let hops_off = word(route + 32) as usize;
+        let hops = route + hops_off;
+        assert_eq!(word(hops), 1, "one hop per sub-route");
+        // Hop is a static 5-word tuple: pool, dexType, tokenIn, tokenOut, fee.
+        dex_types.push(word(hops + 32 + 32));
+    }
+    assert_eq!(dex_types, vec![3, 4], "Xylo=3 and Presto=4 dex types encoded");
 }
