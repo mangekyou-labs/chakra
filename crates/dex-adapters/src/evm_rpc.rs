@@ -237,6 +237,18 @@ impl EvmRpcClient {
             .context("eth_getBalance result not a hex string")
     }
 
+    /// `eth_getCode` returning the raw `0x`-prefixed bytecode hex (empty
+    /// `0x`/`0x0` when the address has no code). Used by manifest venue
+    /// verification (2026-08-29).
+    pub async fn eth_get_code(&self, address: &str) -> Result<String> {
+        let params = json!([address, "latest"]);
+        let result = self.request("eth_getCode", params).await?;
+        result
+            .as_str()
+            .map(str::to_string)
+            .context("eth_getCode result not a hex string")
+    }
+
     pub async fn eth_get_logs(&self, filter: &LogFilter) -> Result<Vec<EvmLog>> {
         let mut object = serde_json::Map::new();
         if let Some(from) = filter.from_block {

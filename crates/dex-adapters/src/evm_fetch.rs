@@ -93,6 +93,9 @@ pub fn get_pool_v3_selector() -> String {
 pub fn get_pool_stable_selector() -> String {
     function_selector_hex("getPool(address,address)")
 }
+pub fn get_amplification_selector() -> String {
+    function_selector_hex("getAmplificationParameter()")
+}
 
 // ─── Hydrators ──────────────────────────────────────────────────────────────
 
@@ -150,9 +153,11 @@ pub async fn fetch_stable_state(
 }
 
 /// XyloNet pool state (T-XYLO): `getReserves()` (stored reserves — the venue
-/// `calculateSwap` uses `reserve0/reserve1`, not balances) + `A=200` (amp
-/// 20000 / A_PRECISION 100) + 4 bps fee on output. Reuses the stableswap
-/// value shape; the QuoteEngine dispatches `xylo` sources to `xylo_quote`.
+/// `calculateSwap` uses `reserve0/reserve1`, not balances) + the **hydrated
+/// on-chain amplification** (`getAmplificationParameter()` = raw amp, e.g.
+/// 20000 → A=200 after `A_PRECISION=100`) + 4 bps fee on output. Reuses the
+/// stableswap value shape; the QuoteEngine dispatches `xylo-stable` sources
+/// to `xylo_quote`. 2026-08-29: A is read from the pool, not hardcoded.
 pub async fn fetch_xylo_state(
     client: &EvmRpcClient,
     source: &str,
@@ -166,6 +171,17 @@ pub async fn fetch_xylo_state(
         bail!("xylo getReserves returned {} words", words.len());
     }
     let (reserve0, reserve1) = (word_to_u128_bytes(&words[0])?, word_to_u128_bytes(&words[1])?);
+    // Hydrate the amplification from the pool: `getAmplificationParameter()`
+    // returns the raw amp (20000); divide by A_PRECISION (100) → A=200.
+    let amp_raw = client
+        .eth_call(&pair.pool_address, &calldata(&get_amplification_selector(), &[]))
+        .await
+        .ok()
+        .and_then(|r| split_words(&r).ok())
+        .and_then(|w| w.first().cloned())
+        .and_then(|w| word_to_u128_bytes(&w).ok())
+        .unwrap_or(0);
+    let a = if amp_raw > 0 { amp_raw / 100 } else { 0 };
     let mut value = StablePoolStateValue::new(
         source,
         &pair.pool_address,
@@ -173,8 +189,7 @@ pub async fn fetch_xylo_state(
         &pair.token_b,
         reserve0,
         reserve1,
-        // Xylo amp: `getAmplificationParameter() = 20000` with `A_PRECISION = 100`.
-        200,
+        a,
         pair.fee_bps,
     );
     value.factory = pair.factory.clone();

@@ -18,7 +18,7 @@
         "internalType": "address"
       },
       {
-        "name": "_mbtc",
+        "name": "_cirbtc",
         "type": "address",
         "internalType": "address"
       }
@@ -46,6 +46,19 @@
         "name": "dexType",
         "type": "uint8",
         "internalType": "enum Aggregator.DexType"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "addPrestoHub",
+    "inputs": [
+      {
+        "name": "hub",
+        "type": "address",
+        "internalType": "address"
       }
     ],
     "outputs": [],
@@ -85,6 +98,19 @@
   },
   {
     "type": "function",
+    "name": "cirbtc",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
     "name": "eurc",
     "inputs": [],
     "outputs": [
@@ -117,6 +143,25 @@
   },
   {
     "type": "function",
+    "name": "factoryFeeBps",
+    "inputs": [
+      {
+        "name": "",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint24",
+        "internalType": "uint24"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
     "name": "isFactory",
     "inputs": [
       {
@@ -136,13 +181,19 @@
   },
   {
     "type": "function",
-    "name": "mbtc",
-    "inputs": [],
-    "outputs": [
+    "name": "isPrestoHub",
+    "inputs": [
       {
         "name": "",
         "type": "address",
         "internalType": "address"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bool",
+        "internalType": "bool"
       }
     ],
     "stateMutability": "view"
@@ -208,6 +259,19 @@
   },
   {
     "type": "function",
+    "name": "removePrestoHub",
+    "inputs": [
+      {
+        "name": "hub",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
     "name": "removeStablePool",
     "inputs": [
       {
@@ -244,6 +308,42 @@
         "name": "amount",
         "type": "uint256",
         "internalType": "uint256"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "setFactoryFee",
+    "inputs": [
+      {
+        "name": "factory",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "feeBps",
+        "type": "uint24",
+        "internalType": "uint24"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "setXyloRouter",
+    "inputs": [
+      {
+        "name": "factory",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "router",
+        "type": "address",
+        "internalType": "address"
       }
     ],
     "outputs": [],
@@ -445,6 +545,25 @@
     "stateMutability": "view"
   },
   {
+    "type": "function",
+    "name": "xyloRouterForFactory",
+    "inputs": [
+      {
+        "name": "",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
     "type": "event",
     "name": "OwnershipTransferred",
     "inputs": [
@@ -602,6 +721,11 @@
   {
     "type": "error",
     "name": "ReentrancyGuardReentrantCall",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "RouterNotConfigured",
     "inputs": []
   },
   {

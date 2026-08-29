@@ -762,9 +762,11 @@ impl QuoteEngine {
         })
     }
 
-    /// XyloNet hop (T-XYLO): `xylo_quote` (A=200, 4 bps fee-on-output) on the
-    /// hydrated stored reserves. Never the Chakra stable math (A=100,
-    /// fee-on-input) — the Xylo venue has a different swap ABI.
+    /// XyloNet hop (T-XYLO): `xylo_quote_with_a` (4 bps fee-on-output) on the
+    /// hydrated stored reserves, using the **hydrated on-chain amplification**
+    /// (`state.a` from `getAmplificationParameter()`, 2026-08-29). Never the
+    /// Chakra stable math (A=100, fee-on-input) — the Xylo venue has a
+    /// different swap ABI.
     fn local_xylo_quote(
         &self,
         token_in: &TokenId,
@@ -788,7 +790,12 @@ impl QuoteEngine {
         } else {
             return None;
         };
-        let amount_out = dex_adapters::evm_quote_math::xylo_quote(reserve_in, reserve_out, amount_in);
+        let amount_out = dex_adapters::evm_quote_math::xylo_quote_with_a(
+            reserve_in,
+            reserve_out,
+            amount_in,
+            state.a,
+        );
         if amount_out == 0 {
             return None;
         }
