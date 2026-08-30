@@ -84,13 +84,13 @@ Key environment variables (see `.env.example`):
 |----------|-------------|
 | `ARC_RPC_URL` | Arc testnet JSON-RPC endpoint |
 | `CHAIN_ID` | Must be `5042002` |
-| `CHAKRA_AGGREGATOR` | Deployed aggregator contract address |
-| `CHAKRA_MBTC_ADDRESS` | Mock BTC token address |
-| `CHAKRA_XYK_FACTORY` | Uniswap V2 factory |
-| `CHAKRA_STABLE_FACTORY` | StableSwap factory |
-| `CHAKRA_CLMM_FACTORY` | Uniswap V3 factory |
-| `CHAKRA_SEED_FACTORIES` | Comma-separated factory addresses for worker |
-
+| `CHAKRA_AGGREGATOR` | Deployed aggregator contract address (`0xeb12351602c56d47c4ee955193335848952b29d8`) |
+| `CHAKRA_CIRBTC_ADDRESS` | Canonical cirBTC token address (`0xf0c4a4ce82a5746abaad9425360ab04fbba432bf`) |
+| `CHAKRA_XYLO_FACTORY` | XyloNet factory address |
+| `CHAKRA_XYLO_ROUTER` | XyloNet router address |
+| `CHAKRA_PRESTO_HUB` | Presto hub address |
+| `CHAKRA_UNITFLOW_FACTORY` | UnitFlow V2.5 factory address |
+| `CHAKRA_SEED_FACTORIES` | Comma-separated factory:dex_type pairs for worker |
 ## Safety
 
 - Testnet only (chain `5042002`). Never deploy to mainnet.

@@ -12,7 +12,7 @@ Quickstart for wallets, dApps, and trading bots integrating the Arc Testnet DEX 
 |-------|---------|----------|-------|
 | USDC | `0x3600000000000000000000000000000000000000` | 6 | ERC-20 (swap token; **not** native gas) |
 | EURC | `0x89B50855Aa3bE2F677cD6303Cec089B5F319D72a` | 6 | ERC-20 |
-| mBTC | (set `CHAKRA_MBTC_ADDRESS` env) | 8 | ERC-20, owner-mint only; buy via swap |
+| cirBTC | `0xf0C4a4CE82A5746AbAAd9425360Ab04fbBA432BF` | 8 | ERC-20 (canonical Bitcoin on Arc testnet) |
 
 Native USDC (18 dp) is **gas only** — never a swap token (SC-12).
 
@@ -193,7 +193,7 @@ HTTP `429` when exceeded. Loopback IPs are exempt (local development).
 |--------|------|---------|
 | GET | `/api/v1/health` | Liveness |
 | GET | `/api/v1/ready` | Readiness (snapshot + pool keys) |
-| GET | `/api/v1/tokens` | Frozen catalog (USDC, EURC, mBTC) |
+| GET | `/api/v1/tokens` | Frozen catalog (USDC, EURC, cirBTC) |
 | GET | `/api/v1/quote` | Best route |
 | POST | `/api/v1/build_tx` | Calldata + Permit2 typed data |
 | GET | `/api/v1/balances` | ERC-20 balances + native USDC (never summed) |
@@ -206,5 +206,5 @@ HTTP `429` when exceeded. Loopback IPs are exempt (local development).
 - **No trustlines**: ERC-20 tokens don't need trustline setup
 - **`value: "0"` always**: the aggregator never holds native ETH/USDC gas (SC-12)
 - **1 confirmation**: swap is final on first inclusion
-- **Frozen catalog**: only USDC, EURC, mBTC (no token discovery)
+- **Frozen catalog**: only USDC, EURC, cirBTC (no token discovery)
 - **No partner API keys**: single rate limit tier (10 req/s/IP)

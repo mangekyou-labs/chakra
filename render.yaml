@@ -32,7 +32,7 @@ services:
       - key: CHAKRA_LISTEN_ADDR
         value: "0.0.0.0:10000"
       - key: CHAKRA_AGGREGATOR
-        value: "0xEa1b2C24bd41163590960F8e40afe6cb4CC92006"
+        value: "0xeb12351602c56d47c4ee955193335848952b29d8"
       - key: CHAKRA_CIRBTC_ADDRESS
         value: "0xf0C4a4CE82A5746AbAAd9425360Ab04fbBA432BF"
       - key: CHAKRA_USDC_ADDRESS

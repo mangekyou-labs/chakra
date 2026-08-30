@@ -74,13 +74,12 @@ Each task: **outcome**, **deps**, **validation**, **tests**. Status: not started
 
 **Supersedes T2.1–T2.4 (mBTC + Chakra-owned seed liquidity).** The old tasks are historical; mBTC and the owned XYK/stable/CLMM deployments now exist only as deterministic chain-31337 fixtures and are never deployed by the Arc operator workflow.
 
-- [ ] **T2.1** Catalog rebaseline: USDC/EURC/cirBTC
+- [x] **T2.1** Catalog rebaseline: USDC/EURC/cirBTC
   **Outcome:** Frozen catalog is exactly ERC-20 USDC (`0x3600…0000`, 6 dp), EURC (`0x89B5…D72a`, 6 dp), cirBTC (canonical Arc, 8 dp). mBTC removed from `/tokens`, `/balances`, PathFinder nodes, and the aggregator sweep; cirBTC replaces it at 8 decimals. WUSDC excluded. cirBTC is acquired via the route itself (USDC → EURC → cirBTC); no prefunded target balance required for canaries.
   **Deps:** T1.1.
   **Validation:** `/tokens` lists exactly the three canonical tokens; `cargo test` catalog/decimals suites green; aggregator sweeps cirBTC not mBTC.
   **Tests:** Unit + Foundry catalog enforcement; no mBTC anywhere on the Arc path.
-  **Status 2026-08-30 (Phase 6 after Check):** **PARTIAL — keep `[ ]`.** Runtime `/tokens` is USDC (6) / EURC (6) / cirBTC (8); aggregator constructor + `_sweepCatalogTo` use cirBTC. Public `README.md` and `docs/integrator-guide.md` still teach mBTC (T10.5). TokenSelector mBTC hint is fixture-only (Low).
-
+  **Done 2026-08-29 / 2026-08-30 (T10.5):** Runtime `/tokens` is USDC (6) / EURC (6) / cirBTC (8); aggregator constructor + `_sweepCatalogTo` use cirBTC. `README.md`, `docs/integrator-guide.md`, and `render.yaml` fully aligned on USDC/EURC/cirBTC.
 - [ ] **T2.2** XyloNet integration (xylo-stable)
   **Outcome:** Source id `xylo-stable`; manifest factory `0x60EDeFB094B84BBC6430cc130B358A43Ba1979e2`, router `0x73742278c31a76dBb0D2587d03ef92E6E2141023`, pool `0x3DF3966F5138143dce7a9cFDdC2c0310ce083BB1`. Atomic owner config of factory/router pair; router exact-input `swapExactTokensForTokens` with request deadline, aggregator recipient, post-call balance delta. Quote from hydrated on-chain pool parameters (amplification read from the pool, not hardcoded).
   **Deps:** T2.1, T5.1.
@@ -349,11 +348,10 @@ Phase 7 Check verdict: **not aligned** with the 2026-08-29 curated rebaseline. L
   **Validation:** dry-run of a fixture script on 5042002 fails closed; aggregator deploy path still works.
   **Done 2026-08-30:** `scripts/arc-operator.sh` enforces allowlist allowing ONLY `DeployAggregator.s.sol`. `DeployAggregator.s.sol` enforces `require(block.chainid == 5042002)`. `Deploy.s.sol`, `Seed.s.sol`, `DeployMockBtc.s.sol`, `DeployXyk.s.sol`, `DeployStable.s.sol`, and `DeployClmm.s.sol` enforce `require(block.chainid == 31337)`. Verified with `scripts/test-arc-operator.sh` (8/8 disallowed scripts rejected with exit 1 and 0 forge calls; `DeployAggregator.s.sol` allowed and invoked forge).
 
-- [ ] **T10.5** Public docs + `render.yaml` + OpenAPI + evidence pack
+- [x] **T10.5** Public docs + `render.yaml` + OpenAPI + evidence pack
   **Outcome:** `README.md` and `docs/integrator-guide.md` drop mBTC from the catalog; `render.yaml` pins `0xeb12351602c56d47c4ee955193335848952b29d8`; OpenAPI quote examples use `xylo-stable`; evidence pack T7.2 / T9.1–T9.5 / `docs/evidence/README.md` re-pin cirBTC + new aggregator. Deployment-doc header matches the hosted cutover (current is not “pre-rebaseline revision”).
   **Deps:** T2.1, T5.2, T7.2, T8.1.
-  **Tests:** testing leftover evidence-pack and OpenAPI bullets.
-
+  **Done 2026-08-30:** `README.md` and `docs/integrator-guide.md` drop mBTC for canonical cirBTC; `render.yaml` pins aggregator `0xeb12351602c56d47c4ee955193335848952b29d8`; `docs/openapi.yaml` and `docs/api-reference.md` use `xylo-stable` examples; `docs/evidence/README.md` re-pins cirBTC + `0xeb1235…29d8` with historical labels; deployment doc header updated to hosted cutover.
 - [ ] **T10.6** Quote-time factory gate + SDK/UI `xylo` dex type
   **Outcome:** QuoteEngine factory membership applies to `xylo-stable` / `presto-hub` / `unitflow-v25`, not only `source.starts_with("chakra-")`. SDK and UI `venueToDexType("xylo-stable"|"xylo")` → `'xylo'` (server `dex_types` still take precedence).
   **Deps:** T4.5, T4.7, T7.1.
@@ -1319,7 +1317,7 @@ After hosting is healthy, run extension-backed MetaMask QA on Arc testnet and th
 | Task | Status | Evidence |
 |------|--------|----------|
 | T0.3 rebaseline docs | `[x]` | Design/requirements freeze 2026-08-29 |
-| T2.1 catalog | `[ ]` **partial** | Hosted `/tokens` USDC/EURC/cirBTC; README + integrator-guide still mBTC (T10.5) |
+| T2.1 catalog | `[x]` | Done via T10.5: runtime, README, integrator-guide, render.yaml all USDC/EURC/cirBTC |
 | T2.2 Xylo | `[ ]` **partial** | Live `/quote` `xylo-stable` / `dex_types:["xylo"]`; SDK fallback maps xylo→stable (T10.6) |
 | T2.3 Presto | `[ ]` **partial** | Code ready via T10.1 (`discover_once` arm + `FetchTask::EvmPresto`); keep `[ ]` until live pool is published |
 | T2.4 UnitFlow | `[x]` | Done via T10.2: `unitflow-v25` stamped in worker parse + `build_tx` factory matching; cirBTC honest `NO_ROUTE` |
@@ -1327,8 +1325,8 @@ After hosting is healthy, run extension-backed MetaMask QA on Arc testnet and th
 | T3.1 / T3.2 | `[x]` | Redis + quote math |
 | T3.3 WS/poll + verifier | `[x]` | Done via T10.3: five-check venue verification (bytecode, endpoints, membership, reserves, probe quote) |
 | T4.* / T5.1 | `[x]` | Encoder selector `0x2e3be0c1`; Permit2 packing; leftover T4.5 curated-id hole → T10.6 |
+| T5.2 aggregator | `[x]` | Live `0xeb12351602c56d47c4ee955193335848952b29d8`; operator allowlist done (T10.4) |
 | T6.1 / T6.2 | `[x]` | Arc chain gate + swap shell |
-| T6.3 live send | `[ ]` | Local correctness + old-aggregator MetaMask proof; new-aggregator send gated |
 | T7.1 / T7.2 | `[x]` | Walkthrough evidence still names old aggregator (T10.5) |
 | T8.1 / T8.2 | `[x]` | API `https://chakra-api-0a5i.onrender.com`, UI `https://chakra-arc-dex.vercel.app`; `render.yaml` leftover T10.5 |
 | T9.1 | `[ ]` **partial** | cirBTC matrix 2026-08-30; SC-1 three-pair not met |

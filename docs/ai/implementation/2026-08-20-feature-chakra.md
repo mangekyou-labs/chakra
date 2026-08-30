@@ -814,3 +814,10 @@ Resolved in code: StableSwap deposit accounting, production snapshot bootstrap/r
 - `contracts/evm/script/DeployAggregator.s.sol`: added `require(block.chainid == 5042002)` in `run()`.
 - `contracts/evm/script/Deploy.s.sol`, `Seed.s.sol`, `DeployMockBtc.s.sol`, `DeployXyk.s.sol`, `DeployStable.s.sol`, `DeployClmm.s.sol`: added `require(block.chainid == 31337)`.
 - Added `scripts/test-arc-operator.sh`: automated test asserting 8/8 disallowed scripts fail closed with exit 1 and 0 forge stub invocations, and `DeployAggregator.s.sol` succeeds.
+
+### T10.5 Public docs + render.yaml + OpenAPI + evidence pack (Done 2026-08-30)
+- `README.md` and `docs/integrator-guide.md`: dropped mBTC and updated token catalog and configuration tables to frozen catalog USDC / EURC / cirBTC.
+- `render.yaml`: pinned `CHAKRA_AGGREGATOR` to `0xeb12351602c56d47c4ee955193335848952b29d8`.
+- `docs/openapi.yaml` and `docs/api-reference.md`: updated quote examples to `xylo-stable` / `xylo` dex type.
+- `docs/evidence/README.md`: re-pinned cirBTC + live aggregator `0xeb1235…29d8`, labeled old-aggregator transactions historical, and documented active blockers.
+- `docs/ai/deployment/2026-08-20-feature-chakra.md`: updated status header to reflect hosted cutover to aggregator `0xeb1235…29d8` and cirBTC catalog.

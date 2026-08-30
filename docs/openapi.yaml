@@ -341,7 +341,7 @@ components:
         source:
           type: string
           description: Joined per-hop source ids (legacy display; do not parse for DEX type)
-          example: chakra-stable
+          example: xylo-stable
         path:
           type: array
           items:
@@ -472,32 +472,32 @@ components:
           nullable: true
   examples:
     QuoteHonest100Usdc:
-      summary: 100 USDC → EURC (honest engine output)
+      summary: 1 USDC → EURC (honest engine output on XyloNet)
       description: |
-        Single `chakra-stable` sub-route. This is the actual engine output on
-        the T2.3 seeds (deep stable 200k vs thin xy=k 10k).
+        Single `xylo-stable` sub-route. This is the actual engine output on
+        the curated manifest (XyloNet USDC/EURC stable pool, A=200, 4 bps fee).
       value:
         success: true
         data:
-          amount_in: '100000000'
-          expected_output: '99955053'
-          minimum_output: '99455277'
-          price_impact_bps: 4
+          amount_in: '1000000'
+          expected_output: '865542'
+          minimum_output: '861214'
+          price_impact_bps: 1344
           protocol_fee_bps: 0
           is_split: false
           max_splits: 5
           sub_routes:
-            - source: chakra-stable
+            - source: xylo-stable
               path:
                 - '0x3600000000000000000000000000000000000000'
                 - '0x89b50855aa3be2f677cd6303cec089b5f319d72a'
               pool_addresses:
-                - '0x0000000000000000000000000000000000000002'
-              dex_types: [stable]
+                - '0x3DF3966F5138143dce7a9cFDdC2c0310ce083BB1'
+              dex_types: [xylo]
               hop_fees: [4]
-              hop_factories: ['']
-              amount_in: '100000000'
-              amount_out: '99955053'
+              hop_factories: ['0x60EDeFB094B84BBC6430cc130B358A43Ba1979e2']
+              amount_in: '1000000'
+              amount_out: '865542'
               fraction_bps: 10000
           compute_time_ms: 2
         error: null
@@ -533,15 +533,15 @@ components:
               amount_in: '70000000'
               amount_out: '69950917'
               fraction_bps: 7000
-            - source: chakra-stable
+            - source: xylo-stable
               path:
                 - '0x3600000000000000000000000000000000000000'
                 - '0x89b50855aa3be2f677cd6303cec089b5f319d72a'
               pool_addresses:
-                - '0x0000000000000000000000000000000000000002'
-              dex_types: [stable]
+                - '0x3DF3966F5138143dce7a9cFDdC2c0310ce083BB1'
+              dex_types: [xylo]
               hop_fees: [4]
-              hop_factories: ['']
+              hop_factories: ['0x60EDeFB094B84BBC6430cc130B358A43Ba1979e2']
               amount_in: '30000000'
               amount_out: '30004200'
               fraction_bps: 3000

@@ -13,14 +13,7 @@ date: 2026-08-20
 > Contracts and seeded pools are on chain ID `5042002` (Arc testnet). Never target Arc
 > mainnet. See requirements and design docs.
 >
-> **Status 2026-08-29 (rebaseline preflight):** Read-only preflight complete — see
-> "Read-only preflight (2026-08-29)" below. The hosted stack still runs the **previous
-> pre-rebaseline revision** (catalog USDC/EURC/mBTC, aggregator `0xEa1b2C…2006`) and is
-> retained for rollback. **Aggregator deployment DONE 2026-08-29 (authorized)** — new
-> non-upgradeable aggregator `0xeb1235…29d8` with cirBTC sweep and all three venues
-> registered; the hosted cutover (worker → snapshot → API/UI) remains **gated on
-> explicit authorization**.
-
+> **Status 2026-08-30 (hosted cutover complete):** Aggregator `0xeb12351602c56d47c4ee955193335848952b29d8` is deployed and live on Arc testnet (5042002). Hosted API `https://chakra-api-0a5i.onrender.com` was cut over to the cirBTC catalog (`0xf0C4…32BF`) and quotes live against the new aggregator. `render.yaml` pins `0xeb12351602c56d47c4ee955193335848952b29d8`. Vercel UI production deploy unblocks the frontend bundle.
 ## Read-only preflight (2026-08-29, before any external mutation)
 
 All checks were read-only (no broadcasts, no hosted mutations, no wallet spending):

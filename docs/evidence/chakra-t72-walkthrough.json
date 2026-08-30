@@ -1,5 +1,7 @@
 {
   "scenario": "SC-6 / SC-9 / T7.2 Clean-Clone SDK Walkthrough",
+  "historical": true,
+  "historical_note": "Captured 2026-08-28 against rollback aggregator 0xEa1b2C24bd41163590960F8e40afe6cb4CC92006. Live production aggregator is 0xeb12351602c56d47c4ee955193335848952b29d8 (cirBTC sweep, Presto hub allowlist, Xylo router atomic config).",
   "timestamp_utc": "2026-08-28T07:28:53Z",
   "elapsed_seconds": 6,
   "gate_seconds_limit": 1800,
