@@ -25,7 +25,7 @@ Every testing scenario is owned by at least one task below. Wallet/chain/Permit2
 - [x] **M1 — Repo foundation:** Drop Arc-only surface from this branch; Foundry + Rust workspace + env + `arcTestnet`. **Done 2026-08-20 (T1.1, T1.2).**
 - [ ] **M2 — Canonical venues & catalog:** USDC/EURC/cirBTC catalog, Xylo/Presto/UnitFlow V2.5 manifest + adapters, fixture-only mocks (replaces the old mBTC/seed track). **PARTIAL 2026-08-30:** catalog + live Xylo USDC↔EURC; Presto undiscovered; UnitFlow stamped `chakra-xyk`. Close via T10.1–T10.2 + T10.5 docs leftover.
 - [ ] **M3 — Worker + Redis:** Bootstrap, discovery, WS + poll, `chakra:` keys, venue verification. **PARTIAL 2026-08-30:** WS/poll shipped (T3.1/T3.2 `[x]`); T3.3 verifier is bytecode-only (T10.3).
-- [ ] **M4 — Router + API:** PathFinder, QuoteEngine, SplitOptimizer, REST, OpenAPI.
+- [x] **M4 — Router + API:** PathFinder, QuoteEngine, SplitOptimizer, REST, OpenAPI. **Done 2026-08-28 (T4.1–T4.7).** Leftover curated-id quote gate + SDK xylo dex-type is T10.6, not a reason to keep M4 open.
 - [x] **M5 — Aggregator:** Solidity `splitSwap` + Permit2, Foundry tests, deploy. **Done 2026-08-28 (T5.1, T5.2); rebaseline aggregator live 2026-08-30 at `0xeb12351602c56d47c4ee955193335848952b29d8`.** Operator-script leftover is T10.4 (allowlist still missing).
 - [ ] **M6 — Swap UI:** Next.js dense pro terminal, EIP-6963, decimals, route legs.
 - [x] **M7 — SDK + integrator docs:** TypeScript SDK, 30-min walkthrough. **Done 2026-08-28 (T7.1, T7.2).**
@@ -93,7 +93,7 @@ Each task: **outcome**, **deps**, **validation**, **tests**. Status: not started
   **Deps:** T2.1, T5.1.
   **Validation:** Adapter parity vs hub view function; Foundry hub hop test; USDC/EURC candidates only.
   **Tests:** See testing doc.
-  **Status 2026-08-30:** **BLOCKED / not in worker topology — keep `[ ]`.** Aggregator Presto hop + Foundry `test_presto_hop_succeeds_via_hub` exist; on-chain hub allowlist is `true`. Worker `discover_once` match arms are `xyk` / `stable` / `xylo` / `clmm` only — seeded `:presto` can publish to `chakra:factories` with **zero pools**. Live USDC↔EURC is Xylo-only. Hydrator maps `presto-hub` → `FetchTask::EvmStable` / `find_evm_pair(..., "stable")` (Medium; T10.1). Do not design-drop Presto in Execute; that is `dev-design`.
+  **Status 2026-08-30:** **PARTIAL — keep `[ ]` until live Presto pool is published.** Code readiness closed via T10.1: worker `discover_once` has `"presto"` arm (restricted to USDC/EURC, publishing `presto-hub` with `dex_type: "presto"`). Hydrator has `FetchTask::EvmPresto` querying `tokenReserves(spoke)` and `pathReserves(spoke)` on the hub with directional token mapping. Aggregator Presto hop and allowlist tested in Foundry fixture.
 
 - [ ] **T2.4** UnitFlow V2.5 integration (unitflow-v25)
   **Outcome:** Source id `unitflow-v25`; factory `0xd67F63A4F26a497b364d1C82e6747Aec8B5743a5`, canonical EURC/cirBTC pair `0x268DC75517EaFc6e0D52666639529e5DAB8c9200`, 30 bps. Quoted via existing XYK state/math. Split plans that reuse a pool are rejected.
@@ -326,6 +326,47 @@ Each task: **outcome**, **deps**, **validation**, **tests**. Status: not started
   **Validation:** Manual testing checklist ticked.
   **Tests:** Manual testing section.
   **Progress 2026-08-28:** Audited live UI on desktop (1280×800) and mobile (375×667) viewports. Unaudited status banner, keyboard accessibility, token selectors, slippage settings, recent swaps storage, and color contrast verified (`docs/evidence/chakra-t98-manual-ux-a11y.json`). Second-wallet (Rabby/Coinbase) and live on-chain confirm remain open pending browser wallet extension.
+  **Update 2026-08-30:** Hosted UI QA is `OPEN_PARTIAL_GATED_ON_VERCEL_REDEPLOY` (bundle still `d3f8c79`). Local `208d5ff` frontend 67/67.
+
+### M10 — Leftover Execute queue (Phase 7 Check 2026-08-29)
+
+Phase 7 Check verdict: **not aligned** with the 2026-08-29 curated rebaseline. Local gates at HEAD `208d5ff` are green and do **not** prove discovery / source-id / operator alignment. Testing leftover `[ ]` items in the testing doc map 1:1 onto T10.1–T10.6; do not duplicate them as done. Dropping Presto or keeping `chakra-xyk` as the UnitFlow id is `dev-design`, not a silent Execute change.
+
+- [x] **T10.1** Presto discovery into topology
+  **Outcome:** `discover_once` has a `"presto"` arm; seeded `:presto` hub `0x5794a8284A29493871Fbfa3c4f343D42001424D6` publishes at least one `presto-hub` pair with `dex_type: "presto"`; hydrator finds that stamp (not `find_evm_pair(..., "stable")` only). Failed discovery stays `NO_ROUTE` — no auto-reseed.
+  **Deps:** T2.3, T3.3.
+  **Validation:** Worker test that a seeded Presto hub yields ≥1 pool; live `/quote` may still prefer Xylo if it is the better path.
+  **Done 2026-08-30:** `discover_once` Presto arm + `FetchTask::EvmPresto` with `fetch_presto_state` querying `tokenReserves(spoke)` and `pathReserves(spoke)` on the hub + directional mapping. Verified with `discovery_finds_presto_hub_pair_from_seeded_hub` and `execute_fetch_task_hydrates_presto_pool_reserves_with_distinct_getters`.
+- [ ] **T10.2** Stamp UnitFlow `unitflow-v25` end-to-end
+  **Outcome:** `FactoryConfig::parse` for seeded `:xyk` at factory `0xd67F63A4F26a497b364d1C82e6747Aec8B5743a5` emits `source: "unitflow-v25"` through snapshot → quote gate → `build_tx` `step_factory_source`. Stop pinning `chakra-xyk` for this factory.
+  **Deps:** T2.4.
+  **Validation:** parse test + `/build_tx` factory membership for the UnitFlow hop.
+  **Tests:** testing leftover “seeded UnitFlow `:xyk` stamps `unitflow-v25`”.
+
+- [ ] **T10.3** T3.3 five-check venue verification
+  **Outcome:** Startup verifier runs bytecode, canonical token endpoints, factory membership, nonzero reserves, and a probe quote. Failed venue → unavailable / `NO_ROUTE`.
+  **Deps:** T3.3.
+  **Validation:** Fixture that fails each check independently is skipped; bytecode-only is not sufficient.
+  **Tests:** testing leftover “manifest venue verification covers the T3.3 five-check list”.
+
+- [ ] **T10.4** Operator script allowlist + fixture chain
+  **Outcome:** `scripts/arc-operator.sh` allowlists `DeployAggregator.s.sol` only on chain `5042002`. `Deploy.s.sol` / `Seed.s.sol` / `DeployMockBtc.s.sol` `require` chain `31337` (or refuse 5042002). Docs-only “FIXTURE-ONLY” is not sufficient.
+  **Deps:** T5.2.
+  **Validation:** dry-run of a fixture script on 5042002 fails closed; aggregator deploy path still works.
+  **Tests:** script-level or Foundry chain-id require.
+
+- [ ] **T10.5** Public docs + `render.yaml` + OpenAPI + evidence pack
+  **Outcome:** `README.md` and `docs/integrator-guide.md` drop mBTC from the catalog; `render.yaml` pins `0xeb12351602c56d47c4ee955193335848952b29d8`; OpenAPI quote examples use `xylo-stable`; evidence pack T7.2 / T9.1–T9.5 / `docs/evidence/README.md` re-pin cirBTC + new aggregator. Deployment-doc header matches the hosted cutover (current is not “pre-rebaseline revision”).
+  **Deps:** T2.1, T5.2, T7.2, T8.1.
+  **Tests:** testing leftover evidence-pack and OpenAPI bullets.
+
+- [ ] **T10.6** Quote-time factory gate + SDK/UI `xylo` dex type
+  **Outcome:** QuoteEngine factory membership applies to `xylo-stable` / `presto-hub` / `unitflow-v25`, not only `source.starts_with("chakra-")`. SDK and UI `venueToDexType("xylo-stable"|"xylo")` → `'xylo'` (server `dex_types` still take precedence).
+  **Deps:** T4.5, T4.7, T7.1.
+  **Tests:** testing leftover quote-gate and `venueToDexType` bullets.
+
+**Follow-up after Majors (do not start ahead of T10.1–T10.6):** unused `IXyloPool`; `setXyloRouter` mapping-only vs design atomic-config wording; PathFinder `xylo-stable`→`stable`; `xyk_quote` 997/1000 vs per-factory fee; `/build_tx` shared-pool re-check; Presto hub not USDC/EURC-restricted in contract; Circle faucet CTA when `balanceFor==0`; A=200 wrappers leftover; `ExecuteSplitSwap.s.sol` default aggregator; Route pill raw `source`.
+
 ## Testing scenario coverage
 
 | Testing group | Tasks |
@@ -352,6 +393,7 @@ Each task: **outcome**, **deps**, **validation**, **tests**. Status: not started
 | Venue matrix / SC-8 | T9.1, T9.2 |
 | p95 / SC-10 | T9.5 |
 | Manual UX | T9.8 |
+| Leftover Execute (Check Majors) | T10.1–T10.6 |
 
 ## Dependencies
 
@@ -373,9 +415,17 @@ T4.2 + T8.1 → T9.1 / T9.2
 T5.2 + T6.3 → T9.3 → T9.6
 T8.1 → T9.5
 T9.* + T7.2 → T9.7
+T2.3 + T3.3 → T10.1
+T2.4 → T10.2
+T3.3 → T10.3
+T5.2 → T10.4
+T2.1 + T5.2 + T7.2 + T8.1 → T10.5
+T4.5 + T4.7 + T7.1 → T10.6
 ```
 
 **2026-08-29 rebaseline:** T2.1–T2.4 are the canonical venue/catalog tasks (not mBTC/seed). T5.2 is one aggregator redeploy + venue registration — no token/factory/pool/liquidity deployment.
+
+**2026-08-30 Check leftover:** T10.1–T10.6 are the Execute correction order. Do not flip T2.1–T2.4 / T3.3 to `[x]` until the matching T10 item is done or `dev-design` explicitly reconciles the gap.
 
 **External:** Arc testnet RPC/WS; Circle faucet; Permit2 predeploy; Vercel account; a VPS/Redis host; MetaMask + dAppwright; funded test wallet (never committed).
 
@@ -439,7 +489,7 @@ M2–M5 can overlap (venues vs worker vs aggregator) once addresses are known.
 
 1. Phase 2 requirements review: **done** 2026-08-20 (T0.1).
 2. Phase 3 design review: **done** 2026-08-20 (T0.2).
-3. Next: `dev-implementation` starting at T1.1. Do not implement until that phase is invoked.
+3. **Living next (2026-08-30):** `dev-implementation` leftover Majors T10.1 → T10.2 → T10.3 (then T10.4–T10.6). Do **not** start `dev-testing` or `dev-review`. Historical “start at T1.1” below is complete.
 
 ## Planning summary
 
@@ -1201,6 +1251,8 @@ After hosting is healthy, run extension-backed MetaMask QA on Arc testnet and th
 - Discovery scanner: **8/8**; `bash -n scripts/discovery_scan.sh` pass.
 - Design-conformance audit: catalog exactly USDC/EURC/cirBTC; venue source ids `xylo-stable`/`presto-hub`/`unitflow-v25` through worker → snapshot → engine → build_tx; Xylo factory/router + Presto hub + UnitFlow factory authorization distinct; single-Redis-writer model retained; transaction encoding selector `0x2e3be0c1` with Xylo=3/Presto=4; operator workflow restricted to `DeployAggregator.s.sol` (one deploy + venue registration).
 
+**Correction 2026-08-30 (Phase 7 Check):** The design-conformance bullet above **overclaimed**. Worker does **not** stamp `unitflow-v25` (it stamps `chakra-xyk`). Presto never enters topology (`discover_once` has no `"presto"` arm). Operator workflow is **not** restricted to `DeployAggregator.s.sol` — `arc-operator.sh` has no script allowlist; `Deploy.s.sol` / `Seed.s.sol` / `DeployMockBtc.s.sol` still `require` chain 5042002. Foundry suite at the same HEAD is **88/88** with **LiquiditySeeder 2**, not MockXylo 2. Stale verify command `cargo test -p api-server --features test-fixture` is invalid; use `cargo test -p api-server` (60 passed at Check). Local gates being green does not close T2.1–T2.4 / T3.3.
+
 **Audit fixes landed in this pass:**
 
 1. `crates/dex-adapters/Cargo.toml` — `autobins=false` + `autotests=false` (Arc-only crate gate).
@@ -1261,3 +1313,55 @@ After hosting is healthy, run extension-backed MetaMask QA on Arc testnet and th
 
 1. **Vercel Production Redeploy:** Run `vercel --prod` (or promote deployment of commit `208d5ff`) in `packages/frontend` to ship the case-insensitive token matching fix and cirBTC catalog to the live UI.
 2. **Fund QA Wallet (T6.3/T9.4/T9.3):** Fund disposable testnet address with $\ge 5$ USDC + native gas to execute live MetaMask and split swap verification against aggregator `0xeb12351602c56d47c4ee955193335848952b29d8`.
+
+**Superseded 2026-08-30 Phase 6 after Check:** The two items above remain real (Vercel bundle is still `d3f8c79`; live MetaMask/split re-proof vs `0xeb1235…29d8` is still gated) but they are **not** the next Execute work. Leftover Majors T10.1–T10.6 come first. Hosted UI QA stays `OPEN_PARTIAL_GATED_ON_VERCEL_REDEPLOY`.
+
+## Phase 6 reconciliation (2026-08-30, after Phase 7 Check — not aligned)
+
+**Question answered:** Phase 7 Check left this planning file’s T2.1–T2.4 / T3.3 boxes `[ ]` on purpose. Commit `cef675d` later recorded Arc QA evidence (T9.1 cirBTC matrix, hosted smoke, Vercel UI gated) but did **not** fold the Check Majors into leftover Execute tasks. This Phase 6 pass does that.
+
+**Progress (what is actually done, not flipped to `[x]` when leftover remains):**
+
+| Task | Status | Evidence |
+|------|--------|----------|
+| T0.3 rebaseline docs | `[x]` | Design/requirements freeze 2026-08-29 |
+| T2.1 catalog | `[ ]` **partial** | Hosted `/tokens` USDC/EURC/cirBTC; README + integrator-guide still mBTC (T10.5) |
+| T2.2 Xylo | `[ ]` **partial** | Live `/quote` `xylo-stable` / `dex_types:["xylo"]`; SDK fallback maps xylo→stable (T10.6) |
+| T2.3 Presto | `[ ]` **partial** | Code ready via T10.1 (`discover_once` arm + `FetchTask::EvmPresto`); keep `[ ]` until live pool is published |
+| T2.4 UnitFlow | `[ ]` **partial** | On-chain 30 bps factory; worker stamps `chakra-xyk`; cirBTC pairs honest `NO_ROUTE` (T10.2) |
+| T2.5 discovery scan | `[x]` | Watchlist correctly absent from code/env/manifest |
+| T3.1 / T3.2 | `[x]` | Redis + quote math |
+| T3.3 WS/poll + verifier | `[ ]` **partial** | WS/poll shipped; verifier bytecode-only (T10.3); `/ready` `pool_keys:[]` |
+| T4.* / T5.1 | `[x]` | Encoder selector `0x2e3be0c1`; Permit2 packing; leftover T4.5 curated-id hole → T10.6 |
+| T5.2 aggregator | `[x]` | Live `0xeb12351602c56d47c4ee955193335848952b29d8`; operator allowlist leftover T10.4 |
+| T6.1 / T6.2 | `[x]` | Arc chain gate + swap shell |
+| T6.3 live send | `[ ]` | Local correctness + old-aggregator MetaMask proof; new-aggregator send gated |
+| T7.1 / T7.2 | `[x]` | Walkthrough evidence still names old aggregator (T10.5) |
+| T8.1 / T8.2 | `[x]` | API `https://chakra-api-0a5i.onrender.com`, UI `https://chakra-arc-dex.vercel.app`; `render.yaml` leftover T10.5 |
+| T9.1 | `[ ]` **partial** | cirBTC matrix 2026-08-30; SC-1 three-pair not met |
+| T9.2 / T9.3 / T9.4 / T9.5 | `[x]` | Live proof vs **old** aggregator `0xEa1b2C…2006` — not re-proven on `0xeb1235…29d8` |
+| T9.6 / T9.7 / T9.8 | `[ ]` | Live WS proof, evidence index, hosted UI QA (Vercel gated) |
+| **T10.1–T10.6** | `[ ]` **new** | Check correction order (this section) |
+
+**2026-08-26 / 2026-08-27 Criticals** (StableSwap custody, production Redis snapshot, cluster `/build_tx`, ABI selector/packing, Permit2, UI approve-spender) remain **resolved in code**. They are not the current leftover.
+
+**Risks / scope changes:**
+
+- Local-release-gate (2026-08-29) overclaimed source-id stability and “operator workflow restricted to `DeployAggregator.s.sol`”. Corrected in place above.
+- Do not reseed UnitFlow to force cirBTC quotes; dust `NO_ROUTE` is honest.
+- Do not silently drop Presto or keep `chakra-xyk` without `dev-design`.
+- Wallet/browser QA stays Arc testnet (`5042002` / `0x4CEF52`); T9.4 harness is not Coston2.
+- Task tracing unavailable (`npx ai-devkit@latest task` → `unknown command 'task'`). This file remains the tracker.
+- Worktree: `.worktrees/feature-chakra` only. Untracked Arc-era tree is noise.
+
+**This-session planning verification:** `cd .worktrees/feature-chakra && npx ai-devkit@latest lint --feature chakra` → **all checks passed** (after this edit). Check local suites were already green at `208d5ff` (`forge test` 88/88, `cargo test --workspace --all-targets` 245, `cargo test -p api-server` 60, frontend 67/67, SDK 14/14). This Phase 6 pass did not re-run those suites; it did not change production code.
+
+**Next 2–3 actions (Execute, not this phase):**
+
+1. **T10.1** Discover Presto (`discover_once` `"presto"` arm + hydrator for `dex_type:"presto"`).
+2. **T10.2** Stamp UnitFlow `unitflow-v25` worker → snapshot → quote → `/build_tx`.
+3. **T10.3** T3.3 five-check venue verification (bytecode, endpoints, membership, reserves, probe quote).
+
+Then T10.4 operator allowlist, T10.5 public docs/`render.yaml`/OpenAPI/evidence, T10.6 quote factory gate + SDK/UI `xylo` dex type. Mediums listed under M10 wait until Majors land.
+
+**Next phase:** `dev-implementation` (Execute T10.1). Do **not** run `dev-testing` or `dev-review` on the Check verdict. Alternative: `dev-design` if product wants to drop Presto or keep `chakra-xyk` as the UnitFlow id.

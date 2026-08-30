@@ -34,6 +34,8 @@ pub enum FetchTask {
     /// XyloNet stableswap pool (T-XYLO, source `xylo`). Catalog USDC/EURC
     /// only; the topology snapshot carries the pinned pool.
     EvmXylo { pool_address: String },
+    /// Presto hub spoke (2026-08-29, source `presto-hub`).
+    EvmPresto { pool_address: String },
 }
 
 #[derive(Default)]
@@ -152,7 +154,7 @@ pub(crate) fn coalesce_touched_into_tasks(touched: HashSet<PoolRef>) -> Vec<Fetc
                 })
             }
             // Presto hub spokes are fetched as stable-family state (2026-08-29).
-            "presto-hub" | "discovered:presto" => tasks.push(FetchTask::EvmStable {
+            "presto-hub" | "discovered:presto" => tasks.push(FetchTask::EvmPresto {
                 pool_address: pool.pool_address,
             }),
             other => {
@@ -289,6 +291,16 @@ async fn execute_fetch_task(ctx: &FetchWorkerContext, task: FetchTask) -> Result
             let value = dex_adapters::evm_fetch::fetch_xylo_state(ctx.evm.as_ref(), source.as_str(), &pair).await?;
             Ok(vec![PoolStateUpdate::Stable(vec![value])])
         }
+        FetchTask::EvmPresto { pool_address } => {
+            let (source, pair) = find_evm_pair(&ctx.shared, "presto", &pool_address).await?;
+            let value = dex_adapters::evm_fetch::fetch_presto_state(
+                ctx.evm.as_ref(),
+                source.as_str(),
+                &pair,
+            )
+            .await?;
+            Ok(vec![PoolStateUpdate::Stable(vec![value])])
+        }
         FetchTask::EvmClmm { pool_address } => {
             let (pool_ref, existing) = {
                 let guard = ctx.shared.read().await;
@@ -354,7 +366,7 @@ async fn find_evm_pair(
     let guard = shared.read().await;
     for source in &guard.sources {
         for pair in &source.pairs {
-            if pair.dex_type == dex_type
+            if (pair.dex_type == dex_type || (dex_type == "stable" && pair.dex_type == "presto"))
                 && normalize_evm_address(&pair.pool_address) == normalize_evm_address(pool_address)
             {
                 return Ok((source.source.clone(), pair.clone()));
@@ -383,6 +395,7 @@ mod tests {
             pref("chakra-stable", "0xS1"),
             pref("discovered:clmm", "0xC1"),
             pref("chakra-clmm", "0xC2"),
+            pref("presto-hub", "0xPRESTO"),
             pref("Arc venue", "0xArc"),
         ]);
         let tasks = coalesce_touched_into_tasks(touched);
@@ -401,10 +414,116 @@ mod tests {
         assert!(tasks
             .iter()
             .any(|t| matches!(t, FetchTask::EvmClmm { pool_address } if pool_address == "0xC2")));
+        assert!(tasks
+            .iter()
+            .any(|t| matches!(t, FetchTask::EvmPresto { pool_address } if pool_address == "0xPRESTO")));
         // Arc sources never produce tasks on the Arc path.
         assert!(!tasks
             .iter()
             .any(|t| matches!(t, FetchTask::EvmXyk { pool_address } if pool_address == "0xArc")));
-        assert_eq!(tasks.len(), 5);
+        assert_eq!(tasks.len(), 6);
+    }
+
+    #[tokio::test]
+    async fn execute_fetch_task_hydrates_presto_pool_reserves_with_distinct_getters() {
+        use {
+            crate::evm_watcher::tests::spawn_fixture_rpc,
+            market_snapshot::SourceSnapshot,
+            serde_json::json,
+        };
+        let path_sel = dex_adapters::evm_fetch::path_reserves_selector();
+        let token_sel = dex_adapters::evm_fetch::token_reserves_selector();
+        let balance_of_sel = dex_adapters::evm_fetch::balance_of_selector();
+
+        let (url, _server) = spawn_fixture_rpc(move |method, params| {
+            if method == "eth_call" {
+                let to = params[0]["to"].as_str().unwrap_or("");
+                let data = params[0]["data"].as_str().unwrap_or("");
+                if data.starts_with(&balance_of_sel) {
+                    return Err(json!("balanceOf must not be called on Presto hub"));
+                }
+                if to.eq_ignore_ascii_case("0x5794a8284A29493871Fbfa3c4f343D42001424D6")
+                    || to.eq_ignore_ascii_case("0x5794a8284A29493871Fbfa3c4f343D42001424D7")
+                {
+                    if data.starts_with(&path_sel) {
+                        return Ok(json!(format!("0x{:0>64x}", 123_000_000_000u128)));
+                    }
+                    if data.starts_with(&token_sel) {
+                        return Ok(json!(format!("0x{:0>64x}", 456_000_000_000u128)));
+                    }
+                }
+            }
+            Ok(json!("0x0"))
+        });
+        let client = Arc::new(EvmRpcClient::single(&url).unwrap());
+        let shared = Arc::new(RwLock::new(WorkerShared {
+            sources: vec![SourceSnapshot {
+                source: "presto-hub".to_string(),
+                pairs: vec![
+                    TradingPairSnapshot {
+                        token_a: "0x3600000000000000000000000000000000000000".to_string(),
+                        token_b: "0x89b50855aa3be2f677cd6303cec089b5f319d72a".to_string(),
+                        pool_address: "0x5794a8284A29493871Fbfa3c4f343D42001424D6".to_string(),
+                        fee_bps: 30,
+                        dex_type: "presto".to_string(),
+                        factory: "0x5794a8284A29493871Fbfa3c4f343D42001424D6".to_string(),
+                    },
+                    TradingPairSnapshot {
+                        token_a: "0x89b50855aa3be2f677cd6303cec089b5f319d72a".to_string(),
+                        token_b: "0x3600000000000000000000000000000000000000".to_string(),
+                        pool_address: "0x5794a8284A29493871Fbfa3c4f343D42001424D7".to_string(),
+                        fee_bps: 30,
+                        dex_type: "presto".to_string(),
+                        factory: "0x5794a8284A29493871Fbfa3c4f343D42001424D6".to_string(),
+                    },
+                ],
+            }],
+            clmm_pools: Vec::new(),
+        }));
+        let ctx = FetchWorkerContext {
+            evm: client,
+            shared,
+            clmm_metrics: None,
+        };
+
+        // Forward direction: token_a is USDC (path), token_b is EURC (spoke)
+        let updates = execute_fetch_task(
+            &ctx,
+            FetchTask::EvmPresto {
+                pool_address: "0x5794a8284A29493871Fbfa3c4f343D42001424D6".to_string(),
+            },
+        )
+        .await
+        .unwrap();
+        assert_eq!(updates.len(), 1);
+        let PoolStateUpdate::Stable(states) = &updates[0] else {
+            panic!("expected PoolStateUpdate::Stable");
+        };
+        let state = &states[0];
+        assert_eq!(state.source, "presto-hub");
+        assert_eq!(state.balance_a, 123_000_000_000, "balance_a must be pathReserves (USDC)");
+        assert_eq!(state.balance_b, 456_000_000_000, "balance_b must be tokenReserves (EURC)");
+        assert_eq!(state.a, 1);
+        assert_eq!(state.fee_bps, 30);
+
+        // Reverse direction: token_a is EURC (spoke), token_b is USDC (path)
+        let updates_rev = execute_fetch_task(
+            &ctx,
+            FetchTask::EvmPresto {
+                pool_address: "0x5794a8284A29493871Fbfa3c4f343D42001424D7".to_string(),
+            },
+        )
+        .await
+        .unwrap();
+        assert_eq!(updates_rev.len(), 1);
+        let PoolStateUpdate::Stable(states_rev) = &updates_rev[0] else {
+            panic!("expected PoolStateUpdate::Stable");
+        };
+        let state_rev = &states_rev[0];
+        assert_eq!(state_rev.source, "presto-hub");
+        assert_eq!(state_rev.balance_a, 456_000_000_000, "balance_a must be tokenReserves (EURC)");
+        assert_eq!(state_rev.balance_b, 123_000_000_000, "balance_b must be pathReserves (USDC)");
+        assert_eq!(state_rev.a, 1);
+        assert_eq!(state_rev.fee_bps, 30);
     }
 }

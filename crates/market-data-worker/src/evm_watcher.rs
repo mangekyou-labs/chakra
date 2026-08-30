@@ -443,6 +443,28 @@ impl EvmRunner {
                             }
                         }
                     }
+                    "presto" => {
+                        // Presto hub discovery: restricted to USDC/EURC discovery (2026-08-29).
+                        // Hub address acts as both factory and pool address.
+                        let is_usdc_eurc = (token_a.eq_ignore_ascii_case(USDC_ERC20)
+                            && token_b.eq_ignore_ascii_case(EURC))
+                            || (token_a.eq_ignore_ascii_case(EURC)
+                                && token_b.eq_ignore_ascii_case(USDC_ERC20));
+                        if is_usdc_eurc {
+                            let (a, b) = pair_key(token_a, token_b);
+                            sources_stable.push((
+                                factory.source.clone(),
+                                TradingPairSnapshot {
+                                    token_a: a,
+                                    token_b: b,
+                                    pool_address: factory.address.clone(),
+                                    fee_bps: 30,
+                                    dex_type: "presto".to_string(),
+                                    factory: factory.address.clone(),
+                                },
+                            ));
+                        }
+                    }
                     _ => {}
                 }
             }
@@ -1003,7 +1025,7 @@ pub(crate) async fn run_arc(config: crate::worker::WorkerConfig) -> Result<()> {
 }
 
 #[cfg(test)]
-mod tests {
+pub(crate) mod tests {
     use {
         super::*,
         crate::worker::WorkerConfig,
@@ -1027,6 +1049,7 @@ mod tests {
     const EURC: &str = "0x89B50855Aa3bE2F677cD6303Cec089B5F319D72a";
     const POOL: &str = "0x2222222222222222222222222222222222222222";
     const XYK_FACTORY: &str = "0x3333333333333333333333333333333333333333";
+    const PRESTO_HUB: &str = "0x5794a8284A29493871Fbfa3c4f343D42001424D6";
 
     fn env_lock() -> &'static Mutex<()> {
         static LOCK: OnceLock<Mutex<()>> = OnceLock::new();
@@ -1197,6 +1220,7 @@ mod tests {
         assert!(FactoryConfig::parse("no-colon", true).is_err());
     }
 
+
     #[test]
     fn evm_config_from_env_reads_chakra_vars() {
         let _guard = env_lock().lock().unwrap();
@@ -1327,6 +1351,41 @@ mod tests {
         let watch = runner.compute_watch_addresses().await;
         assert!(watch.contains(&XYK_FACTORY.to_ascii_lowercase()));
         assert!(watch.contains(&POOL.to_ascii_lowercase()));
+    }
+
+    #[tokio::test]
+    async fn discovery_finds_presto_hub_pair_from_seeded_hub() {
+        let (url, _server) = spawn_fixture_rpc(move |method, _params| {
+            if method == "eth_getCode" {
+                return Ok(json!("0x60806040"));
+            }
+            Ok(json!(word(0)))
+        });
+        let client = EvmRpcClient::single(&url).unwrap();
+        let config = EvmConfig {
+            seed_factories: vec![FactoryConfig::parse(&format!("{PRESTO_HUB}:presto"), true).unwrap()],
+            ws_enabled: false,
+            ..Default::default()
+        };
+        let shared = Arc::new(RwLock::new(WorkerShared {
+            sources: Vec::new(),
+            clmm_pools: Vec::new(),
+        }));
+        let mut runner = EvmRunner::new(config, client, shared.clone(), None);
+        let found = runner.discover_once().await.unwrap();
+        assert!(found >= 1, "seeded Presto hub must yield >= 1 pool, got {found}");
+        let guard = shared.read().await;
+        let presto_source = guard
+            .sources
+            .iter()
+            .find(|s| s.source == "presto-hub")
+            .expect("presto-hub source in topology");
+        assert_eq!(presto_source.pairs.len(), 1);
+        let pair = &presto_source.pairs[0];
+        assert_eq!(pair.dex_type, "presto");
+        assert_eq!(pair.fee_bps, 30);
+        assert_eq!(pair.pool_address, PRESTO_HUB.to_ascii_lowercase());
+        assert_eq!(pair.factory, PRESTO_HUB.to_ascii_lowercase());
     }
 
     // ─── Poll path (SC-11 local) ─────────────────────────────────────

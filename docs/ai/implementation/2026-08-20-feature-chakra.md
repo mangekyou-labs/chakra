@@ -790,3 +790,11 @@ Resolved in code: StableSwap deposit accounting, production snapshot bootstrap/r
 ### Next
 
 `dev-execute` for the Majors above (or `dev-design` if product wants to drop Presto / keep `chakra-xyk` as the UnitFlow id). **Do not** run `dev-testing` or `dev-review` on this verdict.
+
+**Phase 6 (2026-08-30):** Planning reconciled. T2.1–T2.4 / T3.3 stay `[ ]` with partial/blocked notes. Leftover Execute queue is **T10.1–T10.6** in `docs/ai/planning/2026-08-20-feature-chakra.md`. Next invocation: `dev-implementation` at T10.1.
+
+### T10.1 Presto discovery into topology (Done 2026-08-30)
+- `crates/market-data-worker/src/evm_watcher.rs`: added `discover_once` `"presto"` arm restricted to USDC/EURC discovery over catalog pairs, publishing `presto-hub` pairs with `dex_type: "presto"` and pool address = hub address.
+- `crates/dex-adapters/src/evm_fetch.rs`: added `token_reserves_selector()`, `path_reserves_selector()`, and `fetch_presto_state()` querying `tokenReserves(spoke)` and `pathReserves(spoke)` on the hub with directional token mapping.
+- `crates/market-data-worker/src/fetch_pipeline.rs`: added `FetchTask::EvmPresto`, mapped `"presto-hub" | "discovered:presto"` in `coalesce_touched_into_tasks` to `FetchTask::EvmPresto`, implemented `execute_fetch_task` delegating to `fetch_presto_state()`, and updated `find_evm_pair` to support `"presto"`.
+- Tests: `discovery_finds_presto_hub_pair_from_seeded_hub`, `coalesce_maps_evm_chakra_sources_to_evm_tasks` with Presto, and `execute_fetch_task_hydrates_presto_pool_reserves_with_distinct_getters` asserting distinct `pathReserves`/`tokenReserves` getters and directional mapping. T2.3 remains partial pending live pool publication.

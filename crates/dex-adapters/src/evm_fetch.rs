@@ -96,6 +96,12 @@ pub fn get_pool_stable_selector() -> String {
 pub fn get_amplification_selector() -> String {
     function_selector_hex("getAmplificationParameter()")
 }
+pub fn token_reserves_selector() -> String {
+    function_selector_hex("tokenReserves(address)")
+}
+pub fn path_reserves_selector() -> String {
+    function_selector_hex("pathReserves(address)")
+}
 
 // ─── Hydrators ──────────────────────────────────────────────────────────────
 
@@ -190,6 +196,53 @@ pub async fn fetch_xylo_state(
         reserve0,
         reserve1,
         a,
+        pair.fee_bps,
+    );
+    value.factory = pair.factory.clone();
+    Ok(value)
+}
+
+/// Presto hub spoke state (2026-08-29): reads `tokenReserves(spoke)` and
+/// `pathReserves(spoke)` on the Presto hub contract (`pair.pool_address`).
+/// Reuses the `StablePoolStateValue` shape with A=1 marker and fee 30 bps.
+pub async fn fetch_presto_state(
+    client: &EvmRpcClient,
+    source: &str,
+    pair: &TradingPairSnapshot,
+) -> Result<StablePoolStateValue> {
+    const USDC_PATH: &str = "0x3600000000000000000000000000000000000000";
+    let (is_a_path, spoke_token) = if pair.token_a.eq_ignore_ascii_case(USDC_PATH) {
+        (true, &pair.token_b)
+    } else if pair.token_b.eq_ignore_ascii_case(USDC_PATH) {
+        (false, &pair.token_a)
+    } else {
+        bail!("Presto hub spoke requires USDC path token: token_a={}, token_b={}", pair.token_a, pair.token_b);
+    };
+
+    let spoke_arg = encode_address_arg(spoke_token)?;
+    let path_call = calldata(&path_reserves_selector(), &[spoke_arg.clone()]);
+    let token_call = calldata(&token_reserves_selector(), &[spoke_arg]);
+
+    let path_resp = client.eth_call(&pair.pool_address, &path_call).await?;
+    let token_resp = client.eth_call(&pair.pool_address, &token_call).await?;
+
+    let path_reserve = word_to_u128(&path_resp).context("decode pathReserves")?;
+    let token_reserve = word_to_u128(&token_resp).context("decode tokenReserves")?;
+
+    let (reserve_a, reserve_b) = if is_a_path {
+        (path_reserve, token_reserve)
+    } else {
+        (token_reserve, path_reserve)
+    };
+
+    let mut value = StablePoolStateValue::new(
+        source,
+        &pair.pool_address,
+        &pair.token_a,
+        &pair.token_b,
+        reserve_a,
+        reserve_b,
+        1,
         pair.fee_bps,
     );
     value.factory = pair.factory.clone();
