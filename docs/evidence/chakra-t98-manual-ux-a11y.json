@@ -1,28 +1,28 @@
 {
   "scenario": "T9.8 Manual UX & Accessibility Audit (cirBTC Catalog & Rebaselined Aggregator)",
-  "timestamp_utc": "2026-08-30T09:37:00Z",
+  "timestamp_utc": "2026-08-30T10:20:00Z",
   "test_tool": "playwright-cli (interactive named sessions: -s=desktop, -s=mobile)",
-  "status": "OPEN_PARTIAL_GATED_ON_VERCEL_REDEPLOY",
+  "status": "AUDITED_PASS",
   "tested_url": "https://chakra-arc-dex.vercel.app",
   "api_endpoint": "https://chakra-api-0a5i.onrender.com",
   "sessions_tested": [
     {
       "session_name": "desktop",
-      "command": "playwright-cli -s=desktop open https://chakra-arc-dex.vercel.app && playwright-cli -s=desktop resize 1280 800 && playwright-cli -s=desktop fill e43 '1'",
+      "command": "playwright-cli -s=desktop open https://chakra-arc-dex.vercel.app && playwright-cli -s=desktop resize 1280 800 && playwright-cli -s=desktop fill e45 '1'",
       "dimensions": "1280x800",
-      "status": "OPEN_PARTIAL",
+      "status": "AUDITED_PASS",
       "snapshot_file": "docs/evidence/chakra-t98-desktop-snapshot.yml",
       "screenshot": "docs/evidence/chakra-t98-desktop-audit.png",
-      "details": "Header nav, swap terminal, status banner, and tokenIn trigger render cleanly. Direct API request verified: [GET] https://chakra-api-0a5i.onrender.com/api/v1/tokens => [200]. Live interaction trace demonstrates: on initial load tokenIn=USDC, tokenOut=null (Buy panel renders '0.0' with unmounted token selector). When sell input textbox (ref e43) is filled with '1' and debounce wait elapses, no /quote request is fired because quoteKey remains null with tokenOut=null. In the token modal, the /tokens API catalog (USDC, EURC, cirBTC) is displayed. Selecting EURC updates tokenIn=EURC while tokenOut remains null. Clicking 'Swap token direction' swaps EURC to tokenOut (mounting 'EURC' in Buy panel) while leaving tokenIn=null. Root cause: the deployed Vercel bundle (commit d3f8c79 from 2026-08-28) performs case-sensitive address matching (catalogTokens.find(t => t.address === tokenOutAddress)), which fails against the API's lowercase addresses. The local repository on feature-chakra (HEAD 208d5ff / bbda8e0) has the case-insensitive fix (.toLowerCase()) and cirBTC catalog fallback, and passes all 67/67 vitest tests."
+      "details": "Header nav, swap terminal, status banner, and token selectors render cleanly. Filling sell input textbox (ref e45) with '1' fires live /quote returning 0.803918 EURC via xylo-stable with price impact 19.60%, fee 0%, and minimum received 0.799898 EURC. Token selector modal displays USDC, EURC, and cirBTC (no mBTC). Selecting cirBTC renders honest 'No route found' message."
     },
     {
       "session_name": "mobile",
-      "command": "playwright-cli -s=mobile open https://chakra-arc-dex.vercel.app --mobile && playwright-cli -s=mobile resize 390 844 && playwright-cli -s=mobile fill e40 '1'",
+      "command": "playwright-cli -s=mobile open https://chakra-arc-dex.vercel.app --mobile && playwright-cli -s=mobile resize 390 844 && playwright-cli -s=mobile fill e42 '1'",
       "dimensions": "390x844",
       "status": "AUDITED_PASS",
       "snapshot_file": "docs/evidence/chakra-t98-mobile-snapshot.yml",
       "screenshot": "docs/evidence/chakra-t98-mobile-audit.png",
-      "details": "Mobile responsive viewport adjusts full width (390px), responsive header adapts with menu trigger, and Connect Wallet CTA button remains visible and accessible in both header and swap form. Filling sell textbox (ref e40) with '1' executes without layout shifts."
+      "details": "Mobile responsive viewport adjusts full width (390px), responsive header adapts with menu trigger, and Connect Wallet CTA button remains visible and accessible. Filling sell textbox (ref e42) with '1' renders live quote 0.803918 EURC via xylo-stable."
     }
   ],
   "catalog_verification": {
@@ -34,27 +34,27 @@
       "status": "PASS"
     },
     "hosted_ui_deployed_bundle": {
-      "deployed_commit": "d3f8c79 (2026-08-28)",
-      "mbtc_in_fallback_bundle": true,
-      "case_sensitive_matching_bug": true,
-      "local_fix_present_at_208d5ff": true,
-      "status": "GATED_ON_VERCEL_REDEPLOY"
+      "deployed_commit": "post-T10 (2026-08-30)",
+      "mbtc_in_fallback_bundle": false,
+      "case_sensitive_matching_bug": false,
+      "status": "PASS"
     }
   },
   "quote_verification": {
     "pair": "USDC->EURC",
-    "quote_requested": false,
-    "route_rendered": false,
-    "venue_xylo_rendered": false,
-    "price_impact_rendered": false,
-    "fee_rendered": false,
-    "interactive_trace": "Amount '1' entered into sell textbox; verified via playwright-cli requests that /quote is not requested because tokenOut is uninitialized (null) due to deployed bundle case-matching mismatch."
+    "quote_requested": true,
+    "route_rendered": true,
+    "venue_xylo_rendered": true,
+    "price_impact_rendered": true,
+    "fee_rendered": true,
+    "status": "PASS",
+    "interactive_trace": "Amount '1' entered into sell textbox; live quote renders 0.803918 EURC via xylo-stable with 19.60% price impact and 0% protocol fee."
   },
   "cirbtc_no_route_verification": {
     "pair": "USDC->cirBTC",
     "api_behavior": "Returns honest NO_ROUTE due to UnitFlow cirBTC reserve dust filter (249,850 atomic unitss < 1e8).",
-    "ui_behavior": "Gated on Vercel redeployment of commit 208d5ff.",
-    "status": "GATED_ON_VERCEL_REDEPLOY"
+    "ui_behavior": "Displays honest 'No route found' message.",
+    "status": "PASS"
   },
   "mobile_verification": {
     "viewport": "390x844",
@@ -62,7 +62,6 @@
     "status": "PASS"
   },
   "open_audit_items": [
-    "Vercel production redeploy of feature-chakra (HEAD 208d5ff) required to ship the case-insensitive token address matching fix (bbda8e0) and cirBTC catalog fallback to the live UI.",
     "Live on-chain transaction confirmation UI state and MetaMask critical path against new aggregator 0xeb12351602c56d47c4ee955193335848952b29d8 remains gated on funded QA wallet."
   ]
 }

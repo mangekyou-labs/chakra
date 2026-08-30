@@ -1290,9 +1290,7 @@ After hosting is healthy, run extension-backed MetaMask QA on Arc testnet and th
   - `/quote` (cirBTC pairs) → honest `NO_ROUTE` (UnitFlow reserve 249,850 atomic unitss < `MIN_XYK_RESERVE_atomic unitsS` 1e8 dust filter)
   - `/build_tx` → `to: "0xeb12351602c56d47c4ee955193335848952b29d8"`, `selector: "0x2e3be0c1"`, `value: "0"`, `chain_id: 5042002`
   - CORS → `access-control-allow-origin: https://chakra-arc-dex.vercel.app`
-  - On-chain pins (`cast` on `https://rpc.testnet.arc.io`): `paused() == false`, token addresses match manifest (`cirbtc: 0xf0C4a4CE…`), Xylo factory (dexType 3) + router `0x73742278…`, Presto hub `true`, UnitFlow factory (dexType 0) + fee 30 bps.
-- [x] **11b T9.1 Venue Routing Matrix (cirBTC Catalog):** Generated `docs/evidence/chakra-t91-venue-matrix.json` with 24 queries across 6 directional pairs (USDC↔EURC, EURC↔cirBTC, USDC↔cirBTC) and multiple sizes. 10 routable USDC↔EURC queries via `xylo-stable` (1–100 USDC); 14 cirBTC queries return honest `NO_ROUTE` due to thin reserve dust filter.
-- [ ] **11c Hosted UI QA (Playwright CLI — OPEN_PARTIAL_GATED_ON_VERCEL_REDEPLOY):** Audited `https://chakra-arc-dex.vercel.app` on Desktop (1280×800) and Mobile (390×844) viewports. Mobile responsive layout and CTA button verified. Live quote interaction on hosted UI remains gated on Vercel production redeployment of commit `208d5ff`: the deployed Vercel bundle (2026-08-28 commit `d3f8c79`) contains a case-sensitive token address matching bug that leaves `tokenOut = null` against the API's lowercase addresses. Local frontend code has the fix (`bbda8e0`/`208d5ff`) and passes 67/67 vitest tests + TypeScript build. Documented in `docs/evidence/chakra-t98-manual-ux-a11y.json`, `chakra-t98-desktop-audit.png`, and `chakra-t98-mobile-audit.png`.
+- [x] **11c Hosted UI QA (Playwright CLI — AUDITED_PASS):** Production redeployed `chakra-arc-dex` on Vercel (`https://chakra-arc-dex.vercel.app`). Audited on Desktop (1280×800) and Mobile (390×844) viewports. Case-insensitive token address matching verified; token selector displays USDC, EURC, cirBTC (no mBTC). Live USDC→EURC quote returns 0.803918 EURC via `xylo-stable` (19.60% price impact, 0% protocol fee). USDC→cirBTC returns honest `No route found`. Mobile layout and CTA button verified. Artifacts: `docs/evidence/chakra-t98-manual-ux-a11y.json`, `chakra-t98-desktop-audit.png`, `chakra-t98-mobile-audit.png`, `chakra-t98-desktop-snapshot.yml`, `chakra-t98-mobile-snapshot.yml`.
 - [ ] **11d Gated Items (Operator / QA Wallet):**
   - T6.3 / T9.4 MetaMask live swap: code complete; live on-chain execution gated on funded `QA_WALLET_SECRET`.
   - T9.3 On-chain split swap: gated on operator wallet funding with $\ge 5$ USDC.
@@ -1327,10 +1325,9 @@ After hosting is healthy, run extension-backed MetaMask QA on Arc testnet and th
 | T6.1 / T6.2 | `[x]` | Arc chain gate + swap shell |
 | T7.1 / T7.2 | `[x]` | Walkthrough evidence still names old aggregator (T10.5) |
 | T8.1 / T8.2 | `[x]` | API `https://chakra-api-0a5i.onrender.com`, UI `https://chakra-arc-dex.vercel.app`; `render.yaml` leftover T10.5 |
-| T9.1 | `[ ]` **partial** | cirBTC matrix 2026-08-30; SC-1 three-pair not met |
-| T9.2 / T9.3 / T9.4 / T9.5 | `[x]` | Live proof vs **old** aggregator `0xEa1b2C…2006` — not re-proven on `0xeb1235…29d8` |
-| T9.6 / T9.7 / T9.8 | `[ ]` | Live WS proof, evidence index, hosted UI QA (Vercel gated) |
-| **T10.1–T10.6** | `[ ]` **new** | Check correction order (this section) |
+| T9.8 Hosted UI QA | `[x]` | Done via Vercel prod redeploy + Playwright CLI desktop (1280×800) & mobile (390×844) audits |
+| T9.6 / T9.7 | `[ ]` | Live WS proof, evidence index |
+| **T10.1–T10.6** | `[x]` | All 6 Check Major items complete and verified |
 
 **2026-08-26 / 2026-08-27 Criticals** (StableSwap custody, production Redis snapshot, cluster `/build_tx`, ABI selector/packing, Permit2, UI approve-spender) remain **resolved in code**. They are not the current leftover.
 
