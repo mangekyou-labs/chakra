@@ -23,6 +23,7 @@ import {Aggregator} from "../src/Aggregator.sol";
 ///        CHAKRA_UNITFLOW_FACTORY   UnitFlow V2.5 factory (Xyk, 30 bps)
 contract DeployAggregator is Script {
     function run() external {
+        require(block.chainid == 5042002, "DeployAggregator: chain must be Arc testnet (5042002)");
         address permit2 =
             vm.envOr("CHAKRA_PERMIT2", address(0x000000000022D473030F116dDEE9F6B43aC78BA3));
         address usdc =

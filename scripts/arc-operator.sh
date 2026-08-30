@@ -20,6 +20,27 @@ case "$mode" in
   *) usage ;;
 esac
 
+# ─── Script Allowlist ────────────────────────────────────────────────────────
+# Only DeployAggregator.s.sol is permitted for Arc testnet operator workflow (5042002).
+# All other scripts (Deploy.s.sol, Seed.s.sol, DeployMockBtc.s.sol, etc.) are chain-31337 local fixtures.
+script_target=""
+prev=""
+for arg in "$@"; do
+  if [[ "$prev" == "script" ]]; then
+    script_target="$arg"
+    break
+  elif [[ "$arg" == *.s.sol* || "$arg" == *Deploy* || "$arg" == *Seed* || "$arg" == *Fund* ]]; then
+    script_target="$arg"
+  fi
+  prev="$arg"
+done
+
+script_filename="$(basename "${script_target:-}" | cut -d: -f1)"
+if [[ "$script_filename" != "DeployAggregator.s.sol" ]]; then
+  echo "Error: scripts/arc-operator.sh allows ONLY DeployAggregator.s.sol on Arc testnet (5042002). Target was: '$script_target'" >&2
+  exit 1
+fi
+
 [[ -f "$wallet_file" ]] || {
   echo "Arc wallet not found: $wallet_file" >&2
   exit 1

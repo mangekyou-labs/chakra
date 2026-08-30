@@ -27,7 +27,7 @@ contract Deploy is Script, VendorDeployer {
     uint256 internal constant V3_FACTORY_CODE_SIZE = 3219; // UniswapV3 bytecode
 
     function run() external {
-        require(block.chainid == CHAKRA_CHAIN_ID, "Deploy: chain must be Arc testnet (5042002)");
+        require(block.chainid == 31337, "Deploy: fixture script forbidden on Arc testnet (chain must be 31337)");
 
         console.log("=== Arc Testnet Deploy (rerun-aware) ===");
         console.log("Chain ID:", block.chainid);

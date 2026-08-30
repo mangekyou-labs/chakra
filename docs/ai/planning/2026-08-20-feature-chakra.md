@@ -343,11 +343,11 @@ Phase 7 Check verdict: **not aligned** with the 2026-08-29 curated rebaseline. L
   **Deps:** T3.3.
   **Validation:** Fixture that fails each check independently is skipped; bytecode-only is not sufficient.
   **Done 2026-08-30:** `discover_once` enforces: (1) factory & pool bytecode, (2) canonical token endpoints (`token0`/`token1` for XYK/Stable/Xylo/CLMM, `pathUSD` for Presto), (3) factory membership (`getPair`/`getPool`), (4) nonzero reserves, (5) probe quote. Seed factories only enter `verified_factories` if $\ge 1$ pool passes all checks. Verified with 7 fixture tests in `evm_watcher.rs`.
-- [ ] **T10.4** Operator script allowlist + fixture chain
+- [x] **T10.4** Operator script allowlist + fixture chain
   **Outcome:** `scripts/arc-operator.sh` allowlists `DeployAggregator.s.sol` only on chain `5042002`. `Deploy.s.sol` / `Seed.s.sol` / `DeployMockBtc.s.sol` `require` chain `31337` (or refuse 5042002). Docs-only “FIXTURE-ONLY” is not sufficient.
   **Deps:** T5.2.
   **Validation:** dry-run of a fixture script on 5042002 fails closed; aggregator deploy path still works.
-  **Tests:** script-level or Foundry chain-id require.
+  **Done 2026-08-30:** `scripts/arc-operator.sh` enforces allowlist allowing ONLY `DeployAggregator.s.sol`. `DeployAggregator.s.sol` enforces `require(block.chainid == 5042002)`. `Deploy.s.sol`, `Seed.s.sol`, `DeployMockBtc.s.sol`, `DeployXyk.s.sol`, `DeployStable.s.sol`, and `DeployClmm.s.sol` enforce `require(block.chainid == 31337)`. Verified with `scripts/test-arc-operator.sh` (8/8 disallowed scripts rejected with exit 1 and 0 forge calls; `DeployAggregator.s.sol` allowed and invoked forge).
 
 - [ ] **T10.5** Public docs + `render.yaml` + OpenAPI + evidence pack
   **Outcome:** `README.md` and `docs/integrator-guide.md` drop mBTC from the catalog; `render.yaml` pins `0xeb12351602c56d47c4ee955193335848952b29d8`; OpenAPI quote examples use `xylo-stable`; evidence pack T7.2 / T9.1–T9.5 / `docs/evidence/README.md` re-pin cirBTC + new aggregator. Deployment-doc header matches the hosted cutover (current is not “pre-rebaseline revision”).

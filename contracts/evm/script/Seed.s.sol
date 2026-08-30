@@ -61,7 +61,7 @@ contract Seed is Script, VendorDeployer {
     int24 internal constant FULL_RANGE_UPPER = 887220;
 
     function run() external {
-        require(block.chainid == CHAKRA_CHAIN_ID, "Seed: chain must be Arc testnet (5042002)");
+        require(block.chainid == 31337, "Seed: fixture script forbidden on Arc testnet (chain must be 31337)");
 
         console.log("=== Arc Testnet Seed (rerun-aware) ===");
 

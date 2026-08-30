@@ -12,6 +12,7 @@ import {VendorDeployer} from "../src/VendorDeployer.sol";
 ///      Do not broadcast without PRIVATE_KEY in gitignored env.
 contract DeployXyk is Script, VendorDeployer {
     function run() external {
+        require(block.chainid == 31337, "DeployXyk: fixture script forbidden on Arc testnet (chain must be 31337)");
         vm.startBroadcast();
         address factoryAddr =
             _deployFromHexFileWithArgs("bytecodes/v2-factory.hex", abi.encode(address(0)));

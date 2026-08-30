@@ -11,6 +11,7 @@ import {MockBtc} from "../src/MockBtc.sol";
 /// Use FOUNDRY_ETH_RPC_URL + a keystore / env loaded from gitignored .env.
 contract DeployMockBtc is Script {
     function run() external {
+        require(block.chainid == 31337, "DeployMockBtc: fixture script forbidden on Arc testnet (chain must be 31337)");
         vm.startBroadcast();
         MockBtc token = new MockBtc();
         vm.stopBroadcast();

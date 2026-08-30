@@ -12,6 +12,7 @@ import {VendorDeployer} from "../src/VendorDeployer.sol";
 ///      Do not broadcast without PRIVATE_KEY in gitignored env.
 contract DeployClmm is Script, VendorDeployer {
     function run() external {
+        require(block.chainid == 31337, "DeployClmm: fixture script forbidden on Arc testnet (chain must be 31337)");
         vm.startBroadcast();
         address factoryAddr = _deployFromHexFile("bytecodes/v3-factory.hex");
         vm.stopBroadcast();

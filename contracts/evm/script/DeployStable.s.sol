@@ -11,6 +11,7 @@ import {StableSwapFactory} from "../src/stable/StableSwapFactory.sol";
 ///      Do not broadcast without PRIVATE_KEY in gitignored env.
 contract DeployStable is Script {
     function run() external {
+        require(block.chainid == 31337, "DeployStable: fixture script forbidden on Arc testnet (chain must be 31337)");
         vm.startBroadcast();
         StableSwapFactory factory = new StableSwapFactory();
         vm.stopBroadcast();
