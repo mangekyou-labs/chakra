@@ -1,34 +1,28 @@
 # Summary
 
-## Overview
+## Product
 
-- [Welcome](README.md)
-- [Architecture](pool-state-architecture.md)
+- [Documentation home](README.md)
+- [Pool-state architecture](pool-state-architecture.md)
+- [Arc Testnet manifest](arc-testnet-manifest.json)
 
 ## Integrate
 
-- [Integrator Guide](integrator-guide.md)
-- [JavaScript / TypeScript Example](javascript-integration-example.md)
-- [API Reference](api-reference.md)
+- [Integrator guide](integrator-guide.md)
+- [API reference](api-reference.md)
+- [OpenAPI](openapi.yaml)
 
-## Deploy
+## Deploy and operate
 
-- [Deployment Overview](deployment-overview.md)
-- [Self-hosted Aggregator Quickstart](self-hosted-aggregator-quickstart.md)
-- [Chakra Swap API](Chakra-swap-api.md)
-- [Production Aggregator](aggregator-deployment.md)
-  - [Configuration Reference](aggregator-configuration.md)
-- [Arbitrage](arbitrage-deployment.md)
-  - [Arbitrage Configuration](arbitrage-configuration.md)
+- [Deployment overview](deployment-overview.md)
+- [Self-hosted quickstart](self-hosted-aggregator-quickstart.md)
+- [QA runbook](qa-playwright-metamask.md)
+- [Evidence index](evidence/README.md)
 
-## On-chain Products
+## T11 records
 
-- [Deploy Smart Contracts](contracts-deployment.md)
-- [Round-trip Arbitrage](round-trip-arb.md)
-- [Limit Orders on Testnet](limit-orders-testnet.md)
-- [Limit/DCA Keeper](limit-dca-keeper.md)
-
-## Analytics
-
-- [Analytics Indexer](analytics-indexer.md)
-- [DefiLlama Listing](defillama.md)
+- [Requirements](ai/requirements/2026-08-31-t11-chakra-arc-only-cleanup.md)
+- [Design](ai/design/2026-08-31-t11-chakra-arc-only-cleanup.md)
+- [Implementation](ai/implementation/2026-08-31-t11-chakra-arc-only-cleanup.md)
+- [Testing](ai/testing/2026-08-31-t11-chakra-arc-only-cleanup.md)
+- [Deployment](ai/deployment/2026-08-31-t11-chakra-arc-only-cleanup.md)

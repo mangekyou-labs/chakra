@@ -58,7 +58,7 @@ DEX type by splitting the `source` string:
   length == `pool_addresses`. Extensible: new venues are added without
   changing the schema.
 - `hop_fees[]` — per-hop venue fee in bps (stable/xylo 4, xyk/clmm 30, …).
-- `hop_factories[]` — per-hop allowlisted factory (`""` = legacy pool).
+- `hop_factories[]` — per-hop allowlisted factory (empty when unstamped).
 
 `/build_tx` validates each submitted step's token pair, DEX type, factory, and
 fee against the snapshot; mismatches return `ROUTE_INVALID`.

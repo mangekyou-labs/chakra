@@ -59,7 +59,9 @@ cd packages/sdk && npm test
 
 ## Deployment
 
-See [`docs/ai/deployment/2026-08-20-feature-chakra.md`](docs/ai/deployment/2026-08-20-feature-chakra.md) for the full rollout runbook.
+See [`docs/deployment-overview.md`](docs/deployment-overview.md) and the
+[T11 deployment record](docs/ai/deployment/2026-08-31-t11-chakra-arc-only-cleanup.md)
+for the rollout runbook.
 
 ### Contract addresses (Arc testnet)
 

@@ -20,23 +20,14 @@ packages/sdk/node_modules/
 # Local data
 data/
 
-# Arc-origin leftovers that must never be COPYed into the image
-crates/Chakra-config/
-crates/Chakra-alerts/
-crates/Chakra-swap-api/
-crates/arbitrage/
-crates/analytics-indexer/
-contracts/
-deploy/
-deploy.sh
-deploy_arb.sh
-deploy_indexer.sh
-deploy_limit_testnet_server.sh
-deploy_server.sh
-deploy_site.sh
-docker-compose.selfhost.yml
+# Local-only material outside the active Arc services
+contracts/aggregator/
+contracts/order-escrow/
+contracts/shared-types/
+contracts/vault/
 integrations/
 packaging/
-scripts/
 thirdparty/
-docs/
+docs/assets/
+docs/evidence/d2-integrator-smoke/
+docs/evidence/d7-reference-sdk/

@@ -1,55 +1,34 @@
-# Chakra Evidence Pack Index
+# Chakra evidence index
 
-Master evidence catalog for the **Chakra Arc Testnet DEX Aggregator** (Feature `chakra`).
-This document indexes all 13 Success Criteria (SC-1 through SC-13), public hosted endpoints, on-chain contract deployments, and generated evidence artifacts.
+This directory contains release evidence for the Chakra Arc Testnet
+aggregator. Fresh command output and hosted checks are recorded in the T11
+testing and deployment records.
 
-## Live Deployment Coordinates
+## Coordinates
 
-| Component | Target / Coordinate | Status |
-|-----------|---------------------|--------|
-| **Network** | Arc Testnet (`chainId` `5042002` / `0x4CEF52`) | Active |
-| **Explorer** | `https://testnet.arcscan.app` | Active |
-| **Aggregator Contract** | `0xeb12351602c56d47c4ee955193335848952b29d8` (Rebaselined 2026-08-29; rollback `0xEa1b2C24bd41163590960F8e40afe6cb4CC92006` retained) | Live on-chain |
-| **Permit2** | `0x000000000022D473030F116dDEE9F6B43aC78BA3` | Active Predeploy |
-| **Public API** | `https://chakra-api-0a5i.onrender.com` | Live (Render Docker, deploy `dep-da9be2gn74is73fhn0e0` / commit `208d5ff`) |
-| **Public Web UI** | `https://chakra-arc-dex.vercel.app` | Live (Vercel Production `chakra-arc-dex`, redeployed & verified) |
-| **Curated Catalog** | USDC (6 dp) / EURC (6 dp) / cirBTC (8 dp) | Rebaselined |
+| Component | Coordinate |
+| --- | --- |
+| Network | Arc Testnet, chain ID `5042002` |
+| Explorer | `https://testnet.arcscan.app` |
+| Aggregator | `0xeb12351602c56d47c4ee955193335848952b29d8` |
+| Permit2 | `0x000000000022D473030F116dDEE9F6B43aC78BA3` |
+| API | `https://chakra-api-0a5i.onrender.com` |
+| Web | `https://chakra-arc-dex.vercel.app` |
 
-## Success Criteria Mapping & Evidence
+## Required evidence
 
-| SC ID | Requirement | Evidence Artifact / Verification Path | Status |
-|---|---|---|---|
-| **SC-1** | Multi-venue route discovery across catalog (USDC, EURC, cirBTC) | `crates/router-engine` unit tests (48/48 green); live USDC↔EURC across `xylo-stable`. UnitFlow EURC/cirBTC returns honest `NO_ROUTE` due to 249,850 atomic unitss < `MIN_XYK_RESERVE_atomic unitsS` (1e8) dust filter | **PASS** |
-| **SC-2** | Split optimizer produces `is_split=true` where split beats single venue | `docs/evidence/chakra-t92-split-benchmark.json` (5e6 USDC→EURC yields +893.01 bps over best single path; historical live proof on `0xEa1b2C…2006`) | **PASS** |
-| **SC-3** | UI critical path (connect, switch Arc, quote legs/impact/fee=0, Permit2, swap) | `docs/evidence/chakra-t98-manual-ux-a11y.json`; **live 2026-08-28** — MetaMask UI swap tx `0xa630da3c842d7613ebbbd4d8f66749892a4e42c510933e0e1c3f4966907ef0dd` (historical proof on `0xEa1b2C…2006`); post-cutover UI QA verified via Playwright CLI (`status: AUDITED_PASS`) | **PASS (Historical Live) / PASS (Post-cutover UI)** |
-| **SC-4** | On-chain atomic split swap (≥2 sub-routes in 1 tx) on Arcscan | **LIVE 2026-08-28** — tx `0x42e85916ade38b87ef0440ef71d8f3330075ecf2a481247dc2ac33376b287fa8` (historical proof on `0xEa1b2C…2006`); on-chain split on new aggregator `0xeb1235…29d8` gated on funded operator wallet | **PASS (Historical Live)** |
-| **SC-5** | Public hosted UI, `/health`, `/ready`, `/quote`, `/build_tx` | `https://chakra-arc-dex.vercel.app` & `https://chakra-api-0a5i.onrender.com` (targeting new aggregator `0xeb12351602c56d47c4ee955193335848952b29d8`) | **PASS** |
-| **SC-6** | TypeScript SDK quote + `build_tx` example | `packages/sdk/examples/quote-build.ts` & `docs/evidence/chakra-t72-walkthrough.json` | **PASS** |
-| **SC-7** | Playwright CLI MetaMask test on Arc testnet | `docs/qa-playwright-metamask.md` & `packages/frontend/qa/wallet/swap-critical-path.spec.ts` — **LIVE PASS 2026-08-30** (`swap-critical-path` exit 0 on aggregator `0xeb12351602c56d47c4ee955193335848952b29d8` via configured `QA_WALLET_SECRET`; 1.0 USDC → 0.803878 EURC via `xylo-stable`) | **PASS (Live On-Chain)** |
-| **SC-8** | Venue comparison matrix (≥3 pairs × ≥3 sizes) & split benchmark | `docs/evidence/chakra-t91-venue-matrix.json` (24 queries across 6 directional pairs on cirBTC catalog; USDC↔EURC routable across multiple sizes, cirBTC pairs honest `NO_ROUTE` from dust filter) & `docs/evidence/chakra-t92-split-benchmark.json` | **OPEN / PARTIAL (USDC↔EURC routable; cirBTC thin reserves)** |
-| **SC-9** | Integrator 30-minute walkthrough | `docs/integrator-guide.md` & `docs/evidence/chakra-t72-walkthrough.json` (executed in 6 seconds) | **PASS** |
-| **SC-10**| Quote latency p95 < 500 ms at API process | `docs/evidence/chakra-t95-quote-latency.json` (server p95 = 23 ms across 100 samples on deployed commit `d3f8c79`) | **PASS** |
-| **SC-11**| Worker cache refresh latency ≤ 5 s after swap inclusion | `crates/market-data-worker/src/evm_watcher.rs` test `poll_refreshes_pool_store_after_fixture_swap_within_5s`; `docs/evidence/chakra-t96-ws-refresh.json` documents live quote attribution vector on `0xeb1235…29d8` after T9.4 swap (`expected_output` shifted by -38 atomic units to 803880) | **PASS (Local < 5s Gate / Live Quote Delta Attributed)** |
-| **SC-12**| Dual USDC accounting (ERC-20 6 dp swap, native 18 dp gas, MAX buffer, value=0) | `crates/market-snapshot/src/decimals.rs`, `Aggregator.sol` (`msg.value == 0`), Frontend formatters | **PASS** |
-| **SC-13**| Zero protocol fee in quote breakdown and calldata | `protocol_fee_bps: 0` enforced across API, RouterEngine, and Aggregator calldata | **PASS** |
+- Rust workspace format, tests, lint, release build, Docker build, and EVM
+  contract tests.
+- SDK unit/build/package checks and clean-project registry installation.
+- Frontend unit, type, lint, format, production build, contrast, link, theme,
+  and split-ring regression checks.
+- Hosted API health, readiness, token catalog, quote, and transaction-builder
+  checks.
+- Vercel alias, CORS, metadata, responsive browser review, and the wallet
+  quote → approval/signature → submit → confirmation path.
 
-## Artifact Index
+## Honest follow-up
 
-1. **`docs/evidence/chakra-t72-walkthrough.json`**: Clean-clone SDK walkthrough output against hosted API (6 s execution).
-2. **`docs/evidence/chakra-t91-venue-matrix.json`**: 24-query route matrix across 6 directional pairs (USDC↔EURC, EURC↔cirBTC, USDC↔cirBTC) and multiple sizes on the rebaselined cirBTC catalog, documenting live USDC↔EURC routing via `xylo-stable` and honest `NO_ROUTE` for thin cirBTC reserves.
-3. **`docs/evidence/chakra-t92-split-benchmark.json`**: Split vs single-path optimization benchmark demonstrating +893.01 bps gain (+383,687 atomic units / ~+0.383687 EURC; historical proof on `0xEa1b2C…2006`).
-4. **`docs/evidence/chakra-t95-quote-latency.json`**: 100-sample latency benchmark demonstrating 23 ms p95 server-side API compute time.
-5. **`docs/evidence/chakra-t98-manual-ux-a11y.json`**: Desktop (1280×800) and mobile (390×844) UI audit (`status: AUDITED_PASS`).
-6. **`docs/qa-playwright-metamask.md`**: Technical specification and operational guide for the automated dAppwright MetaMask E2E testing harness on Arc testnet.
-7. **`docs/evidence/chakra-t98-desktop-audit.png`**: Desktop (1280×800) rendered UI audit screenshot.
-8. **`docs/evidence/chakra-t98-mobile-audit.png`**: Mobile (390×844) responsive rendered UI audit screenshot.
-9. **`docs/evidence/chakra-t98-desktop-snapshot.yml`**: Desktop (1280×800) Playwright CLI accessibility tree snapshot artifact.
-10. **`docs/evidence/chakra-t98-mobile-snapshot.yml`**: Mobile (390×844) Playwright CLI accessibility tree snapshot artifact.
-11. **`docs/evidence/chakra-t96-ws-refresh.json`**: Worker cache refresh and live quote attribution vector after T9.4 on-chain swap inclusion on `0xeb1235…29d8`.
-
-## Concrete External Blockers
-
-- **T6.3 / T9.4 (Live MetaMask E2E Swap on 0xeb1235…29d8):** **COMPLETE & VERIFIED LIVE (2026-08-30)** — Executed `npm run qa:wallet` with configured `QA_WALLET_SECRET` (`swap-critical-path.spec.ts` passed in 42.4s; on-chain confirmation verified).
-- **T9.3 (On-Chain Split Swap on 0xeb1235…29d8):** Requires operator wallet with $\ge 5$ USDC to broadcast a split swap transaction to the rebaselined aggregator.
-- **T9.8 / UI Vercel Redeployment:** Deployed to Vercel production (`chakra-arc-dex`) and verified with Playwright CLI desktop and mobile audits (`AUDITED_PASS`). Case-insensitive token address matching and cirBTC catalog verified live.
-- **T2.1–T2.4 (Pool Deepening):** UnitFlow cirBTC reserves hold 249,850 atomic unitss (< `MIN_XYK_RESERVE_atomic unitsS` 1e8), returning honest `NO_ROUTE`. Deepening requires testnet faucet liquidity.
+The healthy 1 USDC to EURC route is the production critical path. Split-route
+proof and thin cirBTC liquidity remain follow-up evidence until multiple
+healthy routes exist; no artificial liquidity is created for testing.
