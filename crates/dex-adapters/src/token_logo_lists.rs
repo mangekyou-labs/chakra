@@ -1,7 +1,6 @@
 //! Token logo index: contract address → official icon URL.
 //!
-//! Arc EVM catalog only (Arc SAC lists removed). Sources (merged in
-//! priority order):
+//! Arc EVM catalog only. Sources (merged in priority order):
 //! 1. Arc overrides verified against the frozen catalog addresses
 //! 2. Remote token lists (configurable via `TOKEN_LOGO_LIST_URLS`)
 
@@ -37,21 +36,20 @@ const VERIFIED_LOGO_OVERRIDES: &[(&str, &str)] = &[
 const IPFS_GATEWAY: &str = "https://ipfs.io/ipfs/";
 
 #[derive(Debug, Deserialize)]
-struct Sep42List {
+struct TokenList {
     #[serde(default)]
-    assets: Vec<Sep42Asset>,
+    assets: Vec<TokenListAsset>,
 }
 
 #[derive(Debug, Deserialize)]
-pub(crate) struct Sep42Asset {
+pub(crate) struct TokenListAsset {
     #[serde(default)]
     contract: Option<String>,
     #[serde(default)]
     icon: Option<String>,
 }
 
-/// In-memory map of contract StrKey → HTTPS icon URL.
-#[derive(Clone, Default)]
+/// In-memory map of contract address → HTTPS icon URL.
 pub struct TokenLogoListIndex {
     pub(crate) icons: Arc<RwLock<HashMap<String, String>>>,
     client: reqwest::Client,
@@ -77,7 +75,7 @@ impl TokenLogoListIndex {
     pub fn new(list_urls: Vec<String>) -> Self {
         let client = reqwest::Client::builder()
             .timeout(Duration::from_secs(20))
-            .user_agent("Chakra-token-logo-lists/0.1")
+            .user_agent("chakra-token-logo-lists/0.1")
             .build()
             .expect("reqwest client");
         Self {
@@ -87,13 +85,16 @@ impl TokenLogoListIndex {
         }
     }
 
-    /// Look up an official icon URL by contract StrKey (`C...`).
+    /// Look up an official icon URL by contract address.
     pub async fn icon_url(&self, contract: &str) -> Option<String> {
         self.icons.read().await.get(contract).cloned()
     }
-
     pub async fn len(&self) -> usize {
         self.icons.read().await.len()
+    }
+
+    pub async fn is_empty(&self) -> bool {
+        self.len().await == 0
     }
 
     /// Fetch all configured lists and merge into the index.
@@ -120,10 +121,10 @@ impl TokenLogoListIndex {
                         merged.insert(contract, icon);
                         added += 1;
                     }
-                    info!(url = %url, added, total = merged.len(), "Loaded SEP-42 logo list");
+                    info!(url = %url, added, total = merged.len(), "Loaded token logo list");
                 }
                 Err(e) => {
-                    warn!(url = %url, error = %e, "Failed to load SEP-42 logo list");
+                    warn!(url = %url, error = %e, "Failed to load token logo list");
                 }
             }
         }
@@ -137,13 +138,13 @@ impl TokenLogoListIndex {
         if !response.status().is_success() {
             anyhow::bail!("HTTP {}", response.status());
         }
-        let list: Sep42List = response.json().await?;
-        Ok(parse_sep42_assets(&list.assets))
+        let list: TokenList = response.json().await?;
+        Ok(parse_token_list_assets(&list.assets))
     }
 }
 
-/// Parse SEP-42 assets into `(contract_strkey, https_icon_url)` pairs.
-pub(crate) fn parse_sep42_assets(assets: &[Sep42Asset]) -> Vec<(String, String)> {
+/// Parse token list assets into `(contract_address, https_icon_url)` pairs.
+pub(crate) fn parse_token_list_assets(assets: &[TokenListAsset]) -> Vec<(String, String)> {
     let mut out = Vec::new();
     for asset in assets {
         let Some(contract_raw) = asset.contract.as_deref() else {
@@ -164,8 +165,7 @@ pub(crate) fn parse_sep42_assets(assets: &[Sep42Asset]) -> Vec<(String, String)>
 }
 
 /// Accept a 40-char EVM address (with or without `0x`) or a 64-char hex
-/// contract hash; return `0x`-prefixed lowercase. Arc StrKeys are not Arc
-/// contract ids.
+/// contract hash; return `0x`-prefixed lowercase.
 pub fn normalize_contract_id(raw: &str) -> Option<String> {
     let s = raw.trim();
     let hex = s.strip_prefix("0x").unwrap_or(s);
@@ -240,23 +240,23 @@ mod tests {
     }
 
     #[test]
-    fn parse_sep42_assets_skips_incomplete_entries() {
+    fn parse_token_list_assets_skips_incomplete_entries() {
         let usdc_hex = "3600000000000000000000000000000000000000000000000000000000000000";
         let assets = vec![
-            Sep42Asset {
+            TokenListAsset {
                 contract: Some(usdc_hex.into()),
                 icon: Some("https://example.com/usdc.png".into()),
             },
-            Sep42Asset {
+            TokenListAsset {
                 contract: Some(usdc_hex.into()),
                 icon: None,
             },
-            Sep42Asset {
+            TokenListAsset {
                 contract: None,
                 icon: Some("https://example.com/x.png".into()),
             },
         ];
-        let parsed = parse_sep42_assets(&assets);
+        let parsed = parse_token_list_assets(&assets);
         assert_eq!(parsed.len(), 1);
         assert_eq!(parsed[0].1, "https://example.com/usdc.png");
     }
@@ -276,10 +276,19 @@ mod tests {
         let index = TokenLogoListIndex::new(vec![]);
         {
             let mut icons = index.icons.write().await;
-            icons.insert("CA".into(), "https://first/a.png".into());
+            icons.insert(
+                "0x1111111111111111111111111111111111111111".into(),
+                "https://first/a.png".into(),
+            );
         }
         // Simulate second list would not overwrite — covered by refresh loop.
-        assert_eq!(index.icon_url("CA").await.as_deref(), Some("https://first/a.png"));
+        assert_eq!(
+            index
+                .icon_url("0x1111111111111111111111111111111111111111")
+                .await
+                .as_deref(),
+            Some("https://first/a.png")
+        );
         assert_eq!(index.len().await, 1);
     }
 }

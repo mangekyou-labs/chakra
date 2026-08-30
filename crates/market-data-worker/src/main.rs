@@ -10,8 +10,7 @@ fn print_help() {
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    let mut args = std::env::args().skip(1);
-    while let Some(arg) = args.next() {
+    if let Some(arg) = std::env::args().nth(1) {
         match arg.as_str() {
             "-h" | "--help" => {
                 print_help();

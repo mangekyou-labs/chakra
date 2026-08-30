@@ -20,6 +20,7 @@ pub struct ClmmCoverageMetricsSnapshot {
 }
 
 impl ClmmCoverageMetrics {
+    #[cfg(test)]
     pub fn new() -> Self {
         Self::default()
     }
@@ -55,7 +56,7 @@ mod tests {
 
     fn sample_pool(complete: bool) -> ClmmPoolSnapshot {
         ClmmPoolSnapshot {
-            source: "sushi".to_string(),
+            source: "chakra-clmm".to_string(),
             pool_address: "pool-1".to_string(),
             token0: "a".to_string(),
             token1: "b".to_string(),

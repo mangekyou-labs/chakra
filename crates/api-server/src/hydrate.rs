@@ -11,6 +11,7 @@ use {
     std::collections::HashSet,
 };
 
+#[allow(clippy::type_complexity)]
 fn collect_pool_refs(paths: &[Path]) -> (Vec<(String, String)>, Vec<(String, String)>, Vec<(String, String)>) {
     let mut xyk = HashSet::new();
     let mut stable = HashSet::new();
@@ -79,6 +80,5 @@ pub async fn hydrate_for_quote(state: &AppState, engine: &QuoteEngine, request: 
         clmm_pools,
         stable_pools,
         factories,
-        ..Default::default()
     }
 }

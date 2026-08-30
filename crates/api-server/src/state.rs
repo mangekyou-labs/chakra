@@ -265,25 +265,10 @@ impl AppState {
 }
 
 pub(crate) fn sanitize_cached_pairs(
-    source: &str,
+    _source: &str,
     pairs: Vec<router_engine::TradingPair>,
 ) -> Vec<router_engine::TradingPair> {
-    if source != "Arc venue" {
-        return pairs;
-    }
-
-    let mut by_pool: std::collections::HashMap<String, usize> = std::collections::HashMap::new();
-    for pair in &pairs {
-        *by_pool.entry(pair.pool_address.clone()).or_insert(0) += 1;
-    }
-
-    // Arc venue multi-token pools are represented as multiple edges sharing one pool
-    // address. Those routes are not executable by the current on-chain
-    // aggregator, so never hydrate them from disk cache during startup.
     pairs
-        .into_iter()
-        .filter(|pair| by_pool.get(&pair.pool_address).copied().unwrap_or(0) == 1)
-        .collect()
 }
 
 #[derive(Debug)]

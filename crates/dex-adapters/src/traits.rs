@@ -1,4 +1,4 @@
-//! Core trait that all DEX adapters must implement.
+//! Core trait that DEX adapters implement.
 
 use {
     anyhow::Result,
@@ -6,32 +6,19 @@ use {
     serde::{Deserialize, Serialize},
 };
 
-/// Token identifier (mirrors router-engine's TokenId but avoids circular dep).
+/// Token identifier (ERC-20 contract address on Arc EVM).
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum TokenId {
-    Native,
-    Classic { code: String, issuer: String },
     Contract { address: String },
 }
 
 impl TokenId {
     pub fn from_str_auto(s: &str) -> Self {
-        if s == "native" {
-            return Self::Native;
-        }
-        if let Some((code, issuer)) = s.split_once(':') {
-            return Self::Classic {
-                code: code.to_string(),
-                issuer: issuer.to_string(),
-            };
-        }
         Self::Contract { address: s.to_string() }
     }
 
     pub fn canonical(&self) -> String {
         match self {
-            Self::Native => "native".to_string(),
-            Self::Classic { code, issuer } => format!("{}:{}", code, issuer),
             Self::Contract { address } => address.clone(),
         }
     }
@@ -43,17 +30,14 @@ impl std::fmt::Display for TokenId {
     }
 }
 
-/// Protocol type classification.
+/// Protocol type classification for EVM venues.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum ProtocolType {
-    /// Arc-based AMM (Uniswap V2 style)
-    ArcAmm,
-    /// Arc-based weighted pool (Balancer style)
-    ArcWeightedPool,
-    /// Arc-based stable swap (Curve style)
-    ArcStableSwap,
-    /// Arc native DEX (orderbook + liquidity pools)
-    ClassicDex,
+    Xyk,
+    Stable,
+    Clmm,
+    Xylo,
+    Presto,
 }
 
 /// A trading pair available on a DEX.
@@ -77,29 +61,16 @@ pub struct AdapterQuote {
 
 /// Swap operation parameters for transaction building.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub enum SwapOperation {
-    /// Arc contract invocation
-    ArcInvoke {
-        contract_id: String,
-        function_name: String,
-        /// XDR-encoded arguments (base64)
-        args_xdr: Vec<String>,
-    },
-    /// Classic DEX PathPaymentStrictSend
-    ClassicPathPayment {
-        send_asset: String,
-        dest_asset: String,
-        send_amount: i64,
-        dest_min: i64,
-        /// Intermediate assets in the path
-        path: Vec<String>,
-    },
+pub struct SwapOperation {
+    pub target: String,
+    pub calldata: Vec<u8>,
+    pub value: u128,
 }
 
-/// The core trait all DEX adapters must implement.
+/// The core trait all DEX adapters implement.
 #[async_trait]
 pub trait DexAdapter: Send + Sync {
-    /// Unique identifier for this adapter (e.g., "Arc venue", "Arc venue").
+    /// Unique identifier for this adapter (e.g., "chakra-xyk", "xylo-stable").
     fn id(&self) -> &str;
 
     /// Human-readable name.
@@ -109,13 +80,10 @@ pub trait DexAdapter: Send + Sync {
     fn protocol_type(&self) -> ProtocolType;
 
     /// Fetch all available trading pairs from this DEX.
-    /// This may involve RPC calls to factory contracts or API queries.
     async fn get_trading_pairs(&self) -> Result<Vec<AdapterTradingPair>>;
 
     /// Get a quote for swapping `amount_in` of `token_in` to `token_out`
     /// through the specified pool.
-    ///
-    /// Returns None if the pair is not available or liquidity is insufficient.
     async fn get_quote(
         &self,
         token_in: &TokenId,
@@ -124,28 +92,6 @@ pub trait DexAdapter: Send + Sync {
         pool_address: &str,
     ) -> Result<Option<AdapterQuote>>;
 
-    /// Build the swap operation parameters for transaction construction.
-    async fn build_swap_op(
-        &self,
-        token_in: &TokenId,
-        token_out: &TokenId,
-        amount_in: u128,
-        min_amount_out: u128,
-        pool_address: &str,
-    ) -> Result<SwapOperation>;
-
     /// Health check: verify the adapter can reach its data source.
     async fn health_check(&self) -> bool;
-
-    /// Fast batch refresh of pool reserves (if supported).
-    /// Returns the number of pools updated.
-    async fn refresh_reserves(&self) -> Result<usize> {
-        Ok(0)
-    }
-
-    /// Get the currently cached pairs without re-fetching from chain.
-    /// Used after refresh_reserves() to update the quote engine's local cache.
-    async fn get_cached_pairs(&self) -> Vec<AdapterTradingPair> {
-        vec![]
-    }
 }

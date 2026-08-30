@@ -1,8 +1,7 @@
 //! Arc worker config + entry (T3.3+).
 //!
-//! `run()` always runs `evm_watcher::run_arc`: bootstrap → WS + poll → EVM
-//! fetch into `chakra:` Redis keys. Arc adapters are never constructed.
-
+/// `run()` runs `evm_watcher::run_arc`: bootstrap → WS + poll → EVM
+/// fetch into `chakra:` Redis keys.
 use {
     anyhow::Result,
     market_snapshot::{
@@ -59,11 +58,7 @@ impl std::fmt::Debug for WorkerConfig {
 
 impl WorkerConfig {
     pub fn from_env() -> Result<Self> {
-        // CHAKRA_REDIS_URL is the primary Redis URL; SNAPSHOT_REDIS_URL stays
-        // the legacy override.
-        let redis_url = std::env::var("SNAPSHOT_REDIS_URL")
-            .ok()
-            .or_else(|| std::env::var("CHAKRA_REDIS_URL").ok());
+        let redis_url = std::env::var("CHAKRA_REDIS_URL").ok();
         let snapshot_backend =
             infer_snapshot_backend(std::env::var("SNAPSHOT_BACKEND").ok().as_deref(), redis_url.as_deref())?;
         Ok(Self {
@@ -163,8 +158,7 @@ mod tests {
     #[test]
     fn worker_config_reads_chakra_redis_and_defaults_to_redis_backend() {
         let _guard = env_lock().lock().unwrap();
-        let original_chakra =
-            ["CHAKRA_REDIS_URL", "SNAPSHOT_REDIS_URL", "SNAPSHOT_BACKEND"].map(|name| (name, std::env::var(name).ok()));
+        let original_chakra = ["CHAKRA_REDIS_URL", "SNAPSHOT_BACKEND"].map(|name| (name, std::env::var(name).ok()));
         for (name, _) in &original_chakra {
             std::env::remove_var(name);
         }
@@ -173,28 +167,6 @@ mod tests {
         let config = WorkerConfig::from_env().unwrap();
         assert_eq!(config.snapshot_redis_url.as_deref(), Some("redis://127.0.0.1:6399/"));
         assert_eq!(config.snapshot_backend, SnapshotStoreBackend::Redis);
-
-        for (name, value) in original_chakra {
-            match value {
-                Some(value) => std::env::set_var(name, value),
-                None => std::env::remove_var(name),
-            }
-        }
-    }
-
-    #[test]
-    fn snapshot_redis_url_overrides_chakra_redis_url() {
-        let _guard = env_lock().lock().unwrap();
-        let original_chakra = ["CHAKRA_REDIS_URL", "SNAPSHOT_REDIS_URL"].map(|name| (name, std::env::var(name).ok()));
-        std::env::set_var("CHAKRA_REDIS_URL", "redis://chakra:6379");
-        std::env::set_var("SNAPSHOT_REDIS_URL", "redis://snapshot:6379");
-
-        let config = WorkerConfig::from_env().unwrap();
-        assert_eq!(
-            config.snapshot_redis_url.as_deref(),
-            Some("redis://snapshot:6379"),
-            "legacy SNAPSHOT_REDIS_URL must win (override)"
-        );
 
         for (name, value) in original_chakra {
             match value {

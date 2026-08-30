@@ -1,16 +1,14 @@
 //! CLMM (Concentrated Liquidity Market Maker) math — pure Rust port of Uniswap
-//! V3 math.
-//!
-//! Shared between Arc venue Concentrated pools and Sushi V3 on Arc.
+//! V3 math for Arc EVM venues.
 //! All calculations use U256 (represented as [u64; 4] little-endian) with
 //! Q64.96 fixed point. This matches the on-chain contract exactly for
 //! precision.
-//!
 //! Key types:
 //! - sqrt_price_x96: Q64.96 fixed-point sqrt(price) = sqrt(token1/token0) *
 //!   2^96
 //! - tick: i32, satisfies sqrt_ratio_at_tick(tick) <= sqrt_price_x96
 //! - liquidity: u128, active liquidity in the current tick range
+#![allow(clippy::all)]
 
 use {
     market_snapshot::{ClmmBitmapWordSnapshot, ClmmCoverageSnapshot, ClmmPoolSnapshot, ClmmTickSnapshot},
@@ -1263,7 +1261,7 @@ pub fn clmm_pool_from_snapshot(snapshot: &ClmmPoolSnapshot) -> (ClmmPoolState, T
     (pool, tick_store)
 }
 
-/// True when the active tick moved outside a prior Sushi-style bitmap word scan
+/// True when the active tick moved outside a prior CLMM-style bitmap word scan
 /// window.
 pub fn tick_outside_word_scan(tick: i32, tick_spacing: i32, word_start: i32, word_end: i32) -> bool {
     let compressed = tick.div_euclid(tick_spacing);
@@ -1730,7 +1728,7 @@ mod tests {
 
     #[test]
     fn clmm_quote_allowed_requires_complete_and_in_range() {
-        let pool = ClmmPoolState {
+        let _pool = ClmmPoolState {
             sqrt_price_x96: sqrt_ratio_at_tick(-200),
             tick: -200,
             liquidity: 1_000_000,
@@ -1847,7 +1845,7 @@ mod tests {
         ticks.word_bitmap.insert(-1, [9u8; 32]);
 
         let snapshot = clmm_pool_to_snapshot(
-            "sushi",
+            "chakra-clmm",
             "pool-1",
             &pool,
             &ticks,
@@ -1861,7 +1859,7 @@ mod tests {
         );
         let (restored_pool, restored_ticks) = clmm_pool_from_snapshot(&snapshot);
 
-        assert_eq!(snapshot.source, "sushi");
+        assert_eq!(snapshot.source, "chakra-clmm");
         assert_eq!(snapshot.pool_address, "pool-1");
         assert_eq!(restored_pool.sqrt_price_x96, pool.sqrt_price_x96);
         assert_eq!(restored_pool.tick, pool.tick);
@@ -1887,7 +1885,7 @@ mod tests {
         let mut ticks = TickDataStore::new();
         ticks.chunk_bitmap.insert(2, [1u8; 32]);
 
-        let snapshot = clmm_pool_to_snapshot("sushi", "pool-derive", &pool, &ticks, None);
+        let snapshot = clmm_pool_to_snapshot("chakra-clmm", "pool-derive", &pool, &ticks, None);
         let (_, restored_ticks) = clmm_pool_from_snapshot(&snapshot);
 
         assert!(!snapshot.word_bitmaps.is_empty());

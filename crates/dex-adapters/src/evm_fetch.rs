@@ -132,27 +132,40 @@ pub async fn verify_canonical_token_endpoints(
         if !is_canonical_pair {
             return Ok(false);
         }
-        let resp = match client.eth_call(target_address, &calldata(&path_usd_selector(), &[])).await {
+        let resp = match client
+            .eth_call(target_address, &calldata(&path_usd_selector(), &[]))
+            .await
+        {
             Ok(r) => r,
             Err(_) => return Ok(false),
         };
         let words = split_words(&resp)?;
-        let Some(word) = words.first() else { return Ok(false); };
+        let Some(word) = words.first() else {
+            return Ok(false);
+        };
         let path_usd = word_to_address(&word_hex(word))?;
         return Ok(normalize_evm_address(&path_usd) == normalize_evm_address(USDC_PATH));
     }
 
-    let t0_resp = match client.eth_call(target_address, &calldata(&token0_selector(), &[])).await {
+    let t0_resp = match client
+        .eth_call(target_address, &calldata(&token0_selector(), &[]))
+        .await
+    {
         Ok(r) => r,
         Err(_) => return Ok(false),
     };
-    let t1_resp = match client.eth_call(target_address, &calldata(&token1_selector(), &[])).await {
+    let t1_resp = match client
+        .eth_call(target_address, &calldata(&token1_selector(), &[]))
+        .await
+    {
         Ok(r) => r,
         Err(_) => return Ok(false),
     };
     let t0_words = split_words(&t0_resp)?;
     let t1_words = split_words(&t1_resp)?;
-    let (Some(w0), Some(w1)) = (t0_words.first(), t1_words.first()) else { return Ok(false); };
+    let (Some(w0), Some(w1)) = (t0_words.first(), t1_words.first()) else {
+        return Ok(false);
+    };
     let t0 = normalize_evm_address(&word_to_address(&word_hex(w0))?);
     let t1 = normalize_evm_address(&word_to_address(&word_hex(w1))?);
     let na = normalize_evm_address(token_a);
@@ -273,7 +286,11 @@ pub async fn fetch_presto_state(
     } else if pair.token_b.eq_ignore_ascii_case(USDC_PATH) {
         (false, &pair.token_a)
     } else {
-        bail!("Presto hub spoke requires USDC path token: token_a={}, token_b={}", pair.token_a, pair.token_b);
+        bail!(
+            "Presto hub spoke requires USDC path token: token_a={}, token_b={}",
+            pair.token_a,
+            pair.token_b
+        );
     };
 
     let spoke_arg = encode_address_arg(spoke_token)?;
@@ -585,7 +602,7 @@ mod tests {
             0,
             0,
         ]);
-        let (url, _server) = fixture::spawn(move |method, params| {
+        let (url, _server) = fixture::spawn(move |_method, params| {
             let data = params[0]["data"].as_str().unwrap();
             match data {
                 "0x3850c7bd" => Ok(json!(slot0_response.clone())),

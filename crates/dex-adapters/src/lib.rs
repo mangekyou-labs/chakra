@@ -1,15 +1,8 @@
 //! DEX adapter trait and shared math for Chakra Arc (EVM).
-//!
-//! Arc adapter modules (Arc venue, Arc venue, Arc venue, sushi, Arc venue,
-//! classic_dex, rpc, batch_refresh, on_chain_quote, pool_index, utils,
-//! dex_event_kinds, router_events, token_registry, etc.) have been
-//! removed from this crate. They live in the parent `avax-dex-agg` repo.
-
 pub mod cache;
 pub mod clmm_math;
 pub mod common_balance_tokens;
 pub mod pool_index;
-pub mod stable_math;
 pub mod token_logo;
 pub mod token_logo_lists;
 pub mod token_metadata;

@@ -223,7 +223,7 @@ impl SplitOptimizer {
         }
 
         // Competitive second path only triggers split when there is measurable impact.
-        // Otherwise Arc/USDC-style pairs (impact ≈ 0, many similar paths) run Brent for
+        // Otherwise stablecoin pairs (impact ≈ 0, many similar paths) run Brent for
         // ~10s+ with no gain.
         let competitive_split = competitive_enough && best_single_impact > 0;
         if best_single_impact < self.config.split_threshold_bps && !competitive_split {
@@ -556,7 +556,7 @@ impl SplitOptimizer {
         let mut result = vec![(amount_a, out_a)];
 
         // Recurse on the rest
-        if amount_rest > 0 && rest.len() > 0 {
+        if amount_rest > 0 && !rest.is_empty() {
             let rest_results = Box::pin(self.optimize_n_paths(rest, amount_rest, quote_fn)).await;
             result.extend(rest_results);
         }
@@ -618,7 +618,7 @@ impl SplitOptimizer {
             let amount = if i + 1 == paths.len() {
                 total_amount.saturating_sub(allocated)
             } else {
-                let share = (total_amount as u128).saturating_mul(weights[i]) / weight_sum;
+                let share = total_amount.saturating_mul(weights[i]) / weight_sum;
                 allocated += share;
                 share
             };
@@ -810,6 +810,7 @@ fn split_amount_in_fraction_bps(amount_in: u128, total_amount: u128) -> u32 {
 /// Leg output must stay near the re-quote at the allocated leg size.
 /// This catches split/math inconsistency without punishing a thin pool for
 /// having a better small-size rate than a full-size dump (AMM convexity).
+#[allow(clippy::type_complexity)]
 async fn leg_rate_matches_alloc_quote<F, Fut>(
     quote_fn: &F,
     path: &Path,
@@ -1088,7 +1089,7 @@ mod tests {
             .brent_maximize(0.0, 1.0, |x| async move { -(x - 0.6) * (x - 0.6) + 1.0 })
             .await;
 
-        assert!((result - 0.6).abs() < 0.001, "Expected ~0.6, got {}", result);
+        assert!((result - 0.6).abs() < 0.001, "Expected ~0.6, got {result}");
     }
 
     /// Test Brent's method on AMM-like diminishing returns
@@ -1113,8 +1114,8 @@ mod tests {
             .await;
 
         // Pool A is deeper, so optimal split should favor A (x > 0.5)
-        assert!(result > 0.5, "Expected x > 0.5 (favor deeper pool), got {}", result);
-        assert!(result < 0.8, "Expected x < 0.8 (still use both), got {}", result);
+        assert!(result > 0.5, "Expected x > 0.5 (favor deeper pool), got {result}");
+        assert!(result < 0.8, "Expected x < 0.8 (still use both), got {result}");
     }
 
     /// Test that 100% to one pool is chosen when other pool is empty
@@ -1134,7 +1135,7 @@ mod tests {
             .await;
 
         // Should put everything in Pool A
-        assert!(result > 0.99, "Expected ~1.0, got {}", result);
+        assert!(result > 0.99, "Expected ~1.0, got {result}");
     }
 
     #[tokio::test]
@@ -1166,7 +1167,7 @@ mod tests {
     #[tokio::test]
     async fn test_shared_pool_paths_are_reduced_to_best_single() {
         let optimizer = SplitOptimizer::new(SplitConfig::default());
-        let mut p1 = test_path("one");
+        let p1 = test_path("one");
         let mut p2 = test_path("two");
         // Both routes use the SAME downstream pool (e.g. the same UnitFlow pair).
         p2.pool_addresses = vec!["pool-one".to_string()];
@@ -1174,8 +1175,14 @@ mod tests {
         let q1 = test_quote(&p1, 1_000, 980, 30);
         let q2 = test_quote(&p2, 1_000, 990, 30); // p2 is "better" but shares the pool
         let quoted_paths = vec![
-            QuotedPath { path: p1.clone(), quote: q1 },
-            QuotedPath { path: p2.clone(), quote: q2 },
+            QuotedPath {
+                path: p1.clone(),
+                quote: q1,
+            },
+            QuotedPath {
+                path: p2.clone(),
+                quote: q2,
+            },
         ];
 
         let route = optimizer
@@ -1396,7 +1403,7 @@ mod tests {
 
     #[tokio::test]
     async fn leg_rate_rejects_fantasy_micro_quote() {
-        let path = test_path("Arc venue");
+        let path = test_path("chakra-xyk");
         let qp = QuotedPath {
             path: path.clone(),
             quote: test_quote(&path, 10_000_000_000, 1_500_000_000, 5),
@@ -1445,7 +1452,7 @@ mod tests {
 
     #[tokio::test]
     async fn t92_independent_venue_check_rejects_self_consistent_bug() {
-        let path = test_path("Arc venue");
+        let path = test_path("chakra-xyk");
         let qp = QuotedPath {
             path: path.clone(),
             quote: test_quote(&path, 10_000_000_000, 1_500_000_000, 5),

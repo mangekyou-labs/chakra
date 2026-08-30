@@ -91,7 +91,7 @@ mod tests {
             123,
             "mainnet",
             vec![SourceSnapshot {
-                source: "Arc venue".to_string(),
+                source: "chakra-xyk".to_string(),
                 pairs: vec![TradingPairSnapshot {
                     token_a: "token-a".to_string(),
                     token_b: "token-b".to_string(),
@@ -106,7 +106,7 @@ mod tests {
 
     fn sample_clmm_pool_state() -> ClmmPoolSnapshot {
         ClmmPoolSnapshot {
-            source: "sushi".to_string(),
+            source: "chakra-clmm".to_string(),
             pool_address: "pool-clmm".to_string(),
             token0: "token-a".to_string(),
             token1: "token-b".to_string(),
@@ -173,7 +173,7 @@ mod tests {
             456,
             "mainnet",
             vec![SourceSnapshot {
-                source: "sushi".to_string(),
+                source: "chakra-clmm".to_string(),
                 pairs: vec![],
             }],
         )
@@ -203,7 +203,7 @@ mod tests {
     #[test]
     fn loads_snapshot_from_current_file() {
         let dir = std::env::temp_dir().join(format!(
-            "Chakra-snapshot-test-{}",
+            "chakra-snapshot-test-{}",
             std::time::SystemTime::now()
                 .duration_since(std::time::UNIX_EPOCH)
                 .unwrap()
@@ -226,7 +226,7 @@ mod tests {
         let engine = build_engine_from_snapshot(&config, &sample_snapshot()).await.unwrap();
         engine
             .update_pairs_from_cache(
-                "Arc venue",
+                "chakra-xyk",
                 &[router_engine::TradingPair {
                     token_a: TokenId::Contract {
                         address: "token-a".to_string(),
@@ -234,7 +234,7 @@ mod tests {
                     token_b: TokenId::Contract {
                         address: "token-b".to_string(),
                     },
-                    source: "Arc venue".to_string(),
+                    source: "chakra-xyk".to_string(),
                     pool_address: "pool-1".to_string(),
                     fee_bps: 30,
                     reserve_a: Some(1_000_000_000),
@@ -257,7 +257,6 @@ mod tests {
                 slippage_bps: Some(50),
                 max_hops: Some(1),
                 max_splits: Some(1),
-                prefer_arc: None,
             })
             .await;
 
@@ -286,7 +285,6 @@ mod tests {
                 slippage_bps: Some(50),
                 max_hops: Some(1),
                 max_splits: Some(1),
-                prefer_arc: None,
             })
             .await;
 

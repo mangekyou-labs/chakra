@@ -21,8 +21,6 @@ use {
     tracing::{debug, info, warn},
 };
 
-const CLASSIC_SOURCE: &str = "classic_dex";
-
 #[derive(Debug, Clone)]
 pub struct SnapshotClmmQuoteState {
     pub source: String,
@@ -49,13 +47,9 @@ fn clmm_coverage_input(state: &SnapshotClmmQuoteState) -> ClmmCoverageInput {
     }
 }
 
-fn apply_slippage(amount: u128, slippage_bps: u32) -> u128 {
-    amount * (10_000 - slippage_bps as u128) / 10_000
-}
-
 /// Skip xy=k pools with dust reserves on either side (misleading quotes at
 /// small trade sizes).
-const MIN_XYK_RESERVE_atomic unitsS: u128 = 100_000_000;
+const MIN_XYK_RESERVE_ATOMIC_UNITS: u128 = 100_000_000;
 
 fn reserves_for_edge(token_in: &TokenId, token_out: &TokenId, hydrated: &XykPoolStateValue) -> Option<(u128, u128)> {
     let in_key = token_in.canonical();
@@ -78,8 +72,8 @@ pub struct QuoteHydration {
     /// Chakra stableswap pools keyed by `source:pool_address`. The Xylo and
     /// Presto spoke state also lives here (stable-family venues).
     pub stable_pools: HashMap<String, StablePoolStateValue>,
-    /// Allowlisted venue factories (from `chakra:factories`). Empty list =
-    /// accept legacy unstamped pools.
+    /// Allowlisted venue factories (from `chakra:factories`). An empty list
+    /// means factory discovery has not produced a restriction yet.
     pub factories: Vec<FactoryRecord>,
 }
 
@@ -96,8 +90,8 @@ impl QuoteHydration {
         StablePoolStateValue::pool_key(source, pool_address)
     }
 
-    /// T4.5: Check if a pool is allowlisted via `chakra:factories`.
-    /// Empty factories list = accept all (legacy mode).
+    /// Check if a pool is allowlisted via `chakra:factories`.
+    /// An empty list means factory discovery has not produced a restriction.
     /// Non-empty list + pool's stamped factory matches an allowlisted record = allow.
     /// Non-empty list + no matching factory record = skip.
     pub fn factory_allows_pool(&self, pool_factory: &str) -> bool {
@@ -105,8 +99,7 @@ impl QuoteHydration {
             return true;
         }
         if pool_factory.is_empty() {
-            // Legacy pool without factory stamp: accept only when factories
-            // are empty (already handled above).
+            // A pool without a factory stamp cannot pass an active allowlist.
             return false;
         }
         self.factories
@@ -357,22 +350,7 @@ impl QuoteEngine {
             };
         }
 
-        // Never return mixed classic+Arc hops — they cannot form one tx.
-        // prefer_arc: Arc AMMs only (no classic / no Horizon).
-        // Default: pure classic OR pure Arc compete; Horizon only for classic.
-        let prefer_arc = request.prefer_arc.unwrap_or(false);
-        let paths: Vec<Path> = paths
-            .iter()
-            .filter(|path| {
-                if prefer_arc {
-                    !Self::path_contains_classic(path)
-                } else {
-                    Self::path_is_executable(path)
-                }
-            })
-            .cloned()
-            .collect();
-
+        let paths: Vec<Path> = paths.to_vec();
         if paths.is_empty() {
             debug!(
                 token_in = %request.token_in,
@@ -428,114 +406,42 @@ impl QuoteEngine {
             };
         }
 
-        debug!(quoted = quoted_paths.len(), "Paths quoted");
+        let hydration_owned = hydration.cloned();
+        let quote_cache = std::sync::Arc::new(tokio::sync::Mutex::new(std::collections::HashMap::<
+            (String, u128),
+            Option<Quote>,
+        >::new()));
+        let amount_bucket = (request.amount_in / 512).max(1);
 
-        let (classic_quoted_paths, Arc_quoted_paths): (Vec<QuotedPath>, Vec<QuotedPath>) = quoted_paths
-            .into_iter()
-            .partition(|quoted| Self::is_classic_only_path(&quoted.path));
-
-        let best_classic_route = classic_quoted_paths
-            .iter()
-            .max_by_key(|quoted| quoted.quote.amount_out)
-            .map(|quoted| {
-                let minimum_out = apply_slippage(quoted.quote.amount_out, slippage_bps);
-                OptimalRoute {
-                    sub_orders: vec![SubOrder {
-                        path: quoted.path.clone(),
-                        amount_in: request.amount_in,
-                        expected_amount_out: quoted.quote.amount_out,
-                        fraction: 1.0,
-                    }],
-                    total_amount_in: request.amount_in,
-                    total_expected_out: quoted.quote.amount_out,
-                    price_impact_bps: quoted.quote.price_impact_bps,
-                    is_split: false,
-                    improvement_bps: 0,
-                    protocol_fee_bps: 0,
-                    minimum_out,
-                    compute_time_ms: start.elapsed().as_millis() as u64,
-                    debug: None,
-                }
-            });
-
-        let best_Arc_route = if Arc_quoted_paths.is_empty() {
-            None
-        } else {
-            let hydration_owned = hydration.cloned();
-            let quote_cache = std::sync::Arc::new(tokio::sync::Mutex::new(std::collections::HashMap::<
-                (String, u128),
-                Option<Quote>,
-            >::new()));
-            let amount_bucket = (request.amount_in / 512).max(1);
-            Some(
-                self.split_optimizer
-                    .optimize(
-                        &Arc_quoted_paths,
-                        request.amount_in,
-                        slippage_bps,
-                        request.max_splits,
-                        |path, amount| {
-                            let path_clone = path.clone();
-                            let hydration_ref = hydration_owned.as_ref();
-                            let cache = quote_cache.clone();
-                            async move {
-                                let bucket = if amount == 0 {
-                                    0
-                                } else {
-                                    (amount / amount_bucket) * amount_bucket
-                                };
-                                let key = (path_clone.pool_addresses.join("+"), bucket);
-                                if let Some(cached) = cache.lock().await.get(&key) {
-                                    if cached.as_ref().is_some_and(|q| q.amount_in == amount) {
-                                        return cached.clone();
-                                    }
-                                }
-                                let quote = self.quote_path(&path_clone, amount, hydration_ref).await;
-                                cache.lock().await.insert(key, quote.clone());
-                                quote
+        self.split_optimizer
+            .optimize(
+                &quoted_paths,
+                request.amount_in,
+                slippage_bps,
+                request.max_splits,
+                |path, amount| {
+                    let path_clone = path.clone();
+                    let hydration_ref = hydration_owned.as_ref();
+                    let cache = quote_cache.clone();
+                    async move {
+                        let bucket = if amount == 0 {
+                            0
+                        } else {
+                            (amount / amount_bucket) * amount_bucket
+                        };
+                        let key = (path_clone.pool_addresses.join("+"), bucket);
+                        if let Some(cached) = cache.lock().await.get(&key) {
+                            if cached.as_ref().is_some_and(|q| q.amount_in == amount) {
+                                return cached.clone();
                             }
-                        },
-                    )
-                    .await,
+                        }
+                        let quote = self.quote_path(&path_clone, amount, hydration_ref).await;
+                        cache.lock().await.insert(key, quote.clone());
+                        quote
+                    }
+                },
             )
-        };
-
-        match (best_classic_route, best_Arc_route) {
-            (Some(classic), Some(Arc)) => {
-                if classic.total_expected_out > Arc.total_expected_out {
-                    classic
-                } else {
-                    Arc
-                }
-            }
-            (Some(classic), None) => classic,
-            (None, Some(Arc)) => Arc,
-            (None, None) => OptimalRoute {
-                sub_orders: vec![],
-                total_amount_in: request.amount_in,
-                total_expected_out: 0,
-                price_impact_bps: 0,
-                is_split: false,
-                improvement_bps: 0,
-                protocol_fee_bps: 0,
-                minimum_out: 0,
-                compute_time_ms: start.elapsed().as_millis() as u64,
-                debug: None,
-            },
-        }
-    }
-
-    fn is_classic_only_path(path: &Path) -> bool {
-        !path.sources.is_empty() && path.sources.iter().all(|source| source == CLASSIC_SOURCE)
-    }
-
-    fn path_contains_classic(path: &Path) -> bool {
-        path.sources.iter().any(|source| source == CLASSIC_SOURCE)
-    }
-
-    /// Pure classic or pure Arc — never mixed hops (unexecutable as one tx).
-    fn path_is_executable(path: &Path) -> bool {
-        Self::is_classic_only_path(path) || !Self::path_contains_classic(path)
+            .await
     }
 
     /// Quote a single path by simulating each hop sequentially.
@@ -552,25 +458,27 @@ impl QuoteEngine {
             let token_out = &path.tokens[i + 1];
             let pool_address = &path.pool_addresses[i];
 
-            // T4.5 / T10.6: Factory gate — skip chakra-* and canonical curated
-            // (xylo-stable, presto-hub, unitflow-v25) hops whose pool's stamped
+            // T4.5 / T10.6: Factory gate — skip active venue hops whose pool's stamped
             // factory does not match an allowlisted factory record.
             if source.starts_with("chakra-")
-                || matches!(source.as_str(), "xylo-stable" | "presto-hub" | "unitflow-v25" | "xylo" | "presto")
+                || matches!(
+                    source.as_str(),
+                    "xylo-stable" | "presto-hub" | "unitflow-v25" | "xylo" | "presto"
+                )
             {
                 let pool_factory = cached_pools
                     .iter()
                     .find(|p| p.source == *source && p.pool_address == *pool_address)
                     .map(|p| p.factory.as_str())
                     .unwrap_or("");
-                let factory_ok = hydration.map_or(true, |h| h.factory_allows_pool(pool_factory));
+                let factory_ok = hydration.is_none_or(|h| h.factory_allows_pool(pool_factory));
                 if !factory_ok {
                     return None;
                 }
             }
 
             // CLMM: local math only during routing (fast). No per-hop RPC simulate.
-            let hop_result = if matches!(source.as_str(), "sushi" | "Arc venue_clmm" | "chakra-clmm") {
+            let hop_result = if source == "chakra-clmm" {
                 self.local_clmm_quote(
                     token_in,
                     token_out,
@@ -587,7 +495,15 @@ impl QuoteEngine {
             } else if source == "presto-hub" {
                 self.local_presto_quote(token_in, token_out, current_amount, pool_address, source, hydration)
             } else if matches!(source.as_str(), "chakra-xyk" | "unitflow-v25") {
-                self.local_evm_xyk_quote(token_in, token_out, current_amount, pool_address, source, hydration)
+                self.local_evm_xyk_quote(
+                    token_in,
+                    token_out,
+                    current_amount,
+                    pool_address,
+                    source,
+                    &cached_pools,
+                    hydration,
+                )
             } else {
                 self.local_quote(
                     token_in,
@@ -629,6 +545,7 @@ impl QuoteEngine {
     }
 
     /// Local quote computation using cached reserves and AMM formulas.
+    #[allow(clippy::too_many_arguments)]
     fn local_quote(
         &self,
         token_in: &TokenId,
@@ -654,8 +571,8 @@ impl QuoteEngine {
 
         let pair = Self::find_pool_edge(cached_pools, pool_address, token_in, token_out)?;
         let hydrated = hydration.and_then(|h| h.xyk_pools.get(&QuoteHydration::xyk_pool_key(source, pool_address)));
-        // Prefer live Redis fee when present — topology snapshot can lag (e.g.
-        // Arc venue total_fee_bps misparsed as default 30 while on-chain is 50).
+        // Prefer live Redis fee when present because topology snapshots can lag
+        // the venue's current fee.
         let fee_bps = hydrated.map(|h| h.fee_bps).unwrap_or(pair.fee_bps);
 
         let (reserve_in, reserve_out) = if let Some(hydrated) = hydrated {
@@ -670,35 +587,15 @@ impl QuoteEngine {
 
         if reserve_in == 0
             || reserve_out == 0
-            || reserve_in < MIN_XYK_RESERVE_atomic unitsS
-            || reserve_out < MIN_XYK_RESERVE_atomic unitsS
+            || reserve_in < MIN_XYK_RESERVE_ATOMIC_UNITS
+            || reserve_out < MIN_XYK_RESERVE_ATOMIC_UNITS
         {
             return None;
         }
 
-        // Apply appropriate AMM formula based on source
-        let (amount_out, fee_bps) = match source {
-            "Arc venue" => {
-                // Arc venue: fee = ceil(amount_in * 3 / 1000)
-                let fee = (amount_in * 3 + 999) / 1000;
-                let in_after_fee = amount_in - fee;
-                let out = in_after_fee * reserve_out / (reserve_in + in_after_fee);
-                (out, 30u32)
-            }
-            "Arc venue" => {
-                // Arc venue: fee on output
-                let gross = amount_in * reserve_out / (reserve_in + amount_in);
-                let commission = gross * fee_bps as u128 / 10_000;
-                (gross - commission, fee_bps)
-            }
-            _ => {
-                // Generic constant product
-                let in_after_fee = amount_in * (10_000 - fee_bps as u128) / 10_000;
-                let out = in_after_fee * reserve_out / (reserve_in + in_after_fee);
-                (out, fee_bps)
-            }
-        };
-
+        // Generic constant product AMM formula
+        let in_after_fee = amount_in * (10_000 - fee_bps as u128) / 10_000;
+        let amount_out = in_after_fee * reserve_out / (reserve_in + in_after_fee);
         if amount_out == 0 {
             return None;
         }
@@ -719,9 +616,8 @@ impl QuoteEngine {
         })
     }
 
-    /// Chakra stableswap hop (SC-2): `evm_quote_math::stable_quote` on the
-    /// hydrated stable balances. Never xy=k math, never the Arc generic
-    /// 9970/10000.
+    /// Chakra stableswap hop: `evm_quote_math::stable_quote` on the hydrated
+    /// stable balances, never constant-product math.
     fn local_stable_quote(
         &self,
         token_in: &TokenId,
@@ -792,12 +688,7 @@ impl QuoteEngine {
         } else {
             return None;
         };
-        let amount_out = dex_adapters::evm_quote_math::xylo_quote_with_a(
-            reserve_in,
-            reserve_out,
-            amount_in,
-            state.a,
-        );
+        let amount_out = dex_adapters::evm_quote_math::xylo_quote_with_a(reserve_in, reserve_out, amount_in, state.a);
         if amount_out == 0 {
             return None;
         }
@@ -845,11 +736,7 @@ impl QuoteEngine {
         };
         // Presto pathUSD routing: USDC is the path; spoke legs are
         // 997/1000 on the raw reserves (equal 6-dp decimals cancel).
-        let amount_out = dex_adapters::evm_quote_math::presto_spoke_quote(
-            reserve_in,
-            reserve_out,
-            amount_in,
-        );
+        let amount_out = dex_adapters::evm_quote_math::presto_spoke_quote(reserve_in, reserve_out, amount_in);
         if amount_out == 0 {
             return None;
         }
@@ -868,6 +755,7 @@ impl QuoteEngine {
 
     /// Chakra xy=k hop: Uniswap V2 997/1000 (`evm_quote_math::xyk_quote`) on
     /// the hydrated reserves, with integer price impact.
+    #[allow(clippy::too_many_arguments)]
     fn local_evm_xyk_quote(
         &self,
         token_in: &TokenId,
@@ -875,16 +763,28 @@ impl QuoteEngine {
         amount_in: u128,
         pool_address: &str,
         source: &str,
+        cached_pools: &[TradingPair],
         hydration: Option<&QuoteHydration>,
     ) -> Option<dex_adapters::AdapterQuote> {
-        let hydrated = hydration?
-            .xyk_pools
-            .get(&QuoteHydration::xyk_pool_key(source, pool_address))?;
-        let (reserve_in, reserve_out) = reserves_for_edge(token_in, token_out, hydrated)?;
+        let hydrated = hydration.and_then(|h| h.xyk_pools.get(&QuoteHydration::xyk_pool_key(source, pool_address)));
+        let (reserve_in, reserve_out, fee_bps) = if let Some(hydrated) = hydrated {
+            let (r_in, r_out) = reserves_for_edge(token_in, token_out, hydrated)?;
+            (r_in, r_out, hydrated.fee_bps)
+        } else {
+            let pair = Self::find_pool_edge(cached_pools, pool_address, token_in, token_out)?;
+            let (r_in, r_out) = if token_in.canonical() == pair.token_a.canonical() {
+                (pair.reserve_a?, pair.reserve_b?)
+            } else if token_in.canonical() == pair.token_b.canonical() {
+                (pair.reserve_b?, pair.reserve_a?)
+            } else {
+                return None;
+            };
+            (r_in, r_out, pair.fee_bps)
+        };
         if reserve_in == 0
             || reserve_out == 0
-            || reserve_in < MIN_XYK_RESERVE_atomic unitsS
-            || reserve_out < MIN_XYK_RESERVE_atomic unitsS
+            || reserve_in < MIN_XYK_RESERVE_ATOMIC_UNITS
+            || reserve_out < MIN_XYK_RESERVE_ATOMIC_UNITS
         {
             return None;
         }
@@ -896,11 +796,12 @@ impl QuoteEngine {
             dex_adapters::evm_quote_math::price_impact_bps(reserve_in, reserve_out, amount_in, amount_out);
         Some(dex_adapters::AdapterQuote {
             amount_out,
-            fee_bps: hydrated.fee_bps,
+            fee_bps,
             price_impact_bps,
         })
     }
 
+    #[allow(clippy::too_many_arguments)]
     fn local_clmm_quote(
         &self,
         token_in: &TokenId,
@@ -911,7 +812,7 @@ impl QuoteEngine {
         clmm_quote_states: &HashMap<String, SnapshotClmmQuoteState>,
         hydration: Option<&QuoteHydration>,
     ) -> Option<dex_adapters::AdapterQuote> {
-        if !matches!(source, "sushi" | "Arc venue_clmm" | "chakra-clmm") {
+        if source != "chakra-clmm" {
             return None;
         }
 
@@ -1081,6 +982,7 @@ mod tests {
     /// Build an engine from the seeded Chakra topology with hydrated pool
     /// state (no RPC): xy=k reserves, stable balances, optional CLMM quote
     /// state.
+    #[allow(dead_code)]
     async fn engine_with_hydration(
         stable: Option<StablePoolStateValue>,
         clmm: Option<(String, SnapshotClmmQuoteState)>,
@@ -1141,7 +1043,6 @@ mod tests {
                     slippage_bps: Some(50),
                     max_hops: Some(1),
                     max_splits: Some(5),
-                    prefer_arc: None,
                 },
                 &engine
                     .find_candidate_paths(&RouteRequest {
@@ -1151,7 +1052,6 @@ mod tests {
                         slippage_bps: Some(50),
                         max_hops: Some(1),
                         max_splits: Some(5),
-                        prefer_arc: None,
                     })
                     .await,
                 Some(&hydration),
@@ -1199,7 +1099,6 @@ mod tests {
             slippage_bps: Some(50),
             max_hops: Some(1),
             max_splits: Some(5),
-            prefer_arc: None,
         };
         let paths = engine.find_candidate_paths(&request).await;
         let route = engine.get_route_with_paths(&request, &paths, Some(&hydration)).await;
@@ -1262,7 +1161,6 @@ mod tests {
             slippage_bps: Some(50),
             max_hops: Some(1),
             max_splits: Some(5),
-            prefer_arc: None,
         };
         let paths = engine.find_candidate_paths(&request).await;
         let route = engine.get_route_with_paths(&request, &paths, Some(&hydration)).await;
@@ -1291,13 +1189,11 @@ mod tests {
         let sources: Vec<&str> = route.sub_orders.iter().map(|o| o.path.sources[0].as_str()).collect();
         assert!(
             sources.contains(&"chakra-xyk"),
-            "split must include chakra-xyk leg, got {:?}",
-            sources
+            "split must include chakra-xyk leg, got {sources:?}"
         );
         assert!(
             sources.contains(&"chakra-stable"),
-            "split must include chakra-stable leg, got {:?}",
-            sources
+            "split must include chakra-stable leg, got {sources:?}"
         );
         assert_eq!(route.protocol_fee_bps, 0);
     }
@@ -1336,7 +1232,6 @@ mod tests {
                     slippage_bps: Some(50),
                     max_hops: Some(1),
                     max_splits: Some(1),
-                    prefer_arc: None,
                 },
                 &engine
                     .find_candidate_paths(&RouteRequest {
@@ -1346,7 +1241,6 @@ mod tests {
                         slippage_bps: Some(50),
                         max_hops: Some(1),
                         max_splits: Some(1),
-                        prefer_arc: None,
                     })
                     .await,
                 Some(&QuoteHydration {
@@ -1386,7 +1280,6 @@ mod tests {
                     slippage_bps: Some(50),
                     max_hops: Some(1),
                     max_splits: Some(1),
-                    prefer_arc: None,
                 },
                 &engine
                     .find_candidate_paths(&RouteRequest {
@@ -1396,7 +1289,6 @@ mod tests {
                         slippage_bps: Some(50),
                         max_hops: Some(1),
                         max_splits: Some(1),
-                        prefer_arc: None,
                     })
                     .await,
                 Some(&QuoteHydration {
@@ -1443,7 +1335,6 @@ mod tests {
                     slippage_bps: Some(50),
                     max_hops: Some(1),
                     max_splits: Some(1),
-                    prefer_arc: None,
                 })
                 .await;
             assert!(route.sub_orders.is_empty(), "native token_in must yield no route");
@@ -1459,7 +1350,6 @@ mod tests {
                     slippage_bps: Some(50),
                     max_hops: Some(1),
                     max_splits: Some(1),
-                    prefer_arc: None,
                 })
                 .await;
             assert!(route.sub_orders.is_empty(), "native token_out must yield no route");
@@ -1509,7 +1399,6 @@ mod tests {
             slippage_bps: Some(50),
             max_hops: Some(1),
             max_splits: Some(1),
-            prefer_arc: None,
         };
         let paths = engine.find_candidate_paths(&request).await;
         let route = engine.get_route_with_paths(&request, &paths, Some(&hydration)).await;
@@ -1530,6 +1419,7 @@ mod tests {
         assert_eq!(route.protocol_fee_bps, 0);
     }
 
+    #[allow(dead_code)]
     fn pair(source: &str, pool: &str, reserve_a: u128, reserve_b: u128) -> TradingPair {
         TradingPair {
             token_a: token("token-in"),
@@ -1655,13 +1545,13 @@ mod tests {
     async fn quote_uses_snapshot_clmm_state_when_reserves_are_missing() {
         let engine = QuoteEngine::new(PathFinderConfig::default(), SplitConfig::default());
         engine
-            .update_pairs_from_cache("sushi", &[clmm_pair("sushi", "sushi-pool")])
+            .update_pairs_from_cache("chakra-clmm", &[clmm_pair("chakra-clmm", "chakra-clmm-pool")])
             .await;
         let (pool, ticks) = sample_clmm_state();
         engine
             .update_clmm_quote_state(
-                "sushi",
-                "sushi-pool",
+                "chakra-clmm",
+                "chakra-clmm-pool",
                 pool,
                 ticks,
                 true,
@@ -1683,25 +1573,24 @@ mod tests {
                 slippage_bps: Some(50),
                 max_hops: Some(1),
                 max_splits: Some(1),
-                prefer_arc: None,
             })
             .await;
 
         assert_eq!(route.sub_orders.len(), 1);
         assert!(route.total_expected_out > 0);
-        assert_eq!(route.sub_orders[0].path.sources, vec!["sushi".to_string()]);
+        assert_eq!(route.sub_orders[0].path.sources, vec!["chakra-clmm".to_string()]);
     }
 
     #[tokio::test]
     async fn quote_rejects_snapshot_clmm_state_without_initialized_ticks() {
         let engine = QuoteEngine::new(PathFinderConfig::default(), SplitConfig::default());
         engine
-            .update_pairs_from_cache("sushi", &[clmm_pair("sushi", "sushi-empty")])
+            .update_pairs_from_cache("chakra-clmm", &[clmm_pair("chakra-clmm", "chakra-clmm-empty")])
             .await;
         engine
             .update_clmm_quote_state(
-                "sushi",
-                "sushi-empty",
+                "chakra-clmm",
+                "chakra-clmm-empty",
                 ClmmPoolState {
                     sqrt_price_x96: sqrt_ratio_at_tick(0),
                     tick: 0,
@@ -1725,7 +1614,6 @@ mod tests {
                 slippage_bps: Some(50),
                 max_hops: Some(1),
                 max_splits: Some(1),
-                prefer_arc: None,
             })
             .await;
 
@@ -1737,13 +1625,13 @@ mod tests {
     async fn quote_rejects_clmm_when_active_tick_outside_scanned_window() {
         let engine = QuoteEngine::new(PathFinderConfig::default(), SplitConfig::default());
         engine
-            .update_pairs_from_cache("sushi", &[clmm_pair("sushi", "sushi-window")])
+            .update_pairs_from_cache("chakra-clmm", &[clmm_pair("chakra-clmm", "chakra-clmm-window")])
             .await;
         let (pool, ticks) = sample_clmm_state();
         engine
             .update_clmm_quote_state(
-                "sushi",
-                "sushi-window",
+                "chakra-clmm",
+                "chakra-clmm-window",
                 pool,
                 ticks,
                 true,
@@ -1765,7 +1653,6 @@ mod tests {
                 slippage_bps: Some(50),
                 max_hops: Some(1),
                 max_splits: Some(1),
-                prefer_arc: None,
             })
             .await;
 
@@ -1776,13 +1663,13 @@ mod tests {
     async fn quote_rejects_incomplete_snapshot_clmm_state() {
         let engine = QuoteEngine::new(PathFinderConfig::default(), SplitConfig::default());
         engine
-            .update_pairs_from_cache("sushi", &[clmm_pair("sushi", "sushi-partial")])
+            .update_pairs_from_cache("chakra-clmm", &[clmm_pair("chakra-clmm", "chakra-clmm-partial")])
             .await;
         let (pool, ticks) = sample_clmm_state();
         engine
             .update_clmm_quote_state(
-                "sushi",
-                "sushi-partial",
+                "chakra-clmm",
+                "chakra-clmm-partial",
                 pool,
                 ticks,
                 false,
@@ -1804,7 +1691,6 @@ mod tests {
                 slippage_bps: Some(50),
                 max_hops: Some(1),
                 max_splits: Some(1),
-                prefer_arc: None,
             })
             .await;
 
@@ -1890,7 +1776,6 @@ mod tests {
                     slippage_bps: Some(50),
                     max_hops: Some(1),
                     max_splits: Some(1),
-                    prefer_arc: None,
                 },
                 &engine
                     .find_candidate_paths(&RouteRequest {
@@ -1900,7 +1785,6 @@ mod tests {
                         slippage_bps: Some(50),
                         max_hops: Some(1),
                         max_splits: Some(1),
-                        prefer_arc: None,
                     })
                     .await,
                 Some(&hydration),
@@ -1941,7 +1825,6 @@ mod tests {
                     slippage_bps: Some(50),
                     max_hops: Some(1),
                     max_splits: Some(1),
-                    prefer_arc: None,
                 },
                 &engine
                     .find_candidate_paths(&RouteRequest {
@@ -1951,7 +1834,6 @@ mod tests {
                         slippage_bps: Some(50),
                         max_hops: Some(1),
                         max_splits: Some(1),
-                        prefer_arc: None,
                     })
                     .await,
                 Some(&hydration),
@@ -1989,9 +1871,22 @@ mod tests {
         let hydration_unlisted = QuoteHydration {
             stable_pools: HashMap::from([(
                 QuoteHydration::stable_pool_key("xylo-stable", XYLO_P),
-                StablePoolStateValue::new("xylo-stable", XYLO_P, USDC_ERC20, EURC, 9_000_000_000_000, 9_000_000_000_000, 200, 4),
+                StablePoolStateValue::new(
+                    "xylo-stable",
+                    XYLO_P,
+                    USDC_ERC20,
+                    EURC,
+                    9_000_000_000_000,
+                    9_000_000_000_000,
+                    200,
+                    4,
+                ),
             )]),
-            factories: vec![FactoryRecord::new("0x0000000000000000000000000000000000000099", "xylo", "xylo-stable")],
+            factories: vec![FactoryRecord::new(
+                "0x0000000000000000000000000000000000000099",
+                "xylo",
+                "xylo-stable",
+            )],
             ..Default::default()
         };
         let req = RouteRequest {
@@ -2001,22 +1896,48 @@ mod tests {
             slippage_bps: Some(50),
             max_hops: Some(1),
             max_splits: Some(1),
-            prefer_arc: None,
         };
-        let route_unlisted = engine.get_route_with_paths(&req, &engine.find_candidate_paths(&req).await, Some(&hydration_unlisted)).await;
-        assert!(route_unlisted.sub_orders.is_empty(), "unallowlisted xylo factory must be skipped");
+        let route_unlisted = engine
+            .get_route_with_paths(
+                &req,
+                &engine.find_candidate_paths(&req).await,
+                Some(&hydration_unlisted),
+            )
+            .await;
+        assert!(
+            route_unlisted.sub_orders.is_empty(),
+            "unallowlisted xylo factory must be skipped"
+        );
 
         // 2. Allowlisted factory -> quotes successfully
         let hydration_allowlisted = QuoteHydration {
             stable_pools: HashMap::from([(
                 QuoteHydration::stable_pool_key("xylo-stable", XYLO_P),
-                StablePoolStateValue::new("xylo-stable", XYLO_P, USDC_ERC20, EURC, 9_000_000_000_000, 9_000_000_000_000, 200, 4),
+                StablePoolStateValue::new(
+                    "xylo-stable",
+                    XYLO_P,
+                    USDC_ERC20,
+                    EURC,
+                    9_000_000_000_000,
+                    9_000_000_000_000,
+                    200,
+                    4,
+                ),
             )]),
             factories: vec![FactoryRecord::new(XYLO_F, "xylo", "xylo-stable")],
             ..Default::default()
         };
-        let route_allowlisted = engine.get_route_with_paths(&req, &engine.find_candidate_paths(&req).await, Some(&hydration_allowlisted)).await;
-        assert!(!route_allowlisted.sub_orders.is_empty(), "allowlisted xylo factory must produce a route");
+        let route_allowlisted = engine
+            .get_route_with_paths(
+                &req,
+                &engine.find_candidate_paths(&req).await,
+                Some(&hydration_allowlisted),
+            )
+            .await;
+        assert!(
+            !route_allowlisted.sub_orders.is_empty(),
+            "allowlisted xylo factory must produce a route"
+        );
         assert!(route_allowlisted.total_expected_out > 0);
     }
 
@@ -2048,7 +1969,16 @@ mod tests {
         let hydration = QuoteHydration {
             stable_pools: HashMap::from([(
                 QuoteHydration::stable_pool_key("discovered:xylo", DISC_P),
-                StablePoolStateValue::new("discovered:xylo", DISC_P, USDC_ERC20, EURC, 9_000_000_000_000, 9_000_000_000_000, 200, 4),
+                StablePoolStateValue::new(
+                    "discovered:xylo",
+                    DISC_P,
+                    USDC_ERC20,
+                    EURC,
+                    9_000_000_000_000,
+                    9_000_000_000_000,
+                    200,
+                    4,
+                ),
             )]),
             factories: vec![FactoryRecord::new(DISC_F, "xylo", "discovered:xylo")],
             ..Default::default()
@@ -2060,16 +1990,20 @@ mod tests {
             slippage_bps: Some(50),
             max_hops: Some(1),
             max_splits: Some(1),
-            prefer_arc: None,
         };
-        let route = engine.get_route_with_paths(&req, &engine.find_candidate_paths(&req).await, Some(&hydration)).await;
-        assert!(route.sub_orders.is_empty(), "discovery-only venue must never quote automatically");
+        let route = engine
+            .get_route_with_paths(&req, &engine.find_candidate_paths(&req).await, Some(&hydration))
+            .await;
+        assert!(
+            route.sub_orders.is_empty(),
+            "discovery-only venue must never quote automatically"
+        );
         assert_eq!(route.total_expected_out, 0);
     }
 
-    /// T4.5: Empty factories list still quotes legacy pools (backward compat).
+    /// An unconfigured factory registry does not block active venue quotes.
     #[tokio::test]
-    async fn t45_empty_factories_still_quotes_legacy_pools() {
+    async fn empty_factories_do_not_block_active_venue_quotes() {
         let engine = QuoteEngine::new(PathFinderConfig::default(), SplitConfig::default());
         engine.update_from_chakra_snapshot(&chakra_snapshot()).await;
         let hydration = QuoteHydration {
@@ -2110,7 +2044,6 @@ mod tests {
                     slippage_bps: Some(50),
                     max_hops: Some(1),
                     max_splits: Some(1),
-                    prefer_arc: None,
                 },
                 &engine
                     .find_candidate_paths(&RouteRequest {
@@ -2120,7 +2053,6 @@ mod tests {
                         slippage_bps: Some(50),
                         max_hops: Some(1),
                         max_splits: Some(1),
-                        prefer_arc: None,
                     })
                     .await,
                 Some(&hydration),
@@ -2128,7 +2060,7 @@ mod tests {
             .await;
         assert!(
             !route.sub_orders.is_empty(),
-            "empty factories must still quote legacy pools"
+            "an unconfigured factory registry must not block active quotes"
         );
         assert!(route.total_expected_out > 0);
     }
@@ -2221,7 +2153,6 @@ mod tests {
             slippage_bps: Some(50),
             max_hops: Some(1),
             max_splits: Some(1),
-            prefer_arc: None,
         };
         let paths = engine.find_candidate_paths(&request).await;
         let route = engine
@@ -2257,7 +2188,6 @@ mod tests {
             slippage_bps: Some(50),
             max_hops: Some(1),
             max_splits: Some(1),
-            prefer_arc: None,
         };
         let paths = engine.find_candidate_paths(&request).await;
         let route = engine

@@ -27,7 +27,7 @@ impl SnapshotStoreBackend {
             "file" => Ok(Self::File),
             "redis" => Ok(Self::Redis),
             "memory" | "embedded" => Ok(Self::Memory),
-            other => Err(anyhow!("unsupported snapshot backend: {}", other)),
+            other => Err(anyhow!("unsupported snapshot backend: {other}")),
         }
     }
 }

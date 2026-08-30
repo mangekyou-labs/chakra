@@ -6,12 +6,14 @@
 
 use {
     api_server::{build_router, config::AppConfig, rate_limit::RateLimitState, state::AppState},
-    axum::{body::Body, http::{Request, StatusCode}, Router},
+    axum::{
+        body::Body,
+        http::{Request, StatusCode},
+        Router,
+    },
     market_snapshot::{
         decimals::{CIRBTC, EURC, USDC_ERC20},
-        pool_state_store::{
-            MemoryPoolStateStore, PoolStateStore, StablePoolStateValue, XykPoolStateValue,
-        },
+        pool_state_store::{MemoryPoolStateStore, PoolStateStore, StablePoolStateValue, XykPoolStateValue},
         store::{MemorySnapshotStore, SnapshotStore},
         MarketSnapshot, SourceSnapshot, TradingPairSnapshot,
     },
@@ -34,7 +36,7 @@ const UNITFLOW_CIRBTC: u128 = 1_000_000_000; // 10 cirBTC (1 EURC ≈ 0.01 cirBT
 
 fn app_config() -> AppConfig {
     let mut config = AppConfig::default();
-    config.Chakra_mode = api_server::config::ChakraMode::Embedded;
+    config.runtime_mode = api_server::config::RuntimeMode::Embedded;
     config.snapshot_backend = Some("memory".to_string());
     config.max_splits = 5;
     config.quote_rpc_hydrate_enabled = false;
@@ -88,6 +90,19 @@ fn canonical_snapshot() -> MarketSnapshot {
 
 async fn seed_pool_state(pools: &MemoryPoolStateStore) {
     pools
+        .set_stable_batch(&[StablePoolStateValue::new(
+            "xylo-stable",
+            XYLO_POOL,
+            USDC_ERC20.to_ascii_lowercase(),
+            EURC.to_ascii_lowercase(),
+            XYLO_RESERVE_USDC,
+            XYLO_RESERVE_EURC,
+            200,
+            4,
+        )])
+        .await
+        .unwrap();
+    pools
         .set_stable_batch(&[
             StablePoolStateValue::new(
                 "xylo-stable",
@@ -99,35 +114,21 @@ async fn seed_pool_state(pools: &MemoryPoolStateStore) {
                 200,
                 4,
             ),
+            // Presto spoke state lives in the stable bucket (A marker unused by
+            // the spoke quote; fee 30 bps per the published hub formula).
+            StablePoolStateValue::new(
+                "presto-hub",
+                PRESTO_HUB,
+                USDC_ERC20.to_ascii_lowercase(),
+                EURC.to_ascii_lowercase(),
+                200_000_000_000,
+                200_000_000_000,
+                1,
+                30,
+            ),
         ])
         .await
         .unwrap();
-    pools.set_stable_batch(&[
-        StablePoolStateValue::new(
-            "xylo-stable",
-            XYLO_POOL,
-            USDC_ERC20.to_ascii_lowercase(),
-            EURC.to_ascii_lowercase(),
-            XYLO_RESERVE_USDC,
-            XYLO_RESERVE_EURC,
-            200,
-            4,
-        ),
-        // Presto spoke state lives in the stable bucket (A marker unused by
-        // the spoke quote; fee 30 bps per the published hub formula).
-        StablePoolStateValue::new(
-            "presto-hub",
-            PRESTO_HUB,
-            USDC_ERC20.to_ascii_lowercase(),
-            EURC.to_ascii_lowercase(),
-            200_000_000_000,
-            200_000_000_000,
-            1,
-            30,
-        ),
-    ])
-    .await
-    .unwrap();
     pools
         .set_xyk_batch(&[XykPoolStateValue::new(
             "unitflow-v25",
@@ -146,16 +147,11 @@ async fn test_app() -> (Router, Arc<MemorySnapshotStore>, Arc<MemoryPoolStateSto
     let config = app_config();
     let snapshot_store = Arc::new(MemorySnapshotStore::new());
     let pool_store = Arc::new(MemoryPoolStateStore::new());
-    snapshot_store
-        .publish_snapshot(&canonical_snapshot())
-        .await
-        .unwrap();
+    snapshot_store.publish_snapshot(&canonical_snapshot()).await.unwrap();
     seed_pool_state(&pool_store).await;
 
     let engine = QuoteEngine::new(PathFinderConfig::default(), SplitConfig::default());
-    engine
-        .update_from_chakra_snapshot(&canonical_snapshot())
-        .await;
+    engine.update_from_chakra_snapshot(&canonical_snapshot()).await;
     let state = AppState::from_backends(
         config,
         Some(snapshot_store.clone() as Arc<dyn SnapshotStore>),
@@ -282,11 +278,7 @@ async fn deterministic_xylo_presto_split() {
         }
     }
     let unique: std::collections::HashSet<&String> = pools.iter().collect();
-    assert_eq!(
-        unique.len(),
-        pools.len(),
-        "split must not reuse a pool: {pools:?}"
-    );
+    assert_eq!(unique.len(), pools.len(), "split must not reuse a pool: {pools:?}");
 }
 
 /// Graceful degradation: a venue that is empty (zero reserves) is skipped and
@@ -343,40 +335,25 @@ async fn build_tx_encodes_xylo_and_presto_dex_types() {
     });
     let snapshot_store = Arc::new(MemorySnapshotStore::new());
     let pool_store = Arc::new(MemoryPoolStateStore::new());
-    snapshot_store
-        .publish_snapshot(&canonical_snapshot())
-        .await
-        .unwrap();
+    snapshot_store.publish_snapshot(&canonical_snapshot()).await.unwrap();
     seed_pool_state(&pool_store).await;
     // Factory allowlist records (chakra:factories) for the canonical venues.
     pool_store
         .set_factories(&[
-            market_snapshot::pool_state_store::FactoryRecord::new(
-                XYLO_FACTORY,
-                "xylo",
-                "xylo-stable",
-            ),
-            market_snapshot::pool_state_store::FactoryRecord::new(
-                PRESTO_HUB,
-                "presto",
-                "presto-hub",
-            ),
+            market_snapshot::pool_state_store::FactoryRecord::new(XYLO_FACTORY, "xylo", "xylo-stable"),
+            market_snapshot::pool_state_store::FactoryRecord::new(PRESTO_HUB, "presto", "presto-hub"),
         ])
         .await
         .unwrap();
     let engine = QuoteEngine::new(PathFinderConfig::default(), SplitConfig::default());
-    engine
-        .update_from_chakra_snapshot(&canonical_snapshot())
-        .await;
+    engine.update_from_chakra_snapshot(&canonical_snapshot()).await;
     let state = AppState::from_backends(
         config,
         Some(snapshot_store.clone() as Arc<dyn SnapshotStore>),
         Some(pool_store.clone() as Arc<dyn PoolStateStore>),
         Some(snapshot_store),
         Some(pool_store),
-        Some(Arc::new(
-            dex_adapters::evm_rpc::EvmRpcClient::single(&rpc_url).unwrap(),
-        )),
+        Some(Arc::new(dex_adapters::evm_rpc::EvmRpcClient::single(&rpc_url).unwrap())),
         Some(("chakra-canonic-1".to_string(), Arc::new(engine))),
     )
     .await;

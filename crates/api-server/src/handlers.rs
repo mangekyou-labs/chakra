@@ -89,7 +89,7 @@ pub struct SubRouteData {
     pub dex_types: Vec<String>,
     /// Per-hop venue fee in bps (T4.7). Same length as `pool_addresses`.
     pub hop_fees: Vec<u32>,
-    /// Per-hop allowlisted factory (empty string = legacy pool). T4.7.
+    /// Per-hop allowlisted factory (empty when venue discovery has no stamp).
     pub hop_factories: Vec<String>,
     pub amount_in: String,
     pub amount_out: String,
@@ -212,7 +212,6 @@ pub async fn get_quote(State(state): State<AppState>, Query(params): Query<Quote
         slippage_bps: Some(slippage_bps),
         max_hops: params.max_hops,
         max_splits: Some(max_splits),
-        prefer_arc: None,
     };
 
     let hydration = hydrate::hydrate_for_quote(&state, &engine, &request).await;

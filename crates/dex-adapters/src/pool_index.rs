@@ -1,4 +1,4 @@
-//! Minimal pool index stub for Chakra EVM (Arc pool_index stripped).
+//! Pool index for Chakra Arc EVM.
 
 use {
     market_snapshot::{ClmmPoolRefSnapshot, SourceSnapshot},

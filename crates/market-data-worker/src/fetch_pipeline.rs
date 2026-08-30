@@ -1,9 +1,8 @@
 //! EVM pool-state fetch pipeline for the Arc path: high-priority `FetchTask`
 //! queue → RPC workers → Redis sink.
 //!
-//! Only EVM venues are handled (`chakra-xyk` / `chakra-stable` /
-//! `chakra-clmm` + `discovered:*`). Arc adapters are never constructed.
-
+/// EVM venues are handled (`chakra-xyk` / `chakra-stable` /
+/// `chakra-clmm` / `presto-hub` + `discovered:*`).
 use {
     crate::{clmm_metrics::ClmmCoverageMetrics, worker::WorkerShared},
     anyhow::Result,
@@ -24,6 +23,7 @@ use {
 };
 
 #[derive(Debug, Clone)]
+#[allow(clippy::enum_variant_names)]
 pub enum FetchTask {
     /// EVM xy=k pool (Arc, chakra-xyk / discovered:xyk).
     EvmXyk { pool_address: String },
@@ -77,6 +77,7 @@ impl FetchPipelineMetrics {
 }
 
 #[derive(Debug)]
+#[allow(clippy::large_enum_variant)]
 enum PoolStateUpdate {
     Xyk(Vec<XykPoolStateValue>),
     Stable(Vec<StablePoolStateValue>),
@@ -148,11 +149,9 @@ pub(crate) fn coalesce_touched_into_tasks(touched: HashSet<PoolRef>) -> Vec<Fetc
                 pool_address: pool.pool_address,
             }),
             // T-XYLO: the pinned XyloNet USDC/EURC pool (source `xylo-stable`).
-            "xylo" | "xylo-stable" | "discovered:xylo" | "chakra-xylo" => {
-                tasks.push(FetchTask::EvmXylo {
-                    pool_address: pool.pool_address,
-                })
-            }
+            "xylo" | "xylo-stable" | "discovered:xylo" | "chakra-xylo" => tasks.push(FetchTask::EvmXylo {
+                pool_address: pool.pool_address,
+            }),
             // Presto hub spokes are fetched as stable-family state (2026-08-29).
             "presto-hub" | "discovered:presto" => tasks.push(FetchTask::EvmPresto {
                 pool_address: pool.pool_address,
@@ -293,12 +292,7 @@ async fn execute_fetch_task(ctx: &FetchWorkerContext, task: FetchTask) -> Result
         }
         FetchTask::EvmPresto { pool_address } => {
             let (source, pair) = find_evm_pair(&ctx.shared, "presto", &pool_address).await?;
-            let value = dex_adapters::evm_fetch::fetch_presto_state(
-                ctx.evm.as_ref(),
-                source.as_str(),
-                &pair,
-            )
-            .await?;
+            let value = dex_adapters::evm_fetch::fetch_presto_state(ctx.evm.as_ref(), source.as_str(), &pair).await?;
             Ok(vec![PoolStateUpdate::Stable(vec![value])])
         }
         FetchTask::EvmClmm { pool_address } => {
@@ -396,7 +390,7 @@ mod tests {
             pref("discovered:clmm", "0xC1"),
             pref("chakra-clmm", "0xC2"),
             pref("presto-hub", "0xPRESTO"),
-            pref("Arc venue", "0xArc"),
+            pref("unknown-venue", "0xUNKNOWN"),
         ]);
         let tasks = coalesce_touched_into_tasks(touched);
         assert!(tasks
@@ -417,20 +411,16 @@ mod tests {
         assert!(tasks
             .iter()
             .any(|t| matches!(t, FetchTask::EvmPresto { pool_address } if pool_address == "0xPRESTO")));
-        // Arc sources never produce tasks on the Arc path.
+        // Unknown sources never produce tasks on the Arc path.
         assert!(!tasks
             .iter()
-            .any(|t| matches!(t, FetchTask::EvmXyk { pool_address } if pool_address == "0xArc")));
+            .any(|t| matches!(t, FetchTask::EvmXyk { pool_address } if pool_address == "0xUNKNOWN")));
         assert_eq!(tasks.len(), 6);
     }
 
     #[tokio::test]
     async fn execute_fetch_task_hydrates_presto_pool_reserves_with_distinct_getters() {
-        use {
-            crate::evm_watcher::tests::spawn_fixture_rpc,
-            market_snapshot::SourceSnapshot,
-            serde_json::json,
-        };
+        use {crate::evm_watcher::tests::spawn_fixture_rpc, market_snapshot::SourceSnapshot, serde_json::json};
         let path_sel = dex_adapters::evm_fetch::path_reserves_selector();
         let token_sel = dex_adapters::evm_fetch::token_reserves_selector();
         let balance_of_sel = dex_adapters::evm_fetch::balance_of_selector();
@@ -501,8 +491,14 @@ mod tests {
         };
         let state = &states[0];
         assert_eq!(state.source, "presto-hub");
-        assert_eq!(state.balance_a, 123_000_000_000, "balance_a must be pathReserves (USDC)");
-        assert_eq!(state.balance_b, 456_000_000_000, "balance_b must be tokenReserves (EURC)");
+        assert_eq!(
+            state.balance_a, 123_000_000_000,
+            "balance_a must be pathReserves (USDC)"
+        );
+        assert_eq!(
+            state.balance_b, 456_000_000_000,
+            "balance_b must be tokenReserves (EURC)"
+        );
         assert_eq!(state.a, 1);
         assert_eq!(state.fee_bps, 30);
 
@@ -521,8 +517,14 @@ mod tests {
         };
         let state_rev = &states_rev[0];
         assert_eq!(state_rev.source, "presto-hub");
-        assert_eq!(state_rev.balance_a, 456_000_000_000, "balance_a must be tokenReserves (EURC)");
-        assert_eq!(state_rev.balance_b, 123_000_000_000, "balance_b must be pathReserves (USDC)");
+        assert_eq!(
+            state_rev.balance_a, 456_000_000_000,
+            "balance_a must be tokenReserves (EURC)"
+        );
+        assert_eq!(
+            state_rev.balance_b, 123_000_000_000,
+            "balance_b must be pathReserves (USDC)"
+        );
         assert_eq!(state_rev.a, 1);
         assert_eq!(state_rev.fee_bps, 30);
     }

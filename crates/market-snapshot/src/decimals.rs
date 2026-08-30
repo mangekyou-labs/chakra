@@ -54,9 +54,7 @@ pub fn v1_catalog() -> Vec<CatalogToken> {
 
 pub fn is_catalog_swap_token(address: &str) -> bool {
     let a = address.to_ascii_lowercase();
-    a == USDC_ERC20.to_ascii_lowercase()
-        || a == EURC.to_ascii_lowercase()
-        || a == CIRBTC.to_ascii_lowercase()
+    a == USDC_ERC20.to_ascii_lowercase() || a == EURC.to_ascii_lowercase() || a == CIRBTC.to_ascii_lowercase()
 }
 
 pub fn is_native_usdc_encoding(token: &str) -> bool {
@@ -117,8 +115,8 @@ mod tests {
     #[test]
     fn native_usdc_is_not_a_graph_node() {
         let nodes = graph_nodes();
-        assert!(!nodes.contains(&NATIVE_USDC.to_string()));
-        assert!(!nodes.contains(&"0x0000000000000000000000000000000000000000".to_string()));
+        assert!(!nodes.contains(NATIVE_USDC));
+        assert!(!nodes.contains("0x0000000000000000000000000000000000000000"));
         assert!(is_native_usdc_encoding(NATIVE_USDC));
         assert!(!is_catalog_swap_token(NATIVE_USDC));
         assert!(!is_catalog_swap_token("0x0000000000000000000000000000000000000000"));

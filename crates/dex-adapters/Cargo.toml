@@ -3,9 +3,7 @@ name = "dex-adapters"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
-# Arc-only crate: `src/bin/` and `tests/` hold untracked Arc-era leftovers
-# that must not be auto-discovered into the release build (cargo check/test
-# --workspace gate).
+# Arc-only crate for EVM venue adapters and quote math.
 autobins = false
 autotests = false
 

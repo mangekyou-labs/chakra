@@ -21,8 +21,7 @@ use {
     market_snapshot::{
         decimals::{EURC, NATIVE_USDC, USDC_ERC20},
         pool_state_store::{
-            FactoryRecord, MemoryPoolStateStore, PoolStateStore, StablePoolStateValue,
-            XykPoolStateValue,
+            FactoryRecord, MemoryPoolStateStore, PoolStateStore, StablePoolStateValue, XykPoolStateValue,
         },
         store::{MemorySnapshotStore, SnapshotStore},
         ClmmBitmapWordSnapshot, ClmmCoverageSnapshot, ClmmPoolRefSnapshot, ClmmPoolSnapshot, ClmmTickSnapshot,
@@ -45,7 +44,7 @@ const STABLE_UE_SEED: u128 = 200_000_000_000;
 
 fn app_config() -> AppConfig {
     let mut config = AppConfig::default();
-    config.Chakra_mode = api_server::config::ChakraMode::Embedded;
+    config.runtime_mode = api_server::config::RuntimeMode::Embedded;
     config.snapshot_backend = Some("memory".to_string());
     config.max_splits = 5;
     config.quote_rpc_hydrate_enabled = false;
@@ -113,7 +112,7 @@ async fn seed_pool_state(pools: &MemoryPoolStateStore) {
                 "chakra-xyk",
                 XYK_POOL_UM,
                 USDC_ERC20,
-                &CIRBTC.to_lowercase(),
+                CIRBTC.to_lowercase(),
                 30,
                 50_000_000_000,
                 100_000_000,
@@ -162,7 +161,7 @@ async fn test_app_with_pools(
         Some(snapshot_store.clone()),
         Some(pool_store.clone()),
         evm_rpc_url.map(|url| Arc::new(dex_adapters::evm_rpc::EvmRpcClient::single(&url).unwrap())),
-                Some(("chakra-api-1".to_string(), Arc::new(engine))),
+        Some(("chakra-api-1".to_string(), Arc::new(engine))),
     )
     .await;
 
@@ -461,13 +460,11 @@ async fn sc2_180k_is_split_and_beats_single_stable() {
     let sources: Vec<&str> = routes.iter().map(|r| r["source"].as_str().unwrap()).collect();
     assert!(
         sources.contains(&"chakra-xyk"),
-        "split must include chakra-xyk, got {:?}",
-        sources
+        "split must include chakra-xyk, got {sources:?}"
     );
     assert!(
         sources.contains(&"chakra-stable"),
-        "split must include chakra-stable, got {:?}",
-        sources
+        "split must include chakra-stable, got {sources:?}"
     );
     // Control: 1_000e6 pins the on-chain vector.
     let (_, body) = get(
@@ -506,7 +503,7 @@ async fn ready_is_503_until_snapshot_and_pool_exist() {
     assert_eq!(body["data"]["ready"], true);
     assert_eq!(body["data"]["snapshot_id"], "chakra-api-1");
     assert!(
-        body["data"]["pool_keys"].as_array().unwrap().len() >= 1,
+        !body["data"]["pool_keys"].as_array().unwrap().is_empty(),
         "pool_keys must list at least one pool key"
     );
 }
@@ -817,7 +814,7 @@ async fn ready_and_clmm_only_snapshot_quotes_and_builds() {
         Some(snapshot_store.clone()),
         Some(pool_store.clone()),
         Some(Arc::new(dex_adapters::evm_rpc::EvmRpcClient::single(&url).unwrap())),
-                None,
+        None,
     )
     .await;
     let router = build_router(state, RateLimitState::from_env());
@@ -869,7 +866,10 @@ async fn ready_and_clmm_only_snapshot_quotes_and_builds() {
     let (status, tx_body) = post(&router, "/api/v1/build_tx", build_tx_body).await;
     assert_eq!(status, StatusCode::OK, "build_tx response: {tx_body}");
     let tx_data = &tx_body["data"];
-    assert_eq!(tx_data["to"].as_str().unwrap().to_ascii_lowercase(), AGGREGATOR.to_ascii_lowercase());
+    assert_eq!(
+        tx_data["to"].as_str().unwrap().to_ascii_lowercase(),
+        AGGREGATOR.to_ascii_lowercase()
+    );
     assert_eq!(tx_data["value"], "0");
     assert!(tx_data["data"].as_str().unwrap().starts_with("0x"));
 }

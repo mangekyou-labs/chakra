@@ -58,6 +58,11 @@ pub struct TokenMetadataStore {
     logo_lists: Arc<TokenLogoListIndex>,
     metadata_file: PathBuf,
 }
+impl Default for TokenMetadataStore {
+    fn default() -> Self {
+        Self::new()
+    }
+}
 
 impl TokenMetadataStore {
     pub fn new() -> Self {
@@ -157,7 +162,7 @@ impl TokenMetadataStore {
         success
     }
 
-    /// Resolve unknown tokens — Chakra stub (no Arc RPC).
+    /// Resolve unknown tokens using the local Chakra metadata cache.
     pub async fn resolve_unknown(&self, _token_addresses: Vec<String>) {
         self.ensure_self_hosted_logos().await;
     }

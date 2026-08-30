@@ -27,7 +27,7 @@ pub struct MarketSnapshot {
     pub token_metadata: Vec<TokenMetadataSnapshot>,
     /// CLMM pool topology only (no slot0 / ticks / liquidity). Live state is in
     /// Redis `chakra:pool:clmm:*`.
-    #[serde(default, skip_serializing_if = "Vec::is_empty", alias = "clmm_pools")]
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub clmm_pool_refs: Vec<ClmmPoolRefSnapshot>,
 }
 
@@ -58,16 +58,10 @@ pub struct TradingPairSnapshot {
     pub token_b: String,
     pub pool_address: String,
     pub fee_bps: u32,
-    /// `"xyk"` | `"stable"` | `"clmm"` (defaults to `"xyk"` for legacy JSON).
-    #[serde(default = "default_dex_type")]
+    /// `"xyk"` | `"stable"` | `"clmm"`.
     pub dex_type: String,
-    /// Allowlisted venue factory address (defaults to empty for legacy JSON).
-    #[serde(default)]
+    /// Allowlisted venue factory address.
     pub factory: String,
-}
-
-fn default_dex_type() -> String {
-    "xyk".to_string()
 }
 
 /// CLMM pool identity for routing / pool index (no tick data).
@@ -79,7 +73,7 @@ pub struct ClmmPoolRefSnapshot {
     pub token1: String,
     pub fee_bps: u32,
     pub tick_spacing: i32,
-    /// Allowlisted venue factory address (empty = legacy / unknown).
+    /// Allowlisted venue factory address.
     #[serde(default)]
     pub factory: String,
 }
@@ -110,7 +104,7 @@ impl ClmmPoolRefSnapshot {
     }
 }
 
-/// Full CLMM pool state (Redis `Chakra:pool:clmm:*` only — not stored in
+/// Full CLMM pool state (Redis `chakra:pool:clmm:*` only — not stored in
 /// topology snapshot).
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct ClmmPoolSnapshot {
@@ -124,7 +118,7 @@ pub struct ClmmPoolSnapshot {
     pub sqrt_price_x96: [u64; 4],
     pub tick: i32,
     pub liquidity: u128,
-    /// Allowlisted venue factory address (empty = legacy / unknown).
+    /// Allowlisted venue factory address (empty when not stamped).
     #[serde(default)]
     pub factory: String,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
@@ -173,9 +167,9 @@ pub fn write_snapshot_to_dir(snapshot_dir: &Path, snapshot: &MarketSnapshot) -> 
     std::fs::create_dir_all(snapshot_dir)?;
 
     let snapshot_path = snapshot_dir.join(CURRENT_SNAPSHOT_FILE);
-    let snapshot_tmp_path = snapshot_dir.join(format!("{}.tmp", CURRENT_SNAPSHOT_FILE));
+    let snapshot_tmp_path = snapshot_dir.join(format!("{CURRENT_SNAPSHOT_FILE}.tmp"));
     let meta_path = snapshot_dir.join(CURRENT_META_FILE);
-    let meta_tmp_path = snapshot_dir.join(format!("{}.tmp", CURRENT_META_FILE));
+    let meta_tmp_path = snapshot_dir.join(format!("{CURRENT_META_FILE}.tmp"));
 
     std::fs::write(&snapshot_tmp_path, serde_json::to_vec_pretty(snapshot)?)?;
     std::fs::rename(&snapshot_tmp_path, &snapshot_path)?;
@@ -253,7 +247,7 @@ mod tests {
 
     fn sample_clmm_pool() -> ClmmPoolSnapshot {
         ClmmPoolSnapshot {
-            source: "sushi".to_string(),
+            source: "chakra-clmm".to_string(),
             pool_address: "pool-clmm".to_string(),
             token0: "A".to_string(),
             token1: "B".to_string(),
@@ -305,7 +299,7 @@ mod tests {
                 token_count: 2,
             },
             sources: vec![SourceSnapshot {
-                source: "Arc venue".to_string(),
+                source: "chakra-xyk".to_string(),
                 pairs: vec![TradingPairSnapshot {
                     token_a: "A".to_string(),
                     token_b: "B".to_string(),
@@ -347,8 +341,8 @@ mod tests {
                 SourceSnapshot {
                     source: "a".to_string(),
                     pairs: vec![TradingPairSnapshot {
-                        token_a: "Arc".to_string(),
-                        token_b: "USDC".to_string(),
+                        token_a: "0xUSDC".to_string(),
+                        token_b: "0xEURC".to_string(),
                         pool_address: "pool-1".to_string(),
                         fee_bps: 30,
                         dex_type: "xyk".to_string(),
@@ -358,8 +352,8 @@ mod tests {
                 SourceSnapshot {
                     source: "b".to_string(),
                     pairs: vec![TradingPairSnapshot {
-                        token_a: "USDC".to_string(),
-                        token_b: "AQUA".to_string(),
+                        token_a: "0xEURC".to_string(),
+                        token_b: "0xUSDT".to_string(),
                         pool_address: "pool-2".to_string(),
                         fee_bps: 5,
                         dex_type: "xyk".to_string(),
@@ -389,7 +383,7 @@ mod tests {
             789,
             "mainnet",
             vec![SourceSnapshot {
-                source: "Arc venue".to_string(),
+                source: "chakra-xyk".to_string(),
                 pairs: vec![TradingPairSnapshot {
                     token_a: "A".to_string(),
                     token_b: "B".to_string(),
@@ -417,10 +411,10 @@ mod tests {
             999,
             "mainnet",
             vec![SourceSnapshot {
-                source: "classic_dex".to_string(),
+                source: "chakra-xyk".to_string(),
                 pairs: vec![TradingPairSnapshot {
-                    token_a: "native".to_string(),
-                    token_b: "USDC:issuer".to_string(),
+                    token_a: "0xUSDC".to_string(),
+                    token_b: "0xEURC".to_string(),
                     pool_address: "pool".to_string(),
                     fee_bps: 30,
                     dex_type: "xyk".to_string(),
@@ -429,104 +423,15 @@ mod tests {
             }],
         )
         .with_token_metadata(vec![TokenMetadataSnapshot {
-            contract: "native".to_string(),
-            symbol: "Arc".to_string(),
-            name: "Arc Lumens".to_string(),
+            contract: "0xUSDC".to_string(),
+            symbol: "USDC".to_string(),
+            name: "USD Coin".to_string(),
             logo: Some("logo".to_string()),
             logo_kind: Some("official".to_string()),
         }]);
 
         assert_eq!(snapshot.token_metadata.len(), 1);
-        assert_eq!(snapshot.token_metadata[0].name, "Arc Lumens");
-    }
-
-    #[test]
-    fn market_snapshot_defaults_missing_clmm_state_for_legacy_json() {
-        let legacy_json = r#"{
-            "version":"v1",
-            "generated_at_ms":123,
-            "network":"mainnet",
-            "meta":{"source_count":1,"pair_count":1,"token_count":2},
-            "sources":[
-                {
-                    "source":"Arc venue",
-                    "pairs":[
-                        {
-                            "token_a":"A",
-                            "token_b":"B",
-                            "pool_address":"POOL",
-                            "fee_bps":30,
-                            "reserve_a":100,
-                            "reserve_b":200
-                        }
-                    ]
-                }
-            ],
-            "token_metadata":[]
-        }"#;
-
-        let restored: MarketSnapshot = serde_json::from_str(legacy_json).unwrap();
-
-        assert!(restored.clmm_pool_refs.is_empty());
-        assert_eq!(restored.sources[0].pairs[0].pool_address, "POOL");
-    }
-
-    #[test]
-    fn legacy_json_defaults_dex_type_and_factory_on_pairs() {
-        let legacy_json = r#"{
-            "version":"v1",
-            "generated_at_ms":123,
-            "network":"mainnet",
-            "meta":{"source_count":1,"pair_count":1,"token_count":2},
-            "sources":[
-                {
-                    "source":"Arc venue",
-                    "pairs":[
-                        {
-                            "token_a":"A",
-                            "token_b":"B",
-                            "pool_address":"POOL",
-                            "fee_bps":30
-                        }
-                    ]
-                }
-            ],
-            "token_metadata":[]
-        }"#;
-
-        let restored: MarketSnapshot = serde_json::from_str(legacy_json).unwrap();
-        let pair = &restored.sources[0].pairs[0];
-        assert_eq!(pair.dex_type, "xyk");
-        assert_eq!(pair.factory, "");
-    }
-
-    #[test]
-    fn legacy_json_with_full_clmm_pools_deserializes_to_refs() {
-        let legacy_json = r#"{
-            "version":"v1",
-            "generated_at_ms":123,
-            "network":"mainnet",
-            "meta":{"source_count":1,"pair_count":1,"token_count":2},
-            "sources":[{"source":"sushi","pairs":[{"token_a":"A","token_b":"B","pool_address":"pool-clmm","fee_bps":30}]}],
-            "clmm_pools":[{
-                "source":"sushi",
-                "pool_address":"pool-clmm",
-                "token0":"A",
-                "token1":"B",
-                "fee_bps":30,
-                "tick_spacing":60,
-                "sqrt_price_x96":[1,2,3,4],
-                "tick":120,
-                "liquidity":999,
-                "ticks":[]
-            }],
-            "token_metadata":[]
-        }"#;
-
-        let restored: MarketSnapshot = serde_json::from_str(legacy_json).unwrap();
-        assert_eq!(restored.clmm_pool_refs.len(), 1);
-        assert_eq!(restored.clmm_pool_refs[0].pool_address, "pool-clmm");
-        assert_eq!(restored.clmm_pool_refs[0].tick_spacing, 60);
+        assert_eq!(snapshot.token_metadata[0].name, "USD Coin");
     }
 
     #[test]
@@ -536,7 +441,7 @@ mod tests {
             1_234,
             "mainnet",
             vec![SourceSnapshot {
-                source: "sushi".to_string(),
+                source: "chakra-clmm".to_string(),
                 pairs: vec![TradingPairSnapshot {
                     token_a: "A".to_string(),
                     token_b: "B".to_string(),
@@ -550,6 +455,6 @@ mod tests {
         .with_clmm_pool_refs(vec![ClmmPoolRefSnapshot::from_pool(&sample_clmm_pool())]);
 
         assert_eq!(snapshot.clmm_pool_refs.len(), 1);
-        assert_eq!(snapshot.clmm_pool_refs[0].source, "sushi");
+        assert_eq!(snapshot.clmm_pool_refs[0].source, "chakra-clmm");
     }
 }

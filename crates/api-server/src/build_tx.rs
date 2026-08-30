@@ -116,7 +116,7 @@ fn step_fee_bps(dex_type: DexType) -> u32 {
 }
 
 /// PermitSingle fields that go into the Permit2Pull struct.
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, Default)]
 pub struct PermitSingleFields {
     pub token: [u8; 20],
     pub amount: u128,
@@ -124,19 +124,6 @@ pub struct PermitSingleFields {
     pub nonce: u64,
     pub spender: [u8; 20],
     pub sig_deadline: u64,
-}
-
-impl Default for PermitSingleFields {
-    fn default() -> Self {
-        Self {
-            token: [0u8; 20],
-            amount: 0,
-            expiration: 0,
-            nonce: 0,
-            spender: [0u8; 20],
-            sig_deadline: 0,
-        }
-    }
 }
 
 /// `Permit2Pull { PermitSingle permitSingle; bytes signature; }`.
@@ -183,6 +170,7 @@ fn encode_permit2_pull(signature: &[u8], permit: Option<&PermitSingleFields>) ->
 }
 
 /// Encode `splitSwap` calldata.
+#[allow(clippy::too_many_arguments)]
 pub fn encode_split_swap(
     token_in: &str,
     token_out: &str,
@@ -270,7 +258,7 @@ async fn validate_routes(state: &AppState, body: &BuildTxRequest) -> Result<Mark
         for step in &sub.steps {
             let pool_key = step.pool_address.to_ascii_lowercase();
             if !seen_pools.insert(pool_key.clone()) {
-                bail!("shared pool across sub-routes is not allowed: {}", pool_key);
+                bail!("shared pool across sub-routes is not allowed: {pool_key}");
             }
             validate_hop(state, &snapshot, step).await?;
         }
@@ -320,8 +308,8 @@ async fn validate_hop(state: &AppState, snapshot: &MarketSnapshot, step: &BuildT
             r.address.eq_ignore_ascii_case(f) && step_factory_matches(&step.dex_type, &r.source)
         })
     });
-    // Legacy pools without a stamped factory: accept only when factories are
-    // empty (pre-T2.5) — otherwise require membership.
+    // A pool without a stamped factory is accepted only when discovery has not
+    // produced an active factory registry; otherwise require membership.
     match allowlisted {
         Some(true) => Ok(()),
         Some(false) => bail!("pool {pool} factory not allowlisted in chakra:factories"),
@@ -346,6 +334,7 @@ fn snapshot_pool_tokens(snapshot: &MarketSnapshot, pool: &str, dex_type: DexType
         })
 }
 
+#[cfg(test)]
 fn step_factory_source(dex_type: &str) -> &'static str {
     match dex_type {
         "xyk" => "chakra-xyk",
@@ -428,10 +417,10 @@ fn snapshot_pool_fee(snapshot: &MarketSnapshot, pool: &str, dex_type: DexType) -
 
 async fn load_snapshot(state: &AppState) -> Result<MarketSnapshot> {
     if let Some(snapshots) = &state.memory_snapshot {
-        return Ok(snapshots.load_current_snapshot().await?);
+        return snapshots.load_current_snapshot().await;
     }
     if let Some(store) = &state.snapshot_store {
-        return Ok(store.load_current_snapshot().await?);
+        return store.load_current_snapshot().await;
     }
     bail!("no snapshot available for build_tx validation")
 }
@@ -447,7 +436,7 @@ fn _pool_state_source(state: &AppState) -> Option<&dyn PoolStateStore> {
 
 /// `paused()` on the aggregator.
 async fn aggregator_paused(rpc: &EvmRpcClient, aggregator: &str) -> Result<bool> {
-    let data = format!("{PAUSED_SELECTOR}");
+    let data = PAUSED_SELECTOR.to_string();
     let word = rpc.eth_call(aggregator, &data).await?;
     let bytes = hex::decode(word.trim_start_matches("0x"))?;
     Ok(bytes.iter().any(|&b| b != 0))

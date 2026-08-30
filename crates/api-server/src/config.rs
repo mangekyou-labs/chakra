@@ -14,7 +14,7 @@ pub fn parse_chakra_rpc_http(value: Option<String>) -> anyhow::Result<String> {
 /// Deployment topology for quote + market data.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "lowercase")]
-pub enum ChakraMode {
+pub enum RuntimeMode {
     /// Separate `market-data-worker` + Redis + API (production default).
     #[default]
     Cluster,
@@ -23,17 +23,17 @@ pub enum ChakraMode {
     Embedded,
 }
 
-impl ChakraMode {
+impl RuntimeMode {
     pub fn parse(value: &str) -> Option<Self> {
         match value.trim().to_ascii_lowercase().as_str() {
             "cluster" | "redis" => Some(Self::Cluster),
-            "embedded" | "all-in-one" | "single" | "memory" => Some(Self::Embedded),
+            "embedded" | "memory" => Some(Self::Embedded),
             _ => None,
         }
     }
 
     pub fn from_env() -> Self {
-        std::env::var("Chakra_MODE")
+        std::env::var("CHAKRA_RUNTIME_MODE")
             .ok()
             .and_then(|v| Self::parse(&v))
             .unwrap_or_default()
@@ -42,14 +42,8 @@ impl ChakraMode {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AppConfig {
-    /// Arc RPC endpoint URL
-    pub rpc_url: String,
-    /// Network passphrase
-    pub network_passphrase: String,
     /// API server listen address
     pub listen_addr: String,
-    /// Aggregator contract address (optional, for on-chain execution)
-    pub aggregator_contract: Option<String>,
     /// Pool reserve refresh interval (seconds). Keep short so quotes track live
     /// reserves.
     pub refresh_interval_secs: u64,
@@ -81,7 +75,7 @@ pub struct AppConfig {
     /// is true.
     pub quote_hydrate_max_pools: usize,
     /// `cluster` (Redis worker) or `embedded` (in-process worker + memory).
-    pub Chakra_mode: ChakraMode,
+    pub runtime_mode: RuntimeMode,
     /// Optional snapshot backend selector (`file`, `redis`, or `memory`).
     pub snapshot_backend: Option<String>,
     /// Optional directory containing file-backed market snapshots.
@@ -99,10 +93,7 @@ pub struct AppConfig {
 impl Default for AppConfig {
     fn default() -> Self {
         Self {
-            rpc_url: "https://Arc-rpc.mainnet.Arc.gateway.fm".to_string(),
-            network_passphrase: "Public Global Arc Network ; September 2015".to_string(),
             listen_addr: "0.0.0.0:3100".to_string(),
-            aggregator_contract: None,
             refresh_interval_secs: 5,
             discovery_interval_secs: 600,
             split_threshold_bps: 5,
@@ -114,7 +105,7 @@ impl Default for AppConfig {
             path_finder_max_direct_paths: 0,
             quote_rpc_hydrate_enabled: false,
             quote_hydrate_max_pools: 12,
-            Chakra_mode: ChakraMode::Cluster,
+            runtime_mode: RuntimeMode::Cluster,
             snapshot_backend: None,
             snapshot_dir: None,
             snapshot_redis_url: None,
@@ -129,13 +120,9 @@ impl AppConfig {
     /// Load config from environment variables, falling back to defaults.
     pub fn from_env() -> Self {
         Self {
-            rpc_url: std::env::var("RPC_URL").unwrap_or_else(|_| Self::default().rpc_url),
-            network_passphrase: std::env::var("NETWORK_PASSPHRASE")
-                .unwrap_or_else(|_| Self::default().network_passphrase),
             listen_addr: std::env::var("CHAKRA_LISTEN_ADDR")
                 .or_else(|_| std::env::var("LISTEN_ADDR"))
                 .unwrap_or_else(|_| Self::default().listen_addr),
-            aggregator_contract: std::env::var("AGGREGATOR_CONTRACT").ok(),
             refresh_interval_secs: std::env::var("REFRESH_INTERVAL_SECS")
                 .ok()
                 .and_then(|s| s.parse().ok())
@@ -181,12 +168,10 @@ impl AppConfig {
                 .ok()
                 .and_then(|s| s.parse().ok())
                 .unwrap_or(Self::default().quote_hydrate_max_pools),
-            Chakra_mode: ChakraMode::from_env(),
+            runtime_mode: RuntimeMode::from_env(),
             snapshot_backend: std::env::var("SNAPSHOT_BACKEND").ok(),
             snapshot_dir: std::env::var("SNAPSHOT_DIR").ok(),
-            snapshot_redis_url: std::env::var("CHAKRA_REDIS_URL")
-                .ok()
-                .or_else(|| std::env::var("SNAPSHOT_REDIS_URL").ok()),
+            snapshot_redis_url: std::env::var("CHAKRA_REDIS_URL").ok(),
             chakra_rpc_http: parse_chakra_rpc_http(std::env::var("CHAKRA_RPC_HTTP").ok())
                 .unwrap_or_else(|_| Self::default().chakra_rpc_http),
             chakra_aggregator: std::env::var("CHAKRA_AGGREGATOR")
@@ -218,14 +203,14 @@ mod tests {
     #[test]
     fn default_config_cluster_mode() {
         let config = AppConfig::default();
-        assert_eq!(config.Chakra_mode, ChakraMode::Cluster);
+        assert_eq!(config.runtime_mode, RuntimeMode::Cluster);
     }
 
     #[test]
-    fn Chakra_mode_parses_embedded_aliases() {
-        assert_eq!(ChakraMode::parse("embedded"), Some(ChakraMode::Embedded));
-        assert_eq!(ChakraMode::parse("all-in-one"), Some(ChakraMode::Embedded));
-        assert_eq!(ChakraMode::parse("cluster"), Some(ChakraMode::Cluster));
+    fn runtime_mode_parses_embedded_aliases() {
+        assert_eq!(RuntimeMode::parse("embedded"), Some(RuntimeMode::Embedded));
+        assert_eq!(RuntimeMode::parse("memory"), Some(RuntimeMode::Embedded));
+        assert_eq!(RuntimeMode::parse("cluster"), Some(RuntimeMode::Cluster));
     }
 
     #[test]
@@ -238,12 +223,10 @@ mod tests {
     }
 
     #[test]
-    fn chakra_redis_url_takes_precedence_over_snapshot_redis_url() {
+    fn chakra_redis_url_is_read_from_the_active_environment_key() {
         let _guard = env_lock().lock().unwrap();
         let original_chakra = std::env::var("CHAKRA_REDIS_URL").ok();
-        let original_snapshot = std::env::var("SNAPSHOT_REDIS_URL").ok();
         std::env::set_var("CHAKRA_REDIS_URL", "redis://chakra:6379");
-        std::env::set_var("SNAPSHOT_REDIS_URL", "redis://snapshot:6379");
 
         let config = AppConfig::from_env();
         assert_eq!(config.snapshot_redis_url.as_deref(), Some("redis://chakra:6379"));
@@ -251,10 +234,6 @@ mod tests {
         match original_chakra {
             Some(v) => std::env::set_var("CHAKRA_REDIS_URL", v),
             None => std::env::remove_var("CHAKRA_REDIS_URL"),
-        }
-        match original_snapshot {
-            Some(v) => std::env::set_var("SNAPSHOT_REDIS_URL", v),
-            None => std::env::remove_var("SNAPSHOT_REDIS_URL"),
         }
     }
 

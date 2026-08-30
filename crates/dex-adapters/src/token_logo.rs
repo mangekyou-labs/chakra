@@ -15,7 +15,7 @@ const MAX_LOGO_BYTES: u64 = 1024 * 1024; // 1 MiB
 const MAX_DOWNLOAD_BYTES: u64 = 4 * 1024 * 1024; // enough to normalize oversized source art
 const MAX_RASTER_DIMENSION: u32 = 512;
 const DEFAULT_DIR: &str = "data/logos";
-const DEFAULT_BASE_URL: &str = "https://api.Chakra.xyz/logos";
+const DEFAULT_BASE_URL: &str = "/logos";
 const CACHED_EXTENSIONS: &[&str] = &["png", "jpg", "webp", "gif", "svg"];
 
 pub struct TokenLogoCache {
@@ -57,7 +57,7 @@ impl TokenLogoCache {
             let ext = existing.extension().and_then(|e| e.to_str()).unwrap_or("");
             let is_raster = matches!(ext, "png" | "jpg" | "webp" | "gif");
             if is_raster || remote_url.is_none() {
-                return Ok(self.url_for_path(&existing)?);
+                return self.url_for_path(&existing);
             }
         }
 
@@ -69,18 +69,18 @@ impl TokenLogoCache {
                 if ext != "svg" {
                     let _ = std::fs::remove_file(self.path_for_ext(token_id, "svg"));
                 }
-                return Ok(self.url_for_path(&path)?);
+                return self.url_for_path(&path);
             }
         }
 
         if let Some(existing) = self.find_existing(token_id) {
-            return Ok(self.url_for_path(&existing)?);
+            return self.url_for_path(&existing);
         }
 
         let svg = fallback_svg(symbol, token_id);
         let path = self.fallback_path(token_id);
         self.atomic_write(&path, svg.as_bytes())?;
-        Ok(self.url_for_path(&path)?)
+        self.url_for_path(&path)
     }
 
     /// True when the cached file for `token_id` looks like a downloaded raster
@@ -582,7 +582,7 @@ mod tests {
 
     #[test]
     fn cache_path_is_deterministic_and_safe() {
-        let cache = TokenLogoCache::new("data/logos", "https://api.Chakra.xyz/logos");
+        let cache = TokenLogoCache::new("data/logos", "/logos");
         let first = cache.fallback_path("CA/unsafe:token");
         let second = cache.fallback_path("CA/unsafe:token");
         assert_eq!(first, second);

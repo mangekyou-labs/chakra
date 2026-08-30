@@ -13,7 +13,6 @@
 //! 4. Discovery every ~600 s rebuilds topology from `CHAKRA_SEED_FACTORIES`
 //!    (+ optional `CHAKRA_DISCOVERY_FACTORIES`) and republishes.
 //!
-//! Arc adapters are never constructed on this path.
 
 use {
     crate::{fetch_pipeline, worker::WorkerShared},
@@ -156,8 +155,7 @@ impl EvmConfig {
         ws_list.extend(split_list(env_var("CHAKRA_RPC_WS_FAILOVERS")));
         let ws_urls = validate_ws_urls(&ws_list)?;
 
-        // CHAKRA_REDIS_URL → snapshot store; SNAPSHOT_REDIS_URL stays the legacy override.
-        let redis_url = env_var("SNAPSHOT_REDIS_URL").or_else(|| env_var("CHAKRA_REDIS_URL"));
+        let redis_url = env_var("CHAKRA_REDIS_URL");
 
         let seed_factories = split_list(env_var("CHAKRA_SEED_FACTORIES"))
             .iter()
@@ -292,10 +290,10 @@ impl EvmRunner {
     }
 
     async fn address_has_code(&self, address: &str) -> bool {
-        match self.http.eth_get_code(address).await {
-            Ok(code) if code.len() > 2 && code[2..].bytes().any(|b| b != b'0') => true,
-            _ => false,
-        }
+        matches!(
+            self.http.eth_get_code(address).await,
+            Ok(code) if code.len() > 2 && code[2..].bytes().any(|b| b != b'0')
+        )
     }
 
     /// Rebuild topology from seed/discovery factories. Returns the number of
@@ -349,11 +347,7 @@ impl EvmRunner {
                             }
                             // 2. Canonical token endpoints: pool token0/token1 match catalog tokens
                             if !dex_adapters::evm_fetch::verify_canonical_token_endpoints(
-                                &self.http,
-                                "xyk",
-                                &pool,
-                                token_a,
-                                token_b,
+                                &self.http, "xyk", &pool, token_a, token_b,
                             )
                             .await
                             .unwrap_or(false)
@@ -371,12 +365,8 @@ impl EvmRunner {
                                 factory: factory.address.clone(),
                             };
                             // 4 & 5. Nonzero reserves & probe quote
-                            let Ok(state) = dex_adapters::evm_fetch::fetch_xyk_state(
-                                &self.http,
-                                &factory.source,
-                                &snapshot,
-                            )
-                            .await
+                            let Ok(state) =
+                                dex_adapters::evm_fetch::fetch_xyk_state(&self.http, &factory.source, &snapshot).await
                             else {
                                 warn!(pool = %pool, "xyk pool state fetch failed — skipped");
                                 continue;
@@ -385,7 +375,8 @@ impl EvmRunner {
                                 warn!(pool = %pool, "xyk pool has zero reserves — skipped");
                                 continue;
                             }
-                            if dex_adapters::evm_quote_math::xyk_quote(state.reserve_a, state.reserve_b, 1_000_000) == 0 {
+                            if dex_adapters::evm_quote_math::xyk_quote(state.reserve_a, state.reserve_b, 1_000_000) == 0
+                            {
                                 warn!(pool = %pool, "xyk pool probe quote failed — skipped");
                                 continue;
                             }
@@ -406,11 +397,7 @@ impl EvmRunner {
                                 continue;
                             }
                             if !dex_adapters::evm_fetch::verify_canonical_token_endpoints(
-                                &self.http,
-                                "stable",
-                                &pool,
-                                token_a,
-                                token_b,
+                                &self.http, "stable", &pool, token_a, token_b,
                             )
                             .await
                             .unwrap_or(false)
@@ -463,11 +450,7 @@ impl EvmRunner {
                                 continue;
                             }
                             if !dex_adapters::evm_fetch::verify_canonical_token_endpoints(
-                                &self.http,
-                                "xylo",
-                                &pool,
-                                token_a,
-                                token_b,
+                                &self.http, "xylo", &pool, token_a, token_b,
                             )
                             .await
                             .unwrap_or(false)
@@ -484,12 +467,8 @@ impl EvmRunner {
                                 dex_type: "xylo".to_string(),
                                 factory: factory.address.clone(),
                             };
-                            let Ok(state) = dex_adapters::evm_fetch::fetch_xylo_state(
-                                &self.http,
-                                &factory.source,
-                                &snapshot,
-                            )
-                            .await
+                            let Ok(state) =
+                                dex_adapters::evm_fetch::fetch_xylo_state(&self.http, &factory.source, &snapshot).await
                             else {
                                 warn!(pool = %pool, "xylo pool state fetch failed — skipped");
                                 continue;
@@ -498,7 +477,13 @@ impl EvmRunner {
                                 warn!(pool = %pool, "xylo pool has zero reserves — skipped");
                                 continue;
                             }
-                            if dex_adapters::evm_quote_math::xylo_quote_with_a(state.balance_a, state.balance_b, 1_000_000, state.a) == 0 {
+                            if dex_adapters::evm_quote_math::xylo_quote_with_a(
+                                state.balance_a,
+                                state.balance_b,
+                                1_000_000,
+                                state.a,
+                            ) == 0
+                            {
                                 warn!(pool = %pool, "xylo pool probe quote failed — skipped");
                                 continue;
                             }
@@ -521,11 +506,7 @@ impl EvmRunner {
                                     continue;
                                 }
                                 if !dex_adapters::evm_fetch::verify_canonical_token_endpoints(
-                                    &self.http,
-                                    "clmm",
-                                    &pool,
-                                    token_a,
-                                    token_b,
+                                    &self.http, "clmm", &pool, token_a, token_b,
                                 )
                                 .await
                                 .unwrap_or(false)
@@ -568,7 +549,9 @@ impl EvmRunner {
                                     token1: b.clone(),
                                 };
                                 let tick_store = dex_adapters::clmm_math::TickDataStore::new();
-                                let Some((amount_out, _, _)) = dex_adapters::clmm_math::simulate_swap(&pool_state, &tick_store, 1_000_000, true) else {
+                                let Some((amount_out, _, _)) =
+                                    dex_adapters::clmm_math::simulate_swap(&pool_state, &tick_store, 1_000_000, true)
+                                else {
                                     warn!(pool = %pool, "clmm pool probe quote failed — skipped");
                                     continue;
                                 };
@@ -583,8 +566,7 @@ impl EvmRunner {
                     "presto" => {
                         let is_usdc_eurc = (token_a.eq_ignore_ascii_case(USDC_ERC20)
                             && token_b.eq_ignore_ascii_case(EURC))
-                            || (token_a.eq_ignore_ascii_case(EURC)
-                                && token_b.eq_ignore_ascii_case(USDC_ERC20));
+                            || (token_a.eq_ignore_ascii_case(EURC) && token_b.eq_ignore_ascii_case(USDC_ERC20));
                         if is_usdc_eurc {
                             if !dex_adapters::evm_fetch::verify_canonical_token_endpoints(
                                 &self.http,
@@ -608,12 +590,9 @@ impl EvmRunner {
                                 dex_type: "presto".to_string(),
                                 factory: factory.address.clone(),
                             };
-                            let Ok(state) = dex_adapters::evm_fetch::fetch_presto_state(
-                                &self.http,
-                                &factory.source,
-                                &snapshot,
-                            )
-                            .await
+                            let Ok(state) =
+                                dex_adapters::evm_fetch::fetch_presto_state(&self.http, &factory.source, &snapshot)
+                                    .await
                             else {
                                 warn!(hub = %factory.address, "presto hub spoke fetch failed — skipped");
                                 continue;
@@ -622,7 +601,12 @@ impl EvmRunner {
                                 warn!(hub = %factory.address, "presto hub has zero reserves — skipped");
                                 continue;
                             }
-                            if dex_adapters::evm_quote_math::presto_spoke_quote(state.balance_a, state.balance_b, 1_000_000) == 0 {
+                            if dex_adapters::evm_quote_math::presto_spoke_quote(
+                                state.balance_a,
+                                state.balance_b,
+                                1_000_000,
+                            ) == 0
+                            {
                                 warn!(hub = %factory.address, "presto hub probe quote failed — skipped");
                                 continue;
                             }
@@ -910,7 +894,7 @@ impl EvmRunner {
                     pool_address: pool,
                     token0,
                     token1,
-                    fee_bps: (fee / 100) as u32,
+                    fee_bps: fee / 100,
                     tick_spacing,
                     sqrt_price_x96: [0; 4],
                     tick: 0,
@@ -1121,7 +1105,7 @@ async fn subscribe_once(
         "params": ["logs", {"address": addresses, "topics": topics}]
     });
     stream
-        .send(Message::Text(subscribe.to_string().into()))
+        .send(Message::Text(subscribe.to_string()))
         .await
         .context("send eth_subscribe")?;
     Ok(stream)
@@ -1146,8 +1130,7 @@ fn now_ms() -> u64 {
 
 // ─── Entry points ───────────────────────────────────────────────────────────
 
-/// Spawn the one-and-only fetch pipeline for the Arc path (EVM client only;
-/// Arc adapters are never constructed).
+/// Spawn the fetch pipeline for Arc EVM venues.
 pub(crate) fn spawn_arc_pipeline(
     pool_store: Arc<dyn PoolStateStore>,
     shared: Arc<RwLock<WorkerShared>>,
@@ -1158,8 +1141,7 @@ pub(crate) fn spawn_arc_pipeline(
     fetch_pipeline::spawn_fetch_pipeline(pipeline_config, pool_store, http, shared)
 }
 
-/// Top-level Arc entry. `WorkerConfig` supplies store URLs (`CHAKRA_REDIS_URL`
-/// → snapshot store; `SNAPSHOT_REDIS_*` keep working as overrides).
+/// Top-level Arc entry. `WorkerConfig` supplies the active Chakra store URL.
 pub(crate) async fn run_arc(config: crate::worker::WorkerConfig) -> Result<()> {
     let evm = EvmConfig::from_env()?;
     let _snapshot_store = match &config.snapshot_store {
@@ -1403,7 +1385,6 @@ pub(crate) mod tests {
         assert_eq!(fixture_xyk.source, "chakra-xyk");
     }
 
-
     #[test]
     fn evm_config_from_env_reads_chakra_vars() {
         let _guard = env_lock().lock().unwrap();
@@ -1413,7 +1394,6 @@ pub(crate) mod tests {
             "CHAKRA_RPC_HTTP_FAILOVERS",
             "CHAKRA_RPC_WS_FAILOVERS",
             "CHAKRA_REDIS_URL",
-            "SNAPSHOT_REDIS_URL",
             "CHAKRA_CHAIN_ID",
             "CHAKRA_SEED_FACTORIES",
             "CHAKRA_DISCOVERY_FACTORIES",
@@ -1496,10 +1476,9 @@ pub(crate) mod tests {
         let usdc_word = format!("{:0>64}", &USDC[2..]);
         let eurc_word = format!("{:0>64}", &EURC[2..]);
         let (url, _server) = spawn_fixture_rpc(move |method, params| {
-            match method {
+            if method == "eth_getCode" {
                 // Manifest venue verification (SC-15): the seed factory has code.
-                "eth_getCode" => return Ok(json!("0x60")),
-                _ => {}
+                return Ok(json!("0x60"));
             }
             assert_eq!(method, "eth_call");
             let to = params[0]["to"].as_str().unwrap();
@@ -1636,7 +1615,10 @@ pub(crate) mod tests {
             ws_enabled: false,
             ..Default::default()
         };
-        let shared = Arc::new(RwLock::new(WorkerShared { sources: Vec::new(), clmm_pools: Vec::new() }));
+        let shared = Arc::new(RwLock::new(WorkerShared {
+            sources: Vec::new(),
+            clmm_pools: Vec::new(),
+        }));
         let mut runner = EvmRunner::new(config, client, shared, None);
         let found = runner.discover_once().await.unwrap();
         assert_eq!(found, 1);
@@ -1671,11 +1653,18 @@ pub(crate) mod tests {
             ws_enabled: false,
             ..Default::default()
         };
-        let shared = Arc::new(RwLock::new(WorkerShared { sources: Vec::new(), clmm_pools: Vec::new() }));
+        let shared = Arc::new(RwLock::new(WorkerShared {
+            sources: Vec::new(),
+            clmm_pools: Vec::new(),
+        }));
         let mut runner = EvmRunner::new(config, client, shared, None);
         let found = runner.discover_once().await.unwrap();
         assert_eq!(found, 0, "pool with no bytecode must be skipped");
-        assert_eq!(runner.verified_factories.read().unwrap().len(), 0, "seed factory with no verified pools must not be in verified_factories");
+        assert_eq!(
+            runner.verified_factories.read().unwrap().len(),
+            0,
+            "seed factory with no verified pools must not be in verified_factories"
+        );
     }
 
     #[tokio::test]
@@ -1691,7 +1680,9 @@ pub(crate) mod tests {
                 if to.eq_ignore_ascii_case(POOL) {
                     if data.starts_with(&dex_adapters::evm_fetch::token0_selector()) {
                         // Mismatched token0 address
-                        return Ok(json!("0x0000000000000000000000009999999999999999999999999999999999999999"));
+                        return Ok(json!(
+                            "0x0000000000000000000000009999999999999999999999999999999999999999"
+                        ));
                     }
                     if data.starts_with(&dex_adapters::evm_fetch::token1_selector()) {
                         return Ok(json!(format!("0x{:0>64}", &EURC[2..])));
@@ -1710,7 +1701,10 @@ pub(crate) mod tests {
             ws_enabled: false,
             ..Default::default()
         };
-        let shared = Arc::new(RwLock::new(WorkerShared { sources: Vec::new(), clmm_pools: Vec::new() }));
+        let shared = Arc::new(RwLock::new(WorkerShared {
+            sources: Vec::new(),
+            clmm_pools: Vec::new(),
+        }));
         let mut runner = EvmRunner::new(config, client, shared, None);
         let found = runner.discover_once().await.unwrap();
         assert_eq!(found, 0, "pool with mismatched token endpoints must be skipped");
@@ -1737,7 +1731,10 @@ pub(crate) mod tests {
             ws_enabled: false,
             ..Default::default()
         };
-        let shared = Arc::new(RwLock::new(WorkerShared { sources: Vec::new(), clmm_pools: Vec::new() }));
+        let shared = Arc::new(RwLock::new(WorkerShared {
+            sources: Vec::new(),
+            clmm_pools: Vec::new(),
+        }));
         let mut runner = EvmRunner::new(config, client, shared, None);
         let found = runner.discover_once().await.unwrap();
         assert_eq!(found, 0, "missing factory membership must yield 0 pools");
@@ -1776,7 +1773,10 @@ pub(crate) mod tests {
             ws_enabled: false,
             ..Default::default()
         };
-        let shared = Arc::new(RwLock::new(WorkerShared { sources: Vec::new(), clmm_pools: Vec::new() }));
+        let shared = Arc::new(RwLock::new(WorkerShared {
+            sources: Vec::new(),
+            clmm_pools: Vec::new(),
+        }));
         let mut runner = EvmRunner::new(config, client, shared, None);
         let found = runner.discover_once().await.unwrap();
         assert_eq!(found, 0, "pool with zero reserves must be skipped");
@@ -1815,7 +1815,10 @@ pub(crate) mod tests {
             ws_enabled: false,
             ..Default::default()
         };
-        let shared = Arc::new(RwLock::new(WorkerShared { sources: Vec::new(), clmm_pools: Vec::new() }));
+        let shared = Arc::new(RwLock::new(WorkerShared {
+            sources: Vec::new(),
+            clmm_pools: Vec::new(),
+        }));
         let mut runner = EvmRunner::new(config, client, shared, None);
         let found = runner.discover_once().await.unwrap();
         assert_eq!(found, 0, "pool with failing probe quote must be skipped");
@@ -1858,7 +1861,10 @@ pub(crate) mod tests {
             ws_enabled: false,
             ..Default::default()
         };
-        let shared = Arc::new(RwLock::new(WorkerShared { sources: Vec::new(), clmm_pools: Vec::new() }));
+        let shared = Arc::new(RwLock::new(WorkerShared {
+            sources: Vec::new(),
+            clmm_pools: Vec::new(),
+        }));
         let mut runner = EvmRunner::new(config, client, shared.clone(), None);
         let found = runner.discover_once().await.unwrap();
         assert_eq!(found, 1);
@@ -1899,7 +1905,10 @@ pub(crate) mod tests {
             ws_enabled: false,
             ..Default::default()
         };
-        let shared = Arc::new(RwLock::new(WorkerShared { sources: Vec::new(), clmm_pools: Vec::new() }));
+        let shared = Arc::new(RwLock::new(WorkerShared {
+            sources: Vec::new(),
+            clmm_pools: Vec::new(),
+        }));
         let mut runner = EvmRunner::new(config, client, shared, None);
         let found = runner.discover_once().await.unwrap();
         assert_eq!(found, 0, "presto hub with wrong pathUSD must be skipped");
@@ -2101,9 +2110,7 @@ pub(crate) mod tests {
                         assert_eq!(request["method"], "eth_subscribe");
                         let id = request["id"].clone();
                         ws.send(Message::Text(
-                            json!({"jsonrpc": "2.0", "id": id, "result": "0xsub1"})
-                                .to_string()
-                                .into(),
+                            json!({"jsonrpc": "2.0", "id": id, "result": "0xsub1"}).to_string(),
                         ))
                         .await
                         .unwrap();
@@ -2113,8 +2120,7 @@ pub(crate) mod tests {
                                 "method": "eth_subscription",
                                 "params": {"subscription": "0xsub1", "result": swap}
                             })
-                            .to_string()
-                            .into(),
+                            .to_string(),
                         ))
                         .await
                         .unwrap();
@@ -2184,7 +2190,7 @@ pub(crate) mod tests {
         let (url, _server) = spawn_fixture_rpc(|method, _params| {
             match method {
                 "eth_getCode" => Ok(json!("0x60")), // verified venue
-                _ => Ok(json!(word(0))), // no pool for any pair
+                _ => Ok(json!(word(0))),            // no pool for any pair
             }
         });
         let client = EvmRpcClient::single(&url).unwrap();

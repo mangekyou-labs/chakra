@@ -17,7 +17,7 @@ fn sample_snapshot(version: &str) -> MarketSnapshot {
         123,
         "mainnet",
         vec![SourceSnapshot {
-            source: "Arc venue".to_string(),
+            source: "chakra-xyk".to_string(),
             pairs: vec![TradingPairSnapshot {
                 token_a: "token-a".to_string(),
                 token_b: "token-b".to_string(),
@@ -38,7 +38,6 @@ fn minimal_config() -> api_server::config::AppConfig {
 #[tokio::test]
 async fn version_pointer_returns_published_version() {
     let mem_snap = Arc::new(MemorySnapshotStore::new());
-    let mem_pool = Arc::new(MemoryPoolStateStore::new());
     let snap: Arc<dyn SnapshotStore> = mem_snap.clone();
 
     snap.publish_snapshot(&sample_snapshot("v1")).await.unwrap();
@@ -101,16 +100,7 @@ async fn cold_state_empty_store_returns_snapshot_load_error() {
     let mem_snap = Arc::new(MemorySnapshotStore::new());
     let snap: Arc<dyn SnapshotStore> = mem_snap.clone();
 
-    let state = AppState::from_backends(
-        minimal_config(),
-        Some(snap),
-        None,
-        Some(mem_snap),
-        None,
-        None,
-        None,
-    )
-    .await;
+    let state = AppState::from_backends(minimal_config(), Some(snap), None, Some(mem_snap), None, None, None).await;
 
     let result = state.engine_for_version("v1").await;
     assert!(matches!(result, Err(EngineError::SnapshotLoad(_))));
@@ -137,8 +127,8 @@ async fn engine_for_version_builds_after_publish() {
     .await;
 
     let engine = state.engine_for_version("v1").await.unwrap();
-    // Engine should be usable (non-empty routes when tokens match).
-    assert!(engine.cached_pool_edges().await.is_empty() || true); // edges may be empty without reserves
+    // Topology is loaded independently from live pool reserves.
+    assert_eq!(engine.cached_pool_edges().await.len(), 1);
 }
 
 /// Unchanged version returns immediately (fast path).

@@ -90,7 +90,6 @@ fn split_swap_calldata_matches_solidity_abi_for_nested_routes() {
     assert_eq!(encoded, expected);
 }
 
-const CIRBTC: &str = "0xf0C4a4CE82A5746AbAAd9425360Ab04fbBA432BF";
 const XYK_POOL_UE: &str = "0x0000000000000000000000000000000000000001";
 const STABLE_POOL_UE: &str = "0x0000000000000000000000000000000000000002";
 const AGGREGATOR: &str = "0x00000000000000000000000000000000000000aa";
@@ -101,7 +100,7 @@ const SPLIT_SWAP_SELECTOR: &str = "2e3be0c1";
 
 fn app_config() -> AppConfig {
     let mut config = AppConfig::default();
-    config.Chakra_mode = api_server::config::ChakraMode::Embedded;
+    config.runtime_mode = api_server::config::RuntimeMode::Embedded;
     config.snapshot_backend = Some("memory".to_string());
     config.chakra_aggregator = AGGREGATOR.to_string();
     config
@@ -295,7 +294,7 @@ async fn test_app(rpc_url: Option<String>) -> Router {
         Some(snapshot_store),
         Some(pool_store),
         rpc_url.map(|url| Arc::new(dex_adapters::evm_rpc::EvmRpcClient::single(&url).unwrap())),
-                None,
+        None,
     )
     .await;
     build_router(state, RateLimitState::from_env())
@@ -396,7 +395,7 @@ async fn build_tx_encodes_split_swap_with_matching_route() {
     let bytes = decode_hex(data);
     let head = decode_head(&bytes);
 
-    assert_eq!(&head.token_in[12..], &decode_hex(&USDC_ERC20)[..]);
+    assert_eq!(&head.token_in[12..], &decode_hex(USDC_ERC20)[..]);
     assert_eq!(&head.token_out[12..], &decode_hex(&EURC.to_ascii_lowercase())[..]);
     assert_eq!(head.amount_in, 1_000_000);
     assert_eq!(head.min_amount_out, 990_000);
@@ -416,11 +415,11 @@ async fn build_tx_encodes_split_swap_with_matching_route() {
     let hops_len = u256_at(&bytes, hops_start);
     assert_eq!(hops_len, 1);
     let hop = hops_start + 32;
-    assert_eq!(&bytes[hop + 12..hop + 32], &decode_hex(&STABLE_POOL_UE)[..], "hop.pool");
+    assert_eq!(&bytes[hop + 12..hop + 32], &decode_hex(STABLE_POOL_UE)[..], "hop.pool");
     assert_eq!(u256_at(&bytes, hop + 32), 1, "hop.dexType must be Stable");
     assert_eq!(
         &bytes[hop + 64 + 12..hop + 64 + 32],
-        &decode_hex(&USDC_ERC20)[..],
+        &decode_hex(USDC_ERC20)[..],
         "hop.tokenIn"
     );
     assert_eq!(
@@ -436,7 +435,7 @@ async fn build_tx_encodes_split_swap_with_matching_route() {
     let permit_token = &bytes[head.permit_offset + 12..head.permit_offset + 32];
     assert_eq!(
         permit_token,
-        &decode_hex(&USDC_ERC20)[..],
+        &decode_hex(USDC_ERC20)[..],
         "PermitSingle.token must match token_in"
     );
 
@@ -456,7 +455,7 @@ async fn build_tx_encodes_split_swap_with_matching_route() {
     let permit_spender = &bytes[head.permit_offset + 128 + 12..head.permit_offset + 128 + 32];
     assert_eq!(
         permit_spender,
-        &decode_hex(&AGGREGATOR)[..],
+        &decode_hex(AGGREGATOR)[..],
         "PermitSingle.spender must be aggregator"
     );
 
@@ -616,7 +615,7 @@ async fn build_tx_requires_typed_data_when_permit2_allowance_insufficient() {
     let (status, body) = post(&router, "/api/v1/build_tx", valid_body()).await;
     assert_eq!(status, StatusCode::OK);
     let typed = body["data"]["typed_data"].as_object().expect("typed_data present");
-    assert_eq!(typed["types"]["PermitSingle"].is_array(), true, "must be PermitSingle");
+    assert!(typed["types"]["PermitSingle"].is_array(), "must be PermitSingle");
     assert!(
         !typed["types"]
             .as_object()
@@ -666,7 +665,7 @@ async fn build_tx_not_ready_when_aggregator_unconfigured() {
         Some(snapshot_store),
         Some(pool_store),
         Some(Arc::new(dex_adapters::evm_rpc::EvmRpcClient::single(&url).unwrap())),
-                None,
+        None,
     )
     .await;
     let router = build_router(state, RateLimitState::from_env());
@@ -737,7 +736,7 @@ async fn build_tx_rejects_pool_from_non_allowlisted_factory() {
         Some(snapshot_store),
         Some(pool_store),
         Some(Arc::new(dex_adapters::evm_rpc::EvmRpcClient::single(&url).unwrap())),
-                None,
+        None,
     )
     .await;
     let router = build_router(state, RateLimitState::from_env());
@@ -831,7 +830,11 @@ async fn build_tx_accepts_unitflow_v25_factory_membership() {
         }]
     });
     let (status, resp) = post(&router, "/api/v1/build_tx", body).await;
-    assert_eq!(status, StatusCode::OK, "build_tx must accept unitflow-v25 hop: {resp:?}");
+    assert_eq!(
+        status,
+        StatusCode::OK,
+        "build_tx must accept unitflow-v25 hop: {resp:?}"
+    );
 }
 
 #[tokio::test]
@@ -844,7 +847,11 @@ async fn build_tx_rejects_unitflow_when_factory_mismatched() {
     let pool_store = Arc::new(MemoryPoolStateStore::new());
     // Mismatched factory address
     pool_store
-        .set_factories(&[FactoryRecord::new("0x0000000000000000000000000000000000000002", "xyk", "chakra-xyk")])
+        .set_factories(&[FactoryRecord::new(
+            "0x0000000000000000000000000000000000000002",
+            "xyk",
+            "chakra-xyk",
+        )])
         .await
         .unwrap();
 
@@ -882,7 +889,10 @@ async fn build_tx_rejects_unitflow_when_factory_mismatched() {
     let (status, resp) = post(&router, "/api/v1/build_tx", body).await;
     assert_eq!(status, StatusCode::BAD_REQUEST);
     assert_eq!(resp["error"]["code"], ApiErrorCode::RouteInvalid.as_str());
-    assert!(resp["error"]["message"].as_str().unwrap().contains("factory not allowlisted in chakra:factories"));
+    assert!(resp["error"]["message"]
+        .as_str()
+        .unwrap()
+        .contains("factory not allowlisted in chakra:factories"));
 }
 
 // ─── 9. CLMM fee validation ────────────────────────────────────────────────
@@ -956,7 +966,7 @@ async fn build_tx_rejects_wrong_fee_for_clmm_pool() {
         Some(snapshot_store),
         Some(pool_store),
         Some(Arc::new(dex_adapters::evm_rpc::EvmRpcClient::single(&url).unwrap())),
-                None,
+        None,
     )
     .await;
     let router = build_router(state, RateLimitState::from_env());
@@ -997,7 +1007,7 @@ async fn build_tx_accepts_correct_fee_for_clmm_pool() {
         Some(snapshot_store),
         Some(pool_store),
         Some(Arc::new(dex_adapters::evm_rpc::EvmRpcClient::single(&url).unwrap())),
-                None,
+        None,
     )
     .await;
     let router = build_router(state, RateLimitState::from_env());
@@ -1032,7 +1042,7 @@ async fn build_tx_encodes_step_fee_not_hardcoded_30() {
         Some(snapshot_store),
         Some(pool_store),
         Some(Arc::new(dex_adapters::evm_rpc::EvmRpcClient::single(&url).unwrap())),
-                None,
+        None,
     )
     .await;
     let router = build_router(state, RateLimitState::from_env());
@@ -1135,7 +1145,7 @@ async fn build_tx_omit_fee_encodes_snapshot_clmm_fee_not_default() {
         Some(snapshot_store),
         Some(pool_store),
         Some(Arc::new(dex_adapters::evm_rpc::EvmRpcClient::single(&url).unwrap())),
-                None,
+        None,
     )
     .await;
     let router = build_router(state, RateLimitState::from_env());
@@ -1189,7 +1199,7 @@ async fn build_tx_encodes_and_validates_5bps_clmm_tier() {
         Some(snapshot_store),
         Some(pool_store),
         Some(Arc::new(dex_adapters::evm_rpc::EvmRpcClient::single(&url).unwrap())),
-                None,
+        None,
     )
     .await;
     let router = build_router(state, RateLimitState::from_env());
@@ -1255,7 +1265,10 @@ async fn build_tx_rejects_shared_pool_across_subroutes() {
     assert_eq!(status, StatusCode::BAD_REQUEST);
     assert_eq!(resp["error"]["code"], ApiErrorCode::RouteInvalid.as_str());
     assert!(
-        resp["error"]["message"].as_str().unwrap().contains("shared pool across sub-routes"),
+        resp["error"]["message"]
+            .as_str()
+            .unwrap()
+            .contains("shared pool across sub-routes"),
         "error message should mention shared pool"
     );
 }

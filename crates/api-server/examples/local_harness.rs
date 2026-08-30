@@ -15,7 +15,7 @@
 use {
     api_server::{
         build_router,
-        config::{AppConfig, ChakraMode},
+        config::{AppConfig, RuntimeMode},
         rate_limit::RateLimitState,
         state::AppState,
     },
@@ -69,11 +69,12 @@ fn chakra_snapshot() -> MarketSnapshot {
 }
 
 fn app_config(aggregator: &str) -> AppConfig {
-    let mut config = AppConfig::default();
-    config.Chakra_mode = ChakraMode::Embedded;
-    config.snapshot_backend = Some("memory".to_string());
-    config.chakra_aggregator = aggregator.to_string();
-    config
+    AppConfig {
+        runtime_mode: RuntimeMode::Embedded,
+        snapshot_backend: Some("memory".to_string()),
+        chakra_aggregator: aggregator.to_string(),
+        ..Default::default()
+    }
 }
 
 #[tokio::main]

@@ -17,7 +17,7 @@ pub struct Edge {
     pub fee_bps: u32,
     /// Per-edge DEX type (`xyk` | `stable` | `clmm` | …). T4.7 hop metadata.
     pub dex_type: String,
-    /// Allowlisted venue factory address (empty = legacy). T4.7 hop metadata.
+    /// Allowlisted venue factory address (empty when no stamp is available).
     pub factory: String,
     pub last_updated_ms: u64,
 }
@@ -42,6 +42,7 @@ impl TokenGraph {
     }
 
     /// Add a bidirectional edge with T4.7 hop metadata (dex type + factory).
+    #[allow(clippy::too_many_arguments)]
     pub fn add_pair_meta(
         &mut self,
         token_a: &TokenId,
@@ -116,6 +117,7 @@ impl TokenGraph {
     ///   `max_multi_hop_paths`.
     ///
     /// Returns paths sorted by hop count (shortest first).
+    #[allow(clippy::type_complexity)]
     pub fn find_paths(
         &self,
         start: &TokenId,
@@ -301,28 +303,28 @@ impl TokenGraph {
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    fn Arc() -> TokenId {
-        TokenId::Native
-    }
-    fn usdc() -> TokenId {
-        TokenId::Classic {
-            code: "USDC".into(),
-            issuer: "GA5ZSEJYB37JRC5AVCIA5MOP4RHTM335X2KGX3IHOJAPP5RE34K4KZVN".into(),
+    fn tok_a() -> TokenId {
+        TokenId::Contract {
+            address: "0x3600000000000000000000000000000000000000".into(),
         }
     }
-    fn eth() -> TokenId {
+    fn tok_b() -> TokenId {
         TokenId::Contract {
-            address: "CETH_CONTRACT_ADDRESS".into(),
+            address: "0x89B50855Aa8D51744b8062fa4173AC0d1c4CD72a".into(),
+        }
+    }
+    fn tok_c() -> TokenId {
+        TokenId::Contract {
+            address: "0x6De6cAC86b864aA2B7b2d56125A0F5952Ac0e774".into(),
         }
     }
 
     #[test]
     fn test_direct_path() {
         let mut graph = TokenGraph::new();
-        graph.add_pair(&Arc(), &usdc(), "Arc venue", "pool_1", 30);
+        graph.add_pair(&tok_a(), &tok_b(), "chakra-xyk", "pool_1", 30);
 
-        let paths = graph.find_paths(&Arc(), &usdc(), 4, 100, 0);
+        let paths = graph.find_paths(&tok_a(), &tok_b(), 4, 100, 0);
         assert_eq!(paths.len(), 1);
         assert_eq!(paths[0].hops, 1);
         assert_eq!(paths[0].tokens.len(), 2);
@@ -331,24 +333,24 @@ mod tests {
     #[test]
     fn test_multi_hop_path() {
         let mut graph = TokenGraph::new();
-        graph.add_pair(&Arc(), &usdc(), "Arc venue", "pool_1", 30);
-        graph.add_pair(&usdc(), &eth(), "Arc venue", "pool_2", 30);
+        graph.add_pair(&tok_a(), &tok_b(), "chakra-xyk", "pool_1", 30);
+        graph.add_pair(&tok_b(), &tok_c(), "chakra-stable", "pool_2", 30);
 
-        let paths = graph.find_paths(&Arc(), &eth(), 4, 100, 0);
-        // Should find: Arc -> USDC -> ETH (2 hops)
+        let paths = graph.find_paths(&tok_a(), &tok_c(), 4, 100, 0);
+        // Should find: tok_a -> tok_b -> tok_c (2 hops)
         assert!(paths.iter().any(|p| p.hops == 2));
     }
 
     #[test]
     fn test_multiple_paths() {
         let mut graph = TokenGraph::new();
-        graph.add_pair(&Arc(), &usdc(), "Arc venue", "pool_1", 30);
-        graph.add_pair(&Arc(), &usdc(), "Arc venue", "pool_2", 20);
-        graph.add_pair(&Arc(), &eth(), "Arc venue", "pool_3", 30);
-        graph.add_pair(&eth(), &usdc(), "Arc venue", "pool_4", 30);
+        graph.add_pair(&tok_a(), &tok_b(), "chakra-xyk", "pool_1", 30);
+        graph.add_pair(&tok_a(), &tok_b(), "chakra-stable", "pool_2", 20);
+        graph.add_pair(&tok_a(), &tok_c(), "chakra-xyk", "pool_3", 30);
+        graph.add_pair(&tok_c(), &tok_b(), "chakra-stable", "pool_4", 30);
 
-        let paths = graph.find_paths(&Arc(), &usdc(), 4, 100, 0);
-        // Direct: pool_1, pool_2; Indirect: Arc->ETH->USDC
+        let paths = graph.find_paths(&tok_a(), &tok_b(), 4, 100, 0);
+        // Direct: pool_1, pool_2; Indirect: tok_a->tok_c->tok_b
         assert!(paths.len() >= 3);
     }
 
@@ -356,9 +358,9 @@ mod tests {
     fn test_all_direct_paths_included_when_many_pools() {
         let mut graph = TokenGraph::new();
         for i in 0..15 {
-            graph.add_pair(&Arc(), &usdc(), "Arc venue", &format!("pool_{i}"), 30);
+            graph.add_pair(&tok_a(), &tok_b(), "chakra-stable", &format!("pool_{i}"), 30);
         }
-        let paths = graph.find_paths(&Arc(), &usdc(), 3, 5, 0);
+        let paths = graph.find_paths(&tok_a(), &tok_b(), 3, 5, 0);
         assert_eq!(paths.len(), 15);
         assert!(paths.iter().all(|p| p.hops == 1));
     }
@@ -367,12 +369,12 @@ mod tests {
     fn test_multi_hop_capped_separately_from_direct() {
         let mut graph = TokenGraph::new();
         for i in 0..12 {
-            graph.add_pair(&Arc(), &usdc(), "Arc venue", &format!("direct_{i}"), 30);
+            graph.add_pair(&tok_a(), &tok_b(), "chakra-stable", &format!("direct_{i}"), 30);
         }
-        graph.add_pair(&Arc(), &eth(), "Arc venue", "bridge", 30);
-        graph.add_pair(&eth(), &usdc(), "Arc venue", "indirect", 30);
+        graph.add_pair(&tok_a(), &tok_c(), "chakra-xyk", "bridge", 30);
+        graph.add_pair(&tok_c(), &tok_b(), "chakra-stable", "indirect", 30);
 
-        let paths = graph.find_paths(&Arc(), &usdc(), 3, 2, 0);
+        let paths = graph.find_paths(&tok_a(), &tok_b(), 3, 2, 0);
         assert_eq!(paths.iter().filter(|p| p.hops == 1).count(), 12);
         assert_eq!(paths.iter().filter(|p| p.hops == 2).count(), 1);
         assert_eq!(paths.len(), 13);
@@ -381,9 +383,9 @@ mod tests {
     #[test]
     fn test_no_path() {
         let mut graph = TokenGraph::new();
-        graph.add_pair(&Arc(), &usdc(), "Arc venue", "pool_1", 30);
+        graph.add_pair(&tok_a(), &tok_b(), "chakra-xyk", "pool_1", 30);
 
-        let paths = graph.find_paths(&Arc(), &eth(), 4, 100, 0);
+        let paths = graph.find_paths(&tok_a(), &tok_c(), 4, 100, 0);
         assert!(paths.is_empty());
     }
 
@@ -393,25 +395,25 @@ mod tests {
     fn test_paths_carry_per_hop_dex_type_fee_factory() {
         let mut graph = TokenGraph::new();
         graph.add_pair_meta(
-            &Arc(),
-            &usdc(),
+            &tok_a(),
+            &tok_b(),
             "chakra-stable",
             "stable_pool",
             4,
             "stable",
             "0xSTABLE_FACTORY",
         );
-        graph.add_pair_meta(&usdc(), &eth(), "chakra-xyk", "xyk_pool", 30, "xyk", "0xXYK_FACTORY");
+        graph.add_pair_meta(&tok_b(), &tok_c(), "chakra-xyk", "xyk_pool", 30, "xyk", "0xXYK_FACTORY");
 
-        // Direct path: Arc → usdc via chakra-stable.
-        let direct = graph.find_paths(&Arc(), &usdc(), 4, 100, 0);
+        // Direct path: tok_a → tok_b via chakra-stable.
+        let direct = graph.find_paths(&tok_a(), &tok_b(), 4, 100, 0);
         assert_eq!(direct.len(), 1);
         assert_eq!(direct[0].dex_types, vec!["stable".to_string()]);
         assert_eq!(direct[0].fee_bps, vec![4]);
         assert_eq!(direct[0].factories, vec!["0xSTABLE_FACTORY".to_string()]);
 
-        // Multi-hop: Arc → usdc → eth via stable then xyk.
-        let multi = graph.find_paths(&Arc(), &eth(), 4, 100, 0);
+        // Multi-hop: tok_a → tok_b → tok_c via stable then xyk.
+        let multi = graph.find_paths(&tok_a(), &tok_c(), 4, 100, 0);
         assert!(multi.iter().any(|p| p.hops == 2));
         let two_hop = multi.iter().find(|p| p.hops == 2).unwrap();
         assert_eq!(two_hop.dex_types, vec!["stable".to_string(), "xyk".to_string()]);
@@ -422,13 +424,12 @@ mod tests {
         );
     }
 
-    /// T4.7: edges added through the legacy `add_pair` (no metadata) still
-    /// yield empty dex_type/factory vectors (legacy sources never quote).
+    /// Edges added without hop metadata yield empty dex_type/factory vectors.
     #[test]
-    fn test_legacy_edges_yield_empty_hop_metadata() {
+    fn untyped_edges_yield_empty_hop_metadata() {
         let mut graph = TokenGraph::new();
-        graph.add_pair(&Arc(), &usdc(), "Arc venue", "pool_1", 30);
-        let paths = graph.find_paths(&Arc(), &usdc(), 4, 100, 0);
+        graph.add_pair(&tok_a(), &tok_b(), "chakra-xyk", "pool_1", 30);
+        let paths = graph.find_paths(&tok_a(), &tok_b(), 4, 100, 0);
         assert_eq!(paths[0].dex_types, vec![String::new()]);
         assert_eq!(paths[0].fee_bps, vec![30]);
         assert_eq!(paths[0].factories, vec![String::new()]);
@@ -437,11 +438,11 @@ mod tests {
     #[test]
     fn test_max_hops_limit() {
         let mut graph = TokenGraph::new();
-        let a = TokenId::from_str_auto("A:ISSUER");
-        let b = TokenId::from_str_auto("B:ISSUER");
-        let c = TokenId::from_str_auto("C:ISSUER");
-        let d = TokenId::from_str_auto("D:ISSUER");
-        let e = TokenId::from_str_auto("E:ISSUER");
+        let a = TokenId::from_str_auto("0x0001");
+        let b = TokenId::from_str_auto("0x0002");
+        let c = TokenId::from_str_auto("0x0003");
+        let d = TokenId::from_str_auto("0x0004");
+        let e = TokenId::from_str_auto("0x0005");
 
         graph.add_pair(&a, &b, "dex", "p1", 30);
         graph.add_pair(&b, &c, "dex", "p2", 30);

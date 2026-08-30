@@ -324,12 +324,12 @@ pub fn decode_hex(hex: &str) -> Result<Vec<u8>> {
     if hex.len() % 2 != 0 {
         bail!("odd-length hex: {hex}");
     }
-    Ok(hex::decode(hex).map_err(|e| anyhow::anyhow!("invalid hex: {e}"))?)
+    hex::decode(hex).map_err(|e| anyhow::anyhow!("invalid hex: {e}"))
 }
 
 pub fn parse_hex_u64(hex: &str) -> Result<u64> {
     let hex = hex.strip_prefix("0x").unwrap_or(hex);
-    Ok(u64::from_str_radix(hex, 16).map_err(|e| anyhow::anyhow!("invalid hex u64: {e}"))?)
+    u64::from_str_radix(hex, 16).map_err(|e| anyhow::anyhow!("invalid hex u64: {e}"))
 }
 
 /// Decode a 32-byte word (as `0x`-prefixed hex) into a `u128`.

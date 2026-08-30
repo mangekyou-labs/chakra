@@ -104,8 +104,7 @@ pub fn xylo_gross_with_a(reserve_in: u128, reserve_out: u128, amount_in: u128, a
     reserve_out - y - 1
 }
 
-/// XyloNet `_getD` (raw amp = A*100, `A_PRECISION=100`, N=2) — exact loop
-/// shape: `dP = d; dP = dP*d/(xp[j]*N)` per coin.
+#[allow(dead_code)]
 fn xylo_invariant_d(balance0: u128, balance1: u128) -> u128 {
     xylo_invariant_d_with_a(balance0, balance1, 200)
 }
@@ -182,7 +181,7 @@ pub fn stable_quote(pool: &StablePoolStateValue, i: usize, j: usize, amount_in: 
     if old_bal_i == 0 || old_bal_j == 0 {
         return 0;
     }
-
+    #[allow(clippy::manual_div_ceil)]
     let fee = (amount_in * pool.fee_bps as u128 + 9_999) / 10_000;
     let amount_after_fee = amount_in - fee;
     let x_new = old_bal_i + amount_after_fee;
@@ -391,12 +390,10 @@ mod tests {
         let (eurc_reserve, cirbtc_reserve) = (100_000_000_000u128, 1_000_000_000u128);
         for amount in [1_000u128, 1_000_000, 100_000_000] {
             let eurc_to_cirbtc = xyk_quote(eurc_reserve, cirbtc_reserve, amount);
-            let expected = amount * 997 * cirbtc_reserve
-                / (eurc_reserve * 1000 + amount * 997);
+            let expected = amount * 997 * cirbtc_reserve / (eurc_reserve * 1000 + amount * 997);
             assert_eq!(eurc_to_cirbtc, expected, "EURC→cirBTC size {amount}");
             let cirbtc_to_eurc = xyk_quote(cirbtc_reserve, eurc_reserve, amount / 100);
-            let expected_rev = (amount / 100) * 997 * eurc_reserve
-                / (cirbtc_reserve * 1000 + (amount / 100) * 997);
+            let expected_rev = (amount / 100) * 997 * eurc_reserve / (cirbtc_reserve * 1000 + (amount / 100) * 997);
             assert_eq!(cirbtc_to_eurc, expected_rev, "cirBTC→EURC size {amount}");
         }
     }
@@ -405,14 +402,12 @@ mod tests {
     fn presto_matches_normalized_hub_formula_both_directions() {
         // USDC (path) → EURC: 997/1000 on the raw reserves (6 dp cancels).
         let usdc_to_eurc = presto_spoke_quote(200_000_000_000, 200_000_000_000, 1_000_000);
-        let expected_ue = 1_000_000u128 * 997 * 200_000_000_000
-            / (200_000_000_000 * 1000 + 1_000_000 * 997);
+        let expected_ue = 1_000_000u128 * 997 * 200_000_000_000 / (200_000_000_000 * 1000 + 1_000_000 * 997);
         assert_eq!(usdc_to_eurc, expected_ue, "USDC→EURC must match 997/1000");
 
         // EURC → USDC: reverse spoke leg, same formula.
         let eurc_to_usdc = presto_spoke_quote(200_000_000_000, 200_000_000_000, 1_000_000);
-        let expected_eu = 1_000_000u128 * 997 * 200_000_000_000
-            / (200_000_000_000 * 1000 + 1_000_000 * 997);
+        let expected_eu = 1_000_000u128 * 997 * 200_000_000_000 / (200_000_000_000 * 1000 + 1_000_000 * 997);
         assert_eq!(eurc_to_usdc, expected_eu, "EURC→USDC must match 997/1000");
     }
 

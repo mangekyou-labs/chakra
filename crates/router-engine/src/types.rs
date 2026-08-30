@@ -12,7 +12,7 @@ pub struct TradingPair {
     pub fee_bps: u32,
     pub reserve_a: Option<u128>,
     pub reserve_b: Option<u128>,
-    /// Allowlisted venue factory address (from snapshot stamp). Empty = legacy.
+    /// Allowlisted venue factory address (from the snapshot stamp).
     #[serde(default)]
     pub factory: String,
     /// DEX type (`xyk` | `stable` | `clmm` | …). T4.7 hop metadata.
@@ -56,7 +56,7 @@ pub struct Path {
     /// Per-hop venue fee in bps (T4.7).
     #[serde(default)]
     pub fee_bps: Vec<u32>,
-    /// Per-hop allowlisted factory address (empty = legacy). T4.7.
+    /// Per-hop allowlisted factory address (empty when unstamped). T4.7.
     #[serde(default)]
     pub factories: Vec<String>,
 }
@@ -145,31 +145,4 @@ pub struct RouteRequest {
     pub max_hops: Option<usize>,
     /// Maximum number of splits (default: 5)
     pub max_splits: Option<usize>,
-    /// When true, Arc AMMs only (no Classic Arc / no Horizon).
-    /// Default may still return a pure classic route; mixed hops are never returned.
-    pub prefer_arc: Option<bool>,
-}
-
-/// Result of transaction simulation.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct SimulationResult {
-    pub success: bool,
-    pub actual_output: Option<u128>,
-    pub resource_fee: Option<u64>,
-    pub error: Option<String>,
-}
-
-/// Unsigned transaction ready for user signing.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct UnsignedTransaction {
-    /// XDR-encoded transaction envelope (base64)
-    pub xdr: String,
-    /// Transaction hash
-    pub hash: String,
-    /// Number of operations
-    pub operation_count: u32,
-    /// Estimated network fee (atomic unitss)
-    pub estimated_fee: u64,
-    /// Simulation result
-    pub simulation: SimulationResult,
 }
