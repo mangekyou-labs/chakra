@@ -12,7 +12,7 @@ date: 2026-08-20
 **Feature key:** `chakra`
 **Branch:** `feature-chakra`
 **Worktree:** `.worktrees/feature-chakra`
-**Status:** Rebaseline execution (2026-08-29): T0.3 design reconciliation **DONE**; local implementation verified at baseline `671f478` (catalog USDC/EURC/cirBTC, Xylo/Presto/UnitFlow manifest, venue verification); operator scripts restricted to one aggregator deploy + venue registration; release gates and gated Arc rollout follow. Previous live surface (Aggregator `0xEa1b2C24bd41163590960F8e40afe6cb4CC92006`, Render, Vercel) is the pre-rebaseline revision retained for rollback.
+**Status:** Phase 6 Update Planning (2026-08-30) after Phase 7 Check — **not aligned**. Runtime catalog is USDC/EURC/cirBTC; hosted API at HEAD `208d5ff` (docs commit `cef675d`) quotes live Xylo USDC↔EURC against aggregator `0xeb12351602c56d47c4ee955193335848952b29d8`. T2.1–T2.4 and T3.3 stay `[ ]` (partial / blocked): Presto is never discovered, UnitFlow is stamped `chakra-xyk` not `unitflow-v25`, venue verification is bytecode-only. Next: `dev-implementation` leftover Majors **T10.1–T10.6**. Do **not** start testing or review. Pre-rebaseline aggregator `0xEa1b2C24bd41163590960F8e40afe6cb4CC92006` is rollback only.
 **Sources:** requirements (reviewed), design (reviewed), testing docs dated 2026-08-20.
 
 Task tracing via `ai-devkit task` was unavailable in Phase 1 (`unknown command 'task'`). Track progress in this file.
@@ -23,14 +23,14 @@ Every testing scenario is owned by at least one task below. Wallet/chain/Permit2
 
 - [x] **M0 — Docs freeze:** Phase 2 requirements review + Phase 3 design review. No code. **Done 2026-08-20.** **Rebaseline T0.3 reconciliation Done 2026-08-29.**
 - [x] **M1 — Repo foundation:** Drop Arc-only surface from this branch; Foundry + Rust workspace + env + `arcTestnet`. **Done 2026-08-20 (T1.1, T1.2).**
-- [ ] **M2 — Canonical venues & catalog:** USDC/EURC/cirBTC catalog, Xylo/Presto/UnitFlow V2.5 manifest + adapters, fixture-only mocks (replaces the old mBTC/seed track).
-- [ ] **M3 — Worker + Redis:** Bootstrap, discovery, WS + poll, `chakra:` keys, venue verification.
+- [ ] **M2 — Canonical venues & catalog:** USDC/EURC/cirBTC catalog, Xylo/Presto/UnitFlow V2.5 manifest + adapters, fixture-only mocks (replaces the old mBTC/seed track). **PARTIAL 2026-08-30:** catalog + live Xylo USDC↔EURC; Presto undiscovered; UnitFlow stamped `chakra-xyk`. Close via T10.1–T10.2 + T10.5 docs leftover.
+- [ ] **M3 — Worker + Redis:** Bootstrap, discovery, WS + poll, `chakra:` keys, venue verification. **PARTIAL 2026-08-30:** WS/poll shipped (T3.1/T3.2 `[x]`); T3.3 verifier is bytecode-only (T10.3).
 - [ ] **M4 — Router + API:** PathFinder, QuoteEngine, SplitOptimizer, REST, OpenAPI.
-- [x] **M5 — Aggregator:** Solidity `splitSwap` + Permit2, Foundry tests, deploy. **Done 2026-08-28 (T5.1, T5.2) — to be redeployed for the new enum/admin surface.**
+- [x] **M5 — Aggregator:** Solidity `splitSwap` + Permit2, Foundry tests, deploy. **Done 2026-08-28 (T5.1, T5.2); rebaseline aggregator live 2026-08-30 at `0xeb12351602c56d47c4ee955193335848952b29d8`.** Operator-script leftover is T10.4 (allowlist still missing).
 - [ ] **M6 — Swap UI:** Next.js dense pro terminal, EIP-6963, decimals, route legs.
 - [x] **M7 — SDK + integrator docs:** TypeScript SDK, 30-min walkthrough. **Done 2026-08-28 (T7.1, T7.2).**
-- [ ] **M8 — Public deploy:** Vercel UI + hosted API/worker/Redis. **T8.1 + T8.2 done 2026-08-28** (public smoke URLs in task entries); M8 closes when the re-verified stack uses the new catalog/venues.
-- [ ] **M9 — Evidence + QA:** Split benchmark (T9.2), latency p95 (T9.5), and SDK walkthrough (T7.2) done; venue matrix (T9.1), UI audit (T9.8), and index (T9.7) partial; on-chain split (T9.3), MetaMask QA (T9.4), and live WS proof (T9.6) open / externally gated.
+- [ ] **M8 — Public deploy:** Vercel UI + hosted API/worker/Redis. **T8.1 + T8.2 done 2026-08-28**; hosted API cut over 2026-08-30 to cirBTC + new aggregator. Leftovers: `render.yaml` still pins `0xEa1b2C…2006` (T10.5); hosted Vercel UI still `d3f8c79` (gated on prod redeploy of `208d5ff`).
+- [ ] **M9 — Evidence + QA:** Split benchmark (T9.2), latency p95 (T9.5), SDK walkthrough (T7.2), and MetaMask harness (T9.4) done vs the **pre-rebaseline** aggregator; T9.1 cirBTC matrix recorded 2026-08-30 (USDC↔EURC only); T9.6 / T9.7 / T9.8 / T6.3 live send still open or partial. Re-pin evidence to `0xeb1235…29d8` is T10.5 — do not treat old split/walkthrough txs as new-aggregator proof.
 
 ## Task Breakdown
 
