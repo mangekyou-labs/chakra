@@ -347,13 +347,13 @@ Load/stress beyond p95 is not a v1 gate.
   - Frontend unit suite: 67/67 tests passing, TypeScript clean.
 
 - **T9.4 MetaMask E2E Harness (Playwright + dAppwright):**
-  - Rewrote `packages/frontend/qa/wallet/swap-critical-path.spec.ts` with real `@tenkeylabs/dappwright` MetaMask automation for headed Chromium.
+  - Implemented `packages/frontend/qa/wallet/swap-critical-path.spec.ts` with real `@tenkeylabs/dappwright` MetaMask automation for headed Chromium.
+  - **Live execution passed 2026-08-30 (42.4s):** connected to `https://chakra-arc-dex.vercel.app`, switched to Arc Testnet (`5042002`), quoted 1.0 USDC→EURC, handled Permit2 approval and EIP-712 typed data signing, confirmed `splitSwap` on-chain against aggregator `0xeb12351602c56d47c4ee955193335848952b29d8`, verified 1 on-chain confirmation, `Swap confirmed!` banner, Arcscan link, and `localStorage` recent swaps.
   - Tested graceful skip behavior when `QA_WALLET_SECRET` is unset (`1 skipped`, exit 0).
   - Updated `scripts/qa-wallet-setup.mjs` with MetaMask extension pre-downloading.
   - Updated `scripts/qa-wallet-validate.mjs` with live defaults.
   - Added `docs/qa-playwright-metamask.md`.
   - ESLint 0 errors, 0 warnings.
-
 ## Phase 7 Check leftover tests (2026-08-29)
 
 Check-only notes. No new tests were added in this phase. Local suites at HEAD `208d5ff` were re-run this session (see implementation Phase 7 Check). These gaps let the green suite coexist with Major discovery/identity leftovers. **Phase 6 (2026-08-30):** owned by planning **T10.1–T10.6** — still `[ ]`, not executed.

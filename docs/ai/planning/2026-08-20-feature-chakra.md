@@ -1291,8 +1291,8 @@ After hosting is healthy, run extension-backed MetaMask QA on Arc testnet and th
   - `/build_tx` → `to: "0xeb12351602c56d47c4ee955193335848952b29d8"`, `selector: "0x2e3be0c1"`, `value: "0"`, `chain_id: 5042002`
   - CORS → `access-control-allow-origin: https://chakra-arc-dex.vercel.app`
 - [x] **11c Hosted UI QA (Playwright CLI — AUDITED_PASS):** Production redeployed `chakra-arc-dex` on Vercel (`https://chakra-arc-dex.vercel.app`). Audited on Desktop (1280×800) and Mobile (390×844) viewports. Case-insensitive token address matching verified; token selector displays USDC, EURC, cirBTC (no mBTC). Live USDC→EURC quote returns 0.803918 EURC via `xylo-stable` (19.60% price impact, 0% protocol fee). USDC→cirBTC returns honest `No route found`. Mobile layout and CTA button verified. Artifacts: `docs/evidence/chakra-t98-manual-ux-a11y.json`, `chakra-t98-desktop-audit.png`, `chakra-t98-mobile-audit.png`, `chakra-t98-desktop-snapshot.yml`, `chakra-t98-mobile-snapshot.yml`.
-- [ ] **11d Gated Items (Operator / QA Wallet):**
-  - T6.3 / T9.4 MetaMask live swap: code complete; live on-chain execution gated on funded `QA_WALLET_SECRET`.
+- [x] **11d T6.3 / T9.4 MetaMask Live Swap (Playwright + dAppwright — LIVE PASS):** Executed `npm run qa:wallet` with configured `QA_WALLET_SECRET`. Real MetaMask extension in headed Chromium connected to `https://chakra-arc-dex.vercel.app`, switched to Arc Testnet (`5042002`), quoted 1.0 USDC→EURC, handled Permit2 approval and signed EIP-712 PermitSingle typed data, confirmed `splitSwap` on-chain against aggregator `0xeb12351602c56d47c4ee955193335848952b29d8`, verified 1 on-chain confirmation, `Swap confirmed!` banner, Arcscan link, and `localStorage` recent swaps entry in 42.4s.
+- [ ] **11f Gated Items (Operator Wallet):**
   - T9.3 On-chain split swap: gated on operator wallet funding with $\ge 5$ USDC.
   - T9.6 Live WS refresh proof: follows on-chain swap from T9.3.
 - [x] **11e Evidence Pack & Docs Synchronization:** Updated `docs/evidence/README.md`, `docs/evidence/chakra-t91-venue-matrix.json`, `docs/evidence/chakra-t98-manual-ux-a11y.json`, testing doc, and planning doc.

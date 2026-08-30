@@ -149,25 +149,41 @@ test.describe('Chakra Arc Testnet — MetaMask Critical Path (T9.4)', () => {
 
       // 10. Sequence MetaMask popups to match handlePrimary:
       //     optional ERC-20 approve confirm -> EIP-712 PermitSingle sign -> splitSwap confirm
-      const approvingLabel = page.locator('button.btn-primary', {
-        hasText: /approve usdc/i,
-      });
-      if (await approvingLabel.isVisible({ timeout: 3_000 }).catch(() => false)) {
-        await wallet.confirmTransaction();
-        await page.bringToFront();
+      for (let attempt = 0; attempt < 15; attempt += 1) {
+        await page.waitForTimeout(2_000);
+        if (await page.locator(`text=${QA_SWAP_CONFIRMED_TEXT}`).isVisible().catch(() => false)) {
+          console.log('[swap] swap confirmed banner visible');
+          break;
+        }
+        const popup = context.pages().find((p) => p.url().includes('notification.html'));
+        if (!popup) {
+          continue;
+        }
+        await popup.bringToFront().catch(() => {});
+        
+        // Handle scroll down button if present on EIP-712 sign requests
+        const scrollBtn = popup.locator('[data-testid="signature-request-scroll-button"]');
+        if (await scrollBtn.isVisible({ timeout: 1_000 }).catch(() => false)) {
+          console.log(`[swap] attempt ${attempt}: clicking signature scroll button`);
+          await scrollBtn.click().catch(() => {});
+          await popup.waitForTimeout(500);
+        }
+
+        // Click Sign / Confirm / Next / Approve / confirm-footer-button
+        const actionBtn = popup
+          .getByRole('button', { name: /^(sign|confirm|approve|next)$/i })
+          .or(popup.locator('[data-testid="confirm-footer-button"]'))
+          .or(popup.locator('[data-testid="confirm-btn"]'))
+          .or(popup.locator('[data-testid="page-container-footer-next"]'));
+
+        if (await actionBtn.first().isVisible({ timeout: 2_000 }).catch(() => false)) {
+          const btnText = await actionBtn.first().innerText().catch(() => 'action');
+          console.log(`[swap] attempt ${attempt}: clicking '${btnText}' button in popup`);
+          await actionBtn.first().click().catch(() => {});
+          await page.waitForTimeout(1_000).catch(() => {});
+        }
       }
-
-      // EIP-712 PermitSingle typed data may be skipped when allowance is sufficient
-      try {
-        await wallet.sign();
-      } catch {
-        // Typed data may have been skipped if Permit2 allowance was already sufficient
-      }
-
-      // splitSwap confirmation (value = 0n per build_tx)
-      await wallet.confirmTransaction();
-      await page.bringToFront();
-
+      await page.bringToFront().catch(() => {});
       // 11. Verify transaction success state — capture hash BEFORE the 3s banner hide
       const successBanner = page.locator(`text=${QA_SWAP_CONFIRMED_TEXT}`);
       await expect(successBanner).toBeVisible({ timeout: 60_000 });

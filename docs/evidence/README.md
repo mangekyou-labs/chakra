@@ -25,7 +25,7 @@ This document indexes all 13 Success Criteria (SC-1 through SC-13), public hoste
 | **SC-4** | On-chain atomic split swap (≥2 sub-routes in 1 tx) on Arcscan | **LIVE 2026-08-28** — tx `0x42e85916ade38b87ef0440ef71d8f3330075ecf2a481247dc2ac33376b287fa8` (historical proof on `0xEa1b2C…2006`); on-chain split on new aggregator `0xeb1235…29d8` gated on funded operator wallet | **PASS (Historical Live)** |
 | **SC-5** | Public hosted UI, `/health`, `/ready`, `/quote`, `/build_tx` | `https://chakra-arc-dex.vercel.app` & `https://chakra-api-0a5i.onrender.com` (targeting new aggregator `0xeb12351602c56d47c4ee955193335848952b29d8`) | **PASS** |
 | **SC-6** | TypeScript SDK quote + `build_tx` example | `packages/sdk/examples/quote-build.ts` & `docs/evidence/chakra-t72-walkthrough.json` | **PASS** |
-| **SC-7** | Playwright CLI MetaMask test on Arc testnet | `docs/qa-playwright-metamask.md` & `packages/frontend/qa/wallet/swap-critical-path.spec.ts` — **LIVE PASS 2026-08-28** (`swap-critical-path` exit 0, historical on `0xEa1b2C…2006`; new aggregator run gated on funded `QA_WALLET_SECRET`) | **PASS (Historical Live)** |
+| **SC-7** | Playwright CLI MetaMask test on Arc testnet | `docs/qa-playwright-metamask.md` & `packages/frontend/qa/wallet/swap-critical-path.spec.ts` — **LIVE PASS 2026-08-30** (`swap-critical-path` exit 0 on aggregator `0xeb12351602c56d47c4ee955193335848952b29d8` via configured `QA_WALLET_SECRET`; 1.0 USDC → 0.803878 EURC via `xylo-stable`) | **PASS (Live On-Chain)** |
 | **SC-8** | Venue comparison matrix (≥3 pairs × ≥3 sizes) & split benchmark | `docs/evidence/chakra-t91-venue-matrix.json` (24 queries across 6 directional pairs on cirBTC catalog; USDC↔EURC routable across multiple sizes, cirBTC pairs honest `NO_ROUTE` from dust filter) & `docs/evidence/chakra-t92-split-benchmark.json` | **OPEN / PARTIAL (USDC↔EURC routable; cirBTC thin reserves)** |
 | **SC-9** | Integrator 30-minute walkthrough | `docs/integrator-guide.md` & `docs/evidence/chakra-t72-walkthrough.json` (executed in 6 seconds) | **PASS** |
 | **SC-10**| Quote latency p95 < 500 ms at API process | `docs/evidence/chakra-t95-quote-latency.json` (server p95 = 23 ms across 100 samples on deployed commit `d3f8c79`) | **PASS** |
@@ -48,7 +48,7 @@ This document indexes all 13 Success Criteria (SC-1 through SC-13), public hoste
 
 ## Concrete External Blockers
 
-- **T6.3 / T9.4 (Live MetaMask E2E Swap on 0xeb1235…29d8):** Requires a funded MetaMask browser extension on Arc testnet (`5042002`) with $\ge 1$ USDC + native gas or `QA_WALLET_SECRET` in `.env`.
+- **T6.3 / T9.4 (Live MetaMask E2E Swap on 0xeb1235…29d8):** **COMPLETE & VERIFIED LIVE (2026-08-30)** — Executed `npm run qa:wallet` with configured `QA_WALLET_SECRET` (`swap-critical-path.spec.ts` passed in 42.4s; on-chain confirmation verified).
 - **T9.3 (On-Chain Split Swap on 0xeb1235…29d8):** Requires operator wallet with $\ge 5$ USDC to broadcast a split swap transaction to the rebaselined aggregator.
 - **T9.8 / UI Vercel Redeployment:** Deployed to Vercel production (`chakra-arc-dex`) and verified with Playwright CLI desktop and mobile audits (`AUDITED_PASS`). Case-insensitive token address matching and cirBTC catalog verified live.
 - **T2.1–T2.4 (Pool Deepening):** UnitFlow cirBTC reserves hold 249,850 atomic unitss (< `MIN_XYK_RESERVE_atomic unitsS` 1e8), returning honest `NO_ROUTE`. Deepening requires testnet faucet liquidity.
