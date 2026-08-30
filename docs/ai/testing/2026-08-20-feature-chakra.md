@@ -44,7 +44,7 @@ cd packages/frontend && npm test
 - [x] Created-pool log (`PairCreated`) upserts topology; later `Swap` on the new pool resolves through the refreshed index — `created_pool_log_upserts_topology_and_later_swap_touches` (2026-08-25)
 - [x] Discovery probes catalog pairs only (`getPair`/`getPool`) — USDC/EURC, USDC/cirBTC, EURC/cirBTC — and never sweeps the market — `discovery_finds_catalog_xyk_pair_from_fixture_factory` / `discovery_without_mbtc_only_probes_usdc_eurc` (2026-08-25)
 - [x] Never-call addresses are never in the WS watch list — `watch_addresses_filter_never_call_and_keep_0x` (2026-08-25)
-- [x] Fetch pipeline coalesces `chakra-*` / `discovered:*` / `xylo` sources into EVM tasks — `fetch_pipeline::tests::coalesce_maps_evm_chakra_sources_to_evm_tasks` + `evm_watcher::tests::factory_tuple_parse_accepts_seed_and_discovery` (pins `source == "xylo"` for xylo seed and discovery) (2026-08-28)
+- [x] Fetch pipeline coalesces `chakra-*` / `discovered:*` / `xylo` sources into EVM tasks — `fetch_pipeline::tests::coalesce_maps_evm_chakra_sources_to_evm_tasks` + `evm_watcher::tests::factory_tuple_parse_accepts_seed_and_discovery` (2026-08-28; **2026-08-29 leftover:** the parse test now pins `source == "xylo-stable"` for xylo seed/discovery, not `"xylo"` — this line was stale vs code)
 
 ### PathFinder (`crates/router-engine`)
 
@@ -354,3 +354,32 @@ Load/stress beyond p95 is not a v1 gate.
   - Updated `scripts/qa-wallet-validate.mjs` with live defaults.
   - Added `docs/qa-playwright-metamask.md`.
   - ESLint 0 errors, 0 warnings.
+
+## Phase 7 Check leftover tests (2026-08-29)
+
+Check-only notes. No new tests were added in this phase. Local suites at HEAD `208d5ff` were re-run this session (see implementation Phase 7 Check). These gaps let the green suite coexist with Major discovery/identity leftovers:
+
+- [ ] `discover_once` publishes at least one `presto-hub` pair with `dex_type: "presto"` from a seeded `:presto` hub (today there is no `"presto"` match arm; seeded Presto yields zero pools).
+- [ ] Seeded UnitFlow `:xyk` stamps `source == "unitflow-v25"` (today `FactoryConfig::parse` + `factory_tuple_parse_accepts_seed_and_discovery` pin `chakra-xyk`).
+- [ ] Manifest venue verification covers the T3.3 five-check list (bytecode, endpoints, factory membership, nonzero reserves, probe quote), not bytecode-only `eth_getCode`.
+- [ ] Quote-time factory gate applies to `xylo-stable` / `presto-hub` / `unitflow-v25`, not only `source.starts_with("chakra-")`.
+- [ ] SDK/UI `venueToDexType("xylo-stable")` / `"xylo"` returns `'xylo'` (today `'stable'`); keep a regression that `/build_tx` hops follow server `dex_types` when present.
+- [ ] `/build_tx` rejects two sub-routes that share a pool (today only SplitOptimizer + Solidity `_rejectSharedPools`).
+- [ ] SwapCard Circle faucet CTA is reachable when `balanceFor == 0` (today nested inside `balanceFor > 0`).
+- [ ] Evidence pack T7.2 / T9.1–T9.5 and `docs/evidence/README.md` re-pin catalog USDC/EURC/cirBTC and aggregator `0xeb12351602c56d47c4ee955193335848952b29d8`.
+- [ ] OpenAPI quote examples use `xylo-stable` (today `chakra-stable`).
+- [ ] Verification command: `cargo test -p api-server` (60 passed this session). Do **not** pass `--features test-fixture` on the `api-server` package; that feature lives on `dex-adapters` and is already enabled in `crates/api-server/Cargo.toml`.
+
+**This-session local gates (HEAD `208d5ff`):** `npx ai-devkit@latest lint --feature chakra` pass (from the worktree); `forge test -vv` 88/88; `cargo test --workspace --all-targets` 245 passed; `cargo test -p api-server` 60 passed; frontend vitest 67/67 + `tsc --noEmit` + `next build` exit 0; SDK vitest 14/14 + `tsc --noEmit`; `git diff --check` pass.
+
+**This-session hosted smoke (2026-08-30):**
+- API `/health` → 200 `{"status":"ok"}`
+- API `/ready` → 200 `ready:true` (`snapshot_id: "snapshot-1788081330115"`, `pool_keys: []` cluster note)
+- API `/tokens` → USDC (6 dp), EURC (6 dp), cirBTC (8 dp) — no mBTC
+- API `/quote` 1e6 USDC→EURC → 200 via `xylo-stable` (`dex_types: ["xylo"]`, `is_split: false`, `expected_output: "803999"`, `price_impact_bps: 1960`)
+- API `/quote` EURC→cirBTC and USDC→cirBTC → honest `NO_ROUTE` (UnitFlow EURC/cirBTC reserve 249,850 atomic unitss < `MIN_XYK_RESERVE_atomic unitsS` 1e8 dust filter)
+- API `/build_tx` (1e6 USDC→EURC) → `to: "0xeb12351602c56d47c4ee955193335848952b29d8"`, `selector: "0x2e3be0c1"`, `value: "0"`, `chain_id: 5042002`
+- CORS → `access-control-allow-origin: https://chakra-arc-dex.vercel.app`
+- On-chain pins (`cast`): `paused() == false`, `usdc()` / `eurc()` / `cirbtc()` match manifest, Xylo dexType 3 + router `0x73742278…`, Presto hub `true`, UnitFlow dexType 0 + fee 30
+- T9.1 venue matrix: 24 queries across 6 directional pairs recorded in `docs/evidence/chakra-t91-venue-matrix.json` (USDC↔EURC routable, cirBTC pairs honest `NO_ROUTE`)
+- Hosted UI QA (Playwright CLI): desktop (1280×800) and mobile (390×844) audits run; mobile CTA visible; hosted UI integration is `OPEN_PARTIAL_GATED_ON_VERCEL_REDEPLOY` because the deployed Vercel bundle (2026-08-28 commit `d3f8c79`) has a case-sensitive token address matching bug (fixed locally in `bbda8e0`/`208d5ff`); all 67/67 local frontend vitest tests pass.

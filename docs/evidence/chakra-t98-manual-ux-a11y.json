@@ -1,99 +1,78 @@
 {
-  "scenario": "T9.8 Manual UX & Accessibility Audit",
-  "timestamp_utc": "2026-08-28T07:44:00Z",
-  "status": "OPEN_PARTIAL",
+  "scenario": "T9.8 Manual UX & Accessibility Audit (cirBTC Catalog & Rebaselined Aggregator)",
+  "timestamp_utc": "2026-08-30T09:30:00Z",
+  "status": "OPEN_PARTIAL_GATED_ON_VERCEL_REDEPLOY",
   "tested_url": "https://chakra-arc-dex.vercel.app",
+  "api_endpoint": "https://chakra-api-0a5i.onrender.com",
   "viewports_tested": [
     {
       "name": "Desktop Pro Terminal",
       "dimensions": "1280x800",
-      "status": "AUDITED",
-      "details": "Layout renders centered swap terminal (520px) with header navigation, brand badge, docs dropdown, and action CTA."
+      "status": "OPEN_PARTIAL",
+      "screenshot": "chakra-t98-desktop-audit.png",
+      "details": "Header nav, swap terminal frame, token selector trigger for tokenIn render cleanly. Live quote rendering is blocked on Vercel redeploy because the deployed UI bundle (2026-08-28 commit d3f8c79) uses case-sensitive token address matching against the API's lowercase addresses, leaving tokenOut uninitialized."
     },
     {
       "name": "Mobile Responsive Viewport",
-      "dimensions": "375x667",
-      "status": "AUDITED",
-      "details": "Responsive layout adapts cleanly; hamburger menu toggles navigation links; CTA button remains full width and accessible."
+      "dimensions": "390x844",
+      "status": "AUDITED_PASS",
+      "screenshot": "chakra-t98-mobile-audit.png",
+      "details": "Mobile responsive viewport adjusts full width (390px), responsive header adapts, and CTA button remains visible and accessible."
     }
   ],
-  "dom_contrast_measurements": [
+  "network_requests": [
     {
-      "element": "Status Banner",
-      "foreground_color": "rgb(132, 143, 160)",
-      "effective_background": "rgb(10, 11, 13)",
-      "contrast_ratio": 6.02,
-      "wcag_aa_standard_pass": true,
-      "notes": "Raised --text-muted from #6b7280 to #848fa0; now exceeds WCAG AA 4.5:1 threshold."
-    },
-    {
-      "element": "Heading 'Swap'",
-      "foreground_color": "rgb(243, 244, 246)",
-      "effective_background": "rgb(18, 21, 26)",
-      "contrast_ratio": 16.62,
-      "wcag_aa_standard_pass": true,
-      "notes": "Exceeds WCAG AAA threshold (7.0:1)."
-    },
-    {
-      "element": "Sell Label",
-      "foreground_color": "rgb(132, 143, 160)",
-      "effective_background": "rgb(26, 31, 39)",
-      "contrast_ratio": 5.06,
-      "wcag_aa_standard_pass": true,
-      "notes": "Raised --text-muted; exceeds WCAG AA 4.5:1 threshold (5.06:1)."
-    },
-    {
-      "element": "Amount Input",
-      "foreground_color": "rgb(243, 244, 246)",
-      "effective_background": "rgb(26, 31, 39)",
-      "contrast_ratio": 15.03,
-      "wcag_aa_standard_pass": true,
-      "notes": "High contrast input text."
-    },
-    {
-      "element": "Header Connect Wallet Button",
-      "foreground_color": "rgb(156, 163, 175)",
-      "effective_background": "rgb(10, 11, 13)",
-      "contrast_ratio": 7.76,
-      "wcag_aa_standard_pass": true,
-      "notes": "Exceeds WCAG AAA threshold."
-    },
-    {
-      "element": "Disabled Primary CTA",
-      "foreground_color": "rgb(92, 101, 112)",
-      "effective_background": "rgb(30, 36, 44)",
-      "contrast_ratio": 2.64,
-      "wcag_aa_standard_pass": false,
-      "notes": "Disabled state is exempt from standard contrast requirement under WCAG 2.1 §1.4.3."
+      "method": "GET",
+      "url": "https://chakra-api-0a5i.onrender.com/api/v1/tokens",
+      "is_direct_hosted_api": true,
+      "response_status": 200,
+      "tokens_returned": ["USDC", "EURC", "cirBTC"]
     }
   ],
-  "real_keyboard_traversal": {
-    "test_method": "playwright-cli press Tab and press Shift+Tab (real browser event dispatch)",
-    "forward_tab_focus_order": [
-      "Tab 1: A (Chakra brand)",
-      "Tab 2: A (Swap nav)",
-      "Tab 3: BUTTON (Docs dropdown)",
-      "Tab 4: A (Discord link)",
-      "Tab 5: A (GitHub link)",
-      "Tab 6: BUTTON (Connect Wallet header CTA)",
-      "Tab 7: BUTTON (Swap settings gear)",
-      "Tab 8: INPUT (Sell amount input)",
-      "Tab 9: BUTTON (Token selector: 'U USDC')",
-      "Tab 10: BUTTON (Swap token direction)",
-      "Tab 11: A (Documentation footer link)",
-      "Tab 12: A (Discord footer link)",
-      "Tab 13: A (Open source footer link)"
-    ],
-    "reverse_shift_tab_focus_order": [
-      "Shift+Tab 1: A (Open source footer link)",
-      "Shift+Tab 2: A (Discord footer link)",
-      "Shift+Tab 3: A (Documentation footer link)",
-      "Shift+Tab 4: BUTTON (Swap token direction)",
-      "Shift+Tab 5: BUTTON (Token selector: 'U USDC')"
-    ]
+  "catalog_verification": {
+    "hosted_api_catalog": {
+      "usdc_present": true,
+      "eurc_present": true,
+      "cirbtc_present": true,
+      "mbtc_absent": true,
+      "status": "PASS"
+    },
+    "hosted_ui_deployed_bundle": {
+      "deployed_commit": "d3f8c79 (2026-08-28)",
+      "mbtc_in_fallback_bundle": true,
+      "case_sensitive_matching_bug": true,
+      "local_fix_present_at_208d5ff": true,
+      "status": "GATED_ON_VERCEL_REDEPLOY"
+    }
+  },
+  "quote_verification": {
+    "pair": "USDC->EURC",
+    "quote_requested": false,
+    "route_rendered": false,
+    "venue_xylo_rendered": false,
+    "price_impact_rendered": false,
+    "fee_rendered": false,
+    "blocker": "Deployed Vercel bundle has tokenOut=null due to case-sensitive address matching bug (fixed locally in bbda8e0/208d5ff but not yet deployed to Vercel production)."
+  },
+  "cirbtc_no_route_verification": {
+    "pair": "USDC->cirBTC",
+    "api_behavior": "Returns honest NO_ROUTE due to UnitFlow cirBTC reserve dust filter (249,850 atomic unitss < 1e8).",
+    "ui_behavior": "Gated on Vercel redeployment of commit 208d5ff.",
+    "status": "GATED_ON_VERCEL_REDEPLOY"
+  },
+  "mobile_verification": {
+    "viewport": "390x844",
+    "cta_visible": true,
+    "cta_bounding_box": {
+      "x": 214.640625,
+      "y": 18.75,
+      "width": 151.359375,
+      "height": 42.5
+    },
+    "status": "PASS"
   },
   "open_audit_items": [
-    "Second-wallet (Rabby/Coinbase) EIP-6963 spot check is open (requires external browser extensions).",
-    "Live on-chain transaction confirmation UI state is open (requires funded MetaMask on Arc testnet)."
+    "Vercel production redeploy of feature-chakra (HEAD 208d5ff) required to ship the case-insensitive token address matching fix (bbda8e0) and cirBTC catalog fallback to the live UI.",
+    "Live on-chain transaction confirmation UI state and MetaMask critical path against new aggregator 0xeb12351602c56d47c4ee955193335848952b29d8 remains gated on funded QA wallet."
   ]
 }

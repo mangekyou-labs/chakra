@@ -1225,3 +1225,29 @@ After hosting is healthy, run extension-backed MetaMask QA on Arc testnet and th
 1. **Batch B Probe:** Inspect operator wallet balance and `QA_WALLET_SECRET` configuration to determine if any operator-gated tasks can execute.
 2. **T9.7 Evidence Index Update:** Sync evidence index with freshly closed T4.3, T2.5, T9.8, and T9.4 artifacts.
 3. **Phase 7 Preparation:** Once operator funding/broadcast decisions are resolved, proceed to Phase 7 Check Implementation.
+
+## Phase 6 reconciliation (2026-08-30, Leftover Arc QA & Evidence Close-out)
+
+### Completed in this execution batch
+
+- [x] **11a Fresh Hosted API Smoke & On-Chain Cast Pins:** Verified live against `https://chakra-api-0a5i.onrender.com` (deploy `dep-da9be2gn74is73fhn0e0` / commit `208d5ff`):
+  - `/health` → 200 `{"status":"ok"}`
+  - `/ready` → 200 `ready:true` (`snapshot_id: "snapshot-1788081330115"`, `pool_keys: []` cluster note)
+  - `/tokens` → USDC (6 dp), EURC (6 dp), cirBTC (8 dp) — no mBTC
+  - `/quote` (1e6 USDC→EURC) → 200 via `xylo-stable` (`dex_types: ["xylo"]`, `is_split: false`, `expected_output: "803999"`, `price_impact_bps: 1960`)
+  - `/quote` (cirBTC pairs) → honest `NO_ROUTE` (UnitFlow reserve 249,850 atomic unitss < `MIN_XYK_RESERVE_atomic unitsS` 1e8 dust filter)
+  - `/build_tx` → `to: "0xeb12351602c56d47c4ee955193335848952b29d8"`, `selector: "0x2e3be0c1"`, `value: "0"`, `chain_id: 5042002`
+  - CORS → `access-control-allow-origin: https://chakra-arc-dex.vercel.app`
+  - On-chain pins (`cast` on `https://rpc.testnet.arc.io`): `paused() == false`, token addresses match manifest (`cirbtc: 0xf0C4a4CE…`), Xylo factory (dexType 3) + router `0x73742278…`, Presto hub `true`, UnitFlow factory (dexType 0) + fee 30 bps.
+- [x] **11b T9.1 Venue Routing Matrix (cirBTC Catalog):** Generated `docs/evidence/chakra-t91-venue-matrix.json` with 24 queries across 6 directional pairs (USDC↔EURC, EURC↔cirBTC, USDC↔cirBTC) and multiple sizes. 10 routable USDC↔EURC queries via `xylo-stable` (1–100 USDC); 14 cirBTC queries return honest `NO_ROUTE` due to thin reserve dust filter.
+- [ ] **11c Hosted UI QA (Playwright CLI — OPEN_PARTIAL_GATED_ON_VERCEL_REDEPLOY):** Audited `https://chakra-arc-dex.vercel.app` on Desktop (1280×800) and Mobile (390×844) viewports. Mobile responsive layout and CTA button verified. Live quote interaction on hosted UI remains gated on Vercel production redeployment of commit `208d5ff`: the deployed Vercel bundle (2026-08-28 commit `d3f8c79`) contains a case-sensitive token address matching bug that leaves `tokenOut = null` against the API's lowercase addresses. Local frontend code has the fix (`bbda8e0`/`208d5ff`) and passes 67/67 vitest tests + TypeScript build. Documented in `docs/evidence/chakra-t98-manual-ux-a11y.json`, `chakra-t98-desktop-audit.png`, and `chakra-t98-mobile-audit.png`.
+- [ ] **11d Gated Items (Operator / QA Wallet):**
+  - T6.3 / T9.4 MetaMask live swap: code complete; live on-chain execution gated on funded `QA_WALLET_SECRET`.
+  - T9.3 On-chain split swap: gated on operator wallet funding with $\ge 5$ USDC.
+  - T9.6 Live WS refresh proof: follows on-chain swap from T9.3.
+- [x] **11e Evidence Pack & Docs Synchronization:** Updated `docs/evidence/README.md`, `docs/evidence/chakra-t91-venue-matrix.json`, `docs/evidence/chakra-t98-manual-ux-a11y.json`, testing doc, and planning doc.
+
+### Next Recommended Actions
+
+1. **Vercel Production Redeploy:** Run `vercel --prod` (or promote deployment of commit `208d5ff`) in `packages/frontend` to ship the case-insensitive token matching fix and cirBTC catalog to the live UI.
+2. **Fund QA Wallet (T6.3/T9.4/T9.3):** Fund disposable testnet address with $\ge 5$ USDC + native gas to execute live MetaMask and split swap verification against aggregator `0xeb12351602c56d47c4ee955193335848952b29d8`.

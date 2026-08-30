@@ -11,7 +11,7 @@ date: 2026-08-20
 **Product:** Chakra  
 **Feature key:** `chakra`  
 **Workspace:** `.worktrees/feature-chakra` (`feature-chakra`)  
-**Phase:** 5 continuation (2026-08-28) — T4.3 (production CLMM loader + quote/build_tx test covered & closed), T2.5 (discovery scanner updated with Arc testnet block windowing & executed), T9.8 (WCAG AA contrast raised to >= 4.5:1, verified with red/green vitest & playwright-cli DOM re-audit), T9.4 (real dAppwright MetaMask harness implemented in swap-critical-path.spec.ts, setup/validate scripts updated, docs/qa-playwright-metamask.md added, skip verified).
+**Phase:** 7 Check (2026-08-29) — **not aligned** with the 2026-08-29 curated rebaseline; return to Execute (do not start Review). Prior Phase 5 continuation notes retained. Canonical surface: "Canonical curated rebaseline (2026-08-29)" below.
 **Rebaseline (2026-08-29):** canonical curated strategy — catalog is USDC/EURC/cirBTC; XyloNet/Presto/UnitFlow V2.5 manifest venues; mBTC and owned mocks are chain-31337 fixtures only; no reseeding gate. See the requirements/design/planning/testing amendments in the same pass.
 
 ## Development Setup
@@ -688,3 +688,105 @@ Watchlist (promotion candidates, never silently enabled): Lunex, UnitFlow V3, Ac
   - Disposable QA wallet `0xc603C3…dCE76` funded from operator (6e6 ERC-20 USDC + 6 native USDC) via keystore-backed `cast send` (key never on argv); `FundQaWallet.s.sol` helper added.
 - **T9.6 (live finding):** Worker publishes snapshots on the 600 s discovery cycle (two consecutive snapshot IDs 599.9 s apart); `/ready` always reports `pool_keys: []` despite working quotes; per-swap pool-key refresh is **not observable via the public API** (Redis is private). SC-11 live gate needs a metrics endpoint or Redis access.
 - **Vercel:** `vercel --prod` upload repeatedly failed with `AbortError` (CLI network issue); the T9.4 run used the locally served fixed build (`DAPP_URL=http://localhost:3000`, hosted API baked via `NEXT_PUBLIC_CHAKRA_API_URL=https://chakra-api-0a5i.onrender.com npm run build`). The UI fix is **not yet deployed to Vercel** — needs a `vercel --prod` retry or push-driven deploy.
+
+## Phase 7 Implementation Check (2026-08-29)
+
+**Verdict:** **not aligned** with the approved 2026-08-29 requirements/design (canonical curated catalog + XyloNet / Presto / UnitFlow V2.5). Return to **Execute Plan** for the Major venue-discovery, source-id, operator-script, and public-doc leftovers. Do **not** start `dev-testing` / `dev-review` until those are closed or the design is explicitly reconciled. This check made **no production-code changes** and did **not** flip planning T2.1–T2.4 / T3.3 checkboxes.
+
+**Workspace:** `.worktrees/feature-chakra` (`feature-chakra`), HEAD `208d5ff` `feat(chakra): rebaseline audit fixes — canonical source ids, operator deploy, cirBTC cleanup`. Dirty tree at check time: only uncommitted `docs/ai/deployment/2026-08-20-feature-chakra.md` (authorized hosted cutover notes) — **not reverted**. Task CLI is unavailable (`npx ai-devkit@latest task` → `unknown command`); no tracing events emitted.
+
+The 2026-08-26 / 2026-08-27 **Critical** blockers (StableSwap custody, production Redis snapshot load, cluster `/build_tx`, ABI selector/packing, Permit2 selector/PermitSingle, UI approve-spender) are **resolved in code** at this HEAD. This check is against the **2026-08-29 rebaseline**, not those earlier Crits.
+
+### What shipped and matches design
+
+| Area | Evidence |
+|------|----------|
+| Catalog | Runtime freeze is ERC-20 USDC `0x3600…0000` (6 dp), EURC `0x89B5…D72a` (6 dp), cirBTC `0xf0C4…32BF` (8 dp). `market-snapshot` `graph_nodes()` excludes native USDC. OpenAPI `/tokens` and UI fallback catalog match. Aggregator constructor + `_sweepCatalogTo` sweep usdc/eurc/cirbtc. `splitSwap` is not payable; `receive`/`fallback` revert DirectEth. |
+| Aggregator surface | `enum DexType { Xyk, Stable, Clmm, Xylo, Presto }` with Xylo=3, Presto=4. Hop is the static 5-word tuple. `_xyloOut` is router `swapExactTokensForTokens` + temp approve + reset + balance delta. `_prestoOut` is hub `swap(..., 0, deadline)` + temp approve + reset + delta. `_rejectSharedPools` present; Foundry `test_split_reuses_pool_reverts` passes. `_xykFeeFor` default 30 bps; `test_xyk_factory_fee_is_configurable` passes. |
+| Split optimizer | `optimize` drops candidates that share a pool with a kept better-output path (`split_optimizer.rs`); unit `test_shared_pool_paths_are_reduced_to_best_single`. |
+| Xylo quote | `fetch_xylo_state` hydrates `getAmplificationParameter()` / `A_PRECISION=100` into `state.a`; live hop uses `xylo_quote_with_a(..., state.a)`. Amp fail → `a=0` (quote 0), not a silent A=200 fallback. |
+| Snapshot / ABI / Permit2 | `AppState::from_env` loads Redis via `snapshot_loader`; `/quote` reloads on version pointer change. Hosted `/build_tx` selector `0x2e3be0c1`. Permit2 AllowanceTransfer `0x000000000022D473030F116dDEE9F6B43aC78BA3`. |
+| No auto-reseed | Failed venue is skipped / `NO_ROUTE`; worker never auto-reseeds. |
+| Live catalog + encoder pin | Hosted API after cutover serves cirBTC catalog; `/build_tx.to` = `0xeb12351602c56d47c4ee955193335848952b29d8`. |
+
+### Findings
+
+| Severity | Area | Finding and impact |
+|----------|------|--------------------|
+| **Major** | Worker Presto discovery | `discover_once` (`evm_watcher.rs` ~341–447) match arms are `xyk` / `stable` / `xylo` / `clmm` only. Seeded `:presto` can pass bytecode verification and publish to `chakra:factories` with **zero pools**. Live USDC→EURC is **Xylo-only**; Presto never enters topology. |
+| **Major** | UnitFlow source id | `FactoryConfig::parse` maps seeded `:xyk` → `chakra-xyk` (test at `evm_watcher.rs:1182` pins this). Comment claims `unitflow-v25`; code never emits it. Quote engine accepts both ids; `/build_tx` `step_factory_source("xyk")` → `chakra-xyk`. Design/manifest id `unitflow-v25` is not the worker stamp. |
+| **Major** | Venue verification vs T3.3 | Startup check is **bytecode-only** (`eth_getCode`). Design wants bytecode, canonical endpoints, factory membership, nonzero reserves, and a probe quote. Failed venues become unavailable (match); the four extra checks are missing. |
+| **Major** | Operator leftovers | `Deploy.s.sol` / `Seed.s.sol` still `require` chain `5042002` and can mint/deploy mBTC + owned factories. `DeployMockBtc.s.sol` still broadcasts `new MockBtc()`. `scripts/arc-operator.sh` has **no script allowlist** — any `script <path>` is runnable. Policy is docs-only. Planning local-release-gate overclaimed "operator workflow restricted to `DeployAggregator.s.sol`". |
+| **Major** | Public integrator docs | `README.md` still lists `CHAKRA_MBTC_ADDRESS`. `docs/integrator-guide.md` still teaches mBTC as a catalog token. Runtime `/tokens` is correct; public docs are not. |
+| **Major** | `render.yaml` | Still pins aggregator `0xEa1b2C24bd41163590960F8e40afe6cb4CC92006`. Hosted Render env was updated to `0xeb1235…29d8`; a yaml-driven redeploy would roll the encoder target back. |
+| **Major** | Quote factory gate | `quote_engine.rs` ~555–568 gates **only** `source.starts_with("chakra-")`. Curated ids `xylo-stable` / `presto-hub` / `unitflow-v25` skip the factory membership check at quote time. `/build_tx` still checks snapshot + factory membership. |
+| **Major** | SDK/UI dex-type fallback | `venueToDexType` maps `xylo-stable` / `xylo` → `'stable'` (`packages/sdk/src/index.ts` 147–148, `packages/frontend/src/lib/aggregator.ts` 99–100). Live quotes send `dex_types: ["xylo"]` so the server wins today; a client reconstructing hops from `source` alone would encode a Stable hop against a Xylo pool. |
+| **Medium** | Unused `IXyloPool` | `Aggregator.sol` imports `IXyloPool` and never uses it. Execution is router-only. |
+| **Medium** | `setXyloRouter` | Mapping-only (`xyloRouterForFactory[factory] = router`). Hop-time still requires factory allowlisted as Xylo **and** a router set (comment calls that atomic). Design bullet also still lists pool `IXyloPool.swap` as an alternate path; code is router-only. |
+| **Medium** | Presto hydrator | Fetch pipeline maps `presto-hub` → `FetchTask::EvmStable`; `find_evm_pair(..., "stable")` will miss pairs stamped `dex_type: "presto"` even if discovery is fixed. |
+| **Medium** | PathFinder legacy map | `dex_type_for_source("xylo-stable")` → `"stable"`. Discovery stamps `dex_type: "xylo"` so live hops are correct; snapshots without a stamp would mis-type Xylo as Stable. |
+| **Medium** | `xyk_quote` | Adapter math is still hardcoded 997/1000. Aggregator `_xykOut` uses per-factory fee (UnitFlow 30 bps default). |
+| **Medium** | `/build_tx` shared-pool | Encoder does not re-check that submitted sub-routes share a pool. SplitOptimizer + Solidity `_rejectSharedPools` cover the happy path; a hand-built body can still reach the contract revert. |
+| **Medium** | Presto pair scope | Contract hub allowlist does not restrict USDC/EURC. Catalog freeze is the three tokens; design "USDC/EURC discovery only" is worker-side (and currently a no-op because Presto is never discovered). |
+| **Medium** | Evidence pack | T7.2 / T9.1–T9.5 / `docs/evidence/README.md` still record mBTC pairs and aggregator `0xEa1b2C…2006`. Stale vs current catalog and `0xeb1235…29d8`. |
+| **Medium** | OpenAPI examples | Still `chakra-stable` / `chakra-xyk`. Live source is `xylo-stable`. |
+| **Medium** | Circle faucet CTA | Nested inside `balanceFor > 0` in `SwapCard.tsx` (~455 vs ~474), so the empty-balance CTA never renders. |
+| **Medium** | Deployment-doc header | File still opens with "hosted stack still runs the pre-rebaseline revision" while the uncommitted cutover section (and this check's live smoke) show the rebaselined catalog + new aggregator. Cutover section also claimed `/quote` `is_split`; this check observed `is_split: false`. |
+| **Low** | A=200 wrappers | `xylo_quote` / `xylo_gross` / `xylo_invariant_d` still hardcode A=200. Production hop uses `xylo_quote_with_a(state.a)`. |
+| **Low** | `ExecuteSplitSwap.s.sol` | Default aggregator still `0xEa1b2C…2006`. |
+| **Low** | Collapsed Route pill | Shows raw `source` (`xylo-stable`) rather than the display map used in expanded legs. |
+| **Low** | TokenSelector mBTC hint | Intentional fixture-only search copy; not a runtime catalog leak. |
+| **Low** | Testing-doc parse pin | Testing doc EVM-worker bullet was stale (`source == "xylo"`); Check leftover note now records that parse pins `xylo-stable`. |
+| **Low** | Stale cargo feature flag | Planning/impl still mention `cargo test -p api-server --features test-fixture`. The feature lives on `dex-adapters` and is already enabled in `crates/api-server/Cargo.toml`; `cargo test -p api-server` is sufficient (60 passed this session). |
+
+### Live hosted smoke (this session, 2026-08-30)
+
+API `https://chakra-api-0a5i.onrender.com`, UI `https://chakra-arc-dex.vercel.app`.
+
+- `GET /api/v1/health` → 200 `{"status":"ok"}`.
+- `GET /api/v1/ready` → 200 `ready:true`, `snapshot_id=snapshot-1788081330115`, `pool_keys:[]` (known T9.6 cluster-mode note).
+- `GET /api/v1/tokens` → USDC (6) / EURC (6) / cirBTC (8).
+- `GET /api/v1/quote` 1e6 USDC→EURC → 200, `source: "xylo-stable"`, `dex_types: ["xylo"]`, hop factory `0x60ed…e2`, pool `0x3df3…bb1`, `expected_output: "803990"`, `minimum_output: "799970"`, `hop_fees: [4]`, **`is_split: false`**, `protocol_fee_bps: 0`.
+- EURC→cirBTC and USDC→cirBTC → honest `NO_ROUTE` (UnitFlow cirBTC reserve 249,850 < 1e8 dust filter; no reseed).
+- `POST /api/v1/build_tx` with `min_amount_out: "799970"` + quoted xylo step → 200; **`to: "0xeb12351602c56d47c4ee955193335848952b29d8"`**, calldata selector **`0x2e3be0c1`**, `value: "0"`, `chain_id: 5042002`, Permit2 `typed_data.domain.verifyingContract` = `0x000000000022D473030F116dDEE9F6B43aC78BA3`, `typed_data.message.spender` = new aggregator. First attempt with `slippage_bps` instead of `min_amount_out` returned 422 (API contract; not a regression).
+- CORS `access-control-allow-origin: https://chakra-arc-dex.vercel.app`. UI HTTP 200.
+
+Working live pair: Xylo USDC↔EURC only.
+
+### Fresh verification (this session, HEAD `208d5ff`)
+
+- `npx ai-devkit@latest lint --feature chakra` (from the worktree): **all checks passed**. (Same command from repo root fails because the five feature docs live in the worktree.)
+- `forge test -vv` in `contracts/evm`: **88 passed / 0 failed** — Aggregator 52 (incl. `test_xylo_hop_succeeds_via_router`, `test_presto_hop_succeeds_via_hub`, `test_split_reuses_pool_reverts`, `test_xyk_factory_fee_is_configurable`, `test_catalog_enforcement_rejects_out_of_catalog_token`), StableSwap 16, Xyk 8, Clmm 5, MockBtc 5, LiquiditySeeder 2. Planning local-release-gate said MockXylo 2; the suite is LiquiditySeeder 2.
+- `cargo test --workspace --all-targets`: **245 passed / 0 failed**.
+- `cargo test -p api-server`: **60 passed / 0 failed** (do not pass `--features test-fixture` on this package).
+- Frontend: vitest **67/67**, `npx tsc --noEmit` clean, `npm run build` exit 0.
+- SDK: vitest **14/14**, `npx tsc --noEmit` clean.
+- `git diff --check`: pass.
+
+Local gates are green. They do **not** prove venue-discovery or source-id alignment; several Majors are untested paths (no Presto discovery arm, parse pins `chakra-xyk`, bytecode-only verification).
+
+### Prior Criticals (08-26 / 08-27) — status at this HEAD
+
+Resolved in code: StableSwap deposit accounting, production snapshot bootstrap/reload, cluster `/build_tx` Redis load, selector `0x2e3be0c1` + canonical ABI packing, Permit2 `0x927da105` + PermitSingle, UI approve spender = Permit2, CLMM snapshot → engine, frontend typecheck/build, MetaMask harness (live evidence still vs old aggregator `0xEa1b2C…2006`).
+
+### Open requirements / evidence
+
+- Planning T2.1–T2.4 and T3.3 remain `[ ]` (Check did not flip them). Catalog/runtime work exists; discovery/verification/source-id gaps above are why they stay open.
+- SC-1 live three-pair routing: USDC↔EURC only; cirBTC legs honest `NO_ROUTE`.
+- SC-2 / SC-4 live split evidence is 2026-08-28 vs the old aggregator and `chakra-stable`+xylo; not re-proven on `0xeb1235…29d8`.
+- SC-6/SC-9 clean-clone walkthrough evidence still names `0xEa1b2C…2006`.
+- SC-11 still not observable via public `/ready` (`pool_keys: []`).
+- Watchlist (Lunex, UnitFlow V3, AchSwap/Arc Swap, Synthra) is docs-only — correctly **not** in code/env/manifest.
+
+### Required correction order (Execute, not this check)
+
+1. Discover Presto hubs into topology (`discover_once` arm + hydrator that finds `dex_type: "presto"`), or design-reconcile Presto as deploy-time allowlist only with a different discovery contract.
+2. Stamp UnitFlow as `unitflow-v25` end-to-end (worker parse, snapshot, quote gate, `step_factory_source`), or reconcile design to `chakra-xyk`.
+3. Implement the T3.3 five-check venue verification (or narrow the design to bytecode-only).
+4. Enforce `arc-operator.sh` script allowlist (`DeployAggregator.s.sol` only on 5042002); keep `Deploy`/`Seed`/`DeployMockBtc` chain-31337 / fixture-marked.
+5. Align public README + integrator-guide + `render.yaml` + OpenAPI examples + evidence pack with cirBTC + `0xeb1235…29d8`.
+6. Gate quote-time factory membership for curated source ids; map SDK/UI `xylo*` → `xylo` not `stable`.
+
+### Next
+
+`dev-execute` for the Majors above (or `dev-design` if product wants to drop Presto / keep `chakra-xyk` as the UnitFlow id). **Do not** run `dev-testing` or `dev-review` on this verdict.

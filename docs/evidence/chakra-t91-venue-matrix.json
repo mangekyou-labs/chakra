@@ -1,19 +1,18 @@
 {
-  "scenario": "SC-8 Venue Routing Matrix & Testnet Liquidity Deployment Analysis",
-  "timestamp_utc": "2026-08-28T07:42:22Z",
+  "scenario": "SC-8 Venue Routing Matrix & Testnet Liquidity Deployment Analysis (cirBTC Catalog)",
+  "timestamp_utc": "2026-08-30T09:27:48Z",
   "api_base": "https://chakra-api-0a5i.onrender.com",
   "chain_id": 5042002,
   "status": "OPEN_PARTIAL",
-  "total_queries": 15,
-  "routable_queries": 6,
-  "no_route_queries": 9,
+  "total_queries": 24,
+  "routable_queries": 10,
+  "no_route_queries": 14,
   "deployment_analysis": {
     "routable_venues": [
-      "chakra-stable (USDC/EURC StableSwap pool 0xE4A881F4211b5cC11d8298032136A0d72e93CB02)",
-      "xylo (USDC/EURC XyloNet pool 0x3DF3966F5138143dce7a9cFDdC2c0310ce083BB1)"
+      "xylo-stable (0x3df3966f5138143dce7a9cfddc2c0310ce083bb1)"
     ],
-    "unseeded_venues_blocker": "mBTC pools on Arc testnet (V2 0x36b7ab... and CLMM 0xe431ff...) hold dust/incomplete ticks. Live multi-venue routing for mBTC pairs remains blocked on T2.1\u2013T2.4 liquidity re-seeding.",
-    "sc8_criterion_status": "OPEN (Gated on T2.1\u2013T2.4 testnet re-seed for 3 distinct pairs)"
+    "cirbtc_venues_status": "cirBTC pairs (UnitFlow EURC/cirBTC pool 0x268DC75517EaFc6e0D52666639529e5DAB8c9200) currently hold thin reserves (249,850 atomic unitss < MIN_XYK_RESERVE_atomic unitsS 1e8 threshold), returning honest NO_ROUTE. Per rebaseline rules, no reseeding or artificial fixture substitution is performed.",
+    "sc8_criterion_status": "OPEN_PARTIAL (USDC<->EURC routable across multiple sizes; cirBTC pairs gated by organic reserve dust filter)"
   },
   "results": [
     {
@@ -24,251 +23,257 @@
       "routable": true,
       "status": "ROUTABLE",
       "error_code": null,
-      "client_rtt_ms": 306.35,
-      "response": {
-        "success": true,
-        "data": {
-          "amount_in": "1000000",
-          "compute_time_ms": 11,
-          "expected_output": "996915",
-          "is_split": false,
-          "max_splits": 5,
-          "minimum_output": "991930",
-          "price_impact_bps": 30,
-          "protocol_fee_bps": 0,
-          "sub_routes": [
-            {
-              "amount_in": "1000000",
-              "amount_out": "996915",
-              "dex_types": [
-                "stable"
-              ],
-              "fraction_bps": 10000,
-              "hop_factories": [
-                "0x77ce21fdaaea40fd94acf65ff3220a0a7db7d690"
-              ],
-              "hop_fees": [
-                4
-              ],
-              "path": [
-                "0x3600000000000000000000000000000000000000",
-                "0x89b50855aa3be2f677cd6303cec089b5f319d72a"
-              ],
-              "pool_addresses": [
-                "0xe4a881f4211b5cc11d8298032136a0d72e93cb02"
-              ],
-              "source": "chakra-stable"
-            }
-          ]
-        }
-      }
-    },
-    {
-      "pair": "USDC->EURC",
-      "token_in": "0x3600000000000000000000000000000000000000",
-      "token_out": "0x89B50855Aa3bE2F677cD6303Cec089B5F319D72a",
-      "amount_in": "5000000",
-      "routable": true,
-      "status": "ROUTABLE",
-      "error_code": null,
-      "client_rtt_ms": 303.3,
-      "response": {
-        "success": true,
-        "data": {
-          "amount_in": "5000000",
-          "compute_time_ms": 12,
-          "expected_output": "4704512",
-          "is_split": true,
-          "max_splits": 5,
-          "minimum_output": "4610421",
-          "price_impact_bps": 631,
-          "protocol_fee_bps": 0,
-          "sub_routes": [
-            {
-              "amount_in": "1180510",
-              "amount_out": "1031376",
-              "dex_types": [
-                "xylo"
-              ],
-              "fraction_bps": 2361,
-              "hop_factories": [
-                "0x60edefb094b84bbc6430cc130b358a43ba1979e2"
-              ],
-              "hop_fees": [
-                4
-              ],
-              "path": [
-                "0x3600000000000000000000000000000000000000",
-                "0x89b50855aa3be2f677cd6303cec089b5f319d72a"
-              ],
-              "pool_addresses": [
-                "0x3df3966f5138143dce7a9cfddc2c0310ce083bb1"
-              ],
-              "source": "xylo"
-            },
-            {
-              "amount_in": "534399",
-              "amount_out": "466889",
-              "dex_types": [
-                "xylo"
-              ],
-              "fraction_bps": 1069,
-              "hop_factories": [
-                "0x60edefb094b84bbc6430cc130b358a43ba1979e2"
-              ],
-              "hop_fees": [
-                4
-              ],
-              "path": [
-                "0x3600000000000000000000000000000000000000",
-                "0x89b50855aa3be2f677cd6303cec089b5f319d72a"
-              ],
-              "pool_addresses": [
-                "0x3df3966f5138143dce7a9cfddc2c0310ce083bb1"
-              ],
-              "source": "xylo"
-            },
-            {
-              "amount_in": "3285091",
-              "amount_out": "3206247",
-              "dex_types": [
-                "stable"
-              ],
-              "fraction_bps": 6570,
-              "hop_factories": [
-                "0x77ce21fdaaea40fd94acf65ff3220a0a7db7d690"
-              ],
-              "hop_fees": [
-                4
-              ],
-              "path": [
-                "0x3600000000000000000000000000000000000000",
-                "0x89b50855aa3be2f677cd6303cec089b5f319d72a"
-              ],
-              "pool_addresses": [
-                "0xe4a881f4211b5cc11d8298032136a0d72e93cb02"
-              ],
-              "source": "chakra-stable"
-            }
-          ]
-        }
-      }
-    },
-    {
-      "pair": "USDC->EURC",
-      "token_in": "0x3600000000000000000000000000000000000000",
-      "token_out": "0x89B50855Aa3bE2F677cD6303Cec089B5F319D72a",
-      "amount_in": "10000000",
-      "routable": true,
-      "status": "ROUTABLE",
-      "error_code": null,
-      "client_rtt_ms": 385.33,
-      "response": {
-        "success": true,
-        "data": {
-          "amount_in": "10000000",
-          "compute_time_ms": 11,
-          "expected_output": "9072854",
-          "is_split": true,
-          "max_splits": 5,
-          "minimum_output": "8891396",
-          "price_impact_bps": 631,
-          "protocol_fee_bps": 0,
-          "sub_routes": [
-            {
-              "amount_in": "3853249",
-              "amount_out": "3366463",
-              "dex_types": [
-                "xylo"
-              ],
-              "fraction_bps": 3853,
-              "hop_factories": [
-                "0x60edefb094b84bbc6430cc130b358a43ba1979e2"
-              ],
-              "hop_fees": [
-                4
-              ],
-              "path": [
-                "0x3600000000000000000000000000000000000000",
-                "0x89b50855aa3be2f677cd6303cec089b5f319d72a"
-              ],
-              "pool_addresses": [
-                "0x3df3966f5138143dce7a9cfddc2c0310ce083bb1"
-              ],
-              "source": "xylo"
-            },
-            {
-              "amount_in": "2860331",
-              "amount_out": "2498983",
-              "dex_types": [
-                "xylo"
-              ],
-              "fraction_bps": 2860,
-              "hop_factories": [
-                "0x60edefb094b84bbc6430cc130b358a43ba1979e2"
-              ],
-              "hop_fees": [
-                4
-              ],
-              "path": [
-                "0x3600000000000000000000000000000000000000",
-                "0x89b50855aa3be2f677cd6303cec089b5f319d72a"
-              ],
-              "pool_addresses": [
-                "0x3df3966f5138143dce7a9cfddc2c0310ce083bb1"
-              ],
-              "source": "xylo"
-            },
-            {
-              "amount_in": "3286420",
-              "amount_out": "3207408",
-              "dex_types": [
-                "stable"
-              ],
-              "fraction_bps": 3286,
-              "hop_factories": [
-                "0x77ce21fdaaea40fd94acf65ff3220a0a7db7d690"
-              ],
-              "hop_fees": [
-                4
-              ],
-              "path": [
-                "0x3600000000000000000000000000000000000000",
-                "0x89b50855aa3be2f677cd6303cec089b5f319d72a"
-              ],
-              "pool_addresses": [
-                "0xe4a881f4211b5cc11d8298032136a0d72e93cb02"
-              ],
-              "source": "chakra-stable"
-            }
-          ]
-        }
-      }
-    },
-    {
-      "pair": "EURC->USDC",
-      "token_in": "0x89B50855Aa3bE2F677cD6303Cec089B5F319D72a",
-      "token_out": "0x3600000000000000000000000000000000000000",
-      "amount_in": "1000000",
-      "routable": true,
-      "status": "ROUTABLE",
-      "error_code": null,
-      "client_rtt_ms": 355.33,
+      "client_rtt_ms": 306.66,
       "response": {
         "success": true,
         "data": {
           "amount_in": "1000000",
           "compute_time_ms": 8,
-          "expected_output": "1143683",
+          "expected_output": "803999",
           "is_split": false,
           "max_splits": 5,
-          "minimum_output": "1137964",
+          "minimum_output": "799979",
+          "price_impact_bps": 1960,
+          "protocol_fee_bps": 0,
+          "sub_routes": [
+            {
+              "amount_in": "1000000",
+              "amount_out": "803999",
+              "dex_types": [
+                "xylo"
+              ],
+              "fraction_bps": 10000,
+              "hop_factories": [
+                "0x60edefb094b84bbc6430cc130b358a43ba1979e2"
+              ],
+              "hop_fees": [
+                4
+              ],
+              "path": [
+                "0x3600000000000000000000000000000000000000",
+                "0x89b50855aa3be2f677cd6303cec089b5f319d72a"
+              ],
+              "pool_addresses": [
+                "0x3df3966f5138143dce7a9cfddc2c0310ce083bb1"
+              ],
+              "source": "xylo-stable"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "pair": "USDC->EURC",
+      "token_in": "0x3600000000000000000000000000000000000000",
+      "token_out": "0x89B50855Aa3bE2F677cD6303Cec089B5F319D72a",
+      "amount_in": "5000000",
+      "routable": true,
+      "status": "ROUTABLE",
+      "error_code": null,
+      "client_rtt_ms": 286.84,
+      "response": {
+        "success": true,
+        "data": {
+          "amount_in": "5000000",
+          "compute_time_ms": 7,
+          "expected_output": "4019987",
+          "is_split": false,
+          "max_splits": 5,
+          "minimum_output": "3999887",
+          "price_impact_bps": 1960,
+          "protocol_fee_bps": 0,
+          "sub_routes": [
+            {
+              "amount_in": "5000000",
+              "amount_out": "4019987",
+              "dex_types": [
+                "xylo"
+              ],
+              "fraction_bps": 10000,
+              "hop_factories": [
+                "0x60edefb094b84bbc6430cc130b358a43ba1979e2"
+              ],
+              "hop_fees": [
+                4
+              ],
+              "path": [
+                "0x3600000000000000000000000000000000000000",
+                "0x89b50855aa3be2f677cd6303cec089b5f319d72a"
+              ],
+              "pool_addresses": [
+                "0x3df3966f5138143dce7a9cfddc2c0310ce083bb1"
+              ],
+              "source": "xylo-stable"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "pair": "USDC->EURC",
+      "token_in": "0x3600000000000000000000000000000000000000",
+      "token_out": "0x89B50855Aa3bE2F677cD6303Cec089B5F319D72a",
+      "amount_in": "10000000",
+      "routable": true,
+      "status": "ROUTABLE",
+      "error_code": null,
+      "client_rtt_ms": 367.18,
+      "response": {
+        "success": true,
+        "data": {
+          "amount_in": "10000000",
+          "compute_time_ms": 7,
+          "expected_output": "8039961",
+          "is_split": false,
+          "max_splits": 5,
+          "minimum_output": "7999761",
+          "price_impact_bps": 1960,
+          "protocol_fee_bps": 0,
+          "sub_routes": [
+            {
+              "amount_in": "10000000",
+              "amount_out": "8039961",
+              "dex_types": [
+                "xylo"
+              ],
+              "fraction_bps": 10000,
+              "hop_factories": [
+                "0x60edefb094b84bbc6430cc130b358a43ba1979e2"
+              ],
+              "hop_fees": [
+                4
+              ],
+              "path": [
+                "0x3600000000000000000000000000000000000000",
+                "0x89b50855aa3be2f677cd6303cec089b5f319d72a"
+              ],
+              "pool_addresses": [
+                "0x3df3966f5138143dce7a9cfddc2c0310ce083bb1"
+              ],
+              "source": "xylo-stable"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "pair": "USDC->EURC",
+      "token_in": "0x3600000000000000000000000000000000000000",
+      "token_out": "0x89B50855Aa3bE2F677cD6303Cec089B5F319D72a",
+      "amount_in": "50000000",
+      "routable": true,
+      "status": "ROUTABLE",
+      "error_code": null,
+      "client_rtt_ms": 311.7,
+      "response": {
+        "success": true,
+        "data": {
+          "amount_in": "50000000",
+          "compute_time_ms": 8,
+          "expected_output": "40199295",
+          "is_split": false,
+          "max_splits": 5,
+          "minimum_output": "39998298",
+          "price_impact_bps": 1960,
+          "protocol_fee_bps": 0,
+          "sub_routes": [
+            {
+              "amount_in": "50000000",
+              "amount_out": "40199295",
+              "dex_types": [
+                "xylo"
+              ],
+              "fraction_bps": 10000,
+              "hop_factories": [
+                "0x60edefb094b84bbc6430cc130b358a43ba1979e2"
+              ],
+              "hop_fees": [
+                4
+              ],
+              "path": [
+                "0x3600000000000000000000000000000000000000",
+                "0x89b50855aa3be2f677cd6303cec089b5f319d72a"
+              ],
+              "pool_addresses": [
+                "0x3df3966f5138143dce7a9cfddc2c0310ce083bb1"
+              ],
+              "source": "xylo-stable"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "pair": "USDC->EURC",
+      "token_in": "0x3600000000000000000000000000000000000000",
+      "token_out": "0x89B50855Aa3bE2F677cD6303Cec089B5F319D72a",
+      "amount_in": "100000000",
+      "routable": true,
+      "status": "ROUTABLE",
+      "error_code": null,
+      "client_rtt_ms": 265.56,
+      "response": {
+        "success": true,
+        "data": {
+          "amount_in": "100000000",
+          "compute_time_ms": 7,
+          "expected_output": "80397308",
+          "is_split": false,
+          "max_splits": 5,
+          "minimum_output": "79995321",
+          "price_impact_bps": 1960,
+          "protocol_fee_bps": 0,
+          "sub_routes": [
+            {
+              "amount_in": "100000000",
+              "amount_out": "80397308",
+              "dex_types": [
+                "xylo"
+              ],
+              "fraction_bps": 10000,
+              "hop_factories": [
+                "0x60edefb094b84bbc6430cc130b358a43ba1979e2"
+              ],
+              "hop_fees": [
+                4
+              ],
+              "path": [
+                "0x3600000000000000000000000000000000000000",
+                "0x89b50855aa3be2f677cd6303cec089b5f319d72a"
+              ],
+              "pool_addresses": [
+                "0x3df3966f5138143dce7a9cfddc2c0310ce083bb1"
+              ],
+              "source": "xylo-stable"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "pair": "EURC->USDC",
+      "token_in": "0x89B50855Aa3bE2F677cD6303Cec089B5F319D72a",
+      "token_out": "0x3600000000000000000000000000000000000000",
+      "amount_in": "1000000",
+      "routable": true,
+      "status": "ROUTABLE",
+      "error_code": null,
+      "client_rtt_ms": 291.26,
+      "response": {
+        "success": true,
+        "data": {
+          "amount_in": "1000000",
+          "compute_time_ms": 8,
+          "expected_output": "1242787",
+          "is_split": false,
+          "max_splits": 5,
+          "minimum_output": "1236573",
           "price_impact_bps": 0,
           "protocol_fee_bps": 0,
           "sub_routes": [
             {
               "amount_in": "1000000",
-              "amount_out": "1143683",
+              "amount_out": "1242787",
               "dex_types": [
                 "xylo"
               ],
@@ -286,7 +291,7 @@
               "pool_addresses": [
                 "0x3df3966f5138143dce7a9cfddc2c0310ce083bb1"
               ],
-              "source": "xylo"
+              "source": "xylo-stable"
             }
           ]
         }
@@ -300,22 +305,22 @@
       "routable": true,
       "status": "ROUTABLE",
       "error_code": null,
-      "client_rtt_ms": 318.46,
+      "client_rtt_ms": 286.48,
       "response": {
         "success": true,
         "data": {
           "amount_in": "5000000",
-          "compute_time_ms": 9,
-          "expected_output": "5718407",
+          "compute_time_ms": 8,
+          "expected_output": "6213929",
           "is_split": false,
           "max_splits": 5,
-          "minimum_output": "5689814",
+          "minimum_output": "6182859",
           "price_impact_bps": 0,
           "protocol_fee_bps": 0,
           "sub_routes": [
             {
               "amount_in": "5000000",
-              "amount_out": "5718407",
+              "amount_out": "6213929",
               "dex_types": [
                 "xylo"
               ],
@@ -333,7 +338,7 @@
               "pool_addresses": [
                 "0x3df3966f5138143dce7a9cfddc2c0310ce083bb1"
               ],
-              "source": "xylo"
+              "source": "xylo-stable"
             }
           ]
         }
@@ -347,22 +352,22 @@
       "routable": true,
       "status": "ROUTABLE",
       "error_code": null,
-      "client_rtt_ms": 441.62,
+      "client_rtt_ms": 286.95,
       "response": {
         "success": true,
         "data": {
           "amount_in": "10000000",
-          "compute_time_ms": 10,
-          "expected_output": "11436802",
+          "compute_time_ms": 7,
+          "expected_output": "12427832",
           "is_split": false,
           "max_splits": 5,
-          "minimum_output": "11379617",
+          "minimum_output": "12365692",
           "price_impact_bps": 0,
           "protocol_fee_bps": 0,
           "sub_routes": [
             {
               "amount_in": "10000000",
-              "amount_out": "11436802",
+              "amount_out": "12427832",
               "dex_types": [
                 "xylo"
               ],
@@ -380,21 +385,115 @@
               "pool_addresses": [
                 "0x3df3966f5138143dce7a9cfddc2c0310ce083bb1"
               ],
-              "source": "xylo"
+              "source": "xylo-stable"
             }
           ]
         }
       }
     },
     {
-      "pair": "USDC->mBTC",
-      "token_in": "0x3600000000000000000000000000000000000000",
-      "token_out": "0xbf5a25D7070FaACAe309D66D05372a6b212ECbdF",
+      "pair": "EURC->USDC",
+      "token_in": "0x89B50855Aa3bE2F677cD6303Cec089B5F319D72a",
+      "token_out": "0x3600000000000000000000000000000000000000",
+      "amount_in": "50000000",
+      "routable": true,
+      "status": "ROUTABLE",
+      "error_code": null,
+      "client_rtt_ms": 307.73,
+      "response": {
+        "success": true,
+        "data": {
+          "amount_in": "50000000",
+          "compute_time_ms": 8,
+          "expected_output": "62138178",
+          "is_split": false,
+          "max_splits": 5,
+          "minimum_output": "61827487",
+          "price_impact_bps": 0,
+          "protocol_fee_bps": 0,
+          "sub_routes": [
+            {
+              "amount_in": "50000000",
+              "amount_out": "62138178",
+              "dex_types": [
+                "xylo"
+              ],
+              "fraction_bps": 10000,
+              "hop_factories": [
+                "0x60edefb094b84bbc6430cc130b358a43ba1979e2"
+              ],
+              "hop_fees": [
+                4
+              ],
+              "path": [
+                "0x89b50855aa3be2f677cd6303cec089b5f319d72a",
+                "0x3600000000000000000000000000000000000000"
+              ],
+              "pool_addresses": [
+                "0x3df3966f5138143dce7a9cfddc2c0310ce083bb1"
+              ],
+              "source": "xylo-stable"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "pair": "EURC->USDC",
+      "token_in": "0x89B50855Aa3bE2F677cD6303Cec089B5F319D72a",
+      "token_out": "0x3600000000000000000000000000000000000000",
+      "amount_in": "100000000",
+      "routable": true,
+      "status": "ROUTABLE",
+      "error_code": null,
+      "client_rtt_ms": 303.11,
+      "response": {
+        "success": true,
+        "data": {
+          "amount_in": "100000000",
+          "compute_time_ms": 6,
+          "expected_output": "124273893",
+          "is_split": false,
+          "max_splits": 5,
+          "minimum_output": "123652523",
+          "price_impact_bps": 0,
+          "protocol_fee_bps": 0,
+          "sub_routes": [
+            {
+              "amount_in": "100000000",
+              "amount_out": "124273893",
+              "dex_types": [
+                "xylo"
+              ],
+              "fraction_bps": 10000,
+              "hop_factories": [
+                "0x60edefb094b84bbc6430cc130b358a43ba1979e2"
+              ],
+              "hop_fees": [
+                4
+              ],
+              "path": [
+                "0x89b50855aa3be2f677cd6303cec089b5f319d72a",
+                "0x3600000000000000000000000000000000000000"
+              ],
+              "pool_addresses": [
+                "0x3df3966f5138143dce7a9cfddc2c0310ce083bb1"
+              ],
+              "source": "xylo-stable"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "pair": "EURC->cirBTC",
+      "token_in": "0x89B50855Aa3bE2F677cD6303Cec089B5F319D72a",
+      "token_out": "0xf0C4a4CE82A5746AbAAd9425360Ab04fbBA432BF",
       "amount_in": "1000000",
       "routable": false,
       "status": "NO_ROUTE",
       "error_code": "NO_ROUTE",
-      "client_rtt_ms": 765.67,
+      "client_rtt_ms": 294.71,
       "response": {
         "success": false,
         "error": {
@@ -404,14 +503,14 @@
       }
     },
     {
-      "pair": "USDC->mBTC",
-      "token_in": "0x3600000000000000000000000000000000000000",
-      "token_out": "0xbf5a25D7070FaACAe309D66D05372a6b212ECbdF",
+      "pair": "EURC->cirBTC",
+      "token_in": "0x89B50855Aa3bE2F677cD6303Cec089B5F319D72a",
+      "token_out": "0xf0C4a4CE82A5746AbAAd9425360Ab04fbBA432BF",
       "amount_in": "5000000",
       "routable": false,
       "status": "NO_ROUTE",
       "error_code": "NO_ROUTE",
-      "client_rtt_ms": 296.43,
+      "client_rtt_ms": 300.01,
       "response": {
         "success": false,
         "error": {
@@ -421,14 +520,14 @@
       }
     },
     {
-      "pair": "USDC->mBTC",
-      "token_in": "0x3600000000000000000000000000000000000000",
-      "token_out": "0xbf5a25D7070FaACAe309D66D05372a6b212ECbdF",
+      "pair": "EURC->cirBTC",
+      "token_in": "0x89B50855Aa3bE2F677cD6303Cec089B5F319D72a",
+      "token_out": "0xf0C4a4CE82A5746AbAAd9425360Ab04fbBA432BF",
       "amount_in": "10000000",
       "routable": false,
       "status": "NO_ROUTE",
       "error_code": "NO_ROUTE",
-      "client_rtt_ms": 313.67,
+      "client_rtt_ms": 261.74,
       "response": {
         "success": false,
         "error": {
@@ -438,14 +537,48 @@
       }
     },
     {
-      "pair": "EURC->mBTC",
-      "token_in": "0x89B50855Aa3bE2F677cD6303Cec089B5F319D72a",
-      "token_out": "0xbf5a25D7070FaACAe309D66D05372a6b212ECbdF",
+      "pair": "cirBTC->EURC",
+      "token_in": "0xf0C4a4CE82A5746AbAAd9425360Ab04fbBA432BF",
+      "token_out": "0x89B50855Aa3bE2F677cD6303Cec089B5F319D72a",
+      "amount_in": "10000",
+      "routable": false,
+      "status": "NO_ROUTE",
+      "error_code": "NO_ROUTE",
+      "client_rtt_ms": 258.48,
+      "response": {
+        "success": false,
+        "error": {
+          "code": "NO_ROUTE",
+          "message": "No route available for this pair"
+        }
+      }
+    },
+    {
+      "pair": "cirBTC->EURC",
+      "token_in": "0xf0C4a4CE82A5746AbAAd9425360Ab04fbBA432BF",
+      "token_out": "0x89B50855Aa3bE2F677cD6303Cec089B5F319D72a",
+      "amount_in": "100000",
+      "routable": false,
+      "status": "NO_ROUTE",
+      "error_code": "NO_ROUTE",
+      "client_rtt_ms": 285.07,
+      "response": {
+        "success": false,
+        "error": {
+          "code": "NO_ROUTE",
+          "message": "No route available for this pair"
+        }
+      }
+    },
+    {
+      "pair": "cirBTC->EURC",
+      "token_in": "0xf0C4a4CE82A5746AbAAd9425360Ab04fbBA432BF",
+      "token_out": "0x89B50855Aa3bE2F677cD6303Cec089B5F319D72a",
       "amount_in": "1000000",
       "routable": false,
       "status": "NO_ROUTE",
       "error_code": "NO_ROUTE",
-      "client_rtt_ms": 275.4,
+      "client_rtt_ms": 303.36,
       "response": {
         "success": false,
         "error": {
@@ -455,14 +588,48 @@
       }
     },
     {
-      "pair": "EURC->mBTC",
-      "token_in": "0x89B50855Aa3bE2F677cD6303Cec089B5F319D72a",
-      "token_out": "0xbf5a25D7070FaACAe309D66D05372a6b212ECbdF",
+      "pair": "cirBTC->EURC",
+      "token_in": "0xf0C4a4CE82A5746AbAAd9425360Ab04fbBA432BF",
+      "token_out": "0x89B50855Aa3bE2F677cD6303Cec089B5F319D72a",
+      "amount_in": "100000000",
+      "routable": false,
+      "status": "NO_ROUTE",
+      "error_code": "NO_ROUTE",
+      "client_rtt_ms": 314.94,
+      "response": {
+        "success": false,
+        "error": {
+          "code": "NO_ROUTE",
+          "message": "No route available for this pair"
+        }
+      }
+    },
+    {
+      "pair": "USDC->cirBTC",
+      "token_in": "0x3600000000000000000000000000000000000000",
+      "token_out": "0xf0C4a4CE82A5746AbAAd9425360Ab04fbBA432BF",
+      "amount_in": "1000000",
+      "routable": false,
+      "status": "NO_ROUTE",
+      "error_code": "NO_ROUTE",
+      "client_rtt_ms": 310.19,
+      "response": {
+        "success": false,
+        "error": {
+          "code": "NO_ROUTE",
+          "message": "No route available for this pair"
+        }
+      }
+    },
+    {
+      "pair": "USDC->cirBTC",
+      "token_in": "0x3600000000000000000000000000000000000000",
+      "token_out": "0xf0C4a4CE82A5746AbAAd9425360Ab04fbBA432BF",
       "amount_in": "5000000",
       "routable": false,
       "status": "NO_ROUTE",
       "error_code": "NO_ROUTE",
-      "client_rtt_ms": 413.13,
+      "client_rtt_ms": 291.16,
       "response": {
         "success": false,
         "error": {
@@ -472,14 +639,14 @@
       }
     },
     {
-      "pair": "EURC->mBTC",
-      "token_in": "0x89B50855Aa3bE2F677cD6303Cec089B5F319D72a",
-      "token_out": "0xbf5a25D7070FaACAe309D66D05372a6b212ECbdF",
+      "pair": "USDC->cirBTC",
+      "token_in": "0x3600000000000000000000000000000000000000",
+      "token_out": "0xf0C4a4CE82A5746AbAAd9425360Ab04fbBA432BF",
       "amount_in": "10000000",
       "routable": false,
       "status": "NO_ROUTE",
       "error_code": "NO_ROUTE",
-      "client_rtt_ms": 621.78,
+      "client_rtt_ms": 258.39,
       "response": {
         "success": false,
         "error": {
@@ -489,14 +656,48 @@
       }
     },
     {
-      "pair": "mBTC->USDC",
-      "token_in": "0xbf5a25D7070FaACAe309D66D05372a6b212ECbdF",
+      "pair": "cirBTC->USDC",
+      "token_in": "0xf0C4a4CE82A5746AbAAd9425360Ab04fbBA432BF",
+      "token_out": "0x3600000000000000000000000000000000000000",
+      "amount_in": "10000",
+      "routable": false,
+      "status": "NO_ROUTE",
+      "error_code": "NO_ROUTE",
+      "client_rtt_ms": 290.32,
+      "response": {
+        "success": false,
+        "error": {
+          "code": "NO_ROUTE",
+          "message": "No route available for this pair"
+        }
+      }
+    },
+    {
+      "pair": "cirBTC->USDC",
+      "token_in": "0xf0C4a4CE82A5746AbAAd9425360Ab04fbBA432BF",
+      "token_out": "0x3600000000000000000000000000000000000000",
+      "amount_in": "100000",
+      "routable": false,
+      "status": "NO_ROUTE",
+      "error_code": "NO_ROUTE",
+      "client_rtt_ms": 288.44,
+      "response": {
+        "success": false,
+        "error": {
+          "code": "NO_ROUTE",
+          "message": "No route available for this pair"
+        }
+      }
+    },
+    {
+      "pair": "cirBTC->USDC",
+      "token_in": "0xf0C4a4CE82A5746AbAAd9425360Ab04fbBA432BF",
       "token_out": "0x3600000000000000000000000000000000000000",
       "amount_in": "1000000",
       "routable": false,
       "status": "NO_ROUTE",
       "error_code": "NO_ROUTE",
-      "client_rtt_ms": 410.12,
+      "client_rtt_ms": 300.25,
       "response": {
         "success": false,
         "error": {
@@ -506,31 +707,14 @@
       }
     },
     {
-      "pair": "mBTC->USDC",
-      "token_in": "0xbf5a25D7070FaACAe309D66D05372a6b212ECbdF",
-      "token_out": "0x3600000000000000000000000000000000000000",
-      "amount_in": "10000000",
-      "routable": false,
-      "status": "NO_ROUTE",
-      "error_code": "NO_ROUTE",
-      "client_rtt_ms": 281.95,
-      "response": {
-        "success": false,
-        "error": {
-          "code": "NO_ROUTE",
-          "message": "No route available for this pair"
-        }
-      }
-    },
-    {
-      "pair": "mBTC->USDC",
-      "token_in": "0xbf5a25D7070FaACAe309D66D05372a6b212ECbdF",
+      "pair": "cirBTC->USDC",
+      "token_in": "0xf0C4a4CE82A5746AbAAd9425360Ab04fbBA432BF",
       "token_out": "0x3600000000000000000000000000000000000000",
       "amount_in": "100000000",
       "routable": false,
       "status": "NO_ROUTE",
       "error_code": "NO_ROUTE",
-      "client_rtt_ms": 313.45,
+      "client_rtt_ms": 273.37,
       "response": {
         "success": false,
         "error": {

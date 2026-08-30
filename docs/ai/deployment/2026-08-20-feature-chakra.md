@@ -61,6 +61,26 @@ Broadcast via `scripts/arc-operator.sh --broadcast script script/DeployAggregato
 
 **Remaining gate:** hosted cutover (worker first → verified snapshot → API/UI) — separately authorized.
 
+## Hosted cutover (2026-08-29, authorized)
+
+Sequence per Chakra deployment guidance: worker first → verified snapshot → API readiness → traffic cutover, previous release retained.
+
+- **Pushed** `feature-chakra` (now `208d5ff`) to `chakra/main` (`fb1a248..208d5ff`) — the rebaselined tree replaces the pre-rebaseline surface on the deploy branch.
+- **Render env updated** (chakra-api `srv-da8g4non74is73ds1jgg`): `CHAKRA_AGGREGATOR=0xeb12351602c56d47c4ee955193335848952b29d8`; `CHAKRA_SEED_FACTORIES` / `CHAKRA_DISCOVERY_FACTORIES` = manifest venues only (`xylo`, `presto`, `xyk`-UnitFlow); then **redeployed** so the env took effect.
+- Deploys: `dep-da9ba8on74is73fhahag` (commit `208d5ff`, live) then `dep-da9be2gn74is73fhn0e0` (live, with new env).
+- **Post-cutover verification (hosted `https://chakra-api-0a5i.onrender.com`):**
+  - `/health` → 200 `{"status":"ok"}` ✓
+  - `/ready` → 200 ready:true with fresh `snapshot_id` (engine edges drive readiness; `pool_keys` remains `[]` by design in cluster mode — T9.6 known note) ✓
+  - `/tokens` → **USDC / EURC / cirBTC** (rebaselined catalog live) ✓
+  - `/quote` USDC→EURC 1e6 → 200 via `xylo-stable` (is_split: false, dex_types: ["xylo"], hop_factories Xylo factory, expected_output: "803999") ✓
+  - `/quote` EURC→cirBTC and USDC→cirBTC → honest `NO_ROUTE` (UnitFlow cirBTC reserve 249,850 < the 1e8 dust filter — organic thin liquidity; **no reseeding, no fixture substitution** per plan) ✓
+  - `/build_tx` → `to: 0xeb12351602c56d47c4ee955193335848952b29d8`, selector `0x2e3be0c1`, value "0" ✓
+  - CORS → `access-control-allow-origin: https://chakra-arc-dex.vercel.app` ✓
+  - Public UI `https://chakra-arc-dex.vercel.app` → HTTP 200 ✓
+- **Rollback coordinates retained:** previous Render deploy `dep-da8jk6cs728c73bvdrb0` (commit `d3f8c79`) and previous aggregator `0xEa1b2C…2006`; Vercel can `vercel rollback`.
+
+**Known/expected (not host gates):** `pool_keys: []` in cluster `/ready` (engine-edge driven; per-swap Redis key visibility needs a metrics endpoint — T9.6). EURC/cirBTC `NO_ROUTE` is honest thin-liquidity (dust filter), per the no-reseed rule.
+
 ## Public URLs (2026-08-28)
 
 | Surface | URL | Notes |
