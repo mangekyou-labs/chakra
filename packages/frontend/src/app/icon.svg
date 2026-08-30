@@ -1,3 +1,6 @@
-<svg documentns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" role="img" aria-label="Chakra">
-  <path d="M10 13 27 24 10 35M27 24h12" fill="none" stroke="#3dd6c6" stroke-width="4.5" stroke-linecap="round" stroke-linejoin="round"/>
+<svg viewBox="0 0 36 36" fill="none" documentns="http://www.w3.org/2000/svg" role="img" aria-label="Chakra">
+  <path d="M18 3 A15 15 0 0 1 31.5 24" stroke="#EC7A3A" stroke-width="2.4" stroke-linecap="round"/>
+  <path d="M28.5 10.5 A15 15 0 0 1 7.5 27" stroke="#B8AFA6" stroke-width="2.4" stroke-linecap="round" opacity=".7"/>
+  <path d="M8 14 A10 10 0 0 1 26 14" stroke="#EC7A3A" stroke-width="2" stroke-linecap="round" opacity=".5"/>
+  <circle cx="18" cy="18" r="2.2" fill="#EC7A3A"/>
 </svg>

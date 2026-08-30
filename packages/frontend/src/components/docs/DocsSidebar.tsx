@@ -29,11 +29,6 @@ const NAV = [
         label: 'Integrator guide',
         external: true,
       },
-      {
-        href: `${GITHUB_REPO_URL}/blob/main/docs/limit-orders-testnet.md`,
-        label: 'Limit orders (testnet)',
-        external: true,
-      },
       { href: GITHUB_REPO_URL, label: 'GitHub', external: true },
     ],
   },

@@ -3,7 +3,15 @@ import { existsSync } from 'fs';
 import { resolve } from 'path';
 
 // Persistent Chromium profile directory (gitignored).
-const _PROFILE_DIR = resolve(__dirname, '..', 'scripts', '..', 'output', 'playwright', 'chromium-profile');
+const _PROFILE_DIR = resolve(
+  __dirname,
+  '..',
+  'scripts',
+  '..',
+  'output',
+  'playwright',
+  'chromium-profile',
+);
 
 // Load QA_WALLET_SECRET from the gitignored packages/frontend/.env (T9.4 prep).
 // @playwright/test has no dotenv loader — process.loadEnvFile is Node >= 20.12.

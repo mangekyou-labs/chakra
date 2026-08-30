@@ -9,11 +9,11 @@ export interface SubRoute {
   source: string;
   path: string[];
   pool_addresses: string[];
-  /** Per-hop DEX type (`xyk` | `stable` | `clmm` | …). T4.7 — server-owned. */
+  /** Per-hop DEX type (`xyk` | `stable` | `clmm` | …), owned by the API. */
   dex_types?: string[];
   /** Per-hop venue fee in bps. T4.7. */
   hop_fees?: number[];
-  /** Per-hop allowlisted factory ('' = legacy pool). T4.7. */
+  /** Per-hop allowlisted factory; empty when the venue does not use one. */
   hop_factories?: string[];
   amount_in: string;
   amount_out: string;
@@ -69,21 +69,13 @@ export interface BuildTxResponse {
 }
 
 /**
- * Quote → build_tx steps mapping (T4.7). Prefers server-owned per-hop
- * `dex_types`; falls back to `source.split(" → ")` for in-flight clients that
- * received a legacy quote. `fee_bps` is carried through so `/build_tx`
- * encodes the snapshot fee.
+ * Quote → build_tx steps mapping. The API owns the per-hop DEX type and fee;
+ * the client forwards those values without interpreting venue names.
  */
 export function quoteSubRoutesToSteps(subRoute: SubRoute): BuildTxStep[] {
-  const venues = subRoute.source
-    .split(' → ')
-    .map((v) => v.trim())
-    .filter(Boolean);
-  const mapped = venues.length > 0 ? venues : ['chakra-xyk'];
   return subRoute.pool_addresses.map((pool, i) => {
-    const serverType = subRoute.dex_types?.[i];
     const step: BuildTxStep = {
-      dex_type: serverType ?? venueToDexType(mapped[i] ?? 'chakra-xyk'),
+      dex_type: subRoute.dex_types?.[i] ?? 'xyk',
       pool_address: pool,
       token_in: subRoute.path[i] ?? '',
       token_out: subRoute.path[i + 1] ?? '',
@@ -92,16 +84,6 @@ export function quoteSubRoutesToSteps(subRoute: SubRoute): BuildTxStep[] {
     if (fee !== undefined && fee > 0) step.fee_bps = fee;
     return step;
   });
-}
-
-function venueToDexType(venue: string): string {
-  const v = venue.toLowerCase();
-  if (v === 'chakra-stable' || v === 'stable') return 'stable';
-  if (v === 'xylo-stable' || v === 'xylo') return 'xylo';
-  if (v === 'chakra-clmm' || v === 'clmm') return 'clmm';
-  if (v === 'presto-hub' || v === 'presto') return 'presto';
-  if (v === 'unitflow-v25' || v === 'chakra-xyk' || v === 'xyk') return 'xyk';
-  return 'xyk';
 }
 
 function buildTxSubRoutesFromQuote(subRoutes: SubRoute[]): BuildTxSubRoute[] {

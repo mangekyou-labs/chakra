@@ -145,7 +145,8 @@ export function TokenSelector({
                 )}
                 {filtered.map((token) => {
                   const bal = balancesReady ? getErc20Balance(token.address) : null;
-                  const isExcluded = excludeLower !== undefined && token.address.toLowerCase() === excludeLower;
+                  const isExcluded =
+                    excludeLower !== undefined && token.address.toLowerCase() === excludeLower;
                   return (
                     <button
                       key={token.address}

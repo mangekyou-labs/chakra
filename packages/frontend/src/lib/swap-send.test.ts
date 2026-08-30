@@ -46,7 +46,11 @@ describe('swap-send', () => {
           if (body.method === 'eth_feeHistory') {
             return { ok: true, status: 200, json: async () => ({ jsonrpc: '2.0', result: null }) };
           }
-          return { ok: true, status: 200, json: async () => ({ jsonrpc: '2.0', result: '0x4a817c800' }) }; // 20 gwei
+          return {
+            ok: true,
+            status: 200,
+            json: async () => ({ jsonrpc: '2.0', result: '0x4a817c800' }),
+          }; // 20 gwei
         }),
       );
       await expect(fetchSuggestedFee()).resolves.toBe(BigInt(20e9));
@@ -54,9 +58,12 @@ describe('swap-send', () => {
     });
 
     it('returns the 20 gwei floor when RPC is down', async () => {
-      vi.stubGlobal('fetch', vi.fn(async () => {
-        throw new Error('network down');
-      }));
+      vi.stubGlobal(
+        'fetch',
+        vi.fn(async () => {
+          throw new Error('network down');
+        }),
+      );
       await expect(fetchSuggestedFee()).resolves.toBe(MIN_FEE_PER_GAS_WEI);
     });
   });

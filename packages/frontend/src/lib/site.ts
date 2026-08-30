@@ -1,8 +1,5 @@
 /** Public repository (open source). */
-export const GITHUB_REPO_URL = 'https://github.com/Chakra/Arc-dex-agg';
-
-/** Community Discord invite. */
-export const DISCORD_URL = 'https://discord.gg/wJDuj6tTCp';
+export const GITHUB_REPO_URL = 'https://github.com/mangekyou-labs/chakra';
 
 /** Full product, integration, and self-hosting documentation. */
-export const DOCUMENTATION_URL = 'https://Chakra.gitbook.io/';
+export const DOCUMENTATION_URL = '/docs';

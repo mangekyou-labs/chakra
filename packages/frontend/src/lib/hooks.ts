@@ -5,12 +5,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useEffect, useRef, useState } from 'react';
 import { CHAKRA_API_URL } from '@/lib/aggregator';
 import { FALLBACK_SWAP_TOKENS, filterSwapTokens } from '@/lib/swap-tokens';
-import {
-  CIRBTC_ADDRESS,
-  USDC_ERC20_ADDRESS,
-  EURC_ADDRESS,
-  NATIVE_USDC_KEY,
-} from '@/lib/decimals';
+import { CIRBTC_ADDRESS, USDC_ERC20_ADDRESS, EURC_ADDRESS, NATIVE_USDC_KEY } from '@/lib/decimals';
 
 const ARC_RPC_URL = 'https://rpc.testnet.arc.io';
 

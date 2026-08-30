@@ -61,12 +61,12 @@ describe('Theme WCAG AA contrast compliance (T9.8)', () => {
     // WCAG AA requires at least 4.5:1 for normal body text
     expect(
       contrastBg0,
-      `--text-muted (${textMuted}) vs --bg-0 (${bg0}) contrast ${contrastBg0.toFixed(2)} must be >= 4.5:1`
+      `--text-muted (${textMuted}) vs --bg-0 (${bg0}) contrast ${contrastBg0.toFixed(2)} must be >= 4.5:1`,
     ).toBeGreaterThanOrEqual(4.5);
 
     expect(
       contrastSurfaceRaised,
-      `--text-muted (${textMuted}) vs --surface-raised (${surfaceRaised}) contrast ${contrastSurfaceRaised.toFixed(2)} must be >= 4.5:1`
+      `--text-muted (${textMuted}) vs --surface-raised (${surfaceRaised}) contrast ${contrastSurfaceRaised.toFixed(2)} must be >= 4.5:1`,
     ).toBeGreaterThanOrEqual(4.5);
   });
 });

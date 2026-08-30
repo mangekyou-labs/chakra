@@ -22,7 +22,6 @@ import { test, expect } from '@playwright/test';
 import dappwright, { MetaMaskWallet } from '@tenkeylabs/dappwright';
 import {
   QA_CHAIN_ID,
-  QA_RPC_URL,
   QA_EXPLORER_URL,
   QA_STORAGE_PREFIX,
   QA_SWAP_CONFIRMED_TEXT,
@@ -91,37 +90,42 @@ test.describe('Chakra Arc Testnet — MetaMask Critical Path (T9.4)', () => {
       });
       const addrChip = page.getByRole('button', { name: /^0x/ }).first();
       await addrChip.click();
-      await expect(page.getByRole('button', { name: /switch to arc testnet/i }).first()).toBeVisible({
+      await expect(
+        page.getByRole('button', { name: /switch to arc testnet/i }).first(),
+      ).toBeVisible({
         timeout: 10_000,
       });
       const switchMenuItem = page.getByRole('button', { name: /switch to arc testnet/i });
       await switchMenuItem.first().click();
-          // The wallet_switchEthereumChain -> wallet_addEthereumChain flow opens a
-          // MetaMask notification popup with Cancel/Confirm. The add-chain flow can
-          // require TWO confirms (add network, then switch) — loop until no popup remains.
-          for (let attempt = 0; attempt < 3; attempt += 1) {
-            await page.waitForTimeout(2_000).catch(() => {});
-            const popup = context.pages().find((p) => p.url().includes('notification.html'));
-            if (!popup) {
-              console.log(`[switch] attempt ${attempt}: no popup`);
-              break;
-            }
-            const confirmBtn = popup.getByRole('button', { name: /confirm/i });
-            if (await confirmBtn.isVisible({ timeout: 5_000 }).catch(() => false)) {
-              console.log(`[switch] attempt ${attempt}: confirming ${popup.url().slice(-30)}`);
-              await confirmBtn.click();
-              await confirmBtn.waitFor({ state: 'detached', timeout: 10_000 }).catch(() => {});
-            } else {
-              console.log(`[switch] attempt ${attempt}: popup no confirm btn`);
-              break;
-            }
-          }
-          await page.bringToFront().catch(() => {});
-          // Wait for the swap card's primary button to become actionable (on Arc):
-          // the dot locator is fragile; the button label is the authoritative signal.
-          await expect(page.locator('button.btn-primary').first()).toHaveText(/^(Enter amount|Finding route|Swap)/, {
-            timeout: 30_000,
-          });
+      // The wallet_switchEthereumChain -> wallet_addEthereumChain flow opens a
+      // MetaMask notification popup with Cancel/Confirm. The add-chain flow can
+      // require TWO confirms (add network, then switch) — loop until no popup remains.
+      for (let attempt = 0; attempt < 3; attempt += 1) {
+        await page.waitForTimeout(2_000).catch(() => {});
+        const popup = context.pages().find((p) => p.url().includes('notification.html'));
+        if (!popup) {
+          console.log(`[switch] attempt ${attempt}: no popup`);
+          break;
+        }
+        const confirmBtn = popup.getByRole('button', { name: /confirm/i });
+        if (await confirmBtn.isVisible({ timeout: 5_000 }).catch(() => false)) {
+          console.log(`[switch] attempt ${attempt}: confirming ${popup.url().slice(-30)}`);
+          await confirmBtn.click();
+          await confirmBtn.waitFor({ state: 'detached', timeout: 10_000 }).catch(() => {});
+        } else {
+          console.log(`[switch] attempt ${attempt}: popup no confirm btn`);
+          break;
+        }
+      }
+      await page.bringToFront().catch(() => {});
+      // Wait for the swap card's primary button to become actionable (on Arc):
+      // the dot locator is fragile; the button label is the authoritative signal.
+      await expect(page.locator('button.btn-primary').first()).toHaveText(
+        /^(Enter amount|Finding route|Swap)/,
+        {
+          timeout: 30_000,
+        },
+      );
 
       // 6. Enter swap parameters (1.0 USDC -> EURC; defaults now apply correctly).
       const sellInput = page.locator('input[placeholder="0.0"]').first();
@@ -151,7 +155,12 @@ test.describe('Chakra Arc Testnet — MetaMask Critical Path (T9.4)', () => {
       //     optional ERC-20 approve confirm -> EIP-712 PermitSingle sign -> splitSwap confirm
       for (let attempt = 0; attempt < 15; attempt += 1) {
         await page.waitForTimeout(2_000);
-        if (await page.locator(`text=${QA_SWAP_CONFIRMED_TEXT}`).isVisible().catch(() => false)) {
+        if (
+          await page
+            .locator(`text=${QA_SWAP_CONFIRMED_TEXT}`)
+            .isVisible()
+            .catch(() => false)
+        ) {
           console.log('[swap] swap confirmed banner visible');
           break;
         }
@@ -160,7 +169,7 @@ test.describe('Chakra Arc Testnet — MetaMask Critical Path (T9.4)', () => {
           continue;
         }
         await popup.bringToFront().catch(() => {});
-        
+
         // Handle scroll down button if present on EIP-712 sign requests
         const scrollBtn = popup.locator('[data-testid="signature-request-scroll-button"]');
         if (await scrollBtn.isVisible({ timeout: 1_000 }).catch(() => false)) {
@@ -176,10 +185,21 @@ test.describe('Chakra Arc Testnet — MetaMask Critical Path (T9.4)', () => {
           .or(popup.locator('[data-testid="confirm-btn"]'))
           .or(popup.locator('[data-testid="page-container-footer-next"]'));
 
-        if (await actionBtn.first().isVisible({ timeout: 2_000 }).catch(() => false)) {
-          const btnText = await actionBtn.first().innerText().catch(() => 'action');
+        if (
+          await actionBtn
+            .first()
+            .isVisible({ timeout: 2_000 })
+            .catch(() => false)
+        ) {
+          const btnText = await actionBtn
+            .first()
+            .innerText()
+            .catch(() => 'action');
           console.log(`[swap] attempt ${attempt}: clicking '${btnText}' button in popup`);
-          await actionBtn.first().click().catch(() => {});
+          await actionBtn
+            .first()
+            .click()
+            .catch(() => {});
           await page.waitForTimeout(1_000).catch(() => {});
         }
       }
@@ -207,7 +227,10 @@ test.describe('Chakra Arc Testnet — MetaMask Critical Path (T9.4)', () => {
         { prefix: QA_STORAGE_PREFIX, chainId: QA_CHAIN_ID },
       );
       expect(recentSwaps.length).toBeGreaterThan(0);
-      const latest = await page.evaluate((key: string) => localStorage.getItem(key), recentSwaps[0]);
+      const latest = await page.evaluate(
+        (key: string) => localStorage.getItem(key),
+        recentSwaps[0],
+      );
       expect(latest).toBeTruthy();
       const parsed = JSON.parse(latest || '[]') as Array<{ txHash?: string; isSplit?: boolean }>;
       expect(parsed[0]?.txHash).toBeTruthy();

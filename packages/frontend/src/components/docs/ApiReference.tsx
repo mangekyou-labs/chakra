@@ -63,7 +63,7 @@ export function ApiReference() {
         </p>
         <p className="docs-meta">
           <a href={GITHUB_REPO_URL} target="_blank" rel="noopener noreferrer">
-            github.com/Chakra/Arc-dex-agg
+            github.com/mangekyou-labs/chakra
           </a>
           {' · '}
           <a

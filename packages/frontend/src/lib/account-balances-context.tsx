@@ -11,12 +11,7 @@ import {
 } from 'react';
 import { useWallet } from '@/lib/wallet-context';
 import { CHAKRA_API_URL } from '@/lib/aggregator';
-import {
-  CIRBTC_ADDRESS,
-  USDC_ERC20_ADDRESS,
-  EURC_ADDRESS,
-  NATIVE_USDC_KEY,
-} from '@/lib/decimals';
+import { CIRBTC_ADDRESS, USDC_ERC20_ADDRESS, EURC_ADDRESS, NATIVE_USDC_KEY } from '@/lib/decimals';
 
 export interface AccountBalancesState {
   /** ERC-20 balances keyed by lowercase token address (never native). */
