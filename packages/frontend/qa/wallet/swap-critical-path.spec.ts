@@ -100,18 +100,56 @@ test.describe('Chakra Arc Testnet — MetaMask Critical Path (T9.4)', () => {
       // The wallet_switchEthereumChain -> wallet_addEthereumChain flow opens a
       // MetaMask notification popup with Cancel/Confirm. The add-chain flow can
       // require TWO confirms (add network, then switch) — loop until no popup remains.
-      for (let attempt = 0; attempt < 3; attempt += 1) {
+      for (let attempt = 0; attempt < 8; attempt += 1) {
         await page.waitForTimeout(2_000).catch(() => {});
-        const popup = context.pages().find((p) => p.url().includes('notification.html'));
+        const popup = context
+          .pages()
+          .filter((p) => p !== page)
+          .at(-1);
         if (!popup) {
           console.log(`[switch] attempt ${attempt}: no popup`);
           break;
         }
-        const confirmBtn = popup.getByRole('button', { name: /confirm/i });
+        let handledAlert = false;
+        const reviewAlertBtn = popup.getByRole('button', { name: /review alert/i });
+        if (await reviewAlertBtn.isVisible({ timeout: 2_000 }).catch(() => false)) {
+          console.log(`[switch] attempt ${attempt}: reviewing MetaMask network alert`);
+          await reviewAlertBtn.click();
+          await popup.waitForTimeout(500);
+          handledAlert = true;
+        }
+        const riskCheckbox = popup.getByRole('checkbox');
+        if (await riskCheckbox.isVisible({ timeout: 2_000 }).catch(() => false)) {
+          console.log(`[switch] attempt ${attempt}: acknowledging MetaMask risk alert`);
+          await riskCheckbox.check();
+          handledAlert = true;
+        }
+        const gotItBtn = popup.getByRole('button', { name: /got it/i });
+        if (await gotItBtn.isVisible({ timeout: 2_000 }).catch(() => false)) {
+          await gotItBtn.click();
+          await popup.waitForTimeout(500);
+          handledAlert = true;
+        }
+        const confirmBtn = popup
+          .getByRole('button', {
+            name: /^(confirm|approve|next|add|continue|connect anyway|i understand)$/i,
+          })
+          .or(popup.locator('[data-testid="confirm-footer-button"]'))
+          .or(popup.locator('[data-testid="confirm-btn"]'))
+          .or(popup.locator('[data-testid="page-container-footer-next"]'));
         if (await confirmBtn.isVisible({ timeout: 5_000 }).catch(() => false)) {
           console.log(`[switch] attempt ${attempt}: confirming ${popup.url().slice(-30)}`);
           await confirmBtn.click();
           await confirmBtn.waitFor({ state: 'detached', timeout: 10_000 }).catch(() => {});
+        } else if (handledAlert) {
+          const popupText = await popup
+            .locator('body')
+            .innerText()
+            .catch(() => '');
+          console.log(
+            `[switch] attempt ${attempt}: alert flow still open: ${popupText.slice(0, 240).replace(/\s+/g, ' ')}`,
+          );
+          continue;
         } else {
           console.log(`[switch] attempt ${attempt}: popup no confirm btn`);
           break;
@@ -164,7 +202,10 @@ test.describe('Chakra Arc Testnet — MetaMask Critical Path (T9.4)', () => {
           console.log('[swap] swap confirmed banner visible');
           break;
         }
-        const popup = context.pages().find((p) => p.url().includes('notification.html'));
+        const popup = context
+          .pages()
+          .filter((p) => p !== page)
+          .at(-1);
         if (!popup) {
           continue;
         }
