@@ -102,6 +102,63 @@ pub fn token_reserves_selector() -> String {
 pub fn path_reserves_selector() -> String {
     function_selector_hex("pathReserves(address)")
 }
+pub fn token0_selector() -> String {
+    function_selector_hex("token0()")
+}
+pub fn token1_selector() -> String {
+    function_selector_hex("token1()")
+}
+pub fn path_usd_selector() -> String {
+    function_selector_hex("pathUSD()")
+}
+
+/// Canonical token endpoints check (T3.3 / SC-15):
+/// - For pool-based venues (XYK, Stable, Xylo, CLMM): calls `token0()` and `token1()` on `pool_address`
+///   and verifies they match `{token_a, token_b}` (order-insensitive).
+/// - For Presto hub: calls `pathUSD()` on `hub_address` and verifies it matches canonical USDC (`0x3600...0000`)
+///   with spoke being EURC (`0x89b5...`).
+pub async fn verify_canonical_token_endpoints(
+    client: &EvmRpcClient,
+    dex_type: &str,
+    target_address: &str,
+    token_a: &str,
+    token_b: &str,
+) -> Result<bool> {
+    if dex_type == "presto" {
+        const USDC_PATH: &str = "0x3600000000000000000000000000000000000000";
+        const EURC_ADDR: &str = "0x89b50855aa3be2f677cd6303cec089b5f319d72a";
+        let is_canonical_pair = (token_a.eq_ignore_ascii_case(USDC_PATH) && token_b.eq_ignore_ascii_case(EURC_ADDR))
+            || (token_a.eq_ignore_ascii_case(EURC_ADDR) && token_b.eq_ignore_ascii_case(USDC_PATH));
+        if !is_canonical_pair {
+            return Ok(false);
+        }
+        let resp = match client.eth_call(target_address, &calldata(&path_usd_selector(), &[])).await {
+            Ok(r) => r,
+            Err(_) => return Ok(false),
+        };
+        let words = split_words(&resp)?;
+        let Some(word) = words.first() else { return Ok(false); };
+        let path_usd = word_to_address(&word_hex(word))?;
+        return Ok(normalize_evm_address(&path_usd) == normalize_evm_address(USDC_PATH));
+    }
+
+    let t0_resp = match client.eth_call(target_address, &calldata(&token0_selector(), &[])).await {
+        Ok(r) => r,
+        Err(_) => return Ok(false),
+    };
+    let t1_resp = match client.eth_call(target_address, &calldata(&token1_selector(), &[])).await {
+        Ok(r) => r,
+        Err(_) => return Ok(false),
+    };
+    let t0_words = split_words(&t0_resp)?;
+    let t1_words = split_words(&t1_resp)?;
+    let (Some(w0), Some(w1)) = (t0_words.first(), t1_words.first()) else { return Ok(false); };
+    let t0 = normalize_evm_address(&word_to_address(&word_hex(w0))?);
+    let t1 = normalize_evm_address(&word_to_address(&word_hex(w1))?);
+    let na = normalize_evm_address(token_a);
+    let nb = normalize_evm_address(token_b);
+    Ok((t0 == na && t1 == nb) || (t0 == nb && t1 == na))
+}
 
 // ─── Hydrators ──────────────────────────────────────────────────────────────
 

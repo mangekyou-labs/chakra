@@ -291,6 +291,13 @@ impl EvmRunner {
         self.watch_revision.fetch_add(1, Ordering::Relaxed);
     }
 
+    async fn address_has_code(&self, address: &str) -> bool {
+        match self.http.eth_get_code(address).await {
+            Ok(code) if code.len() > 2 && code[2..].bytes().any(|b| b != b'0') => true,
+            _ => false,
+        }
+    }
+
     /// Rebuild topology from seed/discovery factories. Returns the number of
     /// pools found. Never a full-market sweep — `getPair`/`getPool` over the
     /// catalog pairs only.
@@ -304,42 +311,25 @@ impl EvmRunner {
 
         for factory in &factories {
             // 2026-08-29 manifest venue verification (SC-15): a seed factory
-            // without deployed code is unavailable — it is never probed,
-            // never published to `chakra:factories`, and its pools never
-            // quote (NO_ROUTE). Chakra never automatically reseeds it.
+            // must pass all 5 checks: bytecode, canonical endpoints, factory membership,
+            // nonzero reserves, and probe quote. Unavailable venues yield NO_ROUTE;
+            // Chakra never automatically reseeds them.
             if factory.is_seed {
-                match self.http.eth_get_code(&factory.address).await {
-                    // Code is present: non-empty hex with at least one
-                    // non-zero byte (`0x0`/`0x00...0` = no code).
-                    Ok(code)
-                        if code.len() > 2
-                            && code[2..].bytes().any(|b| b != b'0') =>
-                    {
-                        verified.push(factory.clone());
-                    }
-                    Ok(_) => {
-                        warn!(
-                            address = %factory.address,
-                            source = %factory.source,
-                            "manifest venue has no bytecode — marked unavailable"
-                        );
-                        continue;
-                    }
-                    Err(e) => {
-                        warn!(
-                            address = %factory.address,
-                            source = %factory.source,
-                            error = %e,
-                            "manifest venue verification failed — marked unavailable"
-                        );
-                        continue;
-                    }
+                if !self.address_has_code(&factory.address).await {
+                    warn!(
+                        address = %factory.address,
+                        source = %factory.source,
+                        "manifest venue has no bytecode — marked unavailable"
+                    );
+                    continue;
                 }
             } else {
                 // Discovery-only factories are never auto-enabled; keep them
-                // out of the verified set (owner `addFactory` gates quotes).
+                // in the topology/discovery set (owner `addFactory` gates quotes).
                 verified.push(factory.clone());
             }
+
+            let initial_pools = sources_xyk.len() + sources_stable.len() + clmm_pools.len();
             for (token_a, token_b) in &pairs {
                 match factory.dex_type.as_str() {
                     "xyk" => {
@@ -351,18 +341,55 @@ impl EvmRunner {
                         )
                         .await?
                         {
+                            // T3.3 / SC-15 five-check verification:
+                            // 1. Bytecode: pool address has deployed code
+                            if !self.address_has_code(&pool).await {
+                                warn!(pool = %pool, "xyk pool has no bytecode — skipped");
+                                continue;
+                            }
+                            // 2. Canonical token endpoints: pool token0/token1 match catalog tokens
+                            if !dex_adapters::evm_fetch::verify_canonical_token_endpoints(
+                                &self.http,
+                                "xyk",
+                                &pool,
+                                token_a,
+                                token_b,
+                            )
+                            .await
+                            .unwrap_or(false)
+                            {
+                                warn!(pool = %pool, "xyk pool token endpoints mismatch — skipped");
+                                continue;
+                            }
                             let (a, b) = pair_key(token_a, token_b);
-                            sources_xyk.push((
-                                factory.source.clone(),
-                                TradingPairSnapshot {
-                                    token_a: a,
-                                    token_b: b,
-                                    pool_address: pool,
-                                    fee_bps: 30,
-                                    dex_type: "xyk".to_string(),
-                                    factory: factory.address.clone(),
-                                },
-                            ));
+                            let snapshot = TradingPairSnapshot {
+                                token_a: a.clone(),
+                                token_b: b.clone(),
+                                pool_address: pool.clone(),
+                                fee_bps: 30,
+                                dex_type: "xyk".to_string(),
+                                factory: factory.address.clone(),
+                            };
+                            // 4 & 5. Nonzero reserves & probe quote
+                            let Ok(state) = dex_adapters::evm_fetch::fetch_xyk_state(
+                                &self.http,
+                                &factory.source,
+                                &snapshot,
+                            )
+                            .await
+                            else {
+                                warn!(pool = %pool, "xyk pool state fetch failed — skipped");
+                                continue;
+                            };
+                            if state.reserve_a == 0 || state.reserve_b == 0 {
+                                warn!(pool = %pool, "xyk pool has zero reserves — skipped");
+                                continue;
+                            }
+                            if dex_adapters::evm_quote_math::xyk_quote(state.reserve_a, state.reserve_b, 1_000_000) == 0 {
+                                warn!(pool = %pool, "xyk pool probe quote failed — skipped");
+                                continue;
+                            }
+                            sources_xyk.push((factory.source.clone(), snapshot));
                         }
                     }
                     "stable" => {
@@ -374,24 +401,54 @@ impl EvmRunner {
                         )
                         .await?
                         {
+                            if !self.address_has_code(&pool).await {
+                                warn!(pool = %pool, "stable pool has no bytecode — skipped");
+                                continue;
+                            }
+                            if !dex_adapters::evm_fetch::verify_canonical_token_endpoints(
+                                &self.http,
+                                "stable",
+                                &pool,
+                                token_a,
+                                token_b,
+                            )
+                            .await
+                            .unwrap_or(false)
+                            {
+                                warn!(pool = %pool, "stable pool token endpoints mismatch — skipped");
+                                continue;
+                            }
                             let (a, b) = pair_key(token_a, token_b);
-                            sources_stable.push((
-                                factory.source.clone(),
-                                TradingPairSnapshot {
-                                    token_a: a,
-                                    token_b: b,
-                                    pool_address: pool,
-                                    fee_bps: 4,
-                                    dex_type: "stable".to_string(),
-                                    factory: factory.address.clone(),
-                                },
-                            ));
+                            let snapshot = TradingPairSnapshot {
+                                token_a: a.clone(),
+                                token_b: b.clone(),
+                                pool_address: pool.clone(),
+                                fee_bps: 4,
+                                dex_type: "stable".to_string(),
+                                factory: factory.address.clone(),
+                            };
+                            let Ok(state) = dex_adapters::evm_fetch::fetch_stable_state(
+                                &self.http,
+                                &factory.source,
+                                &snapshot,
+                                dex_adapters::evm_fetch::CHAKRA_STABLE_A,
+                            )
+                            .await
+                            else {
+                                warn!(pool = %pool, "stable pool state fetch failed — skipped");
+                                continue;
+                            };
+                            if state.balance_a == 0 || state.balance_b == 0 {
+                                warn!(pool = %pool, "stable pool has zero balances — skipped");
+                                continue;
+                            }
+                            if dex_adapters::evm_quote_math::stable_quote(&state, 0, 1, 1_000_000) == 0 {
+                                warn!(pool = %pool, "stable pool probe quote failed — skipped");
+                                continue;
+                            }
+                            sources_stable.push((factory.source.clone(), snapshot));
                         }
                     }
-                    // T-XYLO: XyloNet `getPool(address,address)` (same selector
-                    // shape as the stable factory) over the catalog pairs.
-                    // The Xylo USDC/EURC pool is pinned; USDC/USYC stays out of
-                    // the catalog so it is never discovered here.
                     "xylo" => {
                         if let Some(pool) = dex_adapters::evm_fetch::factory_has_stable_pool(
                             &self.http,
@@ -401,18 +458,51 @@ impl EvmRunner {
                         )
                         .await?
                         {
+                            if !self.address_has_code(&pool).await {
+                                warn!(pool = %pool, "xylo pool has no bytecode — skipped");
+                                continue;
+                            }
+                            if !dex_adapters::evm_fetch::verify_canonical_token_endpoints(
+                                &self.http,
+                                "xylo",
+                                &pool,
+                                token_a,
+                                token_b,
+                            )
+                            .await
+                            .unwrap_or(false)
+                            {
+                                warn!(pool = %pool, "xylo pool token endpoints mismatch — skipped");
+                                continue;
+                            }
                             let (a, b) = pair_key(token_a, token_b);
-                            sources_stable.push((
-                                factory.source.clone(),
-                                TradingPairSnapshot {
-                                    token_a: a,
-                                    token_b: b,
-                                    pool_address: pool,
-                                    fee_bps: 4,
-                                    dex_type: "xylo".to_string(),
-                                    factory: factory.address.clone(),
-                                },
-                            ));
+                            let snapshot = TradingPairSnapshot {
+                                token_a: a.clone(),
+                                token_b: b.clone(),
+                                pool_address: pool.clone(),
+                                fee_bps: 4,
+                                dex_type: "xylo".to_string(),
+                                factory: factory.address.clone(),
+                            };
+                            let Ok(state) = dex_adapters::evm_fetch::fetch_xylo_state(
+                                &self.http,
+                                &factory.source,
+                                &snapshot,
+                            )
+                            .await
+                            else {
+                                warn!(pool = %pool, "xylo pool state fetch failed — skipped");
+                                continue;
+                            };
+                            if state.balance_a == 0 || state.balance_b == 0 {
+                                warn!(pool = %pool, "xylo pool has zero reserves — skipped");
+                                continue;
+                            }
+                            if dex_adapters::evm_quote_math::xylo_quote_with_a(state.balance_a, state.balance_b, 1_000_000, state.a) == 0 {
+                                warn!(pool = %pool, "xylo pool probe quote failed — skipped");
+                                continue;
+                            }
+                            sources_stable.push((factory.source.clone(), snapshot));
                         }
                     }
                     "clmm" => {
@@ -426,50 +516,108 @@ impl EvmRunner {
                             )
                             .await?
                             {
+                                if !self.address_has_code(&pool).await {
+                                    warn!(pool = %pool, "clmm pool has no bytecode — skipped");
+                                    continue;
+                                }
+                                if !dex_adapters::evm_fetch::verify_canonical_token_endpoints(
+                                    &self.http,
+                                    "clmm",
+                                    &pool,
+                                    token_a,
+                                    token_b,
+                                )
+                                .await
+                                .unwrap_or(false)
+                                {
+                                    warn!(pool = %pool, "clmm pool token endpoints mismatch — skipped");
+                                    continue;
+                                }
                                 let (a, b) = pair_key(token_a, token_b);
-                                clmm_pools.push(ClmmPoolSnapshot {
+                                let pool_ref = ClmmPoolRefSnapshot {
                                     source: factory.source.clone(),
-                                    pool_address: pool,
-                                    token0: a,
-                                    token1: b,
+                                    pool_address: pool.clone(),
+                                    token0: a.clone(),
+                                    token1: b.clone(),
                                     fee_bps: *fee_bps,
                                     tick_spacing: *tick_spacing,
-                                    sqrt_price_x96: [0; 4],
-                                    tick: 0,
-                                    liquidity: 0,
                                     factory: factory.address.clone(),
-                                    ticks: Vec::new(),
-                                    chunk_bitmaps: Vec::new(),
-                                    word_bitmaps: Vec::new(),
-                                    coverage: None,
-                                });
+                                };
+                                let Ok(state) = dex_adapters::evm_fetch::fetch_clmm_state(
+                                    &self.http,
+                                    &factory.source,
+                                    &pool_ref,
+                                    None,
+                                )
+                                .await
+                                else {
+                                    warn!(pool = %pool, "clmm pool state fetch failed — skipped");
+                                    continue;
+                                };
+                                if state.liquidity == 0 {
+                                    warn!(pool = %pool, "clmm pool has zero liquidity — skipped");
+                                    continue;
+                                }
+                                clmm_pools.push(state);
                             }
                         }
                     }
                     "presto" => {
-                        // Presto hub discovery: restricted to USDC/EURC discovery (2026-08-29).
-                        // Hub address acts as both factory and pool address.
                         let is_usdc_eurc = (token_a.eq_ignore_ascii_case(USDC_ERC20)
                             && token_b.eq_ignore_ascii_case(EURC))
                             || (token_a.eq_ignore_ascii_case(EURC)
                                 && token_b.eq_ignore_ascii_case(USDC_ERC20));
                         if is_usdc_eurc {
+                            if !dex_adapters::evm_fetch::verify_canonical_token_endpoints(
+                                &self.http,
+                                "presto",
+                                &factory.address,
+                                token_a,
+                                token_b,
+                            )
+                            .await
+                            .unwrap_or(false)
+                            {
+                                warn!(hub = %factory.address, "presto hub pathUSD endpoint mismatch — skipped");
+                                continue;
+                            }
                             let (a, b) = pair_key(token_a, token_b);
-                            sources_stable.push((
-                                factory.source.clone(),
-                                TradingPairSnapshot {
-                                    token_a: a,
-                                    token_b: b,
-                                    pool_address: factory.address.clone(),
-                                    fee_bps: 30,
-                                    dex_type: "presto".to_string(),
-                                    factory: factory.address.clone(),
-                                },
-                            ));
+                            let snapshot = TradingPairSnapshot {
+                                token_a: a.clone(),
+                                token_b: b.clone(),
+                                pool_address: factory.address.clone(),
+                                fee_bps: 30,
+                                dex_type: "presto".to_string(),
+                                factory: factory.address.clone(),
+                            };
+                            let Ok(state) = dex_adapters::evm_fetch::fetch_presto_state(
+                                &self.http,
+                                &factory.source,
+                                &snapshot,
+                            )
+                            .await
+                            else {
+                                warn!(hub = %factory.address, "presto hub spoke fetch failed — skipped");
+                                continue;
+                            };
+                            if state.balance_a == 0 || state.balance_b == 0 {
+                                warn!(hub = %factory.address, "presto hub has zero reserves — skipped");
+                                continue;
+                            }
+                            if dex_adapters::evm_quote_math::presto_spoke_quote(state.balance_a, state.balance_b, 1_000_000) == 0 {
+                                warn!(hub = %factory.address, "presto hub probe quote failed — skipped");
+                                continue;
+                            }
+                            sources_stable.push((factory.source.clone(), snapshot));
                         }
                     }
                     _ => {}
                 }
+            }
+
+            let final_pools = sources_xyk.len() + sources_stable.len() + clmm_pools.len();
+            if factory.is_seed && final_pools > initial_pools {
+                verified.push(factory.clone());
             }
         }
 
@@ -1334,11 +1482,28 @@ pub(crate) mod tests {
                 _ => {}
             }
             assert_eq!(method, "eth_call");
-            assert_eq!(params[0]["to"], XYK_FACTORY);
+            let to = params[0]["to"].as_str().unwrap();
             let data = params[0]["data"].as_str().unwrap();
-            if data.contains(&usdc_word) && data.contains(&eurc_word) {
-                // getPair(USDC, EURC) → the seeded pool.
-                return Ok(json!(format!("0x{:0>64}", &pool[2..])));
+            if to.eq_ignore_ascii_case(XYK_FACTORY) {
+                if data.contains(&usdc_word) && data.contains(&eurc_word) {
+                    // getPair(USDC, EURC) → the seeded pool.
+                    return Ok(json!(format!("0x{:0>64}", &pool[2..])));
+                }
+                return Ok(json!(word(0)));
+            }
+            if to.eq_ignore_ascii_case(POOL) {
+                let t0_sel = dex_adapters::evm_fetch::token0_selector();
+                let t1_sel = dex_adapters::evm_fetch::token1_selector();
+                let res_sel = dex_adapters::evm_fetch::get_reserves_selector();
+                if data.starts_with(&t0_sel) {
+                    return Ok(json!(format!("0x{:0>64}", &USDC[2..])));
+                }
+                if data.starts_with(&t1_sel) {
+                    return Ok(json!(format!("0x{:0>64}", &EURC[2..])));
+                }
+                if data.starts_with(&res_sel) {
+                    return Ok(json!(reserves_response(10_000_000_000, 10_000_000_000)));
+                }
             }
             Ok(json!(word(0)))
         });
@@ -1370,9 +1535,24 @@ pub(crate) mod tests {
 
     #[tokio::test]
     async fn discovery_finds_presto_hub_pair_from_seeded_hub() {
-        let (url, _server) = spawn_fixture_rpc(move |method, _params| {
+        let (url, _server) = spawn_fixture_rpc(move |method, params| {
             if method == "eth_getCode" {
                 return Ok(json!("0x60806040"));
+            }
+            if method == "eth_call" {
+                let data = params[0]["data"].as_str().unwrap_or("");
+                let path_usd_sel = dex_adapters::evm_fetch::path_usd_selector();
+                let path_res_sel = dex_adapters::evm_fetch::path_reserves_selector();
+                let token_res_sel = dex_adapters::evm_fetch::token_reserves_selector();
+                if data.starts_with(&path_usd_sel) {
+                    return Ok(json!(format!("0x{:0>64}", &USDC[2..])));
+                }
+                if data.starts_with(&path_res_sel) {
+                    return Ok(json!(format!("0x{:0>64x}", 200_000_000_000u128)));
+                }
+                if data.starts_with(&token_res_sel) {
+                    return Ok(json!(format!("0x{:0>64x}", 200_000_000_000u128)));
+                }
             }
             Ok(json!(word(0)))
         });
@@ -1401,6 +1581,258 @@ pub(crate) mod tests {
         assert_eq!(pair.fee_bps, 30);
         assert_eq!(pair.pool_address, PRESTO_HUB.to_ascii_lowercase());
         assert_eq!(pair.factory, PRESTO_HUB.to_ascii_lowercase());
+    }
+
+    // ─── T3.3 Five-check venue verification failure matrix ──────────
+
+    #[tokio::test]
+    async fn venue_five_checks_all_pass_published() {
+        let (url, _server) = spawn_fixture_rpc(move |method, params| match method {
+            "eth_getCode" => Ok(json!("0x60")),
+            "eth_call" => {
+                let to = params[0]["to"].as_str().unwrap_or("");
+                let data = params[0]["data"].as_str().unwrap_or("");
+                if to.eq_ignore_ascii_case(XYK_FACTORY) {
+                    return Ok(json!(format!("0x{:0>64}", &POOL[2..])));
+                }
+                if to.eq_ignore_ascii_case(POOL) {
+                    if data.starts_with(&dex_adapters::evm_fetch::token0_selector()) {
+                        return Ok(json!(format!("0x{:0>64}", &USDC[2..])));
+                    }
+                    if data.starts_with(&dex_adapters::evm_fetch::token1_selector()) {
+                        return Ok(json!(format!("0x{:0>64}", &EURC[2..])));
+                    }
+                    if data.starts_with(&dex_adapters::evm_fetch::get_reserves_selector()) {
+                        return Ok(json!(reserves_response(10_000_000_000, 10_000_000_000)));
+                    }
+                }
+                Ok(json!(word(0)))
+            }
+            _ => Ok(json!(word(0))),
+        });
+        let client = EvmRpcClient::single(&url).unwrap();
+        let config = EvmConfig {
+            seed_factories: vec![FactoryConfig::parse(&format!("{XYK_FACTORY}:xyk"), true).unwrap()],
+            ws_enabled: false,
+            ..Default::default()
+        };
+        let shared = Arc::new(RwLock::new(WorkerShared { sources: Vec::new(), clmm_pools: Vec::new() }));
+        let mut runner = EvmRunner::new(config, client, shared, None);
+        let found = runner.discover_once().await.unwrap();
+        assert_eq!(found, 1);
+        assert_eq!(runner.verified_factories.read().unwrap().len(), 1);
+        assert_eq!(runner.verified_factories.read().unwrap()[0].source, "chakra-xyk");
+    }
+
+    #[tokio::test]
+    async fn venue_five_checks_bytecode_fails_skipped() {
+        let (url, _server) = spawn_fixture_rpc(move |method, params| match method {
+            "eth_getCode" => {
+                let addr = params[0].as_str().unwrap_or("");
+                if addr.eq_ignore_ascii_case(XYK_FACTORY) {
+                    Ok(json!("0x60"))
+                } else {
+                    Ok(json!("0x")) // POOL has no bytecode
+                }
+            }
+            "eth_call" => {
+                let to = params[0]["to"].as_str().unwrap_or("");
+                if to.eq_ignore_ascii_case(XYK_FACTORY) {
+                    Ok(json!(format!("0x{:0>64}", &POOL[2..])))
+                } else {
+                    Ok(json!(word(0)))
+                }
+            }
+            _ => Ok(json!(word(0))),
+        });
+        let client = EvmRpcClient::single(&url).unwrap();
+        let config = EvmConfig {
+            seed_factories: vec![FactoryConfig::parse(&format!("{XYK_FACTORY}:xyk"), true).unwrap()],
+            ws_enabled: false,
+            ..Default::default()
+        };
+        let shared = Arc::new(RwLock::new(WorkerShared { sources: Vec::new(), clmm_pools: Vec::new() }));
+        let mut runner = EvmRunner::new(config, client, shared, None);
+        let found = runner.discover_once().await.unwrap();
+        assert_eq!(found, 0, "pool with no bytecode must be skipped");
+        assert_eq!(runner.verified_factories.read().unwrap().len(), 0, "seed factory with no verified pools must not be in verified_factories");
+    }
+
+    #[tokio::test]
+    async fn venue_five_checks_canonical_endpoints_fail_skipped() {
+        let (url, _server) = spawn_fixture_rpc(move |method, params| match method {
+            "eth_getCode" => Ok(json!("0x60")),
+            "eth_call" => {
+                let to = params[0]["to"].as_str().unwrap_or("");
+                let data = params[0]["data"].as_str().unwrap_or("");
+                if to.eq_ignore_ascii_case(XYK_FACTORY) {
+                    return Ok(json!(format!("0x{:0>64}", &POOL[2..])));
+                }
+                if to.eq_ignore_ascii_case(POOL) {
+                    if data.starts_with(&dex_adapters::evm_fetch::token0_selector()) {
+                        // Mismatched token0 address
+                        return Ok(json!("0x0000000000000000000000009999999999999999999999999999999999999999"));
+                    }
+                    if data.starts_with(&dex_adapters::evm_fetch::token1_selector()) {
+                        return Ok(json!(format!("0x{:0>64}", &EURC[2..])));
+                    }
+                    if data.starts_with(&dex_adapters::evm_fetch::get_reserves_selector()) {
+                        return Ok(json!(reserves_response(10_000_000_000, 10_000_000_000)));
+                    }
+                }
+                Ok(json!(word(0)))
+            }
+            _ => Ok(json!(word(0))),
+        });
+        let client = EvmRpcClient::single(&url).unwrap();
+        let config = EvmConfig {
+            seed_factories: vec![FactoryConfig::parse(&format!("{XYK_FACTORY}:xyk"), true).unwrap()],
+            ws_enabled: false,
+            ..Default::default()
+        };
+        let shared = Arc::new(RwLock::new(WorkerShared { sources: Vec::new(), clmm_pools: Vec::new() }));
+        let mut runner = EvmRunner::new(config, client, shared, None);
+        let found = runner.discover_once().await.unwrap();
+        assert_eq!(found, 0, "pool with mismatched token endpoints must be skipped");
+        assert_eq!(runner.verified_factories.read().unwrap().len(), 0);
+    }
+
+    #[tokio::test]
+    async fn venue_five_checks_factory_membership_fails_skipped() {
+        let (url, _server) = spawn_fixture_rpc(move |method, params| match method {
+            "eth_getCode" => Ok(json!("0x60")),
+            "eth_call" => {
+                let to = params[0]["to"].as_str().unwrap_or("");
+                if to.eq_ignore_ascii_case(XYK_FACTORY) {
+                    // getPair returns address(0)
+                    return Ok(json!(word(0)));
+                }
+                Ok(json!(word(0)))
+            }
+            _ => Ok(json!(word(0))),
+        });
+        let client = EvmRpcClient::single(&url).unwrap();
+        let config = EvmConfig {
+            seed_factories: vec![FactoryConfig::parse(&format!("{XYK_FACTORY}:xyk"), true).unwrap()],
+            ws_enabled: false,
+            ..Default::default()
+        };
+        let shared = Arc::new(RwLock::new(WorkerShared { sources: Vec::new(), clmm_pools: Vec::new() }));
+        let mut runner = EvmRunner::new(config, client, shared, None);
+        let found = runner.discover_once().await.unwrap();
+        assert_eq!(found, 0, "missing factory membership must yield 0 pools");
+        assert_eq!(runner.verified_factories.read().unwrap().len(), 0);
+    }
+
+    #[tokio::test]
+    async fn venue_five_checks_nonzero_reserves_fail_skipped() {
+        let (url, _server) = spawn_fixture_rpc(move |method, params| match method {
+            "eth_getCode" => Ok(json!("0x60")),
+            "eth_call" => {
+                let to = params[0]["to"].as_str().unwrap_or("");
+                let data = params[0]["data"].as_str().unwrap_or("");
+                if to.eq_ignore_ascii_case(XYK_FACTORY) {
+                    return Ok(json!(format!("0x{:0>64}", &POOL[2..])));
+                }
+                if to.eq_ignore_ascii_case(POOL) {
+                    if data.starts_with(&dex_adapters::evm_fetch::token0_selector()) {
+                        return Ok(json!(format!("0x{:0>64}", &USDC[2..])));
+                    }
+                    if data.starts_with(&dex_adapters::evm_fetch::token1_selector()) {
+                        return Ok(json!(format!("0x{:0>64}", &EURC[2..])));
+                    }
+                    if data.starts_with(&dex_adapters::evm_fetch::get_reserves_selector()) {
+                        // Zero reserves
+                        return Ok(json!(reserves_response(0, 0)));
+                    }
+                }
+                Ok(json!(word(0)))
+            }
+            _ => Ok(json!(word(0))),
+        });
+        let client = EvmRpcClient::single(&url).unwrap();
+        let config = EvmConfig {
+            seed_factories: vec![FactoryConfig::parse(&format!("{XYK_FACTORY}:xyk"), true).unwrap()],
+            ws_enabled: false,
+            ..Default::default()
+        };
+        let shared = Arc::new(RwLock::new(WorkerShared { sources: Vec::new(), clmm_pools: Vec::new() }));
+        let mut runner = EvmRunner::new(config, client, shared, None);
+        let found = runner.discover_once().await.unwrap();
+        assert_eq!(found, 0, "pool with zero reserves must be skipped");
+        assert_eq!(runner.verified_factories.read().unwrap().len(), 0);
+    }
+
+    #[tokio::test]
+    async fn venue_five_checks_probe_quote_fails_skipped() {
+        let (url, _server) = spawn_fixture_rpc(move |method, params| match method {
+            "eth_getCode" => Ok(json!("0x60")),
+            "eth_call" => {
+                let to = params[0]["to"].as_str().unwrap_or("");
+                let data = params[0]["data"].as_str().unwrap_or("");
+                if to.eq_ignore_ascii_case(XYK_FACTORY) {
+                    return Ok(json!(format!("0x{:0>64}", &POOL[2..])));
+                }
+                if to.eq_ignore_ascii_case(POOL) {
+                    if data.starts_with(&dex_adapters::evm_fetch::token0_selector()) {
+                        return Ok(json!(format!("0x{:0>64}", &USDC[2..])));
+                    }
+                    if data.starts_with(&dex_adapters::evm_fetch::token1_selector()) {
+                        return Ok(json!(format!("0x{:0>64}", &EURC[2..])));
+                    }
+                    if data.starts_with(&dex_adapters::evm_fetch::get_reserves_selector()) {
+                        // Both reserves are non-zero (passes check 4), but extreme ratio makes integer quote output 0 (fails check 5)
+                        return Ok(json!(reserves_response(100_000_000_000_000_000, 1)));
+                    }
+                }
+                Ok(json!(word(0)))
+            }
+            _ => Ok(json!(word(0))),
+        });
+        let client = EvmRpcClient::single(&url).unwrap();
+        let config = EvmConfig {
+            seed_factories: vec![FactoryConfig::parse(&format!("{XYK_FACTORY}:xyk"), true).unwrap()],
+            ws_enabled: false,
+            ..Default::default()
+        };
+        let shared = Arc::new(RwLock::new(WorkerShared { sources: Vec::new(), clmm_pools: Vec::new() }));
+        let mut runner = EvmRunner::new(config, client, shared, None);
+        let found = runner.discover_once().await.unwrap();
+        assert_eq!(found, 0, "pool with failing probe quote must be skipped");
+        assert_eq!(runner.verified_factories.read().unwrap().len(), 0);
+    }
+
+    #[tokio::test]
+    async fn presto_five_checks_path_usd_endpoint_fails_skipped() {
+        let (url, _server) = spawn_fixture_rpc(move |method, params| match method {
+            "eth_getCode" => Ok(json!("0x60806040")),
+            "eth_call" => {
+                let data = params[0]["data"].as_str().unwrap_or("");
+                if data.starts_with(&dex_adapters::evm_fetch::path_usd_selector()) {
+                    // Mismatched pathUSD (returns non-USDC)
+                    return Ok(json!(format!("0x{:0>64}", &EURC[2..])));
+                }
+                if data.starts_with(&dex_adapters::evm_fetch::path_reserves_selector()) {
+                    return Ok(json!(format!("0x{:0>64x}", 200_000_000_000u128)));
+                }
+                if data.starts_with(&dex_adapters::evm_fetch::token_reserves_selector()) {
+                    return Ok(json!(format!("0x{:0>64x}", 200_000_000_000u128)));
+                }
+                Ok(json!(word(0)))
+            }
+            _ => Ok(json!(word(0))),
+        });
+        let client = EvmRpcClient::single(&url).unwrap();
+        let config = EvmConfig {
+            seed_factories: vec![FactoryConfig::parse(&format!("{PRESTO_HUB}:presto"), true).unwrap()],
+            ws_enabled: false,
+            ..Default::default()
+        };
+        let shared = Arc::new(RwLock::new(WorkerShared { sources: Vec::new(), clmm_pools: Vec::new() }));
+        let mut runner = EvmRunner::new(config, client, shared, None);
+        let found = runner.discover_once().await.unwrap();
+        assert_eq!(found, 0, "presto hub with wrong pathUSD must be skipped");
+        assert_eq!(runner.verified_factories.read().unwrap().len(), 0);
     }
 
     // ─── Poll path (SC-11 local) ─────────────────────────────────────

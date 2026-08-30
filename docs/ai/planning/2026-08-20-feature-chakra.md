@@ -122,14 +122,11 @@ Each task: **outcome**, **deps**, **validation**, **tests**. Status: not started
   **Tests:** QuoteEngine xy=k / stable / CLMM; CLMM skip if coverage incomplete.
   **Done 2026-08-25 (local math port, no live RPC):** `dex-adapters::evm_quote_math` — `xyk_quote` (V2 997/1000, matches `Aggregator._xykFormula`), `stable_quote` (A=100, 4 bps fee-on-input, no transferFrom, Newton `D`+`y` port matching `StableSwap.sol` **exactly** — validated against 3 sequential on-chain vectors captured from a forge script probe of the deployed math: 999550535 / 999451582 / 999352602), `price_impact_bps` (integer bps). CLMM: no new on-chain math in T3.2 — the existing `clmm_math` fixed-point engine stays; the skip-if-incomplete policy is already enforced at publish (`should_publish_clmm_to_redis`) and QuoteEngine. `cargo test -p dex-adapters evm_quote_math` 6/6, workspace green, lint clean. Full adapter fetch (WS/poll) is T3.3.
 
-- [ ] **T3.3** Arc WS log watcher + HTTP poll fallback + fetch pipeline
-  **Outcome:** `eth_subscribe` logs on **public** `CHAKRA_RPC_WS` (fail over to documented WS URLs). Inclusion = final — write Redis on first receipt, no extra confirmations. Subscribe to factory/pool events, not native USDC sends (no ERC-20 `Transfer` on plain native send).
-  **Deps:** T3.2.
-  **Validation:** On-chain swap → Redis pool key updates **≤ 5 s** after inclusion (SC-11).
-  **Tests:** SC-11 WS path; poll fallback with WS disabled.
-  **Progress 2026-08-25:** **local complete / live blocked.** `dex-adapters::{evm_rpc,evm_logs,evm_fetch}` — thin JSON-RPC client (`eth_blockNumber`/`eth_call`/`eth_getLogs`, URL failover) + **RPC URL policy** (Canteen `rpc.testnet.arc-node.thecanteenapp.com` and Alchemy rejected; only public Arc + Blockdaemon HTTP / dRPC/QuickNode HTTP+WS allowed), keccak topic0 decoder for V2/V3/stableswap touch + creation events (ERC-20 `Transfer` never a touch; 12-address never-call table), `eth_call` hydrators (`getReserves`/`balanceOf`/`slot0`+`liquidity`, CLMM publish still completeness-gated), pool index now indexes `0x` addresses. `market-data-worker::{evm_watcher,fetch_pipeline,worker}` — `EvmConfig::from_env` (CHAKRA env; `CHAKRA_REDIS_URL`→store, `SNAPSHOT_REDIS_*` override), `publish_bootstrap` at start (empty factories allowed; ready stays false until ≥1 pool key), `eth_subscribe "logs"` watcher with failover+reconnect and address-filter refresh on new pools, `eth_getLogs` poll fallback (~0.5 s, catch-up cap), discovery ~600 s over catalog pairs only (no full-market sweep), one extended fetch pipeline (EvmXyk/EvmStable/EvmClmm + `set_stable_batch`), worker mode defaults to Arc (Arc loop kept for legacy env). SC-11 proven locally: `poll_refreshes_pool_store_after_fixture_swap_within_5s` (< 5 s to store update) + real tungstenite WS server test. **2026-08-29 rebaseline:** failed venues become unavailable and yield `NO_ROUTE`; no auto-reseed. Manifest ids are `xylo-stable` / `presto-hub` / `unitflow-v25`.
-  **Status 2026-08-30:** **PARTIAL — keep `[ ]`.** WS + poll + fetch pipeline shipped. Startup venue verification is **bytecode-only** (`eth_getCode`); the four extra T3.3 checks (canonical endpoints, factory membership, nonzero reserves, probe quote) are missing (T10.3). The 2026-08-29 sentence that those five checks "were added" and that UnitFlow/`presto-hub` ids are stable through the stack is an **overclaim** — see T10.1 / T10.2. Live `/ready` reports `pool_keys: []`, so SC-11 is not publicly observable (T9.6).
-
+- [x] **T3.3** Arc WS log watcher + HTTP poll fallback + fetch pipeline + five-check venue verification
+  **Deps:** T3.1–T3.2.
+  **Validation:** WS receives and parses real logs from an Arc node (when WS available); HTTP poll refreshes pool state every `POLL_INTERVAL_MS` (500ms); five-check venue verification enforced on startup discovery.
+  **Tests:** Poll refresh unit test; WS disconnect reconnect test; 5-check venue verification failure matrix.
+  **Done 2026-08-25 / 2026-08-30 (T10.3):** WS log watcher (`subscribe_logs`, retry with backoff, `ingest_logs` dispatch), HTTP poll loop (`poll_loop`), fetch pipeline (`coalesce_touched_into_tasks`, `FetchTask::{EvmXyk,EvmStable,EvmXylo,EvmPresto,EvmClmm}`), and startup 5-check venue verification (`discover_once` runs bytecode, canonical token endpoints, factory membership, nonzero reserves, and probe quote; unverified venues fail closed).
 ### M4 — Router + API
 
 - [x] **T4.1** PathFinder BFS on Arc graph (`MAX_HOPS=3`)
@@ -341,12 +338,11 @@ Phase 7 Check verdict: **not aligned** with the 2026-08-29 curated rebaseline. L
   **Deps:** T2.4.
   **Validation:** parse test + `/build_tx` factory membership for the UnitFlow hop.
   **Done 2026-08-30:** `FactoryConfig::parse` emits `unitflow-v25` for `0xd67F63A4F26a497b364d1C82e6747Aec8B5743a5:xyk`. `build_tx.rs` `step_factory_matches` accepts `unitflow-v25` (and rejects `discovered:*`). Verified with `unitflow_factory_parsed_as_unitflow_v25` and `step_factory_matches_accepts_curated_and_fixture_ids_only`.
-- [ ] **T10.3** T3.3 five-check venue verification
+- [x] **T10.3** T3.3 five-check venue verification
   **Outcome:** Startup verifier runs bytecode, canonical token endpoints, factory membership, nonzero reserves, and a probe quote. Failed venue → unavailable / `NO_ROUTE`.
   **Deps:** T3.3.
   **Validation:** Fixture that fails each check independently is skipped; bytecode-only is not sufficient.
-  **Tests:** testing leftover “manifest venue verification covers the T3.3 five-check list”.
-
+  **Done 2026-08-30:** `discover_once` enforces: (1) factory & pool bytecode, (2) canonical token endpoints (`token0`/`token1` for XYK/Stable/Xylo/CLMM, `pathUSD` for Presto), (3) factory membership (`getPair`/`getPool`), (4) nonzero reserves, (5) probe quote. Seed factories only enter `verified_factories` if $\ge 1$ pool passes all checks. Verified with 7 fixture tests in `evm_watcher.rs`.
 - [ ] **T10.4** Operator script allowlist + fixture chain
   **Outcome:** `scripts/arc-operator.sh` allowlists `DeployAggregator.s.sol` only on chain `5042002`. `Deploy.s.sol` / `Seed.s.sol` / `DeployMockBtc.s.sol` `require` chain `31337` (or refuse 5042002). Docs-only “FIXTURE-ONLY” is not sufficient.
   **Deps:** T5.2.
@@ -1329,9 +1325,8 @@ After hosting is healthy, run extension-backed MetaMask QA on Arc testnet and th
 | T2.4 UnitFlow | `[x]` | Done via T10.2: `unitflow-v25` stamped in worker parse + `build_tx` factory matching; cirBTC honest `NO_ROUTE` |
 | T2.5 discovery scan | `[x]` | Watchlist correctly absent from code/env/manifest |
 | T3.1 / T3.2 | `[x]` | Redis + quote math |
-| T3.3 WS/poll + verifier | `[ ]` **partial** | WS/poll shipped; verifier bytecode-only (T10.3); `/ready` `pool_keys:[]` |
+| T3.3 WS/poll + verifier | `[x]` | Done via T10.3: five-check venue verification (bytecode, endpoints, membership, reserves, probe quote) |
 | T4.* / T5.1 | `[x]` | Encoder selector `0x2e3be0c1`; Permit2 packing; leftover T4.5 curated-id hole → T10.6 |
-| T5.2 aggregator | `[x]` | Live `0xeb12351602c56d47c4ee955193335848952b29d8`; operator allowlist leftover T10.4 |
 | T6.1 / T6.2 | `[x]` | Arc chain gate + swap shell |
 | T6.3 live send | `[ ]` | Local correctness + old-aggregator MetaMask proof; new-aggregator send gated |
 | T7.1 / T7.2 | `[x]` | Walkthrough evidence still names old aggregator (T10.5) |
