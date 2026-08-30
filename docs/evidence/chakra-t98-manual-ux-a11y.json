@@ -1,28 +1,28 @@
 {
   "scenario": "T9.8 Manual UX & Accessibility Audit (cirBTC Catalog & Rebaselined Aggregator)",
-  "timestamp_utc": "2026-08-30T09:34:30Z",
-  "test_tool": "playwright-cli (isolated named sessions: -s=desktop, -s=mobile)",
+  "timestamp_utc": "2026-08-30T09:37:00Z",
+  "test_tool": "playwright-cli (interactive named sessions: -s=desktop, -s=mobile)",
   "status": "OPEN_PARTIAL_GATED_ON_VERCEL_REDEPLOY",
   "tested_url": "https://chakra-arc-dex.vercel.app",
   "api_endpoint": "https://chakra-api-0a5i.onrender.com",
   "sessions_tested": [
     {
       "session_name": "desktop",
-      "command": "playwright-cli -s=desktop open https://chakra-arc-dex.vercel.app && playwright-cli -s=desktop resize 1280 800",
+      "command": "playwright-cli -s=desktop open https://chakra-arc-dex.vercel.app && playwright-cli -s=desktop resize 1280 800 && playwright-cli -s=desktop fill e43 '1'",
       "dimensions": "1280x800",
       "status": "OPEN_PARTIAL",
       "snapshot_file": "docs/evidence/chakra-t98-desktop-snapshot.yml",
       "screenshot": "docs/evidence/chakra-t98-desktop-audit.png",
-      "details": "Header nav, swap terminal, status banner, and tokenIn trigger render cleanly. Direct API request verified: [GET] https://chakra-api-0a5i.onrender.com/api/v1/tokens => [200]. Live quote rendering remains blocked on Vercel production redeployment of commit 208d5ff: the deployed Vercel bundle (2026-08-28 commit d3f8c79) uses case-sensitive token address matching against the API's lowercase addresses, leaving tokenOut uninitialized on initial mount."
+      "details": "Header nav, swap terminal, status banner, and tokenIn trigger render cleanly. Direct API request verified: [GET] https://chakra-api-0a5i.onrender.com/api/v1/tokens => [200]. Live interaction trace demonstrates: on initial load tokenIn=USDC, tokenOut=null (Buy panel renders '0.0' with unmounted token selector). When sell input textbox (ref e43) is filled with '1' and debounce wait elapses, no /quote request is fired because quoteKey remains null with tokenOut=null. In the token modal, the /tokens API catalog (USDC, EURC, cirBTC) is displayed. Selecting EURC updates tokenIn=EURC while tokenOut remains null. Clicking 'Swap token direction' swaps EURC to tokenOut (mounting 'EURC' in Buy panel) while leaving tokenIn=null. Root cause: the deployed Vercel bundle (commit d3f8c79 from 2026-08-28) performs case-sensitive address matching (catalogTokens.find(t => t.address === tokenOutAddress)), which fails against the API's lowercase addresses. The local repository on feature-chakra (HEAD 208d5ff / bbda8e0) has the case-insensitive fix (.toLowerCase()) and cirBTC catalog fallback, and passes all 67/67 vitest tests."
     },
     {
       "session_name": "mobile",
-      "command": "playwright-cli -s=mobile open https://chakra-arc-dex.vercel.app --mobile && playwright-cli -s=mobile resize 390 844",
+      "command": "playwright-cli -s=mobile open https://chakra-arc-dex.vercel.app --mobile && playwright-cli -s=mobile resize 390 844 && playwright-cli -s=mobile fill e40 '1'",
       "dimensions": "390x844",
       "status": "AUDITED_PASS",
       "snapshot_file": "docs/evidence/chakra-t98-mobile-snapshot.yml",
       "screenshot": "docs/evidence/chakra-t98-mobile-audit.png",
-      "details": "Mobile responsive viewport adjusts full width (390px), responsive header adapts with menu trigger, and Connect Wallet CTA button remains visible and accessible in both header and swap form."
+      "details": "Mobile responsive viewport adjusts full width (390px), responsive header adapts with menu trigger, and Connect Wallet CTA button remains visible and accessible in both header and swap form. Filling sell textbox (ref e40) with '1' executes without layout shifts."
     }
   ],
   "catalog_verification": {
@@ -48,7 +48,7 @@
     "venue_xylo_rendered": false,
     "price_impact_rendered": false,
     "fee_rendered": false,
-    "blocker": "Deployed Vercel bundle has tokenOut=null due to case-sensitive address matching bug (fixed locally in bbda8e0/208d5ff but not yet deployed to Vercel production)."
+    "interactive_trace": "Amount '1' entered into sell textbox; verified via playwright-cli requests that /quote is not requested because tokenOut is uninitialized (null) due to deployed bundle case-matching mismatch."
   },
   "cirbtc_no_route_verification": {
     "pair": "USDC->cirBTC",

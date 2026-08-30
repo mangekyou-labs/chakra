@@ -1,4 +1,4 @@
-- generic [active] [ref=e1]:
+- generic [ref=e1]:
   - generic [ref=e2]:
     - banner [ref=e3]:
       - generic [ref=e4]:
@@ -26,16 +26,13 @@
           - generic [ref=e36]:
             - generic [ref=e37]: Sell
             - generic [ref=e39]:
-              - textbox "0.0" [ref=e40]
+              - textbox "0.0" [active] [ref=e40]: "1"
               - button "USDC" [ref=e42]:
                 - generic [ref=e43]: U
           - button "Swap token direction" [ref=e48]
           - generic [ref=e51]:
             - generic [ref=e52]: Buy
-            - generic [ref=e54]:
-              - generic [ref=e55]: "0.0"
-              - button "EURC" [ref=e57]:
-                - generic [ref=e58]: E
+            - generic [ref=e54]: "0.0"
           - button "Connect Wallet" [disabled] [ref=e63]
     - contentinfo [ref=e64]:
       - generic [ref=e65]:
