@@ -233,7 +233,7 @@ pub fn extension_for_content_type(content_type: &str) -> Option<&'static str> {
         "image/jpeg" => Some("jpg"),
         "image/webp" => Some("webp"),
         "image/gif" => Some("gif"),
-        "image/svg+document" => Some("svg"),
+        "image/svg+xml" => Some("svg"),
         _ => None,
     }
 }
@@ -277,11 +277,11 @@ fn looks_like_html(bytes: &[u8]) -> bool {
 fn looks_like_svg(bytes: &[u8]) -> bool {
     let head = trim_leading_whitespace(bytes);
     let lower: Vec<u8> = head.iter().take(256).map(u8::to_ascii_lowercase).collect();
-    // Accept <?document ...><svg or bare <svg
+    // Accept <?xml ...><svg or bare <svg
     if lower.starts_with(b"<svg") {
         return true;
     }
-    if lower.starts_with(b"<?document") {
+    if lower.starts_with(b"<?xml") {
         return contains_ascii_ci(&lower, b"<svg");
     }
     false
@@ -531,14 +531,14 @@ fn scrub_tag_attributes(tag: &str) -> String {
     out
 }
 
-/// Deterministic SVG avatar with document-escaped symbol text and hash-derived
+/// Deterministic SVG avatar with XML-escaped symbol text and hash-derived
 /// colors.
 pub fn fallback_svg(symbol: &str, token_id: &str) -> String {
-    let escaped = escape_document(symbol);
+    let escaped = escape_xml(symbol);
     let (bg, fg) = colors_from_token(token_id);
     format!(
         concat!(
-            r#"<svg documentns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128">"#,
+            r#"<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128">"#,
             r#"<rect width="128" height="128" rx="64" fill="{bg}"/>"#,
             r#"<text x="64" y="64" dy="0.35em" text-anchor="middle" fill="{fg}" "#,
             r#"font-family="sans-serif" font-size="36" font-weight="600">{symbol}</text>"#,
@@ -550,7 +550,7 @@ pub fn fallback_svg(symbol: &str, token_id: &str) -> String {
     )
 }
 
-fn escape_document(s: &str) -> String {
+fn escape_xml(s: &str) -> String {
     let mut out = String::with_capacity(s.len());
     for c in s.chars() {
         match c {
@@ -603,7 +603,7 @@ mod tests {
         assert_eq!(extension_for_content_type("image/jpeg"), Some("jpg"));
         assert_eq!(extension_for_content_type("image/webp"), Some("webp"));
         assert_eq!(extension_for_content_type("image/gif"), Some("gif"));
-        assert_eq!(extension_for_content_type("image/svg+document"), Some("svg"));
+        assert_eq!(extension_for_content_type("image/svg+xml"), Some("svg"));
         assert_eq!(extension_for_content_type("text/html"), None);
     }
 
@@ -622,7 +622,7 @@ mod tests {
         let gif = b"GIF89a............";
         assert_eq!(detect_image_ext(gif, ""), Some("gif"));
 
-        let svg = b"<?document version=\"1.0\"?><svg documentns=\"http://www.w3.org/2000/svg\"></svg>";
+        let svg = b"<?xml version=\"1.0\"?><svg xmlns=\"http://www.w3.org/2000/svg\"></svg>";
         assert_eq!(detect_image_ext(svg, "image/png"), Some("svg"));
     }
 
@@ -632,7 +632,7 @@ mod tests {
         assert_eq!(detect_image_ext(html, "image/png"), None);
 
         let html2 = b"<html><head></head></html>";
-        assert_eq!(detect_image_ext(html2, "image/svg+document"), None);
+        assert_eq!(detect_image_ext(html2, "image/svg+xml"), None);
     }
 
     #[test]
@@ -656,10 +656,10 @@ mod tests {
 
     #[test]
     fn sanitize_svg_strips_script_and_handlers() {
-        let dirty = br#"<svg documentns="http://www.w3.org/2000/svg" onclick="alert(1)">
+        let dirty = br#"<svg xmlns="http://www.w3.org/2000/svg" onclick="alert(1)">
 <script>alert(1)</script>
 <a href="javascript:alert(1)"><circle r="10"/></a>
-<foreignObject><body documentns="http://www.w3.org/1999/xhtml">x</body></foreignObject>
+<foreignObject><body xmlns="http://www.w3.org/1999/xhtml">x</body></foreignObject>
 </svg>"#;
         let clean = sanitize_svg(dirty).expect("sanitized");
         let lower = clean.to_ascii_lowercase();

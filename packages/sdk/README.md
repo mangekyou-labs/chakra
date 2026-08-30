@@ -41,13 +41,13 @@ Builds an unsigned transaction XDR for the given quote.
 
 Returns available tokens on the Arc Testnet.
 
-### `chakra.getBalance({ account, token })`
+### `chakra.getBalances({ account })`
 
-Returns the balance for a given account and token.
+Returns the ERC-20 and native balance snapshot for an account.
 
-### `chakra.getHealth()`
+### `chakra.isHealthy()` / `chakra.isReady()`
 
-Returns the health status of the API.
+Check API health and snapshot readiness.
 
 ## License
 

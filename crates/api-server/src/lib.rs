@@ -113,7 +113,7 @@ mod tests {
         ));
         std::fs::create_dir_all(&dir).unwrap();
         let sample = dir.join("sample.svg");
-        std::fs::write(&sample, b"<svg documentns=\"http://www.w3.org/2000/svg\"></svg>").unwrap();
+        std::fs::write(&sample, b"<svg xmlns=\"http://www.w3.org/2000/svg\"></svg>").unwrap();
 
         let app = axum::Router::new().nest_service("/logos", tower_http::services::ServeDir::new(&dir));
 
@@ -129,7 +129,7 @@ mod tests {
 
         assert_eq!(response.status(), StatusCode::OK);
         let content_type = response.headers().get(CONTENT_TYPE).unwrap().to_str().unwrap();
-        assert!(content_type.starts_with("image/svg+document"), "got {content_type}");
+        assert!(content_type.starts_with("image/svg+xml"), "got {content_type}");
 
         let _ = std::fs::remove_dir_all(&dir);
     }

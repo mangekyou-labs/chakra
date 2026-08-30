@@ -120,7 +120,7 @@ function ChakraLogo({ className }: { className?: string }) {
       className={className}
       viewBox="0 0 36 36"
       fill="none"
-      documentns="http://www.w3.org/2000/svg"
+      xmlns="http://www.w3.org/2000/svg"
       aria-label="Chakra logo"
     >
       {/* Outer ring segment — top-right arc */}
