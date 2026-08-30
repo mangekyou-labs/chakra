@@ -19,25 +19,31 @@
 The implementation was completed in granular commits. A bundle was created
 and verified outside the repository before rewriting. The cleaned mirror passed
 the full lineage scan, and both public branches are synchronized at
-`d9fcec57125a10af1df76c1fb73b5353af320754` before this evidence update.
+`63f690c` before this evidence update. The wallet QA runner's MetaMask warning
+handling is included in that head.
 
 The SDK is published as `@chakra-ag/sdk@0.3.0`. Registry identity is
 `zerefwtf`; a clean registry install and live quote/build smoke passed. The
 client constructor uses the documented `{ apiUrl }` option.
 
-Render health, readiness, tokens, quote, and build-transaction checks passed.
-The repository CORS configuration includes the active Vercel aliases, but the
-running Render service still serves its previous CORS allow-list. No Render
-deployment credential is available in this environment, and the dashboard
-redirects to login, so that configuration remains an external deployment
-follow-up.
+Render deployment `dep-daa7nb67bikc73fleun0` is live from commit `efaf383`.
+Health, readiness, tokens, quote, and build-transaction checks passed. The
+1 USDC to EURC quote returned one healthy `xylo` route with expected output
+`805774`; build transaction returned chain `5042002`, `value: "0"`, calldata,
+and no required approvals. CORS preflight passed for both active Vercel
+aliases. The operator-provided Render credential is available from the local
+worktree `.env` as `RENDER_API_KEY` and is never committed or printed.
 
-Vercel production deployment `dpl_Hvi7vc41FvPkGoKRXPAVdu8H9Cu5` is ready and
-the active aliases serve the rebrand, `/docs`, `/docs/api`, metadata, links,
-and the split-ring SVG. The documented `chakra-arc-dex.vercel.app` alias is
-outside the available Vercel team and still serves stale content; it must be
-reassigned or updated by its owner before it can be called the canonical alias.
+Vercel production deployment `dpl_9M23MoL5QT7hi9u4CQnyWeWzsHth` is ready at
+`https://chakra-arc-62ly0jgt0-gadillacers-projects.vercel.app`. Active aliases
+are `https://frontend-ruddy-two-90.vercel.app` and
+`https://chakra-arc-dex-gadillacers-projects.vercel.app`; they serve the
+rebrand, `/docs`, `/docs/api`, metadata, links, and split-ring SVG. The old
+unmanaged alias is not treated as canonical.
 
-The authenticated wallet path was not run because `QA_WALLET_SECRET` is not
-present. No transaction evidence was fabricated. The separate legacy package
-lookup returned not found, so no deprecation mutation was performed.
+The disposable wallet credential is available from the local worktree `.env`
+as `QA_WALLET_SECRET` and is never committed or printed. The authenticated
+wallet run reached MetaMask's Arc network-add warning but did not complete the
+confirmation, leaving the app on `Switch to Arc Testnet`; no transaction was
+submitted and no receipt was fabricated. The separate legacy package lookup
+returned not found, so no deprecation mutation was performed.

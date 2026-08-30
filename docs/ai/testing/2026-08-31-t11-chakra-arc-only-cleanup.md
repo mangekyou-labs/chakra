@@ -13,13 +13,19 @@
 | SDK registry smoke | clean install, quote, build transaction | passed |
 | Frontend | unit, typecheck, lint, format, production build | 67 unit tests passed; all listed gates passed |
 | Lineage | `python3 scripts/check-lineage.py all` | passed in a fresh checkout |
-| Docker | `docker buildx build --file Dockerfile .` | blocked by Docker Desktop overlay metadata I/O during image commit |
+| Docker | `docker buildx build --file Dockerfile .` | blocked: Docker Desktop daemon did not respond to the client ping; retry interrupted |
 
 ## Production gates
 
-Render health/readiness/quote/build responses passed. Vercel production HTTP,
-metadata, favicon, links, docs routes, and responsive browser review passed on
-the active aliases; browser API requests still expose the stale Render CORS
-allow-list. The healthy 1 USDC to EURC wallet flow remains pending the
-disposable QA wallet secret. Split-route and thin-pool scenarios remain honest
-follow-up checks.
+Render health/readiness/tokens/quote/build responses passed. The live 1 USDC
+to EURC quote returned one `xylo` route, expected output `805774`, and the
+build response returned chain `5042002`, zero native value, calldata, and no
+required approvals. CORS preflight passed for both active Vercel aliases.
+Vercel production inspect reported Ready; metadata, favicon, links, docs
+routes, and responsive browser review passed on the active aliases.
+
+The authenticated wallet run used the existing local `QA_WALLET_SECRET` but
+stopped at MetaMask's network-add risk confirmation. The wallet remained off
+Arc, so the swap was not attempted and there is no transaction evidence. The
+QA runner now handles the warning screens and records the remaining provider
+blocker. Split-route and thin-pool scenarios remain honest follow-up checks.
