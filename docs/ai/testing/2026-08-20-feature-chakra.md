@@ -363,8 +363,8 @@ Check-only notes. No new tests were added in this phase. Local suites at HEAD `2
 - [x] Seeded UnitFlow `:xyk` stamps `source == "unitflow-v25"`, and `/build_tx` factory membership validates `unitflow-v25` for `xyk` hops. **Done 2026-08-30 (T10.2).**
 - [x] Manifest venue verification covers the T3.3 five-check list (bytecode, endpoints, factory membership, nonzero reserves, probe quote), not bytecode-only `eth_getCode`. **Done 2026-08-30 (T10.3).**
 - [x] `scripts/arc-operator.sh` allowlists `DeployAggregator.s.sol` and rejects fixture scripts; `DeployAggregator.s.sol` requires chain 5042002; fixture scripts require chain 31337. **Done 2026-08-30 (T10.4).**
-- [ ] Quote-time factory gate applies to `xylo-stable` / `presto-hub` / `unitflow-v25`, not only `source.starts_with("chakra-")`. **T10.6**
-- [ ] SDK/UI `venueToDexType("xylo-stable")` / `"xylo"` returns `'xylo'` (today `'stable'`); keep a regression that `/build_tx` hops follow server `dex_types` when present. **T10.6**
+- [x] Quote-time factory gate applies to `xylo-stable` / `presto-hub` / `unitflow-v25`, not only `source.starts_with("chakra-")` (and rejects `discovered:*` venues without owner allowlist). **Done 2026-08-30 (T10.6).**
+- [x] SDK/UI `venueToDexType("xylo-stable")` / `"xylo"` returns `'xylo'` and `venueToDexType("presto-hub")` / `"presto"` returns `'presto'`, with server `dex_types` taking precedence when present. **Done 2026-08-30 (T10.6).**
 - [ ] `/build_tx` rejects two sub-routes that share a pool (today only SplitOptimizer + Solidity `_rejectSharedPools`).
 - [ ] SwapCard Circle faucet CTA is reachable when `balanceFor == 0` (today nested inside `balanceFor > 0`).
 - [x] Evidence pack T7.2 / T9.1–T9.5 and `docs/evidence/README.md` re-pin catalog USDC/EURC/cirBTC and aggregator `0xeb12351602c56d47c4ee955193335848952b29d8` with historical labels. **Done 2026-08-30 (T10.5).**

@@ -821,3 +821,9 @@ Resolved in code: StableSwap deposit accounting, production snapshot bootstrap/r
 - `docs/openapi.yaml` and `docs/api-reference.md`: updated quote examples to `xylo-stable` / `xylo` dex type.
 - `docs/evidence/README.md`: re-pinned cirBTC + live aggregator `0xeb1235…29d8`, labeled old-aggregator transactions historical, and documented active blockers.
 - `docs/ai/deployment/2026-08-20-feature-chakra.md`: updated status header to reflect hosted cutover to aggregator `0xeb1235…29d8` and cirBTC catalog.
+
+### T10.6 Quote-time factory gate + SDK/UI xylo dex type (Done 2026-08-30)
+- `crates/router-engine/src/quote_engine.rs`: QuoteEngine factory membership gate applies to `xylo-stable`, `presto-hub`, and `unitflow-v25` in addition to `chakra-*`. Discovered venues (`discovered:*`) cannot quote without owner allowlist.
+- `packages/sdk/src/index.ts` & `packages/frontend/src/lib/aggregator.ts`: `venueToDexType` maps `xylo-stable` / `xylo` → `'xylo'` and `presto-hub` / `presto` → `'presto'`. Server `dex_types` retain precedence when present.
+- `crates/market-data-worker/src/evm_watcher.rs`: `FactoryConfig::parse` stamps non-seed xylo and presto factories as `discovered:xylo` and `discovered:presto` to prevent unauthorized auto-routing.
+- Tests: `t106_curated_id_factory_gate_skips_unallowlisted_xylo_presto_unitflow`, `t106_discovery_only_venues_cannot_quote_without_curated_source`, and SDK client unit tests (17/17).

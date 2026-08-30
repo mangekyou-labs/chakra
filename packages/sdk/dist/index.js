@@ -38,14 +38,15 @@ export function quoteSubRoutesToSteps(subRoute) {
 }
 function venueToDexType(venue) {
     const v = venue.toLowerCase();
-    if (v === 'chakra-stable' || v === 'stable' || v === 'xylo-stable' || v === 'xylo') {
+    if (v === 'chakra-stable' || v === 'stable')
         return 'stable';
-    }
+    if (v === 'xylo-stable' || v === 'xylo')
+        return 'xylo';
     if (v === 'chakra-clmm' || v === 'clmm')
         return 'clmm';
     if (v === 'presto-hub' || v === 'presto')
         return 'presto';
-    if (v === 'unitflow-v25')
+    if (v === 'unitflow-v25' || v === 'chakra-xyk' || v === 'xyk')
         return 'xyk';
     return 'xyk';
 }

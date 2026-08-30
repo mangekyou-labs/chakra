@@ -73,8 +73,8 @@ impl FactoryConfig {
         const UNITFLOW_FACTORY_ADDR: &str = "0xd67f63a4f26a497b364d1c82e6747aec8b5743a5";
         let normalized = normalize_evm_address(address);
         let source = match dex_type.as_str() {
-            "xylo" => "xylo-stable".to_string(),
-            "presto" => "presto-hub".to_string(),
+            "xylo" if is_seed => "xylo-stable".to_string(),
+            "presto" if is_seed => "presto-hub".to_string(),
             "xyk" if is_seed && normalized == UNITFLOW_FACTORY_ADDR => "unitflow-v25".to_string(),
             "xyk" if is_seed => "chakra-xyk".to_string(),
             "stable" if is_seed => "chakra-stable".to_string(),
@@ -1378,13 +1378,15 @@ pub(crate) mod tests {
         assert_eq!(discovered.source, "discovered:stable");
         assert!(!discovered.is_seed);
         assert!(FactoryConfig::parse("0xABCD:clmm", true).is_ok());
-        // 2026-08-29 canonical source ids.
+        // 2026-08-29 canonical source ids for seed vs discovery.
         let xylo_seed = FactoryConfig::parse("0xABCD:xylo", true).unwrap();
         assert_eq!(xylo_seed.source, "xylo-stable");
         let xylo_disc = FactoryConfig::parse("0xABCD:xylo", false).unwrap();
-        assert_eq!(xylo_disc.source, "xylo-stable");
-        let presto = FactoryConfig::parse("0xABCD:presto", true).unwrap();
-        assert_eq!(presto.source, "presto-hub");
+        assert_eq!(xylo_disc.source, "discovered:xylo");
+        let presto_seed = FactoryConfig::parse("0xABCD:presto", true).unwrap();
+        assert_eq!(presto_seed.source, "presto-hub");
+        let presto_disc = FactoryConfig::parse("0xABCD:presto", false).unwrap();
+        assert_eq!(presto_disc.source, "discovered:presto");
         assert!(FactoryConfig::parse("0xABCD:liquidity-pool", true).is_err());
         assert!(FactoryConfig::parse("no-colon", true).is_err());
     }

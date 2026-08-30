@@ -552,10 +552,12 @@ impl QuoteEngine {
             let token_out = &path.tokens[i + 1];
             let pool_address = &path.pool_addresses[i];
 
-            // T4.5: Factory gate — skip chakra-* hops whose pool's stamped
+            // T4.5 / T10.6: Factory gate — skip chakra-* and canonical curated
+            // (xylo-stable, presto-hub, unitflow-v25) hops whose pool's stamped
             // factory does not match an allowlisted factory record.
-            // Non-chakra sources are not gated.
-            if source.starts_with("chakra-") {
+            if source.starts_with("chakra-")
+                || matches!(source.as_str(), "xylo-stable" | "presto-hub" | "unitflow-v25" | "xylo" | "presto")
+            {
                 let pool_factory = cached_pools
                     .iter()
                     .find(|p| p.source == *source && p.pool_address == *pool_address)
@@ -1956,6 +1958,112 @@ mod tests {
             )
             .await;
         assert!(route.sub_orders.is_empty(), "unlisted factory pool must be skipped");
+        assert_eq!(route.total_expected_out, 0);
+    }
+
+    /// T10.6: Curated ids (xylo-stable, presto-hub, unitflow-v25) are also gated by factory allowlist.
+    #[tokio::test]
+    async fn t106_curated_id_factory_gate_skips_unallowlisted_xylo_presto_unitflow() {
+        const XYLO_F: &str = "0x60EDeFB094B84BBC6430cc130B358A43Ba1979e2";
+        const XYLO_P: &str = "0x3DF3966F5138143dce7a9cFDdC2c0310ce083BB1";
+        let snapshot = MarketSnapshot::from_sources(
+            "curated-snap",
+            1_700_000_000_000,
+            "arc-testnet",
+            vec![SourceSnapshot {
+                source: "xylo-stable".to_string(),
+                pairs: vec![TradingPairSnapshot {
+                    token_a: USDC_ERC20.to_string(),
+                    token_b: EURC.to_string(),
+                    pool_address: XYLO_P.to_string(),
+                    fee_bps: 4,
+                    dex_type: "xylo".to_string(),
+                    factory: XYLO_F.to_string(),
+                }],
+            }],
+        );
+        let engine = QuoteEngine::new(PathFinderConfig::default(), SplitConfig::default());
+        engine.update_from_chakra_snapshot(&snapshot).await;
+
+        // 1. Unlisted factory -> skipped (returns 0)
+        let hydration_unlisted = QuoteHydration {
+            stable_pools: HashMap::from([(
+                QuoteHydration::stable_pool_key("xylo-stable", XYLO_P),
+                StablePoolStateValue::new("xylo-stable", XYLO_P, USDC_ERC20, EURC, 9_000_000_000_000, 9_000_000_000_000, 200, 4),
+            )]),
+            factories: vec![FactoryRecord::new("0x0000000000000000000000000000000000000099", "xylo", "xylo-stable")],
+            ..Default::default()
+        };
+        let req = RouteRequest {
+            token_in: token(USDC_ERC20),
+            token_out: token(EURC),
+            amount_in: 1_000_000,
+            slippage_bps: Some(50),
+            max_hops: Some(1),
+            max_splits: Some(1),
+            prefer_arc: None,
+        };
+        let route_unlisted = engine.get_route_with_paths(&req, &engine.find_candidate_paths(&req).await, Some(&hydration_unlisted)).await;
+        assert!(route_unlisted.sub_orders.is_empty(), "unallowlisted xylo factory must be skipped");
+
+        // 2. Allowlisted factory -> quotes successfully
+        let hydration_allowlisted = QuoteHydration {
+            stable_pools: HashMap::from([(
+                QuoteHydration::stable_pool_key("xylo-stable", XYLO_P),
+                StablePoolStateValue::new("xylo-stable", XYLO_P, USDC_ERC20, EURC, 9_000_000_000_000, 9_000_000_000_000, 200, 4),
+            )]),
+            factories: vec![FactoryRecord::new(XYLO_F, "xylo", "xylo-stable")],
+            ..Default::default()
+        };
+        let route_allowlisted = engine.get_route_with_paths(&req, &engine.find_candidate_paths(&req).await, Some(&hydration_allowlisted)).await;
+        assert!(!route_allowlisted.sub_orders.is_empty(), "allowlisted xylo factory must produce a route");
+        assert!(route_allowlisted.total_expected_out > 0);
+    }
+
+    /// T10.6: Discovery-only venues (discovered:xylo, discovered:presto, discovered:xyk) cannot quote without owner promotion.
+    #[tokio::test]
+    async fn t106_discovery_only_venues_cannot_quote_without_curated_source() {
+        const DISC_F: &str = "0x60EDeFB094B84BBC6430cc130B358A43Ba1979e2";
+        const DISC_P: &str = "0x3DF3966F5138143dce7a9cFDdC2c0310ce083BB1";
+        let snapshot = MarketSnapshot::from_sources(
+            "disc-snap",
+            1_700_000_000_000,
+            "arc-testnet",
+            vec![SourceSnapshot {
+                source: "discovered:xylo".to_string(),
+                pairs: vec![TradingPairSnapshot {
+                    token_a: USDC_ERC20.to_string(),
+                    token_b: EURC.to_string(),
+                    pool_address: DISC_P.to_string(),
+                    fee_bps: 4,
+                    dex_type: "xylo".to_string(),
+                    factory: DISC_F.to_string(),
+                }],
+            }],
+        );
+        let engine = QuoteEngine::new(PathFinderConfig::default(), SplitConfig::default());
+        engine.update_from_chakra_snapshot(&snapshot).await;
+
+        // Even if factory record exists with discovered:xylo, it cannot produce a quote
+        let hydration = QuoteHydration {
+            stable_pools: HashMap::from([(
+                QuoteHydration::stable_pool_key("discovered:xylo", DISC_P),
+                StablePoolStateValue::new("discovered:xylo", DISC_P, USDC_ERC20, EURC, 9_000_000_000_000, 9_000_000_000_000, 200, 4),
+            )]),
+            factories: vec![FactoryRecord::new(DISC_F, "xylo", "discovered:xylo")],
+            ..Default::default()
+        };
+        let req = RouteRequest {
+            token_in: token(USDC_ERC20),
+            token_out: token(EURC),
+            amount_in: 1_000_000,
+            slippage_bps: Some(50),
+            max_hops: Some(1),
+            max_splits: Some(1),
+            prefer_arc: None,
+        };
+        let route = engine.get_route_with_paths(&req, &engine.find_candidate_paths(&req).await, Some(&hydration)).await;
+        assert!(route.sub_orders.is_empty(), "discovery-only venue must never quote automatically");
         assert_eq!(route.total_expected_out, 0);
     }
 

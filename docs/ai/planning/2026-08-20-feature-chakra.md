@@ -80,13 +80,12 @@ Each task: **outcome**, **deps**, **validation**, **tests**. Status: not started
   **Validation:** `/tokens` lists exactly the three canonical tokens; `cargo test` catalog/decimals suites green; aggregator sweeps cirBTC not mBTC.
   **Tests:** Unit + Foundry catalog enforcement; no mBTC anywhere on the Arc path.
   **Done 2026-08-29 / 2026-08-30 (T10.5):** Runtime `/tokens` is USDC (6) / EURC (6) / cirBTC (8); aggregator constructor + `_sweepCatalogTo` use cirBTC. `README.md`, `docs/integrator-guide.md`, and `render.yaml` fully aligned on USDC/EURC/cirBTC.
-- [ ] **T2.2** XyloNet integration (xylo-stable)
+- [x] **T2.2** XyloNet integration (xylo-stable)
   **Outcome:** Source id `xylo-stable`; manifest factory `0x60EDeFB094B84BBC6430cc130B358A43Ba1979e2`, router `0x73742278c31a76dBb0D2587d03ef92E6E2141023`, pool `0x3DF3966F5138143dce7a9cFDdC2c0310ce083BB1`. Atomic owner config of factory/router pair; router exact-input `swapExactTokensForTokens` with request deadline, aggregator recipient, post-call balance delta. Quote from hydrated on-chain pool parameters (amplification read from the pool, not hardcoded).
   **Deps:** T2.1, T5.1.
   **Validation:** Adapter parity vs `calculateSwap` view functions; Foundry router hop test.
   **Tests:** See testing doc (Xylo parity both directions × 3 sizes; approval cleanup; deadline/slippage reverts).
-  **Status 2026-08-30:** **PARTIAL — keep `[ ]`.** Live `/quote` 1e6 USDC→EURC is `source:"xylo-stable"` / `dex_types:["xylo"]` via factory `0x60ed…e2` pool `0x3df3…bb1`. Production quote uses hydrated `getAmplificationParameter()` (`xylo_quote_with_a`). Foundry `test_xylo_hop_succeeds_via_router` green. Leftovers: SDK/UI `venueToDexType` maps xylo→`stable` (T10.6); PathFinder `dex_type_for_source("xylo-stable")` → `"stable"` (Medium); quote-time factory gate skips curated ids (T10.6).
-
+  **Done 2026-08-28 / 2026-08-30 (T10.6):** Live `/quote` USDC→EURC routes `xylo-stable` / `dex_types:["xylo"]` via factory `0x60ed…e2` pool `0x3df3…bb1`. Production quote uses hydrated `getAmplificationParameter()` (`xylo_quote_with_a`). Foundry `test_xylo_hop_succeeds_via_router` green. QuoteEngine factory gate enforces allowlist membership for `xylo-stable`, and SDK/UI `venueToDexType` maps xylo→`xylo`.
 - [ ] **T2.3** Presto integration (presto-hub)
   **Outcome:** Source id `presto-hub`; hub `0x5794a8284A29493871Fbfa3c4f343D42001424D6` allowlisted, restricted to USDC/EURC discovery. Execution `swap(tokenIn, tokenOut, amountIn, 0, deadline)` with exact temporary approval, allowance reset, post-call balance delta. Quote from Presto's published normalized hub formula.
   **Deps:** T2.1, T5.1.
@@ -352,11 +351,10 @@ Phase 7 Check verdict: **not aligned** with the 2026-08-29 curated rebaseline. L
   **Outcome:** `README.md` and `docs/integrator-guide.md` drop mBTC from the catalog; `render.yaml` pins `0xeb12351602c56d47c4ee955193335848952b29d8`; OpenAPI quote examples use `xylo-stable`; evidence pack T7.2 / T9.1–T9.5 / `docs/evidence/README.md` re-pin cirBTC + new aggregator. Deployment-doc header matches the hosted cutover (current is not “pre-rebaseline revision”).
   **Deps:** T2.1, T5.2, T7.2, T8.1.
   **Done 2026-08-30:** `README.md` and `docs/integrator-guide.md` drop mBTC for canonical cirBTC; `render.yaml` pins aggregator `0xeb12351602c56d47c4ee955193335848952b29d8`; `docs/openapi.yaml` and `docs/api-reference.md` use `xylo-stable` examples; `docs/evidence/README.md` re-pins cirBTC + `0xeb1235…29d8` with historical labels; deployment doc header updated to hosted cutover.
-- [ ] **T10.6** Quote-time factory gate + SDK/UI `xylo` dex type
+- [x] **T10.6** Quote-time factory gate + SDK/UI `xylo` dex type
   **Outcome:** QuoteEngine factory membership applies to `xylo-stable` / `presto-hub` / `unitflow-v25`, not only `source.starts_with("chakra-")`. SDK and UI `venueToDexType("xylo-stable"|"xylo")` → `'xylo'` (server `dex_types` still take precedence).
   **Deps:** T4.5, T4.7, T7.1.
-  **Tests:** testing leftover quote-gate and `venueToDexType` bullets.
-
+  **Done 2026-08-30:** QuoteEngine factory membership enforces allowlist for `xylo-stable`, `presto-hub`, and `unitflow-v25` (rejecting `discovered:*` venues without owner allowlist). SDK and UI `venueToDexType` map `xylo-stable`/`xylo` → `'xylo'` and `presto-hub`/`presto` → `'presto'`. Verified with QuoteEngine unit tests and SDK client test suite (17/17).
 **Follow-up after Majors (do not start ahead of T10.1–T10.6):** unused `IXyloPool`; `setXyloRouter` mapping-only vs design atomic-config wording; PathFinder `xylo-stable`→`stable`; `xyk_quote` 997/1000 vs per-factory fee; `/build_tx` shared-pool re-check; Presto hub not USDC/EURC-restricted in contract; Circle faucet CTA when `balanceFor==0`; A=200 wrappers leftover; `ExecuteSplitSwap.s.sol` default aggregator; Route pill raw `source`.
 
 ## Testing scenario coverage
@@ -1318,7 +1316,7 @@ After hosting is healthy, run extension-backed MetaMask QA on Arc testnet and th
 |------|--------|----------|
 | T0.3 rebaseline docs | `[x]` | Design/requirements freeze 2026-08-29 |
 | T2.1 catalog | `[x]` | Done via T10.5: runtime, README, integrator-guide, render.yaml all USDC/EURC/cirBTC |
-| T2.2 Xylo | `[ ]` **partial** | Live `/quote` `xylo-stable` / `dex_types:["xylo"]`; SDK fallback maps xylo→stable (T10.6) |
+| T2.2 Xylo | `[x]` | Done via T10.6: quote gate enforces curated ids; SDK/UI `venueToDexType` maps xylo→xylo |
 | T2.3 Presto | `[ ]` **partial** | Code ready via T10.1 (`discover_once` arm + `FetchTask::EvmPresto`); keep `[ ]` until live pool is published |
 | T2.4 UnitFlow | `[x]` | Done via T10.2: `unitflow-v25` stamped in worker parse + `build_tx` factory matching; cirBTC honest `NO_ROUTE` |
 | T2.5 discovery scan | `[x]` | Watchlist correctly absent from code/env/manifest |

@@ -206,6 +206,54 @@ describe('quoteSubRoutesToSteps', () => {
     expect(steps[0].dex_type).toBe('stable');
     expect(steps[0].fee_bps).toBe(4);
   });
+
+  it('maps xylo-stable and xylo sources to xylo dex_type when dexTypes is absent', () => {
+    const steps = quoteSubRoutesToSteps({
+      source: 'xylo-stable',
+      path: [USDC, EURC],
+      poolAddresses: ['0x3DF3966F5138143dce7a9cFDdC2c0310ce083BB1'],
+      dexTypes: [],
+      hopFees: [4],
+      hopFactories: ['0x60EDeFB094B84BBC6430cc130B358A43Ba1979e2'],
+      amountIn: '1000000',
+      amountOut: '865542',
+      fractionBps: 10000,
+    });
+    expect(steps[0].dex_type).toBe('xylo');
+    expect(steps[0].fee_bps).toBe(4);
+  });
+
+  it('maps presto-hub and presto sources to presto dex_type when dexTypes is absent', () => {
+    const steps = quoteSubRoutesToSteps({
+      source: 'presto-hub',
+      path: [USDC, EURC],
+      poolAddresses: ['0x5794a8284A29493871Fbfa3c4f343D42001424D6'],
+      dexTypes: [],
+      hopFees: [30],
+      hopFactories: ['0x5794a8284A29493871Fbfa3c4f343D42001424D6'],
+      amountIn: '1000000',
+      amountOut: '996915',
+      fractionBps: 10000,
+    });
+    expect(steps[0].dex_type).toBe('presto');
+    expect(steps[0].fee_bps).toBe(30);
+  });
+
+  it('maps unitflow-v25 source to xyk dex_type when dexTypes is absent', () => {
+    const steps = quoteSubRoutesToSteps({
+      source: 'unitflow-v25',
+      path: [EURC, '0xf0c4a4ce82a5746abaad9425360ab04fbba432bf'],
+      poolAddresses: ['0x268DC75517EaFc6e0D52666639529e5DAB8c9200'],
+      dexTypes: [],
+      hopFees: [30],
+      hopFactories: ['0xd67F63A4F26a497b364d1C82e6747Aec8B5743a5'],
+      amountIn: '1000000',
+      amountOut: '240000',
+      fractionBps: 10000,
+    });
+    expect(steps[0].dex_type).toBe('xyk');
+    expect(steps[0].fee_bps).toBe(30);
+  });
 });
 
 describe('envelope errors', () => {
