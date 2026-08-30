@@ -798,3 +798,8 @@ Resolved in code: StableSwap deposit accounting, production snapshot bootstrap/r
 - `crates/dex-adapters/src/evm_fetch.rs`: added `token_reserves_selector()`, `path_reserves_selector()`, and `fetch_presto_state()` querying `tokenReserves(spoke)` and `pathReserves(spoke)` on the hub with directional token mapping.
 - `crates/market-data-worker/src/fetch_pipeline.rs`: added `FetchTask::EvmPresto`, mapped `"presto-hub" | "discovered:presto"` in `coalesce_touched_into_tasks` to `FetchTask::EvmPresto`, implemented `execute_fetch_task` delegating to `fetch_presto_state()`, and updated `find_evm_pair` to support `"presto"`.
 - Tests: `discovery_finds_presto_hub_pair_from_seeded_hub`, `coalesce_maps_evm_chakra_sources_to_evm_tasks` with Presto, and `execute_fetch_task_hydrates_presto_pool_reserves_with_distinct_getters` asserting distinct `pathReserves`/`tokenReserves` getters and directional mapping. T2.3 remains partial pending live pool publication.
+
+### T10.2 Stamp UnitFlow unitflow-v25 end-to-end (Done 2026-08-30)
+- `crates/market-data-worker/src/evm_watcher.rs`: `FactoryConfig::parse` checks for seeded UnitFlow factory `0xd67F63A4F26a497b364d1C82e6747Aec8B5743a5:xyk` and stamps `source: "unitflow-v25"`. Other seeded xyk factories (31337 fixtures) stay `"chakra-xyk"`.
+- `crates/api-server/src/build_tx.rs`: `step_factory_matches` matches `"unitflow-v25" | "chakra-xyk"` for `xyk` hops, `"chakra-stable"` for `stable`, `"chakra-clmm"` for `clmm`, `"xylo-stable" | "xylo"` for `xylo`, and `"presto-hub" | "presto"` for `presto`. Rejects all `discovered:*` records to prevent unallowlisted factory routing.
+- Tests: `unitflow_factory_parsed_as_unitflow_v25` and `step_factory_matches_accepts_curated_and_fixture_ids_only`.

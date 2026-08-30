@@ -312,7 +312,7 @@ async fn validate_hop(state: &AppState, snapshot: &MarketSnapshot, step: &BuildT
     let pool_factory = snapshot_pool_factory(snapshot, &pool);
     let allowlisted = pool_factory.as_deref().map(|f| {
         factories.iter().any(|r: &FactoryRecord| {
-            r.address.eq_ignore_ascii_case(f) && r.source == step_factory_source(&step.dex_type)
+            r.address.eq_ignore_ascii_case(f) && step_factory_matches(&step.dex_type, &r.source)
         })
     });
     // Legacy pools without a stamped factory: accept only when factories are
@@ -349,6 +349,17 @@ fn step_factory_source(dex_type: &str) -> &'static str {
         "xylo" => "xylo-stable",
         "presto" => "presto-hub",
         _ => "",
+    }
+}
+
+pub(crate) fn step_factory_matches(dex_type: &str, record_source: &str) -> bool {
+    match dex_type {
+        "xyk" => matches!(record_source, "unitflow-v25" | "chakra-xyk"),
+        "stable" => record_source == "chakra-stable",
+        "clmm" => record_source == "chakra-clmm",
+        "xylo" => matches!(record_source, "xylo-stable" | "xylo"),
+        "presto" => matches!(record_source, "presto-hub" | "presto"),
+        _ => false,
     }
 }
 
@@ -635,5 +646,20 @@ mod tests {
         assert_eq!(step_factory_source("xylo"), "xylo-stable");
         assert_eq!(step_factory_source("presto"), "presto-hub");
         assert_eq!(step_factory_source("unknown"), "");
+    }
+
+    #[test]
+    fn step_factory_matches_accepts_curated_and_fixture_ids_only() {
+        use super::step_factory_matches;
+        assert!(step_factory_matches("xyk", "unitflow-v25"));
+        assert!(step_factory_matches("xyk", "chakra-xyk"));
+        assert!(!step_factory_matches("xyk", "discovered:xyk"));
+        assert!(!step_factory_matches("xyk", "xylo-stable"));
+        assert!(step_factory_matches("xylo", "xylo-stable"));
+        assert!(step_factory_matches("xylo", "xylo"));
+        assert!(!step_factory_matches("xylo", "discovered:xylo"));
+        assert!(step_factory_matches("presto", "presto-hub"));
+        assert!(step_factory_matches("presto", "presto"));
+        assert!(!step_factory_matches("presto", "discovered:presto"));
     }
 }

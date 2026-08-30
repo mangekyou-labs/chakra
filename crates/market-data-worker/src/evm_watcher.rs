@@ -70,16 +70,19 @@ impl FactoryConfig {
         }
         // 2026-08-29 canonical source ids: xylo → xylo-stable, presto → presto-hub;
         // seeded unitflow/xyk factories → unitflow-v25 / chakra-xyk.
+        const UNITFLOW_FACTORY_ADDR: &str = "0xd67f63a4f26a497b364d1c82e6747aec8b5743a5";
+        let normalized = normalize_evm_address(address);
         let source = match dex_type.as_str() {
             "xylo" => "xylo-stable".to_string(),
             "presto" => "presto-hub".to_string(),
+            "xyk" if is_seed && normalized == UNITFLOW_FACTORY_ADDR => "unitflow-v25".to_string(),
             "xyk" if is_seed => "chakra-xyk".to_string(),
             "stable" if is_seed => "chakra-stable".to_string(),
             "clmm" if is_seed => "chakra-clmm".to_string(),
             _ => format!("discovered:{dex_type}"),
         };
         Ok(Self {
-            address: normalize_evm_address(address),
+            address: normalized,
             dex_type,
             source,
             is_seed,
@@ -1218,6 +1221,18 @@ pub(crate) mod tests {
         assert_eq!(presto.source, "presto-hub");
         assert!(FactoryConfig::parse("0xABCD:liquidity-pool", true).is_err());
         assert!(FactoryConfig::parse("no-colon", true).is_err());
+    }
+
+    #[test]
+    fn unitflow_factory_parsed_as_unitflow_v25() {
+        const UNITFLOW_FACTORY: &str = "0xd67F63A4F26a497b364d1C82e6747Aec8B5743a5";
+        let unitflow = FactoryConfig::parse(&format!("{UNITFLOW_FACTORY}:xyk"), true).unwrap();
+        assert_eq!(unitflow.source, "unitflow-v25");
+        assert_eq!(unitflow.address, UNITFLOW_FACTORY.to_ascii_lowercase());
+
+        // Other seeded xyk factories stay chakra-xyk (e.g. 31337 fixtures).
+        let fixture_xyk = FactoryConfig::parse("0x0c812E5D55D767533c8E4783D33b28EA825b4D8e:xyk", true).unwrap();
+        assert_eq!(fixture_xyk.source, "chakra-xyk");
     }
 
 

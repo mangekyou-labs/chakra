@@ -360,7 +360,7 @@ Load/stress beyond p95 is not a v1 gate.
 Check-only notes. No new tests were added in this phase. Local suites at HEAD `208d5ff` were re-run this session (see implementation Phase 7 Check). These gaps let the green suite coexist with Major discovery/identity leftovers. **Phase 6 (2026-08-30):** owned by planning **T10.1–T10.6** — still `[ ]`, not executed.
 
 - [x] `discover_once` publishes at least one `presto-hub` pair with `dex_type: "presto"` from a seeded `:presto` hub; hydrator `FetchTask::EvmPresto` reads `tokenReserves(spoke)` and `pathReserves(spoke)` on the hub with directional token mapping. **Done 2026-08-30 (T10.1).**
-- [ ] Seeded UnitFlow `:xyk` stamps `source == "unitflow-v25"` (today `FactoryConfig::parse` + `factory_tuple_parse_accepts_seed_and_discovery` pin `chakra-xyk`). **T10.2**
+- [x] Seeded UnitFlow `:xyk` stamps `source == "unitflow-v25"`, and `/build_tx` factory membership validates `unitflow-v25` for `xyk` hops. **Done 2026-08-30 (T10.2).**
 - [ ] Manifest venue verification covers the T3.3 five-check list (bytecode, endpoints, factory membership, nonzero reserves, probe quote), not bytecode-only `eth_getCode`. **T10.3**
 - [ ] Quote-time factory gate applies to `xylo-stable` / `presto-hub` / `unitflow-v25`, not only `source.starts_with("chakra-")`. **T10.6**
 - [ ] SDK/UI `venueToDexType("xylo-stable")` / `"xylo"` returns `'xylo'` (today `'stable'`); keep a regression that `/build_tx` hops follow server `dex_types` when present. **T10.6**

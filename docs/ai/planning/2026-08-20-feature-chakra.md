@@ -95,13 +95,12 @@ Each task: **outcome**, **deps**, **validation**, **tests**. Status: not started
   **Tests:** See testing doc.
   **Status 2026-08-30:** **PARTIAL — keep `[ ]` until live Presto pool is published.** Code readiness closed via T10.1: worker `discover_once` has `"presto"` arm (restricted to USDC/EURC, publishing `presto-hub` with `dex_type: "presto"`). Hydrator has `FetchTask::EvmPresto` querying `tokenReserves(spoke)` and `pathReserves(spoke)` on the hub with directional token mapping. Aggregator Presto hop and allowlist tested in Foundry fixture.
 
-- [ ] **T2.4** UnitFlow V2.5 integration (unitflow-v25)
+- [x] **T2.4** UnitFlow V2.5 integration (unitflow-v25)
   **Outcome:** Source id `unitflow-v25`; factory `0xd67F63A4F26a497b364d1C82e6747Aec8B5743a5`, canonical EURC/cirBTC pair `0x268DC75517EaFc6e0D52666639529e5DAB8c9200`, 30 bps. Quoted via existing XYK state/math. Split plans that reuse a pool are rejected.
   **Deps:** T2.1, T5.1.
   **Validation:** Adapter parity vs `getAmountsOut` (both directions × 3 sizes); 30 bps fee pinned.
   **Tests:** See testing doc (UnitFlow fee calculation, shared-pool split rejection).
-  **Status 2026-08-30:** **PARTIAL — keep `[ ]`.** Manifest pair `0x268D…9200` + factory `0xd67F…a5` + on-chain 30 bps exist. `FactoryConfig::parse` maps seeded `:xyk` → `chakra-xyk` (test at `evm_watcher.rs` pins this); comment claims `unitflow-v25` but code never emits it. `/build_tx` `step_factory_source("xyk")` → `chakra-xyk`. Live EURC↔cirBTC and USDC↔cirBTC → honest `NO_ROUTE` (UnitFlow cirBTC reserve 249,850 < 1e8 dust; no reseed). SplitOptimizer shared-pool reduction exists; `/build_tx` does not re-check (Medium). Close identity via T10.2 — or `dev-design` to keep `chakra-xyk`.
-
+  **Done 2026-08-30 (T10.2):** Manifest pair `0x268D…9200` + factory `0xd67F…a5` + on-chain 30 bps. `FactoryConfig::parse` stamps `unitflow-v25` for seeded UnitFlow factory `0xd67F…a5` (other fixtures stay `chakra-xyk`). `/build_tx` `step_factory_matches` accepts `unitflow-v25`. Thin UnitFlow cirBTC reserve (249,850 < 1e8 dust) stays honest `NO_ROUTE` (no reseed).
 - [x] **T2.5** Factory discovery scan
   **Outcome:** Worker reads `CHAKRA_SEED_FACTORIES` + optional `CHAKRA_DISCOVERY_FACTORIES`. Script/adapter probes those factories for `PairCreated`/`PoolCreated`; record none-or-addresses in docs. **Do not auto-allowlist** discovered factories on the aggregator. Owner `addFactory` is required before quotes use them. **Watchlist venues (Lunex, UnitFlow V3, AchSwap/Arc Swap, Synthra) are recorded as promotion candidates, never silently enabled.**
   **Deps:** T2.2–T2.4.
@@ -337,12 +336,11 @@ Phase 7 Check verdict: **not aligned** with the 2026-08-29 curated rebaseline. L
   **Deps:** T2.3, T3.3.
   **Validation:** Worker test that a seeded Presto hub yields ≥1 pool; live `/quote` may still prefer Xylo if it is the better path.
   **Done 2026-08-30:** `discover_once` Presto arm + `FetchTask::EvmPresto` with `fetch_presto_state` querying `tokenReserves(spoke)` and `pathReserves(spoke)` on the hub + directional mapping. Verified with `discovery_finds_presto_hub_pair_from_seeded_hub` and `execute_fetch_task_hydrates_presto_pool_reserves_with_distinct_getters`.
-- [ ] **T10.2** Stamp UnitFlow `unitflow-v25` end-to-end
+- [x] **T10.2** Stamp UnitFlow `unitflow-v25` end-to-end
   **Outcome:** `FactoryConfig::parse` for seeded `:xyk` at factory `0xd67F63A4F26a497b364d1C82e6747Aec8B5743a5` emits `source: "unitflow-v25"` through snapshot → quote gate → `build_tx` `step_factory_source`. Stop pinning `chakra-xyk` for this factory.
   **Deps:** T2.4.
   **Validation:** parse test + `/build_tx` factory membership for the UnitFlow hop.
-  **Tests:** testing leftover “seeded UnitFlow `:xyk` stamps `unitflow-v25`”.
-
+  **Done 2026-08-30:** `FactoryConfig::parse` emits `unitflow-v25` for `0xd67F63A4F26a497b364d1C82e6747Aec8B5743a5:xyk`. `build_tx.rs` `step_factory_matches` accepts `unitflow-v25` (and rejects `discovered:*`). Verified with `unitflow_factory_parsed_as_unitflow_v25` and `step_factory_matches_accepts_curated_and_fixture_ids_only`.
 - [ ] **T10.3** T3.3 five-check venue verification
   **Outcome:** Startup verifier runs bytecode, canonical token endpoints, factory membership, nonzero reserves, and a probe quote. Failed venue → unavailable / `NO_ROUTE`.
   **Deps:** T3.3.
@@ -1328,7 +1326,7 @@ After hosting is healthy, run extension-backed MetaMask QA on Arc testnet and th
 | T2.1 catalog | `[ ]` **partial** | Hosted `/tokens` USDC/EURC/cirBTC; README + integrator-guide still mBTC (T10.5) |
 | T2.2 Xylo | `[ ]` **partial** | Live `/quote` `xylo-stable` / `dex_types:["xylo"]`; SDK fallback maps xylo→stable (T10.6) |
 | T2.3 Presto | `[ ]` **partial** | Code ready via T10.1 (`discover_once` arm + `FetchTask::EvmPresto`); keep `[ ]` until live pool is published |
-| T2.4 UnitFlow | `[ ]` **partial** | On-chain 30 bps factory; worker stamps `chakra-xyk`; cirBTC pairs honest `NO_ROUTE` (T10.2) |
+| T2.4 UnitFlow | `[x]` | Done via T10.2: `unitflow-v25` stamped in worker parse + `build_tx` factory matching; cirBTC honest `NO_ROUTE` |
 | T2.5 discovery scan | `[x]` | Watchlist correctly absent from code/env/manifest |
 | T3.1 / T3.2 | `[x]` | Redis + quote math |
 | T3.3 WS/poll + verifier | `[ ]` **partial** | WS/poll shipped; verifier bytecode-only (T10.3); `/ready` `pool_keys:[]` |
