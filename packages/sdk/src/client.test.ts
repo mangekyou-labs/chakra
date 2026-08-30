@@ -21,14 +21,13 @@ function stubFetch(handler: (url: string, init?: RequestInit) => unknown) {
 }
 
 describe('ChakraClient.quote', () => {
-  it('encodes token_in/token_out/amount_in/slippage_bps and never sends prefer_arc or percent slippage', async () => {
+  it('encodes the supported quote fields as snake_case query parameters', async () => {
     stubFetch((url) => {
       const parsed = new URL(url);
       expect(parsed.searchParams.get('token_in')).toBe(USDC);
       expect(parsed.searchParams.get('token_out')).toBe(EURC);
       expect(parsed.searchParams.get('amount_in')).toBe('1000000');
       expect(parsed.searchParams.get('slippage_bps')).toBe('50');
-      expect(parsed.searchParams.has('prefer_arc')).toBe(false);
       expect(parsed.searchParams.has('slippage')).toBe(false);
       return {
         success: true,
@@ -48,7 +47,7 @@ describe('ChakraClient.quote', () => {
     });
 
     const client = new ChakraClient({ apiUrl: API });
-    await client.quote({ tokenIn: USDC, tokenOut: EURC, amountIn: '1000000', slippage: 0.5 });
+    await client.quote({ tokenIn: USDC, tokenOut: EURC, amountIn: '1000000', slippageBps: 50 });
   });
 
   it('parses price_impact_bps, protocol_fee_bps, is_split, fraction_bps, sub_routes', async () => {
@@ -81,7 +80,7 @@ describe('ChakraClient.quote', () => {
     }));
 
     const client = new ChakraClient({ apiUrl: API });
-    const quote = await client.quote({ tokenIn: USDC, tokenOut: EURC, amountIn: '1000000', slippage: 0.5 });
+    const quote = await client.quote({ tokenIn: USDC, tokenOut: EURC, amountIn: '1000000', slippageBps: 50 });
     expect(quote.priceImpactBps).toBe(12);
     expect(quote.protocolFeeBps).toBe(0);
     expect(quote.isSplit).toBe(true);
@@ -95,7 +94,7 @@ describe('ChakraClient.quote', () => {
 });
 
 describe('ChakraClient.buildTx', () => {
-  it('POSTs user (not from/user_public_key), token_in, amount_in, min_amount_out, sub_routes[].steps', async () => {
+  it('POSTs the supported build fields as snake_case JSON', async () => {
     let captured: RequestInit | null = null;
     stubFetch((_url, init) => {
       captured = init ?? null;
@@ -138,8 +137,8 @@ describe('ChakraClient.buildTx', () => {
 
     const body = JSON.parse(String(captured?.body));
     expect(body.user).toBe('0x1234567890123456789012345678901234567890');
-    expect(body.user_public_key).toBeUndefined();
-    expect(body.from).toBeUndefined();
+    expect(Object.hasOwn(body, 'user_public_key')).toBe(false);
+    expect(Object.hasOwn(body, 'from')).toBe(false);
     expect(body.token_in).toBe(USDC);
     expect(body.amount_in).toBe('1000000');
     expect(body.min_amount_out).toBe('994552');
@@ -174,7 +173,7 @@ describe('quoteSubRoutesToSteps', () => {
     ]);
   });
 
-  it('falls back to the joined source when dexTypes is absent (legacy quote)', () => {
+  it('uses xyk when a route has no server-provided dex type', () => {
     const steps = quoteSubRoutesToSteps({
       source: 'chakra-stable',
       path: [USDC, EURC],
@@ -187,11 +186,11 @@ describe('quoteSubRoutesToSteps', () => {
       fractionBps: 10000,
     });
     expect(steps).toEqual([
-      { dex_type: 'stable', pool_address: '0x0000000000000000000000000000000000000002', token_in: USDC, token_out: EURC },
+      { dex_type: 'xyk', pool_address: '0x0000000000000000000000000000000000000002', token_in: USDC, token_out: EURC },
     ]);
   });
 
-  it('uses server dex_types over the joined source when they disagree', () => {
+  it('uses server dex_types for transaction encoding', () => {
     const steps = quoteSubRoutesToSteps({
       source: 'chakra-xyk',
       path: [USDC, EURC],
@@ -207,53 +206,6 @@ describe('quoteSubRoutesToSteps', () => {
     expect(steps[0].fee_bps).toBe(4);
   });
 
-  it('maps xylo-stable and xylo sources to xylo dex_type when dexTypes is absent', () => {
-    const steps = quoteSubRoutesToSteps({
-      source: 'xylo-stable',
-      path: [USDC, EURC],
-      poolAddresses: ['0x3DF3966F5138143dce7a9cFDdC2c0310ce083BB1'],
-      dexTypes: [],
-      hopFees: [4],
-      hopFactories: ['0x60EDeFB094B84BBC6430cc130B358A43Ba1979e2'],
-      amountIn: '1000000',
-      amountOut: '865542',
-      fractionBps: 10000,
-    });
-    expect(steps[0].dex_type).toBe('xylo');
-    expect(steps[0].fee_bps).toBe(4);
-  });
-
-  it('maps presto-hub and presto sources to presto dex_type when dexTypes is absent', () => {
-    const steps = quoteSubRoutesToSteps({
-      source: 'presto-hub',
-      path: [USDC, EURC],
-      poolAddresses: ['0x5794a8284A29493871Fbfa3c4f343D42001424D6'],
-      dexTypes: [],
-      hopFees: [30],
-      hopFactories: ['0x5794a8284A29493871Fbfa3c4f343D42001424D6'],
-      amountIn: '1000000',
-      amountOut: '996915',
-      fractionBps: 10000,
-    });
-    expect(steps[0].dex_type).toBe('presto');
-    expect(steps[0].fee_bps).toBe(30);
-  });
-
-  it('maps unitflow-v25 source to xyk dex_type when dexTypes is absent', () => {
-    const steps = quoteSubRoutesToSteps({
-      source: 'unitflow-v25',
-      path: [EURC, '0xf0c4a4ce82a5746abaad9425360ab04fbba432bf'],
-      poolAddresses: ['0x268DC75517EaFc6e0D52666639529e5DAB8c9200'],
-      dexTypes: [],
-      hopFees: [30],
-      hopFactories: ['0xd67F63A4F26a497b364d1C82e6747Aec8B5743a5'],
-      amountIn: '1000000',
-      amountOut: '240000',
-      fractionBps: 10000,
-    });
-    expect(steps[0].dex_type).toBe('xyk');
-    expect(steps[0].fee_bps).toBe(30);
-  });
 });
 
 describe('envelope errors', () => {

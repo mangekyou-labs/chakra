@@ -17,9 +17,7 @@ export interface QuoteParams {
     tokenIn: string;
     tokenOut: string;
     amountIn: string;
-    /** Percent slippage (0.5 = 0.5%). Converted to `slippage_bps`. */
-    slippage?: number;
-    /** Integer bps (50 = 0.5%). Takes precedence over `slippage`. */
+    /** Integer basis points (50 = 0.5%). */
     slippageBps?: number;
     maxHops?: number;
     maxSplits?: number;
@@ -32,7 +30,7 @@ export interface SubRoute {
     dexTypes: string[];
     /** Per-hop venue fee in bps. T4.7. */
     hopFees: number[];
-    /** Per-hop allowlisted factory ('' = legacy pool). T4.7. */
+    /** Per-hop allowlisted factory; empty when the venue does not use one. */
     hopFactories: string[];
     amountIn: string;
     amountOut: string;
@@ -96,12 +94,7 @@ export interface TokenRow {
     address: string;
     decimals: number;
 }
-/**
- * Quote → build_tx steps mapping (T4.7). Prefers server-owned per-hop
- * `dexTypes`; falls back to `source.split(" → ")` for in-flight clients that
- * received a legacy quote. `fee_bps` is carried through so `/build_tx`
- * encodes the snapshot fee.
- */
+/** Quote → build_tx steps mapping using server-owned per-hop metadata. */
 export declare function quoteSubRoutesToSteps(subRoute: SubRoute): BuildTxStep[];
 export declare class ChakraClient {
     private baseUrl;

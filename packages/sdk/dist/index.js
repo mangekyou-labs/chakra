@@ -9,21 +9,10 @@ export class ChakraApiError extends Error {
         this.code = code;
     }
 }
-/**
- * Quote → build_tx steps mapping (T4.7). Prefers server-owned per-hop
- * `dexTypes`; falls back to `source.split(" → ")` for in-flight clients that
- * received a legacy quote. `fee_bps` is carried through so `/build_tx`
- * encodes the snapshot fee.
- */
+/** Quote → build_tx steps mapping using server-owned per-hop metadata. */
 export function quoteSubRoutesToSteps(subRoute) {
-    const venues = subRoute.source
-        .split(' → ')
-        .map((v) => v.trim())
-        .filter(Boolean);
-    const mapped = venues.length > 0 ? venues : ['chakra-xyk'];
     return subRoute.poolAddresses.map((pool, i) => {
-        const serverType = subRoute.dexTypes?.[i];
-        const dexType = serverType ?? venueToDexType(mapped[i] ?? 'chakra-xyk');
+        const dexType = subRoute.dexTypes[i] ?? 'xyk';
         const step = {
             dex_type: dexType,
             pool_address: pool,
@@ -35,27 +24,6 @@ export function quoteSubRoutesToSteps(subRoute) {
             step.fee_bps = fee;
         return step;
     });
-}
-function venueToDexType(venue) {
-    const v = venue.toLowerCase();
-    if (v === 'chakra-stable' || v === 'stable')
-        return 'stable';
-    if (v === 'xylo-stable' || v === 'xylo')
-        return 'xylo';
-    if (v === 'chakra-clmm' || v === 'clmm')
-        return 'clmm';
-    if (v === 'presto-hub' || v === 'presto')
-        return 'presto';
-    if (v === 'unitflow-v25' || v === 'chakra-xyk' || v === 'xyk')
-        return 'xyk';
-    return 'xyk';
-}
-function slippageToBps(slippage, slippageBps) {
-    if (slippageBps !== undefined)
-        return slippageBps;
-    if (slippage !== undefined)
-        return Math.round(slippage * 100);
-    return undefined;
 }
 export class ChakraClient {
     constructor(options) {
@@ -113,9 +81,8 @@ export class ChakraClient {
             token_out: params.tokenOut,
             amount_in: params.amountIn,
         });
-        const bps = slippageToBps(params.slippage, params.slippageBps);
-        if (bps !== undefined)
-            search.set('slippage_bps', String(bps));
+        if (params.slippageBps !== undefined)
+            search.set('slippage_bps', String(params.slippageBps));
         if (params.maxHops !== undefined)
             search.set('max_hops', String(params.maxHops));
         if (params.maxSplits !== undefined)

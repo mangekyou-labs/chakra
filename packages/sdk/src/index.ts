@@ -25,9 +25,7 @@ export interface QuoteParams {
   tokenIn: string;
   tokenOut: string;
   amountIn: string;
-  /** Percent slippage (0.5 = 0.5%). Converted to `slippage_bps`. */
-  slippage?: number;
-  /** Integer bps (50 = 0.5%). Takes precedence over `slippage`. */
+  /** Integer basis points (50 = 0.5%). */
   slippageBps?: number;
   maxHops?: number;
   maxSplits?: number;
@@ -41,7 +39,7 @@ export interface SubRoute {
   dexTypes: string[];
   /** Per-hop venue fee in bps. T4.7. */
   hopFees: number[];
-  /** Per-hop allowlisted factory ('' = legacy pool). T4.7. */
+  /** Per-hop allowlisted factory; empty when the venue does not use one. */
   hopFactories: string[];
   amountIn: string;
   amountOut: string;
@@ -114,22 +112,10 @@ export interface TokenRow {
   decimals: number;
 }
 
-/**
- * Quote → build_tx steps mapping (T4.7). Prefers server-owned per-hop
- * `dexTypes`; falls back to `source.split(" → ")` for in-flight clients that
- * received a legacy quote. `fee_bps` is carried through so `/build_tx`
- * encodes the snapshot fee.
- */
+/** Quote → build_tx steps mapping using server-owned per-hop metadata. */
 export function quoteSubRoutesToSteps(subRoute: SubRoute): BuildTxStep[] {
-  const venues = subRoute.source
-    .split(' → ')
-    .map((v) => v.trim())
-    .filter(Boolean);
-  const mapped = venues.length > 0 ? venues : ['chakra-xyk'];
   return subRoute.poolAddresses.map((pool, i) => {
-    const serverType = subRoute.dexTypes?.[i];
-    const dexType =
-      serverType ?? venueToDexType(mapped[i] ?? 'chakra-xyk');
+    const dexType = subRoute.dexTypes[i] ?? 'xyk';
     const step: BuildTxStep = {
       dex_type: dexType,
       pool_address: pool,
@@ -140,22 +126,6 @@ export function quoteSubRoutesToSteps(subRoute: SubRoute): BuildTxStep[] {
     if (fee !== undefined && fee > 0) step.fee_bps = fee;
     return step;
   });
-}
-
-function venueToDexType(venue: string): string {
-  const v = venue.toLowerCase();
-  if (v === 'chakra-stable' || v === 'stable') return 'stable';
-  if (v === 'xylo-stable' || v === 'xylo') return 'xylo';
-  if (v === 'chakra-clmm' || v === 'clmm') return 'clmm';
-  if (v === 'presto-hub' || v === 'presto') return 'presto';
-  if (v === 'unitflow-v25' || v === 'chakra-xyk' || v === 'xyk') return 'xyk';
-  return 'xyk';
-}
-
-function slippageToBps(slippage?: number, slippageBps?: number): number | undefined {
-  if (slippageBps !== undefined) return slippageBps;
-  if (slippage !== undefined) return Math.round(slippage * 100);
-  return undefined;
 }
 
 export class ChakraClient {
@@ -223,8 +193,7 @@ export class ChakraClient {
       token_out: params.tokenOut,
       amount_in: params.amountIn,
     });
-    const bps = slippageToBps(params.slippage, params.slippageBps);
-    if (bps !== undefined) search.set('slippage_bps', String(bps));
+    if (params.slippageBps !== undefined) search.set('slippage_bps', String(params.slippageBps));
     if (params.maxHops !== undefined) search.set('max_hops', String(params.maxHops));
     if (params.maxSplits !== undefined) search.set('max_splits', String(params.maxSplits));
 

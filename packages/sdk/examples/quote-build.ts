@@ -23,7 +23,7 @@ async function main() {
     tokenIn: USDC,
     tokenOut: EURC,
     amountIn: '1000000', // 1 USDC (6 dp)
-    slippage: 0.5, // → slippage_bps 50
+    slippageBps: 50,
   });
 
   console.log('Quote:');

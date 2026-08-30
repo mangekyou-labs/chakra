@@ -1,11 +1,11 @@
 {
-  "name": "@Chakra/sdk",
-  "version": "0.2.0",
+  "name": "@chakra-ag/sdk",
+  "version": "0.3.0",
   "description": "TypeScript SDK for the Chakra Arc Testnet DEX Aggregator API",
   "license": "Apache-2.0",
   "repository": {
     "type": "git",
-    "url": "https://github.com/Chakra/Arc-dex-agg.git",
+    "url": "https://github.com/mangekyou-labs/chakra.git",
     "directory": "packages/sdk"
   },
   "main": "dist/index.js",
