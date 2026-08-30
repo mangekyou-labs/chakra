@@ -6,8 +6,8 @@
 | --- | --- | --- |
 | Rust format | `cargo fmt --all -- --check` | passed |
 | Rust tests | `cargo test --workspace` | passed |
-| Rust lint | `cargo clippy --workspace --all-targets -- -D warnings` | not rerun in this continuation |
-| Rust release | `cargo build --workspace --release` | not rerun in this continuation |
+| Rust lint | `cargo clippy --workspace --all-targets -- -D warnings` | passed from the fresh remote clone |
+| Rust release | `cargo build --workspace --release` | passed from the fresh remote clone |
 | Contracts | `cd contracts/evm && forge test` | 88 passed in a dependency-equipped isolated checkout; fresh checkout lacks ignored Forge libraries |
 | SDK | `npm test`, `npm run build`, `npm pack --dry-run` | passed |
 | SDK registry smoke | clean install, quote, build transaction | passed |
