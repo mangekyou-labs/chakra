@@ -554,8 +554,26 @@ impl EvmRunner {
                                     warn!(pool = %pool, "clmm pool state fetch failed — skipped");
                                     continue;
                                 };
-                                if state.liquidity == 0 {
-                                    warn!(pool = %pool, "clmm pool has zero liquidity — skipped");
+                                if state.liquidity == 0 || state.sqrt_price_x96 == [0; 4] {
+                                    warn!(pool = %pool, "clmm pool has zero liquidity or price — skipped");
+                                    continue;
+                                }
+                                let pool_state = dex_adapters::clmm_math::ClmmPoolState {
+                                    sqrt_price_x96: dex_adapters::clmm_math::U256(state.sqrt_price_x96),
+                                    tick: state.tick,
+                                    liquidity: state.liquidity,
+                                    fee_bps: *fee_bps,
+                                    tick_spacing: *tick_spacing,
+                                    token0: a.clone(),
+                                    token1: b.clone(),
+                                };
+                                let tick_store = dex_adapters::clmm_math::TickDataStore::new();
+                                let Some((amount_out, _, _)) = dex_adapters::clmm_math::simulate_swap(&pool_state, &tick_store, 1_000_000, true) else {
+                                    warn!(pool = %pool, "clmm pool probe quote failed — skipped");
+                                    continue;
+                                };
+                                if amount_out == 0 {
+                                    warn!(pool = %pool, "clmm pool probe quote zero — skipped");
                                     continue;
                                 }
                                 clmm_pools.push(state);
@@ -1800,6 +1818,57 @@ pub(crate) mod tests {
         let found = runner.discover_once().await.unwrap();
         assert_eq!(found, 0, "pool with failing probe quote must be skipped");
         assert_eq!(runner.verified_factories.read().unwrap().len(), 0);
+    }
+
+    #[tokio::test]
+    async fn venue_five_checks_xylo_all_pass_published() {
+        const XYLO_FACTORY: &str = "0x60EDeFB094B84BBC6430cc130B358A43Ba1979e2";
+        const XYLO_POOL: &str = "0x3DF3966F5138143dce7a9cFDdC2c0310ce083BB1";
+        let (url, _server) = spawn_fixture_rpc(move |method, params| match method {
+            "eth_getCode" => Ok(json!("0x60")),
+            "eth_call" => {
+                let to = params[0]["to"].as_str().unwrap_or("");
+                let data = params[0]["data"].as_str().unwrap_or("");
+                if to.eq_ignore_ascii_case(XYLO_FACTORY) {
+                    return Ok(json!(format!("0x{:0>64}", &XYLO_POOL[2..])));
+                }
+                if to.eq_ignore_ascii_case(XYLO_POOL) {
+                    if data.starts_with(&dex_adapters::evm_fetch::token0_selector()) {
+                        return Ok(json!(format!("0x{:0>64}", &USDC[2..])));
+                    }
+                    if data.starts_with(&dex_adapters::evm_fetch::token1_selector()) {
+                        return Ok(json!(format!("0x{:0>64}", &EURC[2..])));
+                    }
+                    if data.starts_with(&dex_adapters::evm_fetch::get_reserves_selector()) {
+                        return Ok(json!(reserves_response(9_323_185_000_000, 9_323_185_000_000)));
+                    }
+                    if data.starts_with(&dex_adapters::evm_fetch::get_amplification_selector()) {
+                        return Ok(json!(format!("0x{:0>64x}", 20000u128)));
+                    }
+                }
+                Ok(json!(word(0)))
+            }
+            _ => Ok(json!(word(0))),
+        });
+        let client = EvmRpcClient::single(&url).unwrap();
+        let config = EvmConfig {
+            seed_factories: vec![FactoryConfig::parse(&format!("{XYLO_FACTORY}:xylo"), true).unwrap()],
+            ws_enabled: false,
+            ..Default::default()
+        };
+        let shared = Arc::new(RwLock::new(WorkerShared { sources: Vec::new(), clmm_pools: Vec::new() }));
+        let mut runner = EvmRunner::new(config, client, shared.clone(), None);
+        let found = runner.discover_once().await.unwrap();
+        assert_eq!(found, 1);
+        let guard = shared.read().await;
+        assert_eq!(guard.sources.len(), 1);
+        assert_eq!(guard.sources[0].source, "xylo-stable");
+        assert_eq!(guard.sources[0].pairs.len(), 1);
+        let pair = &guard.sources[0].pairs[0];
+        assert_eq!(pair.dex_type, "xylo");
+        assert_eq!(pair.pool_address, XYLO_POOL.to_ascii_lowercase());
+        assert_eq!(runner.verified_factories.read().unwrap().len(), 1);
+        assert_eq!(runner.verified_factories.read().unwrap()[0].source, "xylo-stable");
     }
 
     #[tokio::test]
