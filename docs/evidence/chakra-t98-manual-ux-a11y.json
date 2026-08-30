@@ -1,32 +1,28 @@
 {
   "scenario": "T9.8 Manual UX & Accessibility Audit (cirBTC Catalog & Rebaselined Aggregator)",
-  "timestamp_utc": "2026-08-30T09:30:00Z",
+  "timestamp_utc": "2026-08-30T09:34:30Z",
+  "test_tool": "playwright-cli (isolated named sessions: -s=desktop, -s=mobile)",
   "status": "OPEN_PARTIAL_GATED_ON_VERCEL_REDEPLOY",
   "tested_url": "https://chakra-arc-dex.vercel.app",
   "api_endpoint": "https://chakra-api-0a5i.onrender.com",
-  "viewports_tested": [
+  "sessions_tested": [
     {
-      "name": "Desktop Pro Terminal",
+      "session_name": "desktop",
+      "command": "playwright-cli -s=desktop open https://chakra-arc-dex.vercel.app && playwright-cli -s=desktop resize 1280 800",
       "dimensions": "1280x800",
       "status": "OPEN_PARTIAL",
-      "screenshot": "chakra-t98-desktop-audit.png",
-      "details": "Header nav, swap terminal frame, token selector trigger for tokenIn render cleanly. Live quote rendering is blocked on Vercel redeploy because the deployed UI bundle (2026-08-28 commit d3f8c79) uses case-sensitive token address matching against the API's lowercase addresses, leaving tokenOut uninitialized."
+      "snapshot_file": ".playwright-cli/page-2026-08-30T09-33-53-952Z.yml",
+      "screenshot": "docs/evidence/chakra-t98-desktop-audit.png",
+      "details": "Header nav, swap terminal, status banner, and tokenIn trigger render cleanly. Direct API request verified: [GET] https://chakra-api-0a5i.onrender.com/api/v1/tokens => [200]. Live quote rendering remains blocked on Vercel production redeployment of commit 208d5ff: the deployed Vercel bundle (2026-08-28 commit d3f8c79) uses case-sensitive token address matching against the API's lowercase addresses, leaving tokenOut uninitialized on initial mount."
     },
     {
-      "name": "Mobile Responsive Viewport",
+      "session_name": "mobile",
+      "command": "playwright-cli -s=mobile open https://chakra-arc-dex.vercel.app --mobile && playwright-cli -s=mobile resize 390 844",
       "dimensions": "390x844",
       "status": "AUDITED_PASS",
-      "screenshot": "chakra-t98-mobile-audit.png",
-      "details": "Mobile responsive viewport adjusts full width (390px), responsive header adapts, and CTA button remains visible and accessible."
-    }
-  ],
-  "network_requests": [
-    {
-      "method": "GET",
-      "url": "https://chakra-api-0a5i.onrender.com/api/v1/tokens",
-      "is_direct_hosted_api": true,
-      "response_status": 200,
-      "tokens_returned": ["USDC", "EURC", "cirBTC"]
+      "snapshot_file": ".playwright-cli/page-2026-08-30T09-34-04-077Z.yml",
+      "screenshot": "docs/evidence/chakra-t98-mobile-audit.png",
+      "details": "Mobile responsive viewport adjusts full width (390px), responsive header adapts with menu trigger, and Connect Wallet CTA button remains visible and accessible in both header and swap form."
     }
   ],
   "catalog_verification": {
@@ -63,12 +59,6 @@
   "mobile_verification": {
     "viewport": "390x844",
     "cta_visible": true,
-    "cta_bounding_box": {
-      "x": 214.640625,
-      "y": 18.75,
-      "width": 151.359375,
-      "height": 42.5
-    },
     "status": "PASS"
   },
   "open_audit_items": [
