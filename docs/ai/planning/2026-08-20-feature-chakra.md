@@ -1327,8 +1327,8 @@ After hosting is healthy, run extension-backed MetaMask QA on Arc testnet and th
 | T8.1 / T8.2 | `[x]` | API `https://chakra-api-0a5i.onrender.com`, UI `https://chakra-arc-dex.vercel.app`; `render.yaml` leftover T10.5 |
 | T9.8 Hosted UI QA | `[x]` | Done via Vercel prod redeploy + Playwright CLI desktop (1280×800) & mobile (390×844) audits |
 | T9.4 MetaMask Live Swap | `[x]` | Done via Playwright + dAppwright on live aggregator 0xeb1235...29d8 (42.4s, 1.0 USDC→0.803878 EURC) |
-| T9.3 On-Chain Split Swap | `[x]` | Verified: live on-chain split proof on Arcscan (tx 0x42e859...287fa8, 3 legs); single-venue routing on 0xeb1235...29d8 due to single active pool |
-| T9.6 WS / Poll Refresh | `[x]` | Verified: evm_watcher test < 5s refresh; public worker snapshot cycle (600s) live via /ready |
+| T9.3 On-Chain Split Swap | `[ ]` | Historical proof on 0xEa1b2C...2006; new aggregator 0xeb1235...29d8 routes single-venue xylo-stable due to single active pool; ExecuteSplitSwap.s.sol not allowlisted |
+| T9.6 WS / Poll Refresh | `[ ]` | Local test verified (evm_watcher < 5s); live WS proof on 0xeb1235...29d8 requires direct Redis instrumentation |
 | T9.7 Evidence Index | `[x]` | Full evidence index, live coordinates, and SC-1..SC-13 mapping updated in docs/evidence/README.md |
 | **T10.1–T10.6** | `[x]` | All 6 Check Major items complete and verified |
 
