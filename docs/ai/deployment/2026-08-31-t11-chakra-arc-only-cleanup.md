@@ -16,7 +16,10 @@
 
 ## Current status
 
-Implementation is local and the public mutation gates are pending. The fresh
+Implementation is local in granular commits. The read-only
+remote check confirmed `chakra/feature-chakra` at `671f478` and `chakra/main` at
+`208d5ff`; a complete pre-rewrite bundle was created and verified outside the
+repository. The public mutation gates are pending. The fresh
 credential check returned npm HTTP 401 from `npm whoami`; `npm view
 @chakra-ag/sdk version` also cannot authorize the package lookup. The local
 SDK pack dry run succeeds, but no package publish, deprecation, branch rewrite,
