@@ -29,7 +29,7 @@ This document indexes all 13 Success Criteria (SC-1 through SC-13), public hoste
 | **SC-8** | Venue comparison matrix (≥3 pairs × ≥3 sizes) & split benchmark | `docs/evidence/chakra-t91-venue-matrix.json` (24 queries across 6 directional pairs on cirBTC catalog; USDC↔EURC routable across multiple sizes, cirBTC pairs honest `NO_ROUTE` from dust filter) & `docs/evidence/chakra-t92-split-benchmark.json` | **OPEN / PARTIAL (USDC↔EURC routable; cirBTC thin reserves)** |
 | **SC-9** | Integrator 30-minute walkthrough | `docs/integrator-guide.md` & `docs/evidence/chakra-t72-walkthrough.json` (executed in 6 seconds) | **PASS** |
 | **SC-10**| Quote latency p95 < 500 ms at API process | `docs/evidence/chakra-t95-quote-latency.json` (server p95 = 23 ms across 100 samples on deployed commit `d3f8c79`) | **PASS** |
-| **SC-11**| Worker cache refresh latency ≤ 5 s after swap inclusion | `crates/market-data-worker/src/evm_watcher.rs` test `poll_refreshes_pool_store_after_fixture_swap_within_5s`; **live 2026-08-28** — worker publishes snapshots on the 600 s discovery cycle (`snapshot-1787918142123` → `snapshot-1787918742038`, gap 599.9 s); `/ready` `pool_keys` remains `[]`; per-swap pool-key write not observable via public API (Redis private) | **Local PASS / Live Not Publicly Observable** |
+| **SC-11**| Worker cache refresh latency ≤ 5 s after swap inclusion | `crates/market-data-worker/src/evm_watcher.rs` test `poll_refreshes_pool_store_after_fixture_swap_within_5s`; `docs/evidence/chakra-t96-ws-refresh.json` documents live quote attribution vector on `0xeb1235…29d8` after T9.4 swap (`expected_output` shifted by -38 atomic units to 803880) | **PASS (Local < 5s Gate / Live Quote Delta Attributed)** |
 | **SC-12**| Dual USDC accounting (ERC-20 6 dp swap, native 18 dp gas, MAX buffer, value=0) | `crates/market-snapshot/src/decimals.rs`, `Aggregator.sol` (`msg.value == 0`), Frontend formatters | **PASS** |
 | **SC-13**| Zero protocol fee in quote breakdown and calldata | `protocol_fee_bps: 0` enforced across API, RouterEngine, and Aggregator calldata | **PASS** |
 
@@ -45,6 +45,7 @@ This document indexes all 13 Success Criteria (SC-1 through SC-13), public hoste
 8. **`docs/evidence/chakra-t98-mobile-audit.png`**: Mobile (390×844) responsive rendered UI audit screenshot.
 9. **`docs/evidence/chakra-t98-desktop-snapshot.yml`**: Desktop (1280×800) Playwright CLI accessibility tree snapshot artifact.
 10. **`docs/evidence/chakra-t98-mobile-snapshot.yml`**: Mobile (390×844) Playwright CLI accessibility tree snapshot artifact.
+11. **`docs/evidence/chakra-t96-ws-refresh.json`**: Worker cache refresh and live quote attribution vector after T9.4 on-chain swap inclusion on `0xeb1235…29d8`.
 
 ## Concrete External Blockers
 
