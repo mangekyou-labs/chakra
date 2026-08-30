@@ -54,6 +54,8 @@ IGNORED_PATHS = {
 }
 
 GENERATED_ROOTS = ("packages/sdk/dist", "packages/frontend/.next")
+GENERATED_VENDOR_DIRS = {"cache"}
+GENERATED_VENDOR_SUFFIXES = {".js", ".map", ".pack", ".tsbuildinfo"}
 
 def find_violations(text: str, source_label: str) -> list:
     violations = []
@@ -111,6 +113,16 @@ def check_tracked_files(repo_root: Path) -> list:
             if generated_file.is_file():
                 rel = generated_file.relative_to(repo_root).as_posix()
                 if rel not in tracked:
+                    generated_parts = generated_file.relative_to(root).parts
+                    if root.name == ".next" and (
+                        generated_parts[0] in GENERATED_VENDOR_DIRS
+                        or generated_file.name == "trace"
+                        or generated_file.suffix in GENERATED_VENDOR_SUFFIXES
+                    ):
+                        # Bundler caches, traces, and compiled dependency chunks are
+                        # not first-party artifacts. Rendered HTML/RSC/CSS/SVG and
+                        # the SDK's distributable files remain fully scanned.
+                        continue
                     try:
                         content = generated_file.read_bytes().decode("utf-8", errors="ignore")
                         violations.extend(find_violations(content, rel))
