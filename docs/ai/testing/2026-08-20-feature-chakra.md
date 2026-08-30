@@ -116,17 +116,16 @@ cd packages/frontend && npm test
 
 **Contract tests (Foundry, TDD red/green):**
 
-- [ ] Catalog enforcement: a hop whose token is outside {USDC, EURC, cirBTC} reverts; the aggregator sweep covers USDC/EURC/cirBTC (SC-14).
-- [ ] Unauthorized venues: Presto hub not allowlisted reverts; Xylo router not atomically paired reverts; UnitFlow factory not allowlisted reverts.
-- [ ] Xylo approval cleanup: after a router hop, the aggregator's Xylo allowance is reset to 0 (no retained dust approvals).
-- [ ] Presto approval cleanup: after a hub hop, the aggregator's Presto allowance is reset to 0.
-- [ ] Deadline revert: Xylo/Presto hops honor the request `deadline` (past → `Expired`).
-- [ ] Slippage revert: `minAmountOut` too high → `SlippageExceeded`, no reserve change.
-- [ ] UnitFlow fee: XYK hop output matches the factory's configured fee (30 bps), not a hardcoded 997/1000.
-- [ ] Multihop execution: USDC → EURC → cirBTC atomic success; revert is atomic (no balance change).
-- [ ] No retained token dust: aggregator balances of USDC/EURC/cirBTC are 0 after success and after revert.
-- [ ] Shared-pool split rejection: a split whose sub-routes reuse the same pool reverts (or is rejected before encode).
-
+- [x] Catalog enforcement: a hop whose token is outside {USDC, EURC, cirBTC} reverts; the aggregator sweep covers USDC/EURC/cirBTC (SC-14) — `test_catalog_enforcement_rejects_out_of_catalog_token`.
+- [x] Unauthorized venues: Presto hub not allowlisted reverts; Xylo router not atomically paired reverts; UnitFlow factory not allowlisted reverts — `test_presto_hop_unknown_hub_reverts`, `test_xylo_hop_unknown_factory_reverts`, `test_hop_without_allowlisted_factory_reverts`.
+- [x] Xylo approval cleanup: after a router hop, the aggregator's Xylo allowance is reset to 0 (no retained dust approvals) — `test_xylo_hop_succeeds_via_router`.
+- [x] Presto approval cleanup: after a hub hop, the aggregator's Presto allowance is reset to 0 — `test_presto_hop_succeeds_via_hub`.
+- [x] Deadline revert: Xylo/Presto hops honor the request `deadline` (past → `Expired`) — `test_deadline_past_reverts`.
+- [x] Slippage revert: `minAmountOut` too high → `SlippageExceeded`, no reserve change — `test_minAmountOut_too_high_reverts`.
+- [x] UnitFlow fee: XYK hop output matches the factory's configured fee (30 bps), not a hardcoded 997/1000 — `test_xyk_factory_fee_is_configurable`.
+- [x] Multihop execution: USDC → EURC → cirBTC atomic success; revert is atomic (no balance change) — `test_multi_hop_eurc_via_usdc_success`, `test_multi_hop_min_revert_is_atomic`.
+- [x] No retained token dust: aggregator balances of USDC/EURC/cirBTC are 0 after success and after revert — `_assertCatalogZero`.
+- [x] Shared-pool split rejection: a split whose sub-routes reuse the same pool reverts in Solidity (`test_split_reuses_pool_reverts`) and is rejected before encode in `/build_tx` (`build_tx_rejects_shared_pool_across_subroutes`).
 **Adapter parity tests (Rust):**
 
 - [ ] Xylo quote vs the on-chain `calculateSwap` view function, both directions, three sizes (amplification hydrated from on-chain pool params, not hardcoded A).
@@ -365,8 +364,8 @@ Check-only notes. No new tests were added in this phase. Local suites at HEAD `2
 - [x] `scripts/arc-operator.sh` allowlists `DeployAggregator.s.sol` and rejects fixture scripts; `DeployAggregator.s.sol` requires chain 5042002; fixture scripts require chain 31337. **Done 2026-08-30 (T10.4).**
 - [x] Quote-time factory gate applies to `xylo-stable` / `presto-hub` / `unitflow-v25`, not only `source.starts_with("chakra-")` (and rejects `discovered:*` venues without owner allowlist). **Done 2026-08-30 (T10.6).**
 - [x] SDK/UI `venueToDexType("xylo-stable")` / `"xylo"` returns `'xylo'` and `venueToDexType("presto-hub")` / `"presto"` returns `'presto'`, with server `dex_types` taking precedence when present. **Done 2026-08-30 (T10.6).**
-- [ ] `/build_tx` rejects two sub-routes that share a pool (today only SplitOptimizer + Solidity `_rejectSharedPools`).
-- [ ] SwapCard Circle faucet CTA is reachable when `balanceFor == 0` (today nested inside `balanceFor > 0`).
+- [x] `/build_tx` rejects two sub-routes that share a pool (both SplitOptimizer + `/build_tx` `validate_routes` + Solidity `_rejectSharedPools`). **Done 2026-08-30.**
+- [x] SwapCard Circle faucet CTA is reachable when `balanceFor == 0` (un-nested from `balanceFor > 0` condition). **Done 2026-08-30.**
 - [x] Evidence pack T7.2 / T9.1–T9.5 and `docs/evidence/README.md` re-pin catalog USDC/EURC/cirBTC and aggregator `0xeb12351602c56d47c4ee955193335848952b29d8` with historical labels. **Done 2026-08-30 (T10.5).**
 - [x] OpenAPI quote examples use `xylo-stable`. **Done 2026-08-30 (T10.5).**
 - [ ] Verification command: `cargo test -p api-server` (60 passed this session). Do **not** pass `--features test-fixture` on the `api-server` package; that feature lives on `dex-adapters` and is already enabled in `crates/api-server/Cargo.toml`.

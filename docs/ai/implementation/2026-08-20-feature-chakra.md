@@ -827,3 +827,8 @@ Resolved in code: StableSwap deposit accounting, production snapshot bootstrap/r
 - `packages/sdk/src/index.ts` & `packages/frontend/src/lib/aggregator.ts`: `venueToDexType` maps `xylo-stable` / `xylo` → `'xylo'` and `presto-hub` / `presto` → `'presto'`. Server `dex_types` retain precedence when present.
 - `crates/market-data-worker/src/evm_watcher.rs`: `FactoryConfig::parse` stamps non-seed xylo and presto factories as `discovered:xylo` and `discovered:presto` to prevent unauthorized auto-routing.
 - Tests: `t106_curated_id_factory_gate_skips_unallowlisted_xylo_presto_unitflow`, `t106_discovery_only_venues_cannot_quote_without_curated_source`, and SDK client unit tests (17/17).
+
+### T10.7 Shared Pool Rejection & Faucet CTA Reachability (Done 2026-08-30)
+- `crates/api-server/src/build_tx.rs`: Added `seen_pools` `HashSet` in `validate_routes` to reject any split request whose sub-routes share a pool (`ApiErrorCode::RouteInvalid`), matching Solidity's `_rejectSharedPools`.
+- `crates/api-server/tests/chakra_build_tx_test.rs`: Added integration test `build_tx_rejects_shared_pool_across_subroutes`.
+- `packages/frontend/src/components/SwapCard.tsx`: Un-nested Circle faucet CTA from `balanceFor > 0` condition so it displays when `balanceFor <= 0` or 0 balance is detected.

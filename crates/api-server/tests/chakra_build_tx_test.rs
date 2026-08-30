@@ -1216,3 +1216,46 @@ async fn build_tx_encodes_and_validates_5bps_clmm_tier() {
     assert_eq!(status, StatusCode::BAD_REQUEST);
     assert_eq!(resp["error"]["code"], ApiErrorCode::RouteInvalid.as_str());
 }
+
+#[tokio::test]
+async fn build_tx_rejects_shared_pool_across_subroutes() {
+    let (url, _server) = permit_needed_fixture();
+    let router = test_app(Some(url)).await;
+
+    // Split swap using the same pool in both sub-routes (500k in leg 1, 500k in leg 2).
+    let body = json!({
+        "user": USER,
+        "token_in": USDC_ERC20.to_ascii_lowercase(),
+        "token_out": EURC.to_ascii_lowercase(),
+        "amount_in": "1000000",
+        "min_amount_out": "990000",
+        "sub_routes": [
+            {
+                "amount_in": "500000",
+                "steps": [{
+                    "dex_type": "stable",
+                    "pool_address": STABLE_POOL_UE,
+                    "token_in": USDC_ERC20.to_ascii_lowercase(),
+                    "token_out": EURC.to_ascii_lowercase()
+                }]
+            },
+            {
+                "amount_in": "500000",
+                "steps": [{
+                    "dex_type": "stable",
+                    "pool_address": STABLE_POOL_UE,
+                    "token_in": USDC_ERC20.to_ascii_lowercase(),
+                    "token_out": EURC.to_ascii_lowercase()
+                }]
+            }
+        ]
+    });
+
+    let (status, resp) = post(&router, "/api/v1/build_tx", body).await;
+    assert_eq!(status, StatusCode::BAD_REQUEST);
+    assert_eq!(resp["error"]["code"], ApiErrorCode::RouteInvalid.as_str());
+    assert!(
+        resp["error"]["message"].as_str().unwrap().contains("shared pool across sub-routes"),
+        "error message should mention shared pool"
+    );
+}

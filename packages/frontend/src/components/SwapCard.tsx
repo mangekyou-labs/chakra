@@ -452,31 +452,34 @@ export function SwapCard() {
                 />
               )}
             </div>
-            {address && tokenIn && balanceFor !== null && balanceFor > BigInt(0) && (
+            {address && tokenIn && balanceFor !== null && (
               <div className="flex items-center gap-1.5 mt-3">
-                {[25, 50, 75].map((pct) => (
-                  <button
-                    key={pct}
-                    type="button"
-                    onClick={() => applyBalancePercent(pct)}
-                    className="px-2.5 py-1 rounded-lg text-[13px] text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-0)] border border-transparent hover:border-[var(--border)] transition-colors"
-                  >
-                    {pct}%
-                  </button>
-                ))}
-                <button
-                  type="button"
-                  onClick={() => applyBalancePercent(100)}
-                  className="px-2.5 py-1 rounded-lg text-[13px] text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-0)] border border-transparent hover:border-[var(--border)] transition-colors"
-                >
-                  Max
-                </button>
-                {address && balanceFor !== null && balanceFor <= BigInt(0) && (
+                {balanceFor > BigInt(0) ? (
+                  <>
+                    {[25, 50, 75].map((pct) => (
+                      <button
+                        key={pct}
+                        type="button"
+                        onClick={() => applyBalancePercent(pct)}
+                        className="px-2.5 py-1 rounded-lg text-[13px] text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-0)] border border-transparent hover:border-[var(--border)] transition-colors"
+                      >
+                        {pct}%
+                      </button>
+                    ))}
+                    <button
+                      type="button"
+                      onClick={() => applyBalancePercent(100)}
+                      className="px-2.5 py-1 rounded-lg text-[13px] text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-0)] border border-transparent hover:border-[var(--border)] transition-colors"
+                    >
+                      Max
+                    </button>
+                  </>
+                ) : (
                   <a
                     href="https://faucet.circle.com"
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="ml-auto text-[12px] text-[var(--accent)] hover:underline"
+                    className="text-[12px] text-[var(--accent)] hover:underline"
                   >
                     Get {tokenIn.symbol} from Circle faucet
                   </a>

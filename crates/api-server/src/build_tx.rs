@@ -244,6 +244,7 @@ async fn validate_routes(state: &AppState, body: &BuildTxRequest) -> Result<Mark
     }
 
     let mut sum: u128 = 0;
+    let mut seen_pools = std::collections::HashSet::new();
     for (i, sub) in body.sub_routes.iter().enumerate() {
         let leg: u128 = sub.amount_in.parse()?;
         if leg == 0 {
@@ -267,6 +268,10 @@ async fn validate_routes(state: &AppState, body: &BuildTxRequest) -> Result<Mark
             }
         }
         for step in &sub.steps {
+            let pool_key = step.pool_address.to_ascii_lowercase();
+            if !seen_pools.insert(pool_key.clone()) {
+                bail!("shared pool across sub-routes is not allowed: {}", pool_key);
+            }
             validate_hop(state, &snapshot, step).await?;
         }
     }
