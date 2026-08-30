@@ -1,0 +1,53 @@
+- generic [active] [ref=e1]:
+  - generic [ref=e2]:
+    - banner [ref=e3]:
+      - generic [ref=e4]:
+        - generic [ref=e5]:
+          - link "Chakra Chakra" [ref=e6] [cursor=pointer]:
+            - /url: /
+            - img "Chakra" [ref=e7]
+            - generic [ref=e8]: Chakra
+          - navigation [ref=e10]:
+            - link "Swap" [ref=e11] [cursor=pointer]:
+              - /url: /
+            - button "Docs" [ref=e13]
+        - generic [ref=e16]:
+          - link "Discord" [ref=e17] [cursor=pointer]:
+            - /url: https://discord.gg/wJDuj6tTCp
+          - link "GitHub" [ref=e20] [cursor=pointer]:
+            - /url: https://github.com/Chakra/Arc-dex-agg
+          - button "Connect Wallet" [ref=e23]
+    - main [ref=e24]:
+      - generic [ref=e27]:
+        - status [ref=e28]: Arc Testnet · Contracts unaudited · Verify amounts before signing · Not financial advice
+        - generic [ref=e30]:
+          - generic [ref=e31]:
+            - heading "Swap" [level=2] [ref=e32]
+            - generic [ref=e33]:
+              - generic [ref=e34]: Slippage 0.5%
+              - button "Swap settings" [ref=e35]
+          - generic [ref=e39]:
+            - generic [ref=e40]: Sell
+            - generic [ref=e42]:
+              - textbox "0.0" [ref=e43]
+              - button "USDC" [ref=e45]:
+                - generic [ref=e46]: U
+          - button "Swap token direction" [ref=e51]
+          - generic [ref=e54]:
+            - generic [ref=e55]: Buy
+            - generic [ref=e57]:
+              - generic [ref=e58]: "0.0"
+              - button "EURC" [ref=e60]:
+                - generic [ref=e61]: E
+          - button "Connect Wallet" [disabled] [ref=e66]
+    - contentinfo [ref=e67]:
+      - generic [ref=e68]:
+        - generic [ref=e69]: Aggregated routing across Arc Testnet DEXs · Best-effort quotes
+        - generic [ref=e70]:
+          - link "Documentation" [ref=e71] [cursor=pointer]:
+            - /url: https://Chakra.gitbook.io/
+          - link "Discord" [ref=e72] [cursor=pointer]:
+            - /url: https://discord.gg/wJDuj6tTCp
+          - link "Open source" [ref=e75] [cursor=pointer]:
+            - /url: https://github.com/Chakra/Arc-dex-agg
+  - alert [ref=e78]

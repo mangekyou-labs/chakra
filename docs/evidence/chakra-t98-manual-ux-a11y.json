@@ -11,7 +11,7 @@
       "command": "playwright-cli -s=desktop open https://chakra-arc-dex.vercel.app && playwright-cli -s=desktop resize 1280 800",
       "dimensions": "1280x800",
       "status": "OPEN_PARTIAL",
-      "snapshot_file": ".playwright-cli/page-2026-08-30T09-33-53-952Z.yml",
+      "snapshot_file": "docs/evidence/chakra-t98-desktop-snapshot.yml",
       "screenshot": "docs/evidence/chakra-t98-desktop-audit.png",
       "details": "Header nav, swap terminal, status banner, and tokenIn trigger render cleanly. Direct API request verified: [GET] https://chakra-api-0a5i.onrender.com/api/v1/tokens => [200]. Live quote rendering remains blocked on Vercel production redeployment of commit 208d5ff: the deployed Vercel bundle (2026-08-28 commit d3f8c79) uses case-sensitive token address matching against the API's lowercase addresses, leaving tokenOut uninitialized on initial mount."
     },
@@ -20,7 +20,7 @@
       "command": "playwright-cli -s=mobile open https://chakra-arc-dex.vercel.app --mobile && playwright-cli -s=mobile resize 390 844",
       "dimensions": "390x844",
       "status": "AUDITED_PASS",
-      "snapshot_file": ".playwright-cli/page-2026-08-30T09-34-04-077Z.yml",
+      "snapshot_file": "docs/evidence/chakra-t98-mobile-snapshot.yml",
       "screenshot": "docs/evidence/chakra-t98-mobile-audit.png",
       "details": "Mobile responsive viewport adjusts full width (390px), responsive header adapts with menu trigger, and Connect Wallet CTA button remains visible and accessible in both header and swap form."
     }

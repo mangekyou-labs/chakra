@@ -41,8 +41,10 @@ This document indexes all 13 Success Criteria (SC-1 through SC-13), public hoste
 4. **`docs/evidence/chakra-t95-quote-latency.json`**: 100-sample latency benchmark demonstrating 23 ms p95 server-side API compute time.
 5. **`docs/evidence/chakra-t98-manual-ux-a11y.json`**: Desktop (1280×800) and mobile (390×844) UI audit (`status: OPEN_PARTIAL_GATED_ON_VERCEL_REDEPLOY`).
 6. **`docs/qa-playwright-metamask.md`**: Technical specification and operational guide for the automated dAppwright MetaMask E2E testing harness on Arc testnet.
-7. **`docs/evidence/chakra-t98-desktop-audit.png`**: Desktop (1280×800) rendered UI audit snapshot with updated contrast.
-8. **`docs/evidence/chakra-t98-mobile-audit.png`**: Mobile (375×667) responsive rendered UI audit snapshot with updated contrast.
+7. **`docs/evidence/chakra-t98-desktop-audit.png`**: Desktop (1280×800) rendered UI audit screenshot.
+8. **`docs/evidence/chakra-t98-mobile-audit.png`**: Mobile (390×844) responsive rendered UI audit screenshot.
+9. **`docs/evidence/chakra-t98-desktop-snapshot.yml`**: Desktop (1280×800) Playwright CLI accessibility tree snapshot artifact.
+10. **`docs/evidence/chakra-t98-mobile-snapshot.yml`**: Mobile (390×844) Playwright CLI accessibility tree snapshot artifact.
 
 ## Concrete External Blockers
 
