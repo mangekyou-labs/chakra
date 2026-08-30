@@ -764,6 +764,127 @@ async fn build_tx_rejects_pool_from_non_allowlisted_factory() {
     assert_eq!(resp["error"]["code"], ApiErrorCode::RouteInvalid.as_str());
 }
 
+const UNITFLOW_FACTORY: &str = "0xd67F63A4F26a497b364d1C82e6747Aec8B5743a5";
+const UNITFLOW_PAIR: &str = "0x268DC75517EaFc6e0D52666639529e5DAB8c9200";
+
+fn unitflow_snapshot() -> MarketSnapshot {
+    MarketSnapshot::from_sources(
+        "chakra-build-unitflow",
+        1_700_000_000_000,
+        "arc-testnet",
+        vec![SourceSnapshot {
+            source: "unitflow-v25".to_string(),
+            pairs: vec![TradingPairSnapshot {
+                token_a: EURC.to_string(),
+                token_b: "0xf0c4a4ce82a5746abaad9425360ab04fbba432bf".to_string(),
+                pool_address: UNITFLOW_PAIR.to_string(),
+                fee_bps: 30,
+                dex_type: "xyk".to_string(),
+                factory: UNITFLOW_FACTORY.to_string(),
+            }],
+        }],
+    )
+}
+
+#[tokio::test]
+async fn build_tx_accepts_unitflow_v25_factory_membership() {
+    use market_snapshot::pool_state_store::FactoryRecord;
+    let (url, _server) = permit_needed_fixture();
+    let config = app_config();
+    let snapshot_store = Arc::new(MemorySnapshotStore::new());
+    snapshot_store.publish_snapshot(&unitflow_snapshot()).await.unwrap();
+    let pool_store = Arc::new(MemoryPoolStateStore::new());
+    pool_store
+        .set_factories(&[FactoryRecord::new(UNITFLOW_FACTORY, "xyk", "unitflow-v25")])
+        .await
+        .unwrap();
+
+    let engine = QuoteEngine::new(PathFinderConfig::default(), SplitConfig::default());
+    engine.update_from_chakra_snapshot(&unitflow_snapshot()).await;
+
+    let state = AppState::from_backends(
+        config,
+        Some(snapshot_store.clone() as Arc<dyn market_snapshot::store::SnapshotStore>),
+        Some(pool_store.clone() as Arc<dyn market_snapshot::pool_state_store::PoolStateStore>),
+        Some(snapshot_store),
+        Some(pool_store),
+        Some(Arc::new(dex_adapters::evm_rpc::EvmRpcClient::single(&url).unwrap())),
+        None,
+    )
+    .await;
+    let router = build_router(state, RateLimitState::from_env());
+
+    let body = json!({
+        "user": USER,
+        "token_in": EURC.to_ascii_lowercase(),
+        "token_out": "0xf0c4a4ce82a5746abaad9425360ab04fbba432bf",
+        "amount_in": "1000000",
+        "min_amount_out": "990000",
+        "sub_routes": [{
+            "amount_in": "1000000",
+            "steps": [{
+                "dex_type": "xyk",
+                "pool_address": UNITFLOW_PAIR.to_ascii_lowercase(),
+                "token_in": EURC.to_ascii_lowercase(),
+                "token_out": "0xf0c4a4ce82a5746abaad9425360ab04fbba432bf"
+            }]
+        }]
+    });
+    let (status, resp) = post(&router, "/api/v1/build_tx", body).await;
+    assert_eq!(status, StatusCode::OK, "build_tx must accept unitflow-v25 hop: {resp:?}");
+}
+
+#[tokio::test]
+async fn build_tx_rejects_unitflow_when_factory_mismatched() {
+    use market_snapshot::pool_state_store::FactoryRecord;
+    let (url, _server) = permit_needed_fixture();
+    let config = app_config();
+    let snapshot_store = Arc::new(MemorySnapshotStore::new());
+    snapshot_store.publish_snapshot(&unitflow_snapshot()).await.unwrap();
+    let pool_store = Arc::new(MemoryPoolStateStore::new());
+    // Mismatched factory address
+    pool_store
+        .set_factories(&[FactoryRecord::new("0x0000000000000000000000000000000000000002", "xyk", "chakra-xyk")])
+        .await
+        .unwrap();
+
+    let engine = QuoteEngine::new(PathFinderConfig::default(), SplitConfig::default());
+    engine.update_from_chakra_snapshot(&unitflow_snapshot()).await;
+
+    let state = AppState::from_backends(
+        config,
+        Some(snapshot_store.clone() as Arc<dyn market_snapshot::store::SnapshotStore>),
+        Some(pool_store.clone() as Arc<dyn market_snapshot::pool_state_store::PoolStateStore>),
+        Some(snapshot_store),
+        Some(pool_store),
+        Some(Arc::new(dex_adapters::evm_rpc::EvmRpcClient::single(&url).unwrap())),
+        None,
+    )
+    .await;
+    let router = build_router(state, RateLimitState::from_env());
+
+    let body = json!({
+        "user": USER,
+        "token_in": EURC.to_ascii_lowercase(),
+        "token_out": "0xf0c4a4ce82a5746abaad9425360ab04fbba432bf",
+        "amount_in": "1000000",
+        "min_amount_out": "990000",
+        "sub_routes": [{
+            "amount_in": "1000000",
+            "steps": [{
+                "dex_type": "xyk",
+                "pool_address": UNITFLOW_PAIR.to_ascii_lowercase(),
+                "token_in": EURC.to_ascii_lowercase(),
+                "token_out": "0xf0c4a4ce82a5746abaad9425360ab04fbba432bf"
+            }]
+        }]
+    });
+    let (status, resp) = post(&router, "/api/v1/build_tx", body).await;
+    assert_eq!(status, StatusCode::BAD_REQUEST);
+    assert_eq!(resp["error"]["code"], ApiErrorCode::RouteInvalid.as_str());
+    assert!(resp["error"]["message"].as_str().unwrap().contains("factory not allowlisted in chakra:factories"));
+}
+
 // ─── 9. CLMM fee validation ────────────────────────────────────────────────
 
 const CLMM_POOL: &str = "0x0000000000000000000000000000000000000010";
