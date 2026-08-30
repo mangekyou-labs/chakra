@@ -39,6 +39,10 @@ disallowed_scripts=(
   "script/Random.s.sol"
 )
 
+# Create an external spoof file with the same filename to test path spoofing
+echo "contract DeployAggregator {}" > "$tmp_dir/DeployAggregator.s.sol"
+disallowed_scripts+=("$tmp_dir/DeployAggregator.s.sol")
+
 for script in "${disallowed_scripts[@]}"; do
   rm -f "$forge_log"
   output="$("$repo_root/scripts/arc-operator.sh" --dry-run script "$script" 2>&1 || true)"

@@ -35,9 +35,19 @@ for arg in "$@"; do
   prev="$arg"
 done
 
-script_filename="$(basename "${script_target:-}" | cut -d: -f1)"
-if [[ "$script_filename" != "DeployAggregator.s.sol" ]]; then
-  echo "Error: scripts/arc-operator.sh allows ONLY DeployAggregator.s.sol on Arc testnet (5042002). Target was: '$script_target'" >&2
+script_raw="${script_target%%:*}"
+resolved_path=""
+if [[ -f "$script_raw" ]]; then
+  resolved_path="$(realpath "$script_raw" 2>/dev/null || true)"
+elif [[ -f "$repo_root/contracts/evm/$script_raw" ]]; then
+  resolved_path="$(realpath "$repo_root/contracts/evm/$script_raw" 2>/dev/null || true)"
+elif [[ -f "$repo_root/$script_raw" ]]; then
+  resolved_path="$(realpath "$repo_root/$script_raw" 2>/dev/null || true)"
+fi
+
+expected_path="$(realpath "$repo_root/contracts/evm/script/DeployAggregator.s.sol")"
+if [[ -z "$resolved_path" || "$resolved_path" != "$expected_path" ]]; then
+  echo "Error: scripts/arc-operator.sh allows ONLY DeployAggregator.s.sol at $expected_path on Arc testnet (5042002). Target resolved to: '$resolved_path'" >&2
   exit 1
 fi
 
