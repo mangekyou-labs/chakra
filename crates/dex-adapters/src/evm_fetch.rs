@@ -294,7 +294,7 @@ pub async fn fetch_presto_state(
     };
 
     let spoke_arg = encode_address_arg(spoke_token)?;
-    let path_call = calldata(&path_reserves_selector(), &[spoke_arg.clone()]);
+    let path_call = calldata(&path_reserves_selector(), std::slice::from_ref(&spoke_arg));
     let token_call = calldata(&token_reserves_selector(), &[spoke_arg]);
 
     let path_resp = client.eth_call(&pair.pool_address, &path_call).await?;

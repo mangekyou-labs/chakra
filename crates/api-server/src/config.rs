@@ -7,7 +7,7 @@ use serde::{Deserialize, Serialize};
 /// Alchemy URLs fail at config load.
 pub fn parse_chakra_rpc_http(value: Option<String>) -> anyhow::Result<String> {
     let value = value.unwrap_or_else(|| dex_adapters::evm_rpc::ARC_RPC_HTTP.to_string());
-    dex_adapters::evm_rpc::validate_http_urls(&[value.clone()])?;
+    dex_adapters::evm_rpc::validate_http_urls(std::slice::from_ref(&value))?;
     Ok(value)
 }
 

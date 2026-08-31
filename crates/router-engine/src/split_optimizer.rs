@@ -110,7 +110,7 @@ impl SplitOptimizer {
 
         // Sort by output (best first)
         let mut sorted: Vec<&QuotedPath> = quoted_paths.iter().collect();
-        sorted.sort_by(|a, b| b.quote.amount_out.cmp(&a.quote.amount_out));
+        sorted.sort_by_key(|b| std::cmp::Reverse(b.quote.amount_out));
 
         // Shared-pool reduction: keep the best-output path per pool so no two
         // sub-routes in a split reuse the same pool (SC-2 2026-08-29).
@@ -138,7 +138,11 @@ impl SplitOptimizer {
                 let gap_bps = if best_single_out == 0 {
                     u32::MAX
                 } else {
-                    (((best_single_out.saturating_sub(second)) * 10_000) / best_single_out) as u32
+                    best_single_out
+                        .saturating_sub(second)
+                        .saturating_mul(10_000)
+                        .checked_div(best_single_out)
+                        .unwrap_or(0) as u32
                 };
                 gap_bps <= competitive_delta_bps
             })
@@ -913,7 +917,7 @@ fn build_planned_split_debug(
                 fraction_bps: if total_amount == 0 {
                     0
                 } else {
-                    ((*amount * 10_000) / total_amount) as u32
+                    amount.saturating_mul(10_000).checked_div(total_amount).unwrap_or(0) as u32
                 },
             }
         })

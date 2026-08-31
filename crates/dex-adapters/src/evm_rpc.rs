@@ -321,7 +321,7 @@ fn log_from_json(value: &Value) -> Result<EvmLog> {
 /// Decode `0x`-prefixed hex into bytes (must be even-length).
 pub fn decode_hex(hex: &str) -> Result<Vec<u8>> {
     let hex = hex.strip_prefix("0x").unwrap_or(hex);
-    if hex.len() % 2 != 0 {
+    if !hex.len().is_multiple_of(2) {
         bail!("odd-length hex: {hex}");
     }
     hex::decode(hex).map_err(|e| anyhow::anyhow!("invalid hex: {e}"))
