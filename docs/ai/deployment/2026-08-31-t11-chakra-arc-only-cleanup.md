@@ -17,22 +17,23 @@
 ## Current status
 
 The implementation was completed in granular commits. A bundle was created
-and verified outside the repository before rewriting. The cleaned mirror passed
-the full lineage scan, and both public branches are synchronized at
-`d8dd20b` before this evidence update. The wallet QA runner's MetaMask warning
-handling is included in that head.
+and verified outside the repository before rewriting. A fresh clone of the
+cleaned mirror passes the full lineage scan, and both public branches are
+synchronized at `d339f2b`.
 
 The SDK is published as `@chakra-ag/sdk@0.3.0`. Registry identity is
 `zerefwtf`; a clean registry install and live quote/build smoke passed. The
 client constructor uses the documented `{ apiUrl }` option.
 
-Render deployment `dep-daa7nb67bikc73fleun0` is live from commit `efaf383`.
+Render deployment `dep-daagnntg1s2s73d4rh70` is live from commit `d339f2b`.
 Health, readiness, tokens, quote, and build-transaction checks passed. The
 1 USDC to EURC quote returned one healthy `xylo` route with expected output
 `805774`; build transaction returned chain `5042002`, `value: "0"`, calldata,
 and no required approvals. CORS preflight passed for both active Vercel
-aliases. The operator-provided Render credential is available from the local
-worktree `.env` as `RENDER_API_KEY` and is never committed or printed.
+aliases. The requested `https://chakra-ag.vercel.app` origin is now included
+in the live Render CORS allowlist. The operator-provided Render credential is
+available from the local worktree `.env` as `RENDER_API_KEY` and is never
+committed or printed.
 
 Vercel production deployment `dpl_4SDwHo26oWHSfy118cRD1wjAunYJ` is ready at
 `https://chakra-arc-5l68aer41-gadillacers-projects.vercel.app`. The requested
@@ -44,8 +45,8 @@ The deployment was created from the synchronized `d8dd20b` head and inspected
 with Vercel as `Ready`.
 
 The disposable wallet credential is available from the local worktree `.env`
-as `QA_WALLET_SECRET` and is never committed or printed. The authenticated
-wallet run reached MetaMask's Arc network-add warning but did not complete the
-confirmation, leaving the app on `Switch to Arc Testnet`; no transaction was
+as `QA_WALLET_SECRET` and is never committed or printed. The latest headed
+wallet run closed during MetaMask bootstrap, while the earlier run reached the
+Arc network-add warning but did not complete confirmation; no transaction was
 submitted and no receipt was fabricated. The separate legacy package lookup
 returned not found, so no deprecation mutation was performed.
