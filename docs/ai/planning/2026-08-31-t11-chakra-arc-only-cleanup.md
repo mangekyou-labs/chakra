@@ -33,14 +33,15 @@ an explicitly tracked provider-dependent follow-up.
 ## Current progress summary
 
 T11 implementation and public release work is complete through container and
-production deployment. Both Chakra branches are synchronized at the evidence
-checkpoint `6cd75df`; the Vercel production alias is assigned to the Ready
+production deployment. Both Chakra branches are synchronized at the latest
+evidence checkpoint; the Vercel production alias is assigned to the Ready
 deployment, and the clean Docker retry passed. No secrets are stored in this
 repository; the operator-provided `RENDER_API_KEY` and disposable
 `QA_WALLET_SECRET` remain local environment inputs only.
 
-The wallet runner reached the provider's Arc network-add risk confirmation but
-did not complete it. The app therefore remained at the chain-switch state,
+The wallet runner now reaches the current Chakra UI, wallet connection, Arc
+chain state, and the healthy 1 USDC to EURC quote, but the provider exposes no
+transaction notification page for approval. The app remains at the swap state
 with no submitted transaction or fabricated receipt. The package lookup for
 the separate retired SDK returned not found, so no deprecation mutation was
 performed.

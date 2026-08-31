@@ -27,7 +27,7 @@ import {
   QA_SWAP_CONFIRMED_TEXT,
 } from './constants';
 
-const DAPP_URL = process.env.DAPP_URL || 'https://chakra-arc-dex.vercel.app';
+const DAPP_URL = process.env.DAPP_URL || 'https://chakra-ag.vercel.app';
 const _API_URL = process.env.QA_API_URL || 'https://chakra-api-0a5i.onrender.com';
 const QA_WALLET_SECRET = process.env.QA_WALLET_SECRET || '';
 
@@ -41,14 +41,56 @@ test.describe('Chakra Arc Testnet — MetaMask Critical Path (T9.4)', () => {
 
     const isMnemonic = QA_WALLET_SECRET.trim().includes(' ');
 
-    // 2. Launch headed Chromium with dAppwright MetaMask (mnemonic seed preferred)
-    const [wallet, page, context] = await dappwright.bootstrap('chromium', {
+    // 2. Launch headed Chromium with dAppwright MetaMask (mnemonic seed preferred).
+    // Use launch + explicit setup instead of bootstrap so the SRP flow can
+    // commit MetaMask 13.17's final recovery word explicitly.
+    const { wallet, browserContext: context } = await dappwright.launch('chromium', {
       wallet: 'metamask',
       version: MetaMaskWallet.recommendedVersion,
-      seed: isMnemonic ? QA_WALLET_SECRET.trim() : undefined,
-      password: 'TestPassword123!',
       headless: false,
     });
+    const page = wallet.page;
+
+    await wallet.setup(
+      {
+        seed: isMnemonic ? QA_WALLET_SECRET.trim() : undefined,
+        password: 'TestPassword123!',
+      },
+      [
+        async (metamaskPage, options) => {
+          if (!options?.seed) return;
+          await metamaskPage.getByTestId('onboarding-import-wallet').click();
+          await metamaskPage.getByTestId('onboarding-import-with-srp-button').click();
+          await metamaskPage
+            .getByTestId('srp-input-import__srp-note')
+            .pressSequentially(options.seed.trim(), { delay: 30 });
+          // MetaMask keeps the final word uncommitted until a separator is
+          // pressed; without this the Continue button remains disabled.
+          await metamaskPage.keyboard.press('Space');
+          await metamaskPage.getByTestId('import-srp-confirm').click();
+        },
+        async (metamaskPage, options) => {
+          await metamaskPage
+            .getByTestId('create-password-new-input')
+            .fill(options?.password || 'TestPassword123!');
+          await metamaskPage
+            .getByTestId('create-password-confirm-input')
+            .fill(options?.password || 'TestPassword123!');
+          await metamaskPage.getByTestId('create-password-terms').click();
+          await metamaskPage.getByTestId('create-password-submit').click();
+        },
+        async (metamaskPage) => {
+          await metamaskPage.getByTestId('metametrics-checkbox').click();
+          await metamaskPage.getByTestId('metametrics-i-agree').click();
+          await metamaskPage.getByTestId('manage-default-settings').click();
+          await metamaskPage.getByTestId('category-item-General').click();
+          await metamaskPage.getByTestId('backup-and-sync-toggle-container').click();
+          await metamaskPage.getByTestId('category-back-button').click();
+          await metamaskPage.getByTestId('privacy-settings-back-button').click();
+          await metamaskPage.getByTestId('onboarding-complete-done').click();
+        },
+      ],
+    );
 
     try {
       // If private key was provided, import it (fallback path only)
@@ -67,13 +109,35 @@ test.describe('Chakra Arc Testnet — MetaMask Critical Path (T9.4)', () => {
       // 4. Connect wallet (EIP-6963 injected connector — no RainbowKit modal)
       const connectBtn = page.getByRole('button', { name: /connect/i }).first();
       await expect(connectBtn).toBeVisible({ timeout: 15_000 });
+      // Register the popup listener before clicking Connect. MetaMask can open
+      // the notification synchronously, which would otherwise race dAppwright's
+      // approve() implementation and leave the dApp on "Connecting…" forever.
+      const connectionPopup = context
+        .waitForEvent('page', { timeout: 60_000 })
+        .then((popup) => ({ kind: 'popup' as const, popup }))
+        .catch(() => ({ kind: 'connected' as const }));
+      const connectionSettled = page
+        .getByRole('button', { name: /connect/i })
+        .first()
+        .waitFor({ state: 'hidden', timeout: 60_000 })
+        .then(() => ({ kind: 'connected' as const }))
+        .catch(() => ({ kind: 'timeout' as const }));
       await connectBtn.click();
 
-      // Approve connection in MetaMask
-      await wallet.approve();
+      // Approve connection in MetaMask.
+      const connectionResult = await Promise.race([connectionPopup, connectionSettled]);
+      if (connectionResult.kind === 'popup') {
+        await connectionResult.popup.bringToFront();
+        const connectionConfirm = connectionResult.popup
+          .locator('[data-testid="confirm-btn"]')
+          .or(connectionResult.popup.locator('[data-testid="allow-authorize-button"]'))
+          .or(connectionResult.popup.getByRole('button', { name: /^(connect|approve|confirm)$/i }));
+        await connectionConfirm.first().click();
+        await connectionResult.popup.waitForEvent('close', { timeout: 15_000 }).catch(() => {});
+      }
       await page.bringToFront();
       await expect(page.getByRole('button', { name: /connect/i }).first()).toBeHidden({
-        timeout: 15_000,
+        timeout: 30_000,
       });
 
       // 5. Primary button drives state: Connect -> Switch to Arc Testnet -> Swap.

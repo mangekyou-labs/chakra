@@ -28,8 +28,10 @@ Vercel production inspect reported Ready for deployment
 responsive browser review passed on the active aliases. CORS preflight for
 `https://chakra-ag.vercel.app` now returns the matching allow-origin header.
 
-The authenticated wallet run used the existing local `QA_WALLET_SECRET` but
-the headed Chromium/MetaMask bootstrap closed before the wallet initialized.
-The earlier run reached MetaMask's network-add risk confirmation; no swap was
-submitted and there is no transaction evidence. Split-route and thin-pool
-scenarios remain honest follow-up checks.
+The authenticated wallet run used the existing local `QA_WALLET_SECRET` and
+the canonical `https://chakra-ag.vercel.app` alias. The harness reached the
+current Chakra UI, connected the wallet, switched to Arc, and resolved the
+live 1 USDC to EURC quote (`805774` expected; `801745` minimum; `xylo-stable`).
+The run then blocked at the MetaMask transaction notification: no provider
+confirmation page appeared, so no swap was submitted and no receipt was
+fabricated. Split-route and thin-pool scenarios remain honest follow-up checks.

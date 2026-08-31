@@ -25,5 +25,5 @@ surface is the REST API, TypeScript SDK, swap frontend, and Arc EVM services.
 ## Hosted services
 
 - API: `https://chakra-api-0a5i.onrender.com`
-- Web: `https://chakra-arc-dex.vercel.app`
+- Web: `https://chakra-ag.vercel.app`
 - Repository: `https://github.com/mangekyou-labs/chakra`

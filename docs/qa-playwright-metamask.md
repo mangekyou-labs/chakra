@@ -19,7 +19,7 @@ The harness uses `@tenkeylabs/dappwright` on top of `@playwright/test` to automa
 |----------|-------------|---------|----------|
 | `QA_WALLET_SECRET` | 12/24-word seed phrase or `0x`-prefixed private key | `""` | Yes (for live test) |
 | `QA_API_URL` | Base URL of the Chakra REST API | `https://chakra-api-0a5i.onrender.com` | No |
-| `DAPP_URL` | Base URL of the Chakra Frontend UI | `https://chakra-arc-dex.vercel.app` | No |
+| `DAPP_URL` | Base URL of the Chakra Frontend UI | `https://chakra-ag.vercel.app` | No |
 | `QA_CHAIN_ID` | Arc testnet chain ID | `5042002` | No |
 
 ## Setup & Validation

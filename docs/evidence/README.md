@@ -13,7 +13,7 @@ testing and deployment records.
 | Aggregator | `0xeb12351602c56d47c4ee955193335848952b29d8` |
 | Permit2 | `0x000000000022D473030F116dDEE9F6B43aC78BA3` |
 | API | `https://chakra-api-0a5i.onrender.com` |
-| Web | `https://chakra-arc-dex.vercel.app` |
+| Web | `https://chakra-ag.vercel.app` |
 
 ## Required evidence
 

@@ -38,7 +38,8 @@ committed or printed.
 Vercel production deployment `dpl_4SDwHo26oWHSfy118cRD1wjAunYJ` is ready at
 `https://chakra-arc-5l68aer41-gadillacers-projects.vercel.app`. The requested
 production alias `https://chakra-ag.vercel.app` now points to that deployment;
-the project aliases `https://frontend-ruddy-two-90.vercel.app` and
+the compatibility alias `https://chakra-arc-dex.vercel.app` was also repointed
+to the same current deployment. The project aliases `https://frontend-ruddy-two-90.vercel.app` and
 `https://chakra-arc-dex-gadillacers-projects.vercel.app` remain active. They
 serve the rebrand, `/docs`, `/docs/api`, metadata, links, and split-ring SVG.
 The deployment was created from the synchronized `d8dd20b` head and inspected
@@ -46,7 +47,7 @@ with Vercel as `Ready`.
 
 The disposable wallet credential is available from the local worktree `.env`
 as `QA_WALLET_SECRET` and is never committed or printed. The latest headed
-wallet run closed during MetaMask bootstrap, while the earlier run reached the
-Arc network-add warning but did not complete confirmation; no transaction was
-submitted and no receipt was fabricated. The separate legacy package lookup
-returned not found, so no deprecation mutation was performed.
+wallet run used the canonical alias, reached the current Chakra UI and live
+quote, then blocked because no MetaMask transaction notification appeared;
+no transaction was submitted and no receipt was fabricated. The separate
+legacy package lookup returned not found, so no deprecation mutation was performed.
