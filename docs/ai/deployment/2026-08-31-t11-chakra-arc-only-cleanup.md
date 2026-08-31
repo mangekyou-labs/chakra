@@ -19,7 +19,7 @@
 The implementation was completed in granular commits. A bundle was created
 and verified outside the repository before rewriting. The cleaned mirror passed
 the full lineage scan, and both public branches are synchronized at
-`63f690c` before this evidence update. The wallet QA runner's MetaMask warning
+`d8dd20b` before this evidence update. The wallet QA runner's MetaMask warning
 handling is included in that head.
 
 The SDK is published as `@chakra-ag/sdk@0.3.0`. Registry identity is
@@ -34,12 +34,14 @@ and no required approvals. CORS preflight passed for both active Vercel
 aliases. The operator-provided Render credential is available from the local
 worktree `.env` as `RENDER_API_KEY` and is never committed or printed.
 
-Vercel production deployment `dpl_9M23MoL5QT7hi9u4CQnyWeWzsHth` is ready at
-`https://chakra-arc-62ly0jgt0-gadillacers-projects.vercel.app`. Active aliases
-are `https://frontend-ruddy-two-90.vercel.app` and
-`https://chakra-arc-dex-gadillacers-projects.vercel.app`; they serve the
-rebrand, `/docs`, `/docs/api`, metadata, links, and split-ring SVG. The old
-unmanaged alias is not treated as canonical.
+Vercel production deployment `dpl_4SDwHo26oWHSfy118cRD1wjAunYJ` is ready at
+`https://chakra-arc-5l68aer41-gadillacers-projects.vercel.app`. The requested
+production alias `https://chakra-ag.vercel.app` now points to that deployment;
+the project aliases `https://frontend-ruddy-two-90.vercel.app` and
+`https://chakra-arc-dex-gadillacers-projects.vercel.app` remain active. They
+serve the rebrand, `/docs`, `/docs/api`, metadata, links, and split-ring SVG.
+The deployment was created from the synchronized `d8dd20b` head and inspected
+with Vercel as `Ready`.
 
 The disposable wallet credential is available from the local worktree `.env`
 as `QA_WALLET_SECRET` and is never committed or printed. The authenticated
