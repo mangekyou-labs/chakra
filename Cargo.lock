@@ -51,6 +51,7 @@ dependencies = [
  "anyhow",
  "async-trait",
  "axum",
+ "chrono",
  "dex-adapters",
  "futures",
  "hex",
@@ -1112,10 +1113,14 @@ name = "market-data-worker"
 version = "0.2.1"
 dependencies = [
  "anyhow",
+ "async-trait",
  "dex-adapters",
  "futures",
+ "hex",
  "market-snapshot",
+ "redis",
  "reqwest",
+ "serde",
  "serde_json",
  "tokio",
  "tokio-tungstenite",
@@ -2050,7 +2055,9 @@ checksum = "edc5f74e248dc973e0dbb7b74c7e0d6fcc301c694ff50049504004ef4d0cdcd9"
 dependencies = [
  "futures-util",
  "log",
+ "native-tls",
  "tokio",
+ "tokio-native-tls",
  "tungstenite",
 ]
 
@@ -2216,6 +2223,7 @@ dependencies = [
  "http",
  "httparse",
  "log",
+ "native-tls",
  "rand",
  "sha1",
  "thiserror 1.0.69",

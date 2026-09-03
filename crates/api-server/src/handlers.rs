@@ -10,6 +10,7 @@ use {
         envelope::{ApiError, ApiErrorCode, Envelope},
         evm_balances, hydrate,
         state::AppState,
+        stats,
     },
     axum::{
         extract::{Query, State},
@@ -36,9 +37,51 @@ pub async fn api_root() -> impl IntoResponse {
             "build_tx": "/api/v1/build_tx",
             "tokens": "/api/v1/tokens",
             "balances": "/api/v1/balances"
+            ,"stats": "/api/v1/stats"
         },
         "docs": { "openapi": "docs/openapi.yaml" }
     }))
+}
+
+#[derive(Deserialize, Default)]
+pub struct StatsQuery {
+    pub range: Option<String>,
+}
+
+/// Public analytics contract. Values are integer/decimal strings; no floating
+/// point monetary transport is used.
+pub async fn get_stats(State(state): State<AppState>, Query(query): Query<StatsQuery>) -> impl IntoResponse {
+    let range = query.range.unwrap_or_else(|| "30d".to_string());
+    if !matches!(range.as_str(), "14d" | "30d" | "90d" | "all") {
+        return err_response(ApiErrorCode::InvalidParams, "range must be 14d, 30d, 90d, or all").into_response();
+    }
+    let engine = state.current_engine().await;
+    let mut response = stats::empty(range, state.config.chakra_aggregator.clone());
+    response.route_health = stats::route_health_for_engine(&engine).await;
+    if let Some(redis_url) = state.config.snapshot_redis_url.as_deref() {
+        if let Ok(store) =
+            market_data_worker::analytics::AnalyticsStore::new(redis_url, 5042002, &state.config.chakra_aggregator)
+        {
+            let now = chrono::Utc::now().timestamp().max(0) as u64;
+            let from = match response.meta.range.as_str() {
+                "14d" => now.saturating_sub(14 * 86_400),
+                "30d" => now.saturating_sub(30 * 86_400),
+                "90d" => now.saturating_sub(90 * 86_400),
+                _ => 0,
+            };
+            if let Ok(summaries) = store.summaries(from, now).await {
+                let edges = engine.cached_pool_edges().await;
+                stats::apply_summaries_with_edges(&mut response, &summaries, &edges);
+            }
+            // Heads (chain / confirmed / indexed) and freshness come from the
+            // poller's own bookkeeping — freshness is the age of the last
+            // successful analytics poll, never the age of the newest swap.
+            let heads = store.heads().await.ok().flatten();
+            let polled_at = store.polled_at().await.ok().flatten();
+            stats::apply_heads(&mut response.meta, heads, polled_at, now);
+        }
+    }
+    (StatusCode::OK, Json(Envelope::ok(response))).into_response()
 }
 
 fn err_response(code: ApiErrorCode, message: impl Into<String>) -> (StatusCode, Json<Envelope<Value>>) {
@@ -339,7 +382,17 @@ pub struct ReadyData {
 }
 
 pub async fn readiness_check(State(state): State<AppState>) -> impl IntoResponse {
-    let ready = state.ready().await;
+    let mut ready = state.ready().await;
+    if ready.is_some()
+        && std::env::var("CHAKRA_STRICT_READINESS")
+            .map(|value| matches!(value.to_ascii_lowercase().as_str(), "1" | "true" | "yes" | "on"))
+            .unwrap_or(false)
+    {
+        let engine = state.current_engine().await;
+        if !stats::all_routes_healthy(&engine).await {
+            ready = None;
+        }
+    }
     let loaded_version = state.loaded_version().await;
     let (status_code, data) = match ready {
         Some((snapshot_id, pool_keys)) => (

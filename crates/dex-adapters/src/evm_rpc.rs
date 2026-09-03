@@ -129,9 +129,49 @@ pub struct LogFilter {
     pub to_block: Option<u64>,
     /// Addresses to match (OR). Empty = every address.
     pub addresses: Vec<String>,
-    /// Topic0..N constraints (OR within each position; `None` = wildcard).
-    pub topics: Vec<Option<String>>,
+    /// Topic0..N constraints. Each position may contain an OR-list; `None`
+    /// is a wildcard. The watcher uses one topic-zero OR-list, which keeps
+    /// the filter within the EVM four-topic limit.
+    pub topics: Vec<Option<Vec<String>>>,
 }
+
+/// One failed JSON-RPC call. Carries the URL and, for JSON-RPC application
+/// errors, the numeric error code.
+#[derive(Debug)]
+pub struct RpcError {
+    pub url: String,
+    /// JSON-RPC application error code; `None` for transport/HTTP failures.
+    pub code: Option<i64>,
+    /// Human-readable failure detail (server message / transport error).
+    pub detail: String,
+}
+
+impl RpcError {
+    /// Transport failures, HTTP non-2xx responses, and JSON-RPC `-32005`
+    /// (rate limit / request limit exceeded) are transient: the client retries
+    /// them with bounded exponential backoff and ordered URL failover.
+    /// Deterministic application errors such as the `-32012` malformed-filter
+    /// rejection are never retried — retrying them only wastes RPC budget and
+    /// hides the config bug from the caller.
+    pub fn retryable(&self) -> bool {
+        match self.code {
+            Some(-32_005) => true,
+            Some(_) => false,
+            None => true,
+        }
+    }
+}
+
+impl std::fmt::Display for RpcError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self.code {
+            Some(code) => write!(f, "RPC error from {}: code {code}: {}", self.url, self.detail),
+            None => write!(f, "RPC POST failed: {}: {}", self.url, self.detail),
+        }
+    }
+}
+
+impl std::error::Error for RpcError {}
 
 /// Minimal JSON-RPC client with ordered URL failover.
 #[derive(Clone)]
@@ -164,51 +204,87 @@ impl EvmRpcClient {
     }
 
     async fn request(&self, method: &str, params: Value) -> Result<Value> {
-        let mut last_error: Option<anyhow::Error> = None;
-        for offset in 0..self.urls.len() {
-            let index = (self.next.load(Ordering::Relaxed) + offset) % self.urls.len();
-            let url = &self.urls[index];
-            let body = json!({
-                "jsonrpc": "2.0",
-                "id": 1u64,
-                "method": method,
-                "params": params,
-            });
-            match self.post_once(url, &body).await {
-                Ok(value) => {
-                    self.next.store((index + 1) % self.urls.len(), Ordering::Relaxed);
-                    return Ok(value);
-                }
-                Err(error) => {
-                    last_error = Some(error);
+        let mut last_error: Option<RpcError> = None;
+        let mut delay_ms = 500u64;
+        for _attempt in 0..8 {
+            for offset in 0..self.urls.len() {
+                let index = (self.next.load(Ordering::Relaxed) + offset) % self.urls.len();
+                let url = &self.urls[index];
+                let body = json!({
+                    "jsonrpc": "2.0",
+                    "id": 1u64,
+                    "method": method,
+                    "params": params,
+                });
+                match self.post_once(url, &body).await {
+                    Ok(value) => {
+                        self.next.store((index + 1) % self.urls.len(), Ordering::Relaxed);
+                        return Ok(value);
+                    }
+                    Err(error) => {
+                        // Only transient failures are retried: transport
+                        // errors, HTTP 429/5xx, and JSON-RPC -32005 rate
+                        // limits. Malformed-filter errors such as -32012 are
+                        // deterministic and surface immediately.
+                        if !error.retryable() {
+                            return Err(anyhow::Error::new(error));
+                        }
+                        last_error = Some(error);
+                    }
                 }
             }
+            tokio::time::sleep(std::time::Duration::from_millis(delay_ms)).await;
+            delay_ms = (delay_ms.saturating_mul(2)).min(30_000);
         }
-        Err(last_error.unwrap_or_else(|| anyhow::anyhow!("no RPC URL to try")))
+        Err(match last_error {
+            Some(error) => anyhow::Error::new(error),
+            None => anyhow::anyhow!("no RPC URL to try"),
+        })
     }
 
-    async fn post_once(&self, url: &str, body: &Value) -> Result<Value> {
+    async fn post_once(&self, url: &str, body: &Value) -> std::result::Result<Value, RpcError> {
         let response = self
             .http
             .post(url)
             .json(body)
             .send()
             .await
-            .with_context(|| format!("RPC POST failed: {url}"))?;
+            .map_err(|error| RpcError {
+                url: url.to_string(),
+                code: None,
+                detail: format!("{error}"),
+            })?;
         if !response.status().is_success() {
-            bail!("RPC HTTP {} from {url}", response.status());
+            return Err(RpcError {
+                url: url.to_string(),
+                code: None,
+                detail: format!("HTTP {}", response.status()),
+            });
         }
         let value: Value = response
             .json()
             .await
-            .with_context(|| format!("RPC response parse failed: {url}"))?;
+            .map_err(|error| RpcError {
+                url: url.to_string(),
+                code: None,
+                detail: format!("response parse failed: {error}"),
+            })?;
         if let Some(error) = value.get("error") {
-            bail!("RPC error from {url}: {error}");
+            return Err(RpcError {
+                url: url.to_string(),
+                code: error.get("code").and_then(Value::as_i64),
+                detail: error
+                    .get("message")
+                    .and_then(Value::as_str)
+                    .map(str::to_string)
+                    .unwrap_or_else(|| error.to_string()),
+            });
         }
-        value
-            .get("result")
-            .cloned()
-            .with_context(|| format!("RPC response missing result: {url}"))
+        value.get("result").cloned().ok_or_else(|| RpcError {
+            url: url.to_string(),
+            code: None,
+            detail: "response missing result".to_string(),
+        })
     }
 
     pub async fn eth_block_number(&self) -> Result<u64> {
@@ -249,6 +325,25 @@ impl EvmRpcClient {
             .context("eth_getCode result not a hex string")
     }
 
+    /// Return the block timestamp for an already-confirmed block.
+    pub async fn eth_get_block_timestamp(&self, block: u64) -> Result<u64> {
+        let result = self
+            .request("eth_getBlockByNumber", json!([format!("0x{block:x}"), false]))
+            .await?;
+        let timestamp = result
+            .get("timestamp")
+            .and_then(Value::as_str)
+            .context("eth_getBlockByNumber result missing timestamp")?;
+        parse_hex_u64(timestamp)
+    }
+
+    /// Return transaction input calldata, if the transaction is still
+    /// available from the node.
+    pub async fn eth_get_transaction_input(&self, tx_hash: &str) -> Result<Option<String>> {
+        let result = self.request("eth_getTransactionByHash", json!([tx_hash])).await?;
+        Ok(result.get("input").and_then(Value::as_str).map(str::to_string))
+    }
+
     pub async fn eth_get_logs(&self, filter: &LogFilter) -> Result<Vec<EvmLog>> {
         let mut object = serde_json::Map::new();
         if let Some(from) = filter.from_block {
@@ -269,7 +364,13 @@ impl EvmRpcClient {
                 json!(filter
                     .topics
                     .iter()
-                    .map(|t| t.as_deref().map(String::from))
+                    .map(|t| t.as_ref().map(|values| {
+                        if values.len() == 1 {
+                            serde_json::Value::String(values[0].clone())
+                        } else {
+                            serde_json::Value::Array(values.iter().cloned().map(serde_json::Value::String).collect())
+                        }
+                    }))
                     .collect::<Vec<_>>()),
             );
         }
@@ -430,7 +531,96 @@ pub mod fixture {
         (url, thread_handle)
     }
 
+    /// Spawn a fixture JSON-RPC server whose handler returns the *complete*
+    /// response object (`{"result": …}` or `{"error": {"code": -32005, …}}`).
+    /// The request id is merged in so handlers never need to echo it. Used for
+    /// error-code-specific tests (rate limits vs malformed filters).
+    pub fn spawn_raw(
+        handler: impl Fn(&str, &Value) -> Value + Send + Sync + 'static,
+    ) -> (String, std::thread::JoinHandle<()>) {
+        let handler = Arc::new(handler);
+        let (tx, rx) = std::sync::mpsc::channel::<String>();
+        let thread_handle = std::thread::spawn(move || {
+            let runtime = tokio::runtime::Builder::new_multi_thread()
+                .worker_threads(1)
+                .enable_all()
+                .build()
+                .expect("fixture runtime");
+            runtime.block_on(async move {
+                let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+                let addr = listener.local_addr().unwrap();
+                let _ = tx.send(format!("http://{addr}"));
+                loop {
+                    let Ok((mut socket, _)) = listener.accept().await else {
+                        continue;
+                    };
+                    let _ = handle_raw_request(&mut socket, handler.as_ref()).await;
+                }
+            });
+        });
+        let url = rx
+            .recv_timeout(std::time::Duration::from_secs(5))
+            .expect("fixture server url timeout");
+        (url, thread_handle)
+    }
+
     const MAX_HEAD: usize = 4096;
+
+    async fn handle_raw_request(
+        socket: &mut TcpStream,
+        handler: &(dyn Fn(&str, &Value) -> Value + Send + Sync),
+    ) -> std::io::Result<()> {
+        let mut buf = [0u8; MAX_HEAD];
+        let mut filled = 0usize;
+        let (content_length, body_start) = loop {
+            let n = socket.read(&mut buf[filled..]).await?;
+            if n == 0 {
+                return Ok(());
+            }
+            filled += n;
+            let hay = std::str::from_utf8(&buf[..filled]).unwrap_or("");
+            if let Some(pos) = hay.find("\r\n\r\n") {
+                let head = &hay[..pos];
+                let content_length = head
+                    .lines()
+                    .find_map(|line| {
+                        let (k, v) = line.split_once(':')?;
+                        (k.eq_ignore_ascii_case("content-length"))
+                            .then(|| v.trim().parse::<usize>().ok())
+                            .flatten()
+                    })
+                    .unwrap_or(0);
+                break (content_length, pos + 4);
+            }
+            if filled >= MAX_HEAD {
+                return Ok(());
+            }
+        };
+        if filled < body_start + content_length {
+            let mut rest = vec![0u8; body_start + content_length - filled];
+            socket.read_exact(&mut rest).await?;
+            buf[filled..filled + rest.len()].copy_from_slice(&rest);
+        }
+        let body = &buf[body_start..body_start + content_length];
+        let request: Value = serde_json::from_slice(body).unwrap_or(json!({"id": 0}));
+        let id = request.get("id").cloned().unwrap_or(Value::Null);
+        let method = request.get("method").and_then(Value::as_str).unwrap_or("");
+        let params = request.get("params").cloned().unwrap_or(Value::Null);
+        let mut response = handler(method, &params);
+        if let Some(object) = response.as_object_mut() {
+            object.insert("jsonrpc".to_string(), Value::String("2.0".to_string()));
+            object.insert("id".to_string(), id);
+        }
+        let body = serde_json::to_vec(&response).unwrap();
+        let head = format!(
+            "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
+            body.len()
+        );
+        socket.write_all(head.as_bytes()).await?;
+        socket.write_all(&body).await?;
+        socket.flush().await?;
+        Ok(())
+    }
 
     async fn handle_request(
         socket: &mut TcpStream,
@@ -612,6 +802,26 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn serializes_topic_or_list_at_single_position() {
+        let (url, _server) = fixture::spawn(|method, params| {
+            assert_eq!(method, "eth_getLogs");
+            let topics = params[0]["topics"].as_array().unwrap();
+            assert_eq!(topics.len(), 1);
+            assert!(topics[0].is_array());
+            assert_eq!(topics[0].as_array().unwrap().len(), 2);
+            Ok(json!([]))
+        });
+        let client = EvmRpcClient::single(&url).unwrap();
+        client
+            .eth_get_logs(&LogFilter {
+                topics: vec![Some(vec!["0xa".into(), "0xb".into()])],
+                ..Default::default()
+            })
+            .await
+            .unwrap();
+    }
+
+    #[tokio::test]
     async fn fails_over_to_next_url_on_connection_error() {
         // First URL points at a closed port; second is the fixture.
         let closed = TcpListener::bind("127.0.0.1:0").await.unwrap();
@@ -632,6 +842,67 @@ mod tests {
         let client = EvmRpcClient::single(&url).unwrap();
         let error = client.eth_block_number().await.unwrap_err();
         assert!(format!("{error}").contains("boom"));
+    }
+
+    #[test]
+    fn rpc_error_classification_retries_rate_limit_but_not_malformed_filters() {
+        let rate = RpcError {
+            url: "http://u".into(),
+            code: Some(-32_005),
+            detail: "rate limit".into(),
+        };
+        assert!(rate.retryable(), "-32005 rate limits are retried");
+        let malformed = RpcError {
+            url: "http://u".into(),
+            code: Some(-32_012),
+            detail: "invalid filter".into(),
+        };
+        assert!(!malformed.retryable(), "-32012 malformed filters are never retried");
+        let method = RpcError {
+            url: "http://u".into(),
+            code: Some(-32_601),
+            detail: "method not found".into(),
+        };
+        assert!(!method.retryable(), "unknown application codes surface immediately");
+        let transport = RpcError {
+            url: "http://u".into(),
+            code: None,
+            detail: "connection refused".into(),
+        };
+        assert!(transport.retryable(), "transport failures are retried");
+    }
+
+    #[tokio::test]
+    async fn rate_limit_error_is_retried_with_backoff_then_succeeds() {
+        let calls = std::sync::Arc::new(std::sync::atomic::AtomicUsize::new(0));
+        let calls_inside = calls.clone();
+        let (url, _server) = fixture::spawn_raw(move |method, _| {
+            assert_eq!(method, "eth_blockNumber");
+            let n = calls_inside.fetch_add(1, Ordering::Relaxed);
+            if n == 0 {
+                json!({"error": {"code": -32005, "message": "rate limit exceeded"}})
+            } else {
+                json!({"result": "0x2a"})
+            }
+        });
+        let client = EvmRpcClient::single(&url).unwrap();
+        assert_eq!(client.eth_block_number().await.unwrap(), 42);
+        assert_eq!(calls.load(Ordering::Relaxed), 2, "exactly one bounded retry after -32005");
+    }
+
+    #[tokio::test]
+    async fn malformed_filter_error_is_never_retried() {
+        let calls = std::sync::Arc::new(std::sync::atomic::AtomicUsize::new(0));
+        let calls_inside = calls.clone();
+        let (url, _server) = fixture::spawn_raw(move |method, _| {
+            assert_eq!(method, "eth_getLogs");
+            calls_inside.fetch_add(1, Ordering::Relaxed);
+            json!({"error": {"code": -32012, "message": "filter exceeds allowed topics"}})
+        });
+        let client = EvmRpcClient::single(&url).unwrap();
+        let error = client.eth_get_logs(&LogFilter::default()).await.unwrap_err();
+        assert!(format!("{error}").contains("filter exceeds allowed topics"));
+        assert_eq!(calls.load(Ordering::Relaxed), 1, "-32012 must surface without retries");
     }
 
     #[tokio::test]

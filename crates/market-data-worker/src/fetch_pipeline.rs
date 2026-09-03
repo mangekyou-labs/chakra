@@ -26,16 +26,36 @@ use {
 #[allow(clippy::enum_variant_names)]
 pub enum FetchTask {
     /// EVM xy=k pool (Arc, chakra-xyk / discovered:xyk).
-    EvmXyk { pool_address: String },
+    EvmXyk {
+        source: String,
+        dex_type: String,
+        pool_address: String,
+    },
     /// EVM stableswap pool (Arc, chakra-stable / discovered:stable).
-    EvmStable { pool_address: String },
+    EvmStable {
+        source: String,
+        dex_type: String,
+        pool_address: String,
+    },
     /// EVM CLMM pool (Arc, chakra-clmm / discovered:clmm).
-    EvmClmm { pool_address: String },
+    EvmClmm {
+        source: String,
+        dex_type: String,
+        pool_address: String,
+    },
     /// XyloNet stableswap pool (T-XYLO, source `xylo`). Catalog USDC/EURC
     /// only; the topology snapshot carries the pinned pool.
-    EvmXylo { pool_address: String },
+    EvmXylo {
+        source: String,
+        dex_type: String,
+        pool_address: String,
+    },
     /// Presto hub spoke (2026-08-29, source `presto-hub`).
-    EvmPresto { pool_address: String },
+    EvmPresto {
+        source: String,
+        dex_type: String,
+        pool_address: String,
+    },
 }
 
 #[derive(Default)]
@@ -140,20 +160,30 @@ pub(crate) fn coalesce_touched_into_tasks(touched: HashSet<PoolRef>) -> Vec<Fetc
         match pool.source.as_str() {
             // Arc venues (seed = chakra-*, discovered factories = discovered:*).
             "chakra-xyk" | "discovered:xyk" | "unitflow-v25" => tasks.push(FetchTask::EvmXyk {
+                source: pool.source,
+                dex_type: "xyk".into(),
                 pool_address: pool.pool_address,
             }),
             "chakra-stable" | "discovered:stable" => tasks.push(FetchTask::EvmStable {
+                source: pool.source,
+                dex_type: "stable".into(),
                 pool_address: pool.pool_address,
             }),
             "chakra-clmm" | "discovered:clmm" => tasks.push(FetchTask::EvmClmm {
+                source: pool.source,
+                dex_type: "clmm".into(),
                 pool_address: pool.pool_address,
             }),
             // T-XYLO: the pinned XyloNet USDC/EURC pool (source `xylo-stable`).
             "xylo" | "xylo-stable" | "discovered:xylo" | "chakra-xylo" => tasks.push(FetchTask::EvmXylo {
+                source: pool.source,
+                dex_type: "xylo".into(),
                 pool_address: pool.pool_address,
             }),
             // Presto hub spokes are fetched as stable-family state (2026-08-29).
             "presto-hub" | "discovered:presto" => tasks.push(FetchTask::EvmPresto {
+                source: pool.source,
+                dex_type: "presto".into(),
                 pool_address: pool.pool_address,
             }),
             other => {
@@ -269,13 +299,23 @@ pub fn spawn_fetch_pipeline(
 
 async fn execute_fetch_task(ctx: &FetchWorkerContext, task: FetchTask) -> Result<Vec<PoolStateUpdate>> {
     match task {
-        FetchTask::EvmXyk { pool_address } => {
-            let (source, pair) = find_evm_pair(&ctx.shared, "xyk", &pool_address).await?;
+        FetchTask::EvmXyk {
+            source,
+            dex_type,
+            pool_address,
+        } => {
+            debug_assert_eq!(dex_type, "xyk");
+            let pair = find_evm_pair_exact(&ctx.shared, &source, "xyk", &pool_address).await?;
             let value = dex_adapters::evm_fetch::fetch_xyk_state(ctx.evm.as_ref(), source.as_str(), &pair).await?;
             Ok(vec![PoolStateUpdate::Xyk(vec![value])])
         }
-        FetchTask::EvmStable { pool_address } => {
-            let (source, pair) = find_evm_pair(&ctx.shared, "stable", &pool_address).await?;
+        FetchTask::EvmStable {
+            source,
+            dex_type,
+            pool_address,
+        } => {
+            debug_assert!(dex_type == "stable" || dex_type == "presto");
+            let pair = find_evm_pair_exact(&ctx.shared, &source, "stable", &pool_address).await?;
             let value = dex_adapters::evm_fetch::fetch_stable_state(
                 ctx.evm.as_ref(),
                 source.as_str(),
@@ -285,23 +325,41 @@ async fn execute_fetch_task(ctx: &FetchWorkerContext, task: FetchTask) -> Result
             .await?;
             Ok(vec![PoolStateUpdate::Stable(vec![value])])
         }
-        FetchTask::EvmXylo { pool_address } => {
-            let (source, pair) = find_evm_pair(&ctx.shared, "xylo", &pool_address).await?;
+        FetchTask::EvmXylo {
+            source,
+            dex_type,
+            pool_address,
+        } => {
+            debug_assert_eq!(dex_type, "xylo");
+            let pair = find_evm_pair_exact(&ctx.shared, &source, "xylo", &pool_address).await?;
             let value = dex_adapters::evm_fetch::fetch_xylo_state(ctx.evm.as_ref(), source.as_str(), &pair).await?;
             Ok(vec![PoolStateUpdate::Stable(vec![value])])
         }
-        FetchTask::EvmPresto { pool_address } => {
-            let (source, pair) = find_evm_pair(&ctx.shared, "presto", &pool_address).await?;
+        FetchTask::EvmPresto {
+            source,
+            dex_type,
+            pool_address,
+        } => {
+            debug_assert_eq!(dex_type, "presto");
+            let pair = find_evm_pair_exact(&ctx.shared, &source, "presto", &pool_address).await?;
             let value = dex_adapters::evm_fetch::fetch_presto_state(ctx.evm.as_ref(), source.as_str(), &pair).await?;
             Ok(vec![PoolStateUpdate::Stable(vec![value])])
         }
-        FetchTask::EvmClmm { pool_address } => {
+        FetchTask::EvmClmm {
+            source,
+            dex_type,
+            pool_address,
+        } => {
+            debug_assert_eq!(dex_type, "clmm");
             let (pool_ref, existing) = {
                 let guard = ctx.shared.read().await;
                 let existing = guard
                     .clmm_pools
                     .iter()
-                    .find(|p| normalize_evm_address(&p.pool_address) == normalize_evm_address(&pool_address))
+                    .find(|p| {
+                        p.source == source
+                            && normalize_evm_address(&p.pool_address) == normalize_evm_address(&pool_address)
+                    })
                     .cloned();
                 let Some(existing) = existing.as_ref() else {
                     anyhow::bail!("EvmClmm pool {pool_address} not in topology");
@@ -352,22 +410,26 @@ async fn execute_fetch_task(ctx: &FetchWorkerContext, task: FetchTask) -> Result
 }
 
 /// Find `(source, pair)` for an EVM xyk/stable pool in the shared topology.
-async fn find_evm_pair(
+async fn find_evm_pair_exact(
     shared: &tokio::sync::RwLock<WorkerShared>,
+    source_id: &str,
     dex_type: &str,
     pool_address: &str,
-) -> anyhow::Result<(String, TradingPairSnapshot)> {
+) -> anyhow::Result<TradingPairSnapshot> {
     let guard = shared.read().await;
     for source in &guard.sources {
+        if source.source != source_id {
+            continue;
+        }
         for pair in &source.pairs {
             if (pair.dex_type == dex_type || (dex_type == "stable" && pair.dex_type == "presto"))
                 && normalize_evm_address(&pair.pool_address) == normalize_evm_address(pool_address)
             {
-                return Ok((source.source.clone(), pair.clone()));
+                return Ok(pair.clone());
             }
         }
     }
-    anyhow::bail!("EVM {dex_type} pool {pool_address} not in topology")
+    anyhow::bail!("EVM {dex_type} pool {pool_address} source {source_id} not in topology")
 }
 
 #[cfg(test)]
@@ -395,26 +457,26 @@ mod tests {
         let tasks = coalesce_touched_into_tasks(touched);
         assert!(tasks
             .iter()
-            .any(|t| matches!(t, FetchTask::EvmXyk { pool_address } if pool_address == "0xP1")));
+            .any(|t| matches!(t, FetchTask::EvmXyk { pool_address, .. } if pool_address == "0xP1")));
         assert!(tasks
             .iter()
-            .any(|t| matches!(t, FetchTask::EvmXyk { pool_address } if pool_address == "0xP2")));
+            .any(|t| matches!(t, FetchTask::EvmXyk { pool_address, .. } if pool_address == "0xP2")));
         assert!(tasks
             .iter()
-            .any(|t| matches!(t, FetchTask::EvmStable { pool_address } if pool_address == "0xS1")));
+            .any(|t| matches!(t, FetchTask::EvmStable { pool_address, .. } if pool_address == "0xS1")));
         assert!(tasks
             .iter()
-            .any(|t| matches!(t, FetchTask::EvmClmm { pool_address } if pool_address == "0xC1")));
+            .any(|t| matches!(t, FetchTask::EvmClmm { pool_address, .. } if pool_address == "0xC1")));
         assert!(tasks
             .iter()
-            .any(|t| matches!(t, FetchTask::EvmClmm { pool_address } if pool_address == "0xC2")));
+            .any(|t| matches!(t, FetchTask::EvmClmm { pool_address, .. } if pool_address == "0xC2")));
         assert!(tasks
             .iter()
-            .any(|t| matches!(t, FetchTask::EvmPresto { pool_address } if pool_address == "0xPRESTO")));
+            .any(|t| matches!(t, FetchTask::EvmPresto { pool_address, .. } if pool_address == "0xPRESTO")));
         // Unknown sources never produce tasks on the Arc path.
         assert!(!tasks
             .iter()
-            .any(|t| matches!(t, FetchTask::EvmXyk { pool_address } if pool_address == "0xUNKNOWN")));
+            .any(|t| matches!(t, FetchTask::EvmXyk { pool_address, .. } if pool_address == "0xUNKNOWN")));
         assert_eq!(tasks.len(), 6);
     }
 
@@ -480,6 +542,8 @@ mod tests {
         let updates = execute_fetch_task(
             &ctx,
             FetchTask::EvmPresto {
+                source: "presto-hub".to_string(),
+                dex_type: "presto".to_string(),
                 pool_address: "0x5794a8284A29493871Fbfa3c4f343D42001424D6".to_string(),
             },
         )
@@ -506,6 +570,8 @@ mod tests {
         let updates_rev = execute_fetch_task(
             &ctx,
             FetchTask::EvmPresto {
+                source: "presto-hub".to_string(),
+                dex_type: "presto".to_string(),
                 pool_address: "0x5794a8284A29493871Fbfa3c4f343D42001424D7".to_string(),
             },
         )

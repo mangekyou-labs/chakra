@@ -88,6 +88,24 @@ pub fn watched_event_signatures() -> Vec<&'static str> {
     sigs
 }
 
+/// Maximum distinct topic0 values Arc accepts in one `eth_getLogs` filter or
+/// one `eth_subscribe` "logs" subscription. Larger OR-lists are rejected
+/// (for example with JSON-RPC `-32012`); the watcher therefore partitions
+/// its watched signatures into batches of at most this size.
+pub const ARC_TOPIC_LIMIT: usize = 10;
+
+/// Partition the watched event signatures into topic-zero OR-list batches,
+/// each within [`ARC_TOPIC_LIMIT`]. The 10 pool-touch signatures arrive
+/// first, followed by the 3 creation signatures, so a 13-signature watcher
+/// yields exactly two batches (10 + 3). Every poll/subscribe pass must query
+/// each batch over the same block window and merge the results.
+pub fn watched_topic0_batches() -> Vec<Vec<String>> {
+    watched_event_signatures()
+        .chunks(ARC_TOPIC_LIMIT)
+        .map(|sigs| sigs.iter().map(|sig| event_topic0_hex(sig)).collect())
+        .collect()
+}
+
 pub fn is_pool_touch_topic(topic0: &str) -> bool {
     let topic0 = normalize_hex_word(topic0);
     TOUCH_EVENT_SIGS.iter().any(|sig| event_topic0_hex(sig) == topic0)
@@ -372,6 +390,30 @@ mod tests {
             }],
             &[],
         )
+    }
+
+    #[test]
+    fn watched_topics_partition_into_two_batches_within_arc_limit() {
+        let sigs = watched_event_signatures();
+        assert_eq!(sigs.len(), 13, "10 pool-touch + 3 pool-creation signatures");
+        let batches = watched_topic0_batches();
+        assert_eq!(batches.len(), 2, "13 topics must become 10 + 3, never one oversized filter");
+        assert!(batches
+            .iter()
+            .all(|batch| !batch.is_empty() && batch.len() <= ARC_TOPIC_LIMIT));
+        assert_eq!(batches[0].len(), 10);
+        assert_eq!(batches[1].len(), 3);
+        assert!(batches[0]
+            .iter()
+            .all(|topic| is_pool_touch_topic(topic)));
+        assert!(batches[1]
+            .iter()
+            .all(|topic| is_created_event_topic(topic)));
+        let expected: std::collections::HashSet<String> =
+            sigs.iter().map(|sig| event_topic0_hex(sig)).collect();
+        let all: std::collections::HashSet<&String> = batches.iter().flatten().collect();
+        assert_eq!(all.len(), 13, "batches must not overlap");
+        assert!(all.into_iter().all(|topic| expected.contains(topic)));
     }
 
     #[test]

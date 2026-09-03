@@ -50,7 +50,19 @@ services:
       - key: CHAKRA_SEED_FACTORIES
         value: "0x60EDeFB094B84BBC6430cc130B358A43Ba1979e2:xylo,0x5794a8284A29493871Fbfa3c4f343D42001424D6:presto,0xd67F63A4F26a497b364d1C82e6747Aec8B5743a5:xyk"
       - key: CHAKRA_DISCOVERY_FACTORIES
-        value: "0x60EDeFB094B84BBC6430cc130B358A43Ba1979e2:xylo,0x5794a8284A29493871Fbfa3c4f343D42001424D6:presto,0xd67F63A4F26a497b364d1C82e6747Aec8B5743a5:xyk"
+        value: ""
+      - key: CHAKRA_ANALYTICS_ENABLED
+        value: "true"
+      - key: CHAKRA_ANALYTICS_START_BLOCK
+        value: "59424918"
+      - key: CHAKRA_ANALYTICS_POLL_SECS
+        value: "30"
+      - key: CHAKRA_ANALYTICS_CONFIRMATIONS
+        value: "12"
+      - key: CHAKRA_ANALYTICS_PAGE_BLOCKS
+        value: "10000"
+      - key: CHAKRA_STRICT_READINESS
+        value: "true"
       - key: CHAKRA_EVM_WS_ENABLED
         value: "true"
       - key: CHAKRA_EVM_POLL_INTERVAL_MS

@@ -9,6 +9,7 @@ pub mod hydrate;
 pub mod rate_limit;
 pub mod snapshot_loader;
 pub mod state;
+pub mod stats;
 
 use {
     axum::{
@@ -40,6 +41,7 @@ pub fn build_router(app_state: AppState, rate_limit: RateLimitState) -> Router {
         .route("/api/v1/build_tx", post(handlers::build_tx))
         .route("/api/v1/tokens", get(handlers::list_tokens))
         .route("/api/v1/balances", get(handlers::get_balances))
+        .route("/api/v1/stats", get(handlers::get_stats))
         .route("/api/v1/health", get(handlers::health_check))
         .route("/api/v1/ready", get(handlers::readiness_check))
         .layer(middleware::from_fn_with_state(
