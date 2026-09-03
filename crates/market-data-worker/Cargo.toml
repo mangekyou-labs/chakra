@@ -15,8 +15,12 @@ dex-adapters = { path = "../dex-adapters" }
 tokio.workspace = true
 reqwest.workspace = true
 futures.workspace = true
+async-trait.workspace = true
 anyhow.workspace = true
 serde_json.workspace = true
+serde.workspace = true
+hex.workspace = true
 tracing.workspace = true
 tracing-subscriber.workspace = true
-tokio-tungstenite = { version = "0.24", features = ["connect"] }
+redis = { version = "1.2.1", features = ["aio", "tokio-comp"] }
+tokio-tungstenite = { version = "0.24", features = ["connect", "native-tls"] }

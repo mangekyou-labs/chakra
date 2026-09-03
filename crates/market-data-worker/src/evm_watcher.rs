@@ -15,12 +15,16 @@
 //!
 
 use {
-    crate::{fetch_pipeline, worker::WorkerShared},
+    crate::{
+        analytics::{AnalyticsConfig, AnalyticsIndexer, AnalyticsStore},
+        fetch_pipeline,
+        worker::WorkerShared,
+    },
     anyhow::{bail, Context, Result},
     dex_adapters::{
         evm_logs::{
-            created_pools_from_evm_logs, event_topic0_hex, filter_subscribe_addresses, normalize_evm_address,
-            touched_pools_from_evm_logs, watched_event_signatures, DecodedCreated,
+            filter_subscribe_addresses, normalize_evm_address, touched_pools_from_evm_logs, watched_topic0_batches,
+            DecodedCreated,
         },
         evm_rpc::{validate_http_urls, validate_ws_urls, EvmLog, EvmRpcClient, LogFilter, ARC_RPC_HTTP, ARC_RPC_WS},
         pool_index::{KnownPoolIndex, PoolRef},
@@ -165,6 +169,7 @@ impl EvmConfig {
             .iter()
             .map(|tuple| FactoryConfig::parse(tuple, false))
             .collect::<Result<Vec<_>>>()?;
+        let (seed_factories, discovery_factories) = dedupe_factories(seed_factories, discovery_factories)?;
 
         let chain_id = env_var("CHAKRA_CHAIN_ID")
             .and_then(|v| v.parse().ok())
@@ -204,6 +209,44 @@ impl EvmConfig {
     pub fn factory_for_source(&self, source: &str) -> Option<&FactoryConfig> {
         self.all_factories().find(|f| f.source == source)
     }
+}
+
+/// Normalize factory configuration by `(address, dex_type)`. Curated seed
+/// entries win over discovery entries; the same address configured with two
+/// different DEX types is rejected rather than silently routing to the wrong
+/// ABI/source.
+pub fn dedupe_factories(
+    seeds: Vec<FactoryConfig>,
+    discoveries: Vec<FactoryConfig>,
+) -> Result<(Vec<FactoryConfig>, Vec<FactoryConfig>)> {
+    use std::collections::BTreeMap;
+    let mut by_address: BTreeMap<String, String> = BTreeMap::new();
+    for factory in seeds.iter().chain(discoveries.iter()) {
+        if let Some(existing) = by_address.insert(factory.address.clone(), factory.dex_type.clone()) {
+            if existing != factory.dex_type {
+                bail!(
+                    "factory {} configured with conflicting DEX types: {} vs {}",
+                    factory.address,
+                    existing,
+                    factory.dex_type
+                );
+            }
+        }
+    }
+    let mut seen = std::collections::HashSet::new();
+    let mut out_seed = Vec::new();
+    for f in seeds {
+        if seen.insert((f.address.clone(), f.dex_type.clone())) {
+            out_seed.push(f);
+        }
+    }
+    let mut out_discovery = Vec::new();
+    for f in discoveries {
+        if seen.insert((f.address.clone(), f.dex_type.clone())) {
+            out_discovery.push(f);
+        }
+    }
+    Ok((out_seed, out_discovery))
 }
 
 /// Catalog pairs Discovery probes each factory with. cirBTC pairs are always
@@ -713,8 +756,16 @@ impl EvmRunner {
         Ok(())
     }
 
-    /// One poll iteration: `eth_blockNumber` → `eth_getLogs` over the new
-    /// window (catch-up capped) → ingest. Returns the number of pools touched.
+    /// One poll iteration: `eth_blockNumber` → one `eth_getLogs` per topic
+    /// batch over the same block window → merge → ingest. Returns the number
+    /// of pools touched.
+    ///
+    /// Arc caps a single log filter at ten topic-zero values, so the watched
+    /// signatures are polled as several ≤10-topic batches. The window is only
+    /// consumed when *every* batch succeeds: any batch error aborts the poll
+    /// before the cursor moves, and the same window is re-polled on the next
+    /// tick. Logs from the batches are merged and deduplicated, then ingested
+    /// exactly once.
     pub async fn poll_once(&mut self) -> Result<usize> {
         let watch = self.compute_watch_addresses().await;
         if watch.is_empty() {
@@ -728,16 +779,18 @@ impl EvmRunner {
             Some(_) => return Ok(0),
             None => latest.saturating_sub(1),
         };
-        let filter = LogFilter {
-            from_block: Some(from_block),
-            to_block: Some(latest),
-            addresses: watch,
-            topics: watched_event_signatures()
-                .iter()
-                .map(|sig| Some(event_topic0_hex(sig)))
-                .collect(),
-        };
-        let logs = self.http.eth_get_logs(&filter).await?;
+        let mut merged: Vec<EvmLog> = Vec::new();
+        for topics in watched_topic0_batches() {
+            let filter = LogFilter {
+                from_block: Some(from_block),
+                to_block: Some(latest),
+                addresses: watch.clone(),
+                topics: vec![Some(topics)],
+            };
+            let logs = self.http.eth_get_logs(&filter).await?;
+            merged.extend(logs);
+        }
+        let logs = dedupe_logs(merged);
         self.poll_cursor = Some(latest);
         if logs.is_empty() {
             return Ok(0);
@@ -749,8 +802,11 @@ impl EvmRunner {
     /// Returns the number of distinct pools touched.
     pub async fn ingest_logs(&mut self, logs: Vec<EvmLog>) -> usize {
         let mut changed = false;
-        for created in created_pools_from_evm_logs(&logs) {
-            match self.upsert_created_pool(created).await {
+        for log in &logs {
+            let Some(created) = dex_adapters::evm_logs::decode_created_pool(log).map(DecodedCreated::sorted) else {
+                continue;
+            };
+            match self.upsert_created_pool(created, Some(&log.address)).await {
                 Ok(true) => changed = true,
                 Ok(false) => {}
                 Err(error) => warn!("created-pool upsert failed: {error}"),
@@ -810,11 +866,17 @@ impl EvmRunner {
 
     /// Insert a created pool into the shared topology (snapshot pairs + CLMM
     /// state). Returns `true` when the topology changed.
-    async fn upsert_created_pool(&mut self, created: DecodedCreated) -> Result<bool> {
+    async fn upsert_created_pool(&mut self, created: DecodedCreated, emitter: Option<&str>) -> Result<bool> {
         let source = match &created {
-            DecodedCreated::Xyk { .. } => self.config.all_factories().find(|f| f.dex_type == "xyk"),
-            DecodedCreated::Stable { .. } => self.config.all_factories().find(|f| f.dex_type == "stable"),
-            DecodedCreated::Clmm { .. } => self.config.all_factories().find(|f| f.dex_type == "clmm"),
+            DecodedCreated::Xyk { .. } => self.config.all_factories().find(|f| {
+                f.dex_type == "xyk" && emitter.map(|e| normalize_evm_address(e) == f.address).unwrap_or(true)
+            }),
+            DecodedCreated::Stable { .. } => self.config.all_factories().find(|f| {
+                f.dex_type == "stable" && emitter.map(|e| normalize_evm_address(e) == f.address).unwrap_or(true)
+            }),
+            DecodedCreated::Clmm { .. } => self.config.all_factories().find(|f| {
+                f.dex_type == "clmm" && emitter.map(|e| normalize_evm_address(e) == f.address).unwrap_or(true)
+            }),
         }
         .map(|f| f.source.clone());
         let Some(source) = source else {
@@ -936,7 +998,7 @@ impl EvmRunner {
             let ws_urls = self.config.ws_urls.clone();
             let revision = self.watch_revision.clone();
             let (ws_log_tx, mut ws_log_rx) = mpsc::channel::<EvmLog>(1024);
-            tokio::spawn(ws_watch_loop(ws_urls, watch, revision, ws_log_tx));
+            tokio::spawn(ws_watch_loop(ws_urls, watch, revision, ws_log_tx, WS_ACK_TIMEOUT));
             let forward = tx.clone();
             tokio::spawn(async move {
                 while let Some(log) = ws_log_rx.recv().await {
@@ -1019,6 +1081,30 @@ impl EvmRunner {
     }
 }
 
+/// Deduplicate logs merged from several topic batches over one block window.
+/// Batches partition distinct topic-zero values, but a node may still echo a
+/// log on both sides of a filter boundary; the key is the full log identity
+/// (emitter, block, tx, index, topics, data).
+fn dedupe_logs(logs: Vec<EvmLog>) -> Vec<EvmLog> {
+    let mut seen = HashSet::new();
+    let mut out = Vec::with_capacity(logs.len());
+    for log in logs {
+        let key = format!(
+            "{}:{}:{}:{}:{}:{}",
+            normalize_evm_address(&log.address),
+            log.block_number.map(|b| b.to_string()).unwrap_or_default(),
+            log.tx_hash.clone().unwrap_or_default(),
+            log.log_index.map(|i| i.to_string()).unwrap_or_default(),
+            log.topics.join(","),
+            log.data
+        );
+        if seen.insert(key) {
+            out.push(log);
+        }
+    }
+    out
+}
+
 // ─── WS path ────────────────────────────────────────────────────────────────
 
 /// Connect, subscribe to logs, forward notifications forever. Reconnects
@@ -1029,6 +1115,7 @@ pub async fn ws_watch_loop(
     watch: Arc<RwLock<Vec<String>>>,
     revision: Arc<AtomicU64>,
     log_tx: mpsc::Sender<EvmLog>,
+    ack_timeout: Duration,
 ) {
     use futures::{SinkExt, StreamExt};
     if ws_urls.is_empty() {
@@ -1045,9 +1132,13 @@ pub async fn ws_watch_loop(
             attempt += 1;
             continue;
         }
-        match subscribe_once(url, &addresses).await {
+        match subscribe_once(url, &addresses, ack_timeout).await {
             Ok(mut stream) => {
-                info!(url = %url, topics = watched_event_signatures().len(), "Arc WS subscribed");
+                info!(
+                    url = %url,
+                    batches = watched_topic0_batches().len(),
+                    "Arc WS subscribed with all subscriptions acknowledged"
+                );
                 loop {
                     if revision.load(Ordering::Relaxed) != subscribed_at_rev {
                         debug!("revision changed — reconnecting WS with fresh address filter");
@@ -1088,26 +1179,78 @@ pub async fn ws_watch_loop(
     }
 }
 
+/// Ceiling for waiting on every `eth_subscribe` acknowledgement before the
+/// socket is declared connected (production path).
+const WS_ACK_TIMEOUT: Duration = Duration::from_secs(10);
+
+/// Open one WebSocket and register every topic batch as a separate
+/// `eth_subscribe` request with a unique JSON-RPC id. The socket is declared
+/// connected only after *every* request has a successful result
+/// acknowledgement; a rejected, missing, or timed-out acknowledgement returns
+/// `Err` so the caller reconnects and re-subscribes from a clean state.
 async fn subscribe_once(
     url: &str,
     addresses: &[String],
+    ack_timeout: Duration,
 ) -> Result<tokio_tungstenite::WebSocketStream<tokio_tungstenite::MaybeTlsStream<tokio::net::TcpStream>>> {
-    use futures::SinkExt;
+    use futures::{SinkExt, StreamExt};
     let (mut stream, _) = tokio_tungstenite::connect_async(url).await.context("ws connect")?;
-    let topics: Vec<String> = watched_event_signatures()
-        .iter()
-        .map(|sig| event_topic0_hex(sig))
-        .collect();
-    let subscribe = serde_json::json!({
-        "jsonrpc": "2.0",
-        "id": 1,
-        "method": "eth_subscribe",
-        "params": ["logs", {"address": addresses, "topics": topics}]
-    });
-    stream
-        .send(Message::Text(subscribe.to_string()))
-        .await
-        .context("send eth_subscribe")?;
+    let batches = watched_topic0_batches();
+    let batch_count = batches.len();
+    for (id, topics) in (1u64..).zip(batches) {
+        let subscribe = serde_json::json!({
+            "jsonrpc": "2.0",
+            "id": id,
+            "method": "eth_subscribe",
+            "params": ["logs", {"address": addresses, "topics": [topics]}]
+        });
+        stream
+            .send(Message::Text(subscribe.to_string()))
+            .await
+            .with_context(|| format!("send eth_subscribe id {id}"))?;
+    }
+    let mut acked: HashSet<u64> = HashSet::new();
+    let deadline = tokio::time::Instant::now() + ack_timeout;
+    while acked.len() < batch_count {
+        let remaining = deadline.saturating_duration_since(tokio::time::Instant::now());
+        if remaining.is_zero() {
+            bail!("WS eth_subscribe acknowledgement timed out after {ack_timeout:?}");
+        }
+        let message = match tokio::time::timeout(remaining, stream.next()).await {
+            Err(_) => bail!("WS eth_subscribe acknowledgement timed out after {ack_timeout:?}"),
+            Ok(None) => bail!("WS closed before eth_subscribe acknowledgements"),
+            Ok(Some(Err(error))) => bail!("WS read error during eth_subscribe handshake: {error}"),
+            Ok(Some(Ok(message))) => message,
+        };
+        match message {
+            Message::Text(text) => {
+                let Ok(value) = serde_json::from_str::<serde_json::Value>(&text) else {
+                    continue;
+                };
+                if value.get("method").and_then(serde_json::Value::as_str) == Some("eth_subscription") {
+                    // Notifications can race the acks; anything observed before
+                    // the handshake completes is covered by the HTTP poll path.
+                    continue;
+                }
+                let Some(id) = value.get("id").and_then(serde_json::Value::as_u64) else {
+                    continue;
+                };
+                if id == 0 || id > batch_count as u64 {
+                    continue;
+                }
+                if value.get("error").is_some() {
+                    bail!("WS eth_subscribe id {id} rejected: {text}");
+                }
+                if value.get("result").is_some() {
+                    acked.insert(id);
+                }
+            }
+            Message::Ping(payload) => {
+                let _ = stream.send(Message::Pong(payload)).await;
+            }
+            _ => {}
+        }
+    }
     Ok(stream)
 }
 
@@ -1168,6 +1311,21 @@ pub(crate) async fn run_arc(config: crate::worker::WorkerConfig) -> Result<()> {
         clmm_pools: Vec::new(),
     }));
     let http = EvmRpcClient::new(evm.http_urls.clone())?;
+    let analytics_config = AnalyticsConfig::from_env();
+    if analytics_config.enabled {
+        match (evm.redis_url.as_deref(), std::env::var("CHAKRA_AGGREGATOR").ok()) {
+            (Some(redis_url), Some(aggregator)) if !aggregator.is_empty() => {
+                let store = Arc::new(AnalyticsStore::new(redis_url, 5042002, &aggregator)?);
+                let indexer = AnalyticsIndexer::new(analytics_config, Arc::new(http.clone()), store, aggregator);
+                tokio::spawn(async move {
+                    if let Err(error) = indexer.run().await {
+                        warn!(%error, "analytics indexer stopped");
+                    }
+                });
+            }
+            _ => warn!("CHAKRA_ANALYTICS_ENABLED=true but Redis or CHAKRA_AGGREGATOR is missing; analytics disabled"),
+        }
+    }
     let pipeline = pool_store
         .clone()
         .map(|store| spawn_arc_pipeline(store, shared.clone(), Arc::new(http.clone()), &config));
@@ -1180,6 +1338,7 @@ pub(crate) mod tests {
     use {
         super::*,
         crate::worker::WorkerConfig,
+        dex_adapters::evm_logs::event_topic0_hex,
         market_snapshot::{
             pool_state_store::{MemoryPoolStateStore, XykPoolStateValue},
             store::SnapshotStoreBackend,
@@ -1201,6 +1360,17 @@ pub(crate) mod tests {
     const POOL: &str = "0x2222222222222222222222222222222222222222";
     const XYK_FACTORY: &str = "0x3333333333333333333333333333333333333333";
     const PRESTO_HUB: &str = "0x5794a8284A29493871Fbfa3c4f343D42001424D6";
+
+    #[test]
+    fn duplicate_factories_are_seed_preferred_and_conflicts_rejected() {
+        let seed = FactoryConfig::parse("0x0000000000000000000000000000000000000001:xyk", true).unwrap();
+        let discovery = FactoryConfig::parse("0x1:xyk", false).unwrap();
+        let (seeds, discoveries) = dedupe_factories(vec![seed], vec![discovery]).unwrap();
+        assert_eq!(seeds.len(), 1);
+        assert!(discoveries.is_empty());
+        let conflicting = FactoryConfig::parse("0x1:stable", false).unwrap();
+        assert!(dedupe_factories(seeds, vec![conflicting]).is_err());
+    }
 
     fn env_lock() -> &'static Mutex<()> {
         static LOCK: OnceLock<Mutex<()>> = OnceLock::new();
@@ -2025,6 +2195,114 @@ pub(crate) mod tests {
         assert_eq!(runner.poll_cursor, Some(0x10));
     }
 
+    // ─── Topic-batch polling (Arc ten-topic filter limit) ────────────
+
+    #[tokio::test]
+    async fn poll_splits_13_topics_into_two_batches_and_ingests_second_batch_logs() {
+        let new_pool = "0x5555555555555555555555555555555555555555";
+        let pool_word = format!("{:0>64}", &new_pool[2..]);
+        let created = json!({
+            "address": XYK_FACTORY,
+            "topics": [
+                event_topic0_hex(dex_adapters::evm_logs::XYK_PAIR_CREATED_SIG),
+                address_topic(USDC),
+                address_topic(EURC)
+            ],
+            "data": format!("0x{pool_word}{:0>64x}", 1u128),
+            "blockNumber": "0x11",
+            "logIndex": "0x0"
+        });
+        let requests = Arc::new(std::sync::Mutex::new(Vec::<usize>::new()));
+        let requests_inside = requests.clone();
+        let (url, _server) = spawn_fixture_rpc(move |method, params| {
+            match method {
+                "eth_blockNumber" => Ok(json!("0x11")),
+                "eth_getLogs" => {
+                    let topics = params[0]["topics"][0].as_array().unwrap().clone();
+                    let mut guard = requests_inside.lock().unwrap();
+                    guard.push(topics.len());
+                    let index = guard.len() - 1;
+                    drop(guard);
+                    if index == 0 {
+                        assert_eq!(topics.len(), 10, "first batch must hold the touch signatures");
+                        Ok(json!([]))
+                    } else {
+                        assert_eq!(topics.len(), 3, "second batch must hold the creation signatures");
+                        assert!(topics.iter().any(|t| {
+                            t.as_str() == Some(event_topic0_hex(dex_adapters::evm_logs::XYK_PAIR_CREATED_SIG).as_str())
+                        }));
+                        Ok(json!([created.clone()]))
+                    }
+                }
+                other => Err(json!(format!("unexpected method {other}"))),
+            }
+        });
+        let client = EvmRpcClient::single(&url).unwrap();
+        let config = EvmConfig {
+            seed_factories: vec![FactoryConfig::parse(&format!("{XYK_FACTORY}:xyk"), true).unwrap()],
+            ws_enabled: false,
+            ..Default::default()
+        };
+        let shared = Arc::new(RwLock::new(WorkerShared {
+            sources: Vec::new(),
+            clmm_pools: Vec::new(),
+        }));
+        let mut runner = EvmRunner::new(config, client, shared.clone(), None);
+        assert_eq!(runner.poll_once().await.unwrap(), 0);
+        {
+            let guard = requests.lock().unwrap();
+            assert_eq!(guard.as_slice(), &[10, 3], "13 topics must become two requests of at most ten");
+        }
+        // Logs returned only by the second batch were ingested: the created
+        // pool now exists in the shared topology and the window was consumed.
+        let guard = shared.read().await;
+        assert_eq!(guard.sources.len(), 1);
+        assert_eq!(guard.sources[0].pairs[0].pool_address, new_pool);
+        assert_eq!(runner.poll_cursor, Some(0x11));
+    }
+
+    #[tokio::test]
+    async fn poll_keeps_cursor_when_any_topic_batch_fails() {
+        let fail_batch_two = Arc::new(std::sync::atomic::AtomicBool::new(true));
+        let flag = fail_batch_two.clone();
+        let (url, _server) = spawn_fixture_rpc(move |method, _params| {
+            match method {
+                "eth_blockNumber" => Ok(json!("0x11")),
+                "eth_getLogs" => {
+                    if flag.load(std::sync::atomic::Ordering::Relaxed) {
+                        Err(json!("second batch simulated failure"))
+                    } else {
+                        Ok(json!([]))
+                    }
+                }
+                other => Err(json!(format!("unexpected method {other}"))),
+            }
+        });
+        let client = EvmRpcClient::single(&url).unwrap();
+        let config = EvmConfig {
+            seed_factories: vec![FactoryConfig::parse(&format!("{XYK_FACTORY}:xyk"), true).unwrap()],
+            ws_enabled: false,
+            ..Default::default()
+        };
+        let shared = Arc::new(RwLock::new(WorkerShared {
+            sources: Vec::new(),
+            clmm_pools: Vec::new(),
+        }));
+        let mut runner = EvmRunner::new(config, client, shared.clone(), None);
+        assert!(
+            runner.poll_once().await.is_err(),
+            "a failing topic batch must abort the poll"
+        );
+        assert_eq!(
+            runner.poll_cursor, None,
+            "cursor must not advance until every batch succeeds"
+        );
+        // Healthy retry over the same window succeeds and advances the cursor.
+        fail_batch_two.store(false, std::sync::atomic::Ordering::Relaxed);
+        assert_eq!(runner.poll_once().await.unwrap(), 0);
+        assert_eq!(runner.poll_cursor, Some(0x11));
+    }
+
     // ─── Created pools ───────────────────────────────────────────────
 
     #[tokio::test]
@@ -2094,50 +2372,170 @@ pub(crate) mod tests {
         assert!(parse_subscription_log("{\"jsonrpc\":\"2.0\",\"id\":1,\"result\":\"0x1\"}").is_none());
     }
 
-    #[tokio::test]
-    async fn ws_subscription_forwards_log_notification() {
+    /// Read the two `eth_subscribe` requests for a fresh connection, asserting
+    /// each batch stays within the Arc topic limit and uses a unique id.
+    /// Returns the request ids in arrival order.
+    async fn read_subscription_requests<S>(ws: &mut tokio_tungstenite::WebSocketStream<S>) -> Vec<u64>
+    where
+        S: tokio::io::AsyncRead + tokio::io::AsyncWrite + Unpin,
+    {
         use futures::{SinkExt, StreamExt};
+        let mut ids = Vec::new();
+        while ids.len() < 2 {
+            match ws.next().await {
+                Some(Ok(Message::Text(text))) => {
+                    let request: serde_json::Value = serde_json::from_str(&text).unwrap();
+                    assert_eq!(request["method"], "eth_subscribe");
+                    let topic_list = request["params"][1]["topics"].as_array().unwrap();
+                    assert_eq!(topic_list.len(), 1, "one topic-zero OR-list per request");
+                    let topics = topic_list[0].as_array().unwrap();
+                    assert!(
+                        topics.len() <= dex_adapters::evm_logs::ARC_TOPIC_LIMIT,
+                        "subscription batch exceeds the Arc topic limit"
+                    );
+                    ids.push(request["id"].as_u64().unwrap());
+                }
+                Some(Ok(Message::Ping(payload))) => {
+                    let _ = ws.send(Message::Pong(payload)).await;
+                }
+                other => panic!("unexpected handshake message: {other:?}"),
+            }
+        }
+        assert_eq!(ids.len(), 2, "watcher must register two topic batches");
+        assert_ne!(ids[0], ids[1], "each topic batch must use a unique request id");
+        ids
+    }
+
+    #[derive(Clone, Copy, Debug)]
+    enum WsHandshakeFailure {
+        /// First connection answers id 1 with a JSON-RPC error.
+        Rejected,
+        /// First connection acknowledges only one of the two requests.
+        MissingAck,
+        /// First connection never acknowledges anything.
+        TimedOut,
+    }
+
+    /// Two-phase WS server for reconnect tests: the first accepted connection
+    /// fails the handshake per `failure`; the second connection acknowledges
+    /// both batches and emits `notification` (frames stay ordered, so the
+    /// notification is consumed by the forwarding loop, never the handshake).
+    async fn run_reconnect_server(
+        listener: TcpListener,
+        failure: WsHandshakeFailure,
+        notification: serde_json::Value,
+    ) {
+        use futures::{SinkExt, StreamExt};
+        let mut accepted = 0u64;
+        loop {
+            let Ok((stream, _)) = listener.accept().await else {
+                return;
+            };
+            let Ok(mut ws) = tokio_tungstenite::accept_async(stream).await else {
+                continue;
+            };
+            if accepted == 0 {
+                let ids = read_subscription_requests(&mut ws).await;
+                match failure {
+                    WsHandshakeFailure::Rejected => {
+                        ws.send(Message::Text(
+                            json!({"jsonrpc": "2.0", "id": ids[0], "error": {"code": -32000, "message": "rejected"}})
+                                .to_string(),
+                        ))
+                        .await
+                        .ok();
+                    }
+                    WsHandshakeFailure::MissingAck => {
+                        ws.send(Message::Text(
+                            json!({"jsonrpc": "2.0", "id": ids[0], "result": "0xsub1"}).to_string(),
+                        ))
+                        .await
+                        .ok();
+                    }
+                    WsHandshakeFailure::TimedOut => {}
+                }
+            } else {
+                let ids = read_subscription_requests(&mut ws).await;
+                for (id, subscription) in ids.iter().zip(["0xsub1", "0xsub2"]) {
+                    ws.send(Message::Text(
+                        json!({"jsonrpc": "2.0", "id": id, "result": subscription}).to_string(),
+                    ))
+                    .await
+                    .ok();
+                }
+                ws.send(Message::Text(
+                    json!({
+                        "jsonrpc": "2.0",
+                        "method": "eth_subscription",
+                        "params": {"subscription": "0xsub2", "result": notification}
+                    })
+                    .to_string(),
+                ))
+                .await
+                .ok();
+            }
+            // Hold the connection until the client disconnects or the test
+            // aborts the task.
+            while ws.next().await.is_some() {}
+            accepted += 1;
+        }
+    }
+
+    #[tokio::test]
+    async fn ws_success_only_after_both_subscriptions_acknowledged() {
+        use futures::{SinkExt, StreamExt};
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let addr = listener.local_addr().unwrap();
+        let server = tokio::spawn(async move {
+            let (stream, _) = listener.accept().await.unwrap();
+            let mut ws = tokio_tungstenite::accept_async(stream).await.unwrap();
+            let ids = read_subscription_requests(&mut ws).await;
+            // Ack only the first request, then prove the client is still
+            // connected and waiting (ping/pong) before acking the second.
+            ws.send(Message::Text(
+                json!({"jsonrpc": "2.0", "id": ids[0], "result": "0xsub1"}).to_string(),
+            ))
+            .await
+            .unwrap();
+            ws.send(Message::Ping(vec![])).await.unwrap();
+            match ws.next().await {
+                Some(Ok(Message::Pong(_))) => {}
+                other => panic!("expected pong while awaiting second ack, got {other:?}"),
+            }
+            ws.send(Message::Text(
+                json!({"jsonrpc": "2.0", "id": ids[1], "result": "0xsub2"}).to_string(),
+            ))
+            .await
+            .unwrap();
+            while ws.next().await.is_some() {}
+        });
+
+        let stream = subscribe_once(&format!("ws://{addr}"), &[POOL.to_string()], Duration::from_secs(3))
+            .await
+            .expect("subscribe must succeed only after both acknowledgements");
+        drop(stream);
+        server.abort();
+    }
+
+    #[tokio::test]
+    async fn ws_forwards_notifications_after_both_subscriptions_acknowledged() {
         let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
         let addr = listener.local_addr().unwrap();
         let swap = swap_log(POOL, 5, 6, 7, 8);
         let server = tokio::spawn(async move {
-            let (stream, _) = listener.accept().await.unwrap();
-            let mut ws = tokio_tungstenite::accept_async(stream).await.unwrap();
-            loop {
-                match ws.next().await {
-                    Some(Ok(Message::Text(text))) => {
-                        let request: serde_json::Value = serde_json::from_str(&text).unwrap();
-                        assert_eq!(request["method"], "eth_subscribe");
-                        let id = request["id"].clone();
-                        ws.send(Message::Text(
-                            json!({"jsonrpc": "2.0", "id": id, "result": "0xsub1"}).to_string(),
-                        ))
-                        .await
-                        .unwrap();
-                        ws.send(Message::Text(
-                            json!({
-                                "jsonrpc": "2.0",
-                                "method": "eth_subscription",
-                                "params": {"subscription": "0xsub1", "result": swap}
-                            })
-                            .to_string(),
-                        ))
-                        .await
-                        .unwrap();
-                        break;
-                    }
-                    Some(Ok(Message::Ping(payload))) => {
-                        ws.send(Message::Pong(payload)).await.unwrap();
-                    }
-                    _ => {}
-                }
-            }
+            run_reconnect_server(listener, WsHandshakeFailure::TimedOut, swap).await;
         });
 
         let watch = Arc::new(RwLock::new(vec![POOL.to_string()]));
         let revision = Arc::new(AtomicU64::new(0));
         let (tx, mut rx) = mpsc::channel::<EvmLog>(16);
-        let loop_handle = tokio::spawn(ws_watch_loop(vec![format!("ws://{addr}")], watch, revision, tx));
+        let loop_handle = tokio::spawn(ws_watch_loop(
+            vec![format!("ws://{addr}")],
+            watch,
+            revision,
+            tx,
+            Duration::from_millis(300),
+        ));
 
         let log = tokio::time::timeout(std::time::Duration::from_secs(5), rx.recv())
             .await
@@ -2148,6 +2546,42 @@ pub(crate) mod tests {
 
         loop_handle.abort();
         server.abort();
+    }
+
+    #[tokio::test]
+    async fn ws_reconnects_when_acknowledgements_are_rejected_missing_or_timed_out() {
+        for failure in [
+            WsHandshakeFailure::Rejected,
+            WsHandshakeFailure::MissingAck,
+            WsHandshakeFailure::TimedOut,
+        ] {
+            let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+            let addr = listener.local_addr().unwrap();
+            let swap = swap_log(POOL, 5, 6, 7, 8);
+            let server = tokio::spawn(async move {
+                run_reconnect_server(listener, failure, swap).await;
+            });
+
+            let watch = Arc::new(RwLock::new(vec![POOL.to_string()]));
+            let revision = Arc::new(AtomicU64::new(0));
+            let (tx, mut rx) = mpsc::channel::<EvmLog>(16);
+            let loop_handle = tokio::spawn(ws_watch_loop(
+                vec![format!("ws://{addr}")],
+                watch,
+                revision,
+                tx,
+                Duration::from_millis(300),
+            ));
+
+            let log = tokio::time::timeout(std::time::Duration::from_secs(8), rx.recv())
+                .await
+                .unwrap_or_else(|_| panic!("no log after reconnect ({failure:?})"))
+                .unwrap_or_else(|| panic!("channel closed ({failure:?})"));
+            assert_eq!(log.address, POOL, "{failure:?} must reconnect and subscribe cleanly");
+
+            loop_handle.abort();
+            server.abort();
+        }
     }
 
     #[test]
