@@ -5,7 +5,8 @@
   "framework": null,
   "rewrites": [
     { "source": "/docs", "destination": "/docs.html" },
-    { "source": "/docs/api", "destination": "/docs/api.html" }
+    { "source": "/docs/api", "destination": "/docs/api.html" },
+    { "source": "/stats", "destination": "/stats.html" }
   ],
   "headers": [
     {
