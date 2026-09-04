@@ -49,3 +49,6 @@ protects all six readiness directions without changing the API contract.
   attributed swap, one additional confirmed swap, and 2,000,000 total
   stablecoin-notional micros (baseline 1,000,000), with Presto and UnitFlow
   attribution.
+- After merge, the static-export `/stats` rewrite was added in `vercel.json`;
+  the Ready production deployment serves both requested aliases and the
+  browser smoke confirms the dashboard consumes live stats.
