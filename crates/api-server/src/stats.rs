@@ -99,9 +99,12 @@ pub fn apply_heads(meta: &mut StatsMeta, heads: Option<(u64, u64, u64)>, polled_
 /// Route diagnostics use the same six catalog directions as readiness. The
 /// engine graph is consulted without RPC; quote-time state remains Redis-only.
 pub async fn route_health_for_engine(engine: &router_engine::QuoteEngine) -> Vec<RouteHealth> {
-    let usdc = market_snapshot::decimals::USDC_ERC20.to_string();
-    let eurc = market_snapshot::decimals::EURC.to_string();
-    let cirbtc = market_snapshot::decimals::CIRBTC.to_string();
+    // Snapshot topology addresses are normalized to lowercase. Keep the
+    // diagnostics requests in the same canonical form; `TokenId` itself is
+    // intentionally a lossless wrapper and does not normalize addresses.
+    let usdc = market_snapshot::decimals::USDC_ERC20.to_ascii_lowercase();
+    let eurc = market_snapshot::decimals::EURC.to_ascii_lowercase();
+    let cirbtc = market_snapshot::decimals::CIRBTC.to_ascii_lowercase();
     let pairs = [(&usdc, &eurc), (&usdc, &cirbtc), (&eurc, &cirbtc)];
     let mut routes = Vec::with_capacity(6);
     for (token_in, token_out) in pairs.iter().flat_map(|(a, b)| [(*a, *b), (*b, *a)]) {
@@ -320,6 +323,61 @@ pub fn apply_summaries_with_edges(response: &mut StatsResponse, summaries: &[Swa
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[tokio::test]
+    async fn route_health_matches_lowercase_snapshot_addresses() {
+        let engine = router_engine::QuoteEngine::new(
+            router_engine::path_finder::PathFinderConfig::default(),
+            router_engine::split_optimizer::SplitConfig::default(),
+        );
+        let usdc = market_snapshot::decimals::USDC_ERC20.to_ascii_lowercase();
+        let eurc = market_snapshot::decimals::EURC.to_ascii_lowercase();
+        let cirbtc = market_snapshot::decimals::CIRBTC.to_ascii_lowercase();
+        engine
+            .update_pairs_from_cache(
+                "fixture",
+                &[
+                    router_engine::TradingPair {
+                        token_a: router_engine::TokenId::from_str_auto(&usdc),
+                        token_b: router_engine::TokenId::from_str_auto(&eurc),
+                        source: "fixture".into(),
+                        pool_address: "0xpool-usdc-eurc".into(),
+                        fee_bps: 30,
+                        reserve_a: None,
+                        reserve_b: None,
+                        factory: String::new(),
+                        dex_type: "xyk".into(),
+                    },
+                    router_engine::TradingPair {
+                        token_a: router_engine::TokenId::from_str_auto(&usdc),
+                        token_b: router_engine::TokenId::from_str_auto(&cirbtc),
+                        source: "fixture".into(),
+                        pool_address: "0xpool-usdc-cirbtc".into(),
+                        fee_bps: 30,
+                        reserve_a: None,
+                        reserve_b: None,
+                        factory: String::new(),
+                        dex_type: "xyk".into(),
+                    },
+                    router_engine::TradingPair {
+                        token_a: router_engine::TokenId::from_str_auto(&eurc),
+                        token_b: router_engine::TokenId::from_str_auto(&cirbtc),
+                        source: "fixture".into(),
+                        pool_address: "0xpool-eurc-cirbtc".into(),
+                        fee_bps: 30,
+                        reserve_a: None,
+                        reserve_b: None,
+                        factory: String::new(),
+                        dex_type: "xyk".into(),
+                    },
+                ],
+            )
+            .await;
+
+        let routes = route_health_for_engine(&engine).await;
+        assert_eq!(routes.len(), 6);
+        assert!(routes.iter().all(|route| route.direct));
+    }
 
     #[test]
     fn zero_history_contract_has_all_directed_catalog_pairs() {
