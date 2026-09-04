@@ -58,6 +58,18 @@ Release gates, all passed:
   `receipt.blockNumber` as BigInt. The serializer was fixed and covered by the
   three-test preflight suite; no rebroadcast was performed.
 
+## Production frontend acceptance (2026-09-04)
+
+- Vercel deployment `dpl_A1v6Nt3McDZjFXh7gf5MsqsJgDFn` reached Ready after the
+  `/stats` static-export rewrite was merged.
+- Both production aliases returned HTTP 200 for `/stats`. Playwright browser
+  smoke loaded `/stats?range=30d`, displayed the live 2 confirmed swaps and
+  $2.00 notional, and rendered six healthy route-health directions plus Presto
+  and UnitFlow venue rows.
+- Final Render stats check reported chain/indexed/confirmed heads, lag 0,
+  freshness 21 seconds, six healthy routes, and the expected 1 attributed / 2
+  confirmed swaps.
+
 ## Fresh local verification (2026-09-04)
 
 - `cargo test -p router-engine`: 51 passed.

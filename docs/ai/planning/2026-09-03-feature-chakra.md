@@ -1,8 +1,8 @@
 # Chakra feature plan
 
 Status: backend hotfix implemented and locally verified; stage 1 is deployed
-and live-accepted. The controlled QA transaction and analytics attribution
-completed on 2026-09-04; stage 2 is ready for commit and review.
+and live-accepted. The controlled QA transaction, analytics attribution, stage
+2 merge, and Vercel production acceptance completed on 2026-09-04.
 
 1. Watcher reliability: topic batching (10 + 3), merge/dedupe polling, WS
    multi-subscription with ack validation (+ native-tls for wss), and
@@ -73,9 +73,10 @@ completed on 2026-09-04; stage 2 is ready for commit and review.
    mined in block `60438104`; after 12 confirmations, stats showed one new
    attributed/confirmed swap and 1,000,000 stablecoin-notional micros, with
    Presto and UnitFlow attribution.
-2. Stage 2: commit the dashboard + final docs, PR → merge, confirm the
-   chakra-arc-dex Vercel deploy reaches Ready (both production aliases),
-   recheck Render health/readiness after the main merge.
+2. **Complete:** stage 2 merged via PRs #7 and #8; production deployment
+   `dpl_A1v6Nt3McDZjFXh7gf5MsqsJgDFn` is Ready and both production aliases serve
+   `/stats`. Render health, readiness, stats freshness, and all six routes were
+   rechecked successfully.
 
 ## Summary
 
@@ -83,5 +84,5 @@ Implementation is complete and green (tasks 1-5 plus the dust-policy regression)
 stage 1 is merged and deployed with the discovery, thin-reserve, and readiness
 fixes. The worker on Render is healthy: discovery republishes every 10 minutes,
 pool state is written continuously, analytics is live with lag 0, and the
-15-minute acceptance window passed. The controlled QA swap is confirmed; the
-separate stage 2 dashboard release is next.
+15-minute acceptance window passed. The controlled QA swap is confirmed and
+the stage 2 dashboard is live on both production aliases.

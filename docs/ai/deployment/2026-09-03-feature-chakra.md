@@ -48,3 +48,16 @@ authorized 1,000,000-atomic swap then confirmed in block `60438104` (tx
 12 confirmations, `/api/v1/stats?range=all` showed the expected +1 attributed
 swap, +1 confirmed swap, and +1,000,000 stablecoin-notional micros, attributed
 to Presto and UnitFlow.
+
+## Stage 2 production acceptance (2026-09-04)
+
+PR #7 and the follow-up static-export rewrite PR #8 were merged into
+`chakra/main`. Vercel production deployment
+`dpl_A1v6Nt3McDZjFXh7gf5MsqsJgDFn` reached Ready. The aliases
+`https://chakra-ag.vercel.app/stats` and
+`https://chakra-arc-dex.vercel.app/stats` both returned HTTP 200; a browser
+smoke rendered the Stats page with live counters, venue attribution, and all
+six route-health directions.
+
+The final Render check returned `/health` 200, `/ready` 200, stats lag 0,
+freshness 21 seconds, and six of six healthy route directions.
