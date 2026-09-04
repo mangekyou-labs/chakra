@@ -1,8 +1,8 @@
 # Chakra feature plan
 
-Status: backend hotfix implemented and locally verified; **stage-1 rollout is
-pending deploy and live acceptance** (see § Rollout below). Planning doc
-reconciled 2026-09-04.
+Status: backend hotfix implemented and locally verified; stage 1 is deployed
+and live-accepted. The controlled QA transaction and analytics attribution
+completed on 2026-09-04; stage 2 is ready for commit and review.
 
 1. Watcher reliability: topic batching (10 + 3), merge/dedupe polling, WS
    multi-subscription with ack validation (+ native-tls for wss), and
@@ -63,17 +63,16 @@ reconciled 2026-09-04.
   zero reserves, zero exact output, factory policy, and slippage remain
   enforced. The fix is live and accepted on Render.
 - The 15-minute observation, strict `/ready`, and six-direction live quote
-  gates passed. The QA-wallet swap + analytics attribution remains approval-
-  gated before stage 2.
+  gates passed. The QA-wallet swap and analytics attribution are now confirmed.
 
 ## Next steps
 
-1. Execute exactly one QA-wallet USDC→cirBTC swap (1,000,000 atomic USDC,
-   50 bps, canonical multihop through EURC + UnitFlow) and confirm the
-   attributed analytics record after 12 confirmations. Current dry-run is
-   safely blocked by the existing 100-bps impact guard: the live quote is
-   1,462 bps, so no approval or transaction has been sent; retry only when a
-   safe quote is available or after an explicit policy decision.
+1. **Complete:** execute exactly one QA-wallet USDC→cirBTC swap (1,000,000
+   atomic USDC, 50 bps, canonical multihop through EURC + UnitFlow). Receipt
+   `0x2df6e81aa9ff0805aad7d49241ccdd9e979dd7c0dae1b261c51ed469542236c5`
+   mined in block `60438104`; after 12 confirmations, stats showed one new
+   attributed/confirmed swap and 1,000,000 stablecoin-notional micros, with
+   Presto and UnitFlow attribution.
 2. Stage 2: commit the dashboard + final docs, PR → merge, confirm the
    chakra-arc-dex Vercel deploy reaches Ready (both production aliases),
    recheck Render health/readiness after the main merge.
@@ -84,5 +83,5 @@ Implementation is complete and green (tasks 1-5 plus the dust-policy regression)
 stage 1 is merged and deployed with the discovery, thin-reserve, and readiness
 fixes. The worker on Render is healthy: discovery republishes every 10 minutes,
 pool state is written continuously, analytics is live with lag 0, and the
-15-minute acceptance window passed. The approval-gated QA swap and then the
-separate stage 2 dashboard release remain.
+15-minute acceptance window passed. The controlled QA swap is confirmed; the
+separate stage 2 dashboard release is next.

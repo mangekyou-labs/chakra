@@ -17,7 +17,11 @@ writes. WS `-32005` rate-limit and block-range-beyond-head warnings occurred in
 the worker log but recovered; they did not produce fetch failures, analytics
 lag, or readiness loss.
 
-The post-window QA preflight returned a canonical EURC + UnitFlow multihop but
-reported 1,462 bps price impact for 1,000,000 atomic USDC. The smoke command
-aborted before approvals/broadcast under its 100-bps guard; do not bypass that
-guard while waiting for a safe quote or policy direction.
+The September 4 guarded quote probe returned the canonical USDC + EURC +
+UnitFlow multihop at 27 bps price impact for 1,000,000 atomic USDC (363 output,
+361 minimum). The explicitly authorized transaction confirmed in block
+`60438104` (tx
+`0x2df6e81aa9ff0805aad7d49241ccdd9e979dd7c0dae1b261c51ed469542236c5`). The
+post-confirmation stats sample reported lag 0, freshness 28 seconds, one new
+attributed swap, one new confirmed swap, and 2,000,000 stablecoin-notional
+micros total; venue attribution included Presto and UnitFlow.

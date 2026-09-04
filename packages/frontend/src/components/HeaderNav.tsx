@@ -7,6 +7,7 @@ import { DOCUMENTATION_URL } from '@/lib/site';
 
 const PRIMARY_LINKS = [
   { href: '/', label: 'Swap', match: (path: string) => path === '/' },
+  { href: '/stats', label: 'Stats', match: (path: string) => path.startsWith('/stats') },
 ] as const;
 
 const SECONDARY_LINKS: { href: string; label: string; match: (path: string) => boolean }[] = [];

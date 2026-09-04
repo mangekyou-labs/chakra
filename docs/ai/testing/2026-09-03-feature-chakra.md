@@ -32,9 +32,31 @@ Release gates, all passed:
   clean 15-minute observation window.
 - Fetch logs showed `tasks_failed=0` and continuing Redis writes. WS rate-limit
   and head-range warnings were observed and recovered; no readiness loss.
-- QA dry-run reached quote/build preflight but stopped before approvals because
-  the live 1,000,000-atomic USDC route reported 1,462 bps price impact, above
-  the smoke tool's 100-bps safety guard. No transaction was broadcast.
+- The September 4 live quote probe returned the canonical USDC→EURC→cirBTC
+  route through UnitFlow at 27 bps impact (363 output, 361 minimum) for the
+  exact 1,000,000-atomic USDC / 50-bps slippage inputs. The smoke CLI could not
+  continue to wallet/build preflight because `QA_WALLET_SECRET` was not
+  exported; no approval or transaction was broadcast.
+- With the worktree `.env` sourced into the process environment, the same dry-run
+  reached wallet/build and signed Permit2 off-chain. Its expected pre-approval
+  `TRANSFER_FROM_FAILED` simulation now produces a clean dry-run verdict; the
+  new `node --test packages/frontend/qa/swap/preflight.test.mjs` regression
+  suite passes (3 tests).
+
+## QA transaction acceptance (2026-09-04)
+
+- Authorized broadcast used exactly 1,000,000 atomic USDC and 50 bps slippage.
+  The canonical USDC→EURC→cirBTC route confirmed in block `60438104` with tx
+  `0x2df6e81aa9ff0805aad7d49241ccdd9e979dd7c0dae1b261c51ed469542236c5`.
+- Receipt logs and balance reads showed the expected stablecoin transfer and
+  +368 cirBTC atoms. The required 12-block window elapsed before analytics
+  verification.
+- `/api/v1/stats?range=all` moved from 0 to 1 attributed swaps, 1 to 2
+  confirmed swaps, and 1,000,000 to 2,000,000 stablecoin-notional micros;
+  attribution included Presto and UnitFlow.
+- The initial CLI exited after confirmation because JSON serialization rejected
+  `receipt.blockNumber` as BigInt. The serializer was fixed and covered by the
+  three-test preflight suite; no rebroadcast was performed.
 
 ## Fresh local verification (2026-09-04)
 
