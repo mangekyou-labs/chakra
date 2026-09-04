@@ -23,3 +23,24 @@ A slow poll can no longer backlog past a due discovery tick. Regression test
 `slow_poll_never_starves_discovery_cycle` proves boot + ≥2 periodic discovery
 cycles run while each poll outlasts its own tick cadence. Live check with a 30 s
 discovery interval: 4 discovery publishes in <100 s (old binary: 1 in 3 h).
+
+## 2026-09-04 hotfix: executable thin XYK reserves and readiness diagnostics
+
+PR #4 (`2f2d1fc`, merged as `9c5c41a`) removed the unit-agnostic
+`MIN_XYK_RESERVE_ATOMIC_UNITS` guard from local XYK quote paths. PR #5
+(`f248252`, merged as `834a65be`) normalized catalog addresses in route
+diagnostics so lowercase snapshot topology is reflected by `/stats` and strict
+`/ready`. Neither change alters a public response shape, schema, or migration.
+
+Render deploy `dep-dad8e3v10e5c73dpv7ag` is live from `834a65be`. On 2026-09-04,
+all six directed production quotes succeeded, `/api/v1/ready` returned HTTP
+200, and five samples spanning a clean 15-minute observation window remained
+ready with lag 0, freshness 18–24 seconds, and all six routes healthy. Worker
+logs showed completed fetch tasks, zero failed tasks, and ongoing Redis writes;
+the existing Arc RPC WS rate-limit and head-range warnings recovered without
+loss of readiness.
+
+The QA smoke dry-run after acceptance was stopped before any state-changing
+transaction: the canonical USDC → EURC → cirBTC quote was 1,462 bps impact,
+above the tool's 100-bps safety threshold. This is a market-state safety
+blocker, not a deployment failure.

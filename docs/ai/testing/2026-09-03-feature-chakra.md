@@ -23,6 +23,19 @@ Release gates, all passed:
 - Regression-proof cycle: temporarily restored the old floor and reproduced
   the failure; restored the fix and reran the targeted test successfully.
 
+## Production acceptance evidence (2026-09-04)
+
+- Render deploy `dep-dad8e3v10e5c73dpv7ag` served all six directed quotes with
+  nonzero output: USDC↔EURC, EURC↔cirBTC direct, and USDC↔cirBTC multihop.
+- `/api/v1/health` and strict `/api/v1/ready` returned HTTP 200; `/stats`
+  reported six healthy routes, lag 0, and freshness 18–24 seconds across the
+  clean 15-minute observation window.
+- Fetch logs showed `tasks_failed=0` and continuing Redis writes. WS rate-limit
+  and head-range warnings were observed and recovered; no readiness loss.
+- QA dry-run reached quote/build preflight but stopped before approvals because
+  the live 1,000,000-atomic USDC route reported 1,462 bps price impact, above
+  the smoke tool's 100-bps safety guard. No transaction was broadcast.
+
 ## Fresh local verification (2026-09-04)
 
 - `cargo test -p router-engine`: 51 passed.
@@ -31,5 +44,5 @@ Release gates, all passed:
   had no test cases).
 - `cargo clippy --workspace --all-targets -- -D warnings`: passed.
 - `cargo fmt --all -- --check`: remains blocked by pre-existing formatting drift
-  in untouched files (`crates/api-server/src/stats.rs`, `crates/dex-adapters`,
+  in unrelated areas (`crates/api-server/src/stats.rs`, `crates/dex-adapters`,
   and `crates/market-data-worker`); no unrelated formatting was applied.
