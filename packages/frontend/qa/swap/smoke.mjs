@@ -30,6 +30,7 @@ import { mkdirSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { createPublicClient, createWalletClient, http } from 'viem';
 import { mnemonicToAccount, privateKeyToAccount } from 'viem/accounts';
+import { isApprovalDependentSimulationError, stringifyEvidence } from './preflight.mjs';
 
 // ── Arc testnet + catalog constants (mirror src/lib/chain.ts, decimals.ts) ──
 
@@ -371,7 +372,7 @@ function writeEvidence(summary) {
   mkdirSync(dir, { recursive: true });
   const stamp = new Date().toISOString().replace(/[:.]/g, '-');
   const file = resolve(dir, `swap-evidence-${stamp}.json`);
-  writeFileSync(file, `${JSON.stringify(summary, null, 2)}\n`);
+  writeFileSync(file, `${stringifyEvidence(summary)}\n`);
   return file;
 }
 
@@ -516,7 +517,7 @@ async function main() {
 
   if (MODE === 'DRY-RUN') {
     const verdict =
-      swapSimError === null || /allowance|approve|insufficient/i.test(swapSimError)
+      swapSimError === null || isApprovalDependentSimulationError(swapSimError)
         ? 'clean'
         : 'review';
     console.log(`\n✅ DRY-RUN complete (verdict: ${verdict}). Nothing was broadcast.`);
@@ -554,7 +555,7 @@ async function main() {
   }
 
   // ── BROADCAST path ─────────────────────────────────────────────────────────
-  if (swapSimError !== null && !/allowance|approve|insufficient/i.test(swapSimError)) {
+  if (swapSimError !== null && !isApprovalDependentSimulationError(swapSimError)) {
     console.error(`❌ Swap simulation reverted (${swapSimError}) — aborting before broadcast`);
     process.exit(2);
   }

@@ -40,7 +40,11 @@ logs showed completed fetch tasks, zero failed tasks, and ongoing Redis writes;
 the existing Arc RPC WS rate-limit and head-range warnings recovered without
 loss of readiness.
 
-The QA smoke dry-run after acceptance was stopped before any state-changing
-transaction: the canonical USDC → EURC → cirBTC quote was 1,462 bps impact,
-above the tool's 100-bps safety threshold. This is a market-state safety
-blocker, not a deployment failure.
+The exact QA quote probe on September 4 returned the canonical USDC → EURC →
+cirBTC route through UnitFlow with 27 bps impact (363 cirBTC atomic output and
+361 minimum output), below the tool's 100-bps safety threshold. The explicitly
+authorized 1,000,000-atomic swap then confirmed in block `60438104` (tx
+`0x2df6e81aa9ff0805aad7d49241ccdd9e979dd7c0dae1b261c51ed469542236c5`). After
+12 confirmations, `/api/v1/stats?range=all` showed the expected +1 attributed
+swap, +1 confirmed swap, and +1,000,000 stablecoin-notional micros, attributed
+to Presto and UnitFlow.
