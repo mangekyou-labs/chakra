@@ -574,7 +574,10 @@ Conditional Arc mainnet only if, during the grant period, Arc mainnet is availab
 ### How will this grant support your technical roadmap?
 
 ```
-The grant funds the work that is not yet shipped: a confirmed public swap receipt, quote-to-transaction integrity hardening, swap recovery UX, operational telemetry, Circle user-controlled Wallets on ARC-TESTNET, Circle Gas Station sponsorship, two integrator paths, an independent security review, and a close-out package.
+The grant funds the work that is not yet shipped: quote-to-transaction integrity
+hardening, swap recovery UX, operational telemetry, Circle user-controlled
+Wallets on ARC-TESTNET, Circle Gas Station sponsorship, two integrator paths, an
+independent security review, and a close-out package.
 
 It does not rebuild the existing router, worker, API, SDK, frontend, or aggregator. Those are already hosted on Arc Testnet and already quote USDC and EURC from live venues. The grant turns that proof of concept into a reviewable Circle-integrated product: an embedded wallet path, sponsored eligible fees, documented integrator adoption, and a security bar before any mainnet discussion.
 
