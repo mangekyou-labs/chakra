@@ -33,6 +33,8 @@ const XYLO_RESERVE_USDC: u128 = 9_323_185_000_000; // ~9.3M USDC (live shape)
 const XYLO_RESERVE_EURC: u128 = 613_516_000_000; // ~0.61M EURC
 const UNITFLOW_EURC: u128 = 100_000_000_000; // 100k EURC
 const UNITFLOW_CIRBTC: u128 = 1_000_000_000; // 10 cirBTC (1 EURC ≈ 0.01 cirBTC)
+const LIVE_UNITFLOW_EURC: u128 = 525_211_244;
+const LIVE_UNITFLOW_CIRBTC: u128 = 122_883;
 
 fn app_config() -> AppConfig {
     let mut config = AppConfig::default();
@@ -255,6 +257,56 @@ async fn atomic_usdc_to_eurc_to_cirbtc_multihop() {
         }),
         "USDC→cirBTC must be a 2-hop route through EURC"
     );
+}
+
+/// The live UnitFlow pool is intentionally thin on the 8-decimal cirBTC side.
+/// Curated XYK pools remain executable when both reserves are nonzero and the
+/// exact integer quote produces nonzero output.
+#[tokio::test]
+async fn live_unitflow_reserves_quote_all_cirbtc_directions() {
+    let directions = [
+        (EURC, CIRBTC, 1_000_000, 1),
+        (CIRBTC, EURC, 100, 1),
+        (USDC_ERC20, CIRBTC, 1_000_000, 2),
+        (CIRBTC, USDC_ERC20, 100, 2),
+    ];
+
+    for (token_in, token_out, amount_in, expected_hops) in directions {
+        let (router, _, pool_store) = test_app().await;
+        pool_store
+            .set_xyk_batch(&[XykPoolStateValue::new(
+                "unitflow-v25",
+                UNITFLOW_PAIR,
+                EURC.to_ascii_lowercase(),
+                CIRBTC.to_ascii_lowercase(),
+                30,
+                LIVE_UNITFLOW_EURC,
+                LIVE_UNITFLOW_CIRBTC,
+            )])
+            .await
+            .unwrap();
+
+        let (status, body) = get(
+            &router,
+            &format!("/api/v1/quote?token_in={token_in}&token_out={token_out}&amount_in={amount_in}"),
+        )
+        .await;
+        assert_eq!(status, StatusCode::OK, "{token_in}→{token_out}: {body}");
+        assert_eq!(body["success"], true, "{token_in}→{token_out}: {body}");
+
+        let output: u128 = body["data"]["expected_output"].as_str().unwrap().parse().unwrap();
+        assert!(output > 0, "{token_in}→{token_out} must produce nonzero output: {body}");
+
+        let routes = body["data"]["sub_routes"].as_array().unwrap();
+        assert!(
+            routes.iter().any(|route| {
+                route["pool_addresses"]
+                    .as_array()
+                    .is_some_and(|pools| pools.len() == expected_hops && pools.iter().any(|pool| pool == UNITFLOW_PAIR))
+            }),
+            "{token_in}→{token_out} must use UnitFlow in a {expected_hops}-hop route: {body}"
+        );
+    }
 }
 
 /// A deterministic Xylo/Presto split at capacity size (no shared pools).

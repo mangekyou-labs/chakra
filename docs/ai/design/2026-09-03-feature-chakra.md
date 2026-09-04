@@ -10,6 +10,10 @@
 - RPC: error classification splits retryable rate limits (-32005, with 500ms→30s
   bounded backoff and URL failover) from permanent malformed-filter errors
   (-32012) that surface immediately.
+- XYK dust policy: curated, factory-allowlisted pools are eligible when both
+  reserves are nonzero and exact integer XYK math produces nonzero output. Do
+  not apply a unit-agnostic atomic reserve floor; this preserves executable
+  8-decimal cirBTC liquidity such as the live UnitFlow pool.
 - Analytics: additive integer Redis records (`chakra:analytics:*`) with
   per-swap attribution from decoded `splitSwap` calldata; `chain_head` is the
   latest observed Arc block, `confirmed_head` the confirmation-adjusted target,
