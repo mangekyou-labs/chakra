@@ -47,10 +47,6 @@ fn clmm_coverage_input(state: &SnapshotClmmQuoteState) -> ClmmCoverageInput {
     }
 }
 
-/// Skip xy=k pools with dust reserves on either side (misleading quotes at
-/// small trade sizes).
-const MIN_XYK_RESERVE_ATOMIC_UNITS: u128 = 100_000_000;
-
 fn reserves_for_edge(token_in: &TokenId, token_out: &TokenId, hydrated: &XykPoolStateValue) -> Option<(u128, u128)> {
     let in_key = token_in.canonical();
     let out_key = token_out.canonical();
@@ -585,11 +581,7 @@ impl QuoteEngine {
             return None;
         };
 
-        if reserve_in == 0
-            || reserve_out == 0
-            || reserve_in < MIN_XYK_RESERVE_ATOMIC_UNITS
-            || reserve_out < MIN_XYK_RESERVE_ATOMIC_UNITS
-        {
+        if reserve_in == 0 || reserve_out == 0 {
             return None;
         }
 
@@ -781,11 +773,7 @@ impl QuoteEngine {
             };
             (r_in, r_out, pair.fee_bps)
         };
-        if reserve_in == 0
-            || reserve_out == 0
-            || reserve_in < MIN_XYK_RESERVE_ATOMIC_UNITS
-            || reserve_out < MIN_XYK_RESERVE_ATOMIC_UNITS
-        {
+        if reserve_in == 0 || reserve_out == 0 {
             return None;
         }
         let amount_out = dex_adapters::evm_quote_math::xyk_quote(reserve_in, reserve_out, amount_in);

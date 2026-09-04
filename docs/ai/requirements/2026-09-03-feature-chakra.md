@@ -17,6 +17,9 @@ venue statistics:
 - Use only discovered live liquidity (Xylo or Presto USDC/EURC, UnitFlow
   0x268D...9200 EURC/cirBTC). Never create liquidity or invent a direct cirBTC
   pool.
+- Curated, factory-allowlisted XYK pools are eligible when both reserves are
+  nonzero and exact integer quote math produces nonzero output; reserve
+  eligibility is not decided by a unit-agnostic atomic reserve floor.
 - Strict readiness only when all six directed USDC/EURC/cirBTC probes have a
   direct or multihop route; `GET /api/v1/stats?range=14d|30d|90d|all` with
   honest heads/lag/freshness semantics; integer decimal-string monetary

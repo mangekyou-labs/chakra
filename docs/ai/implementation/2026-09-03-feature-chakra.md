@@ -9,3 +9,11 @@ additive integer analytics indexer with correct heads/lag/freshness; six-probe
 strict readiness; `GET /api/v1/stats`; viem QA smoke CLI; and the `/stats`
 dashboard with BigInt USD formatting, URL range selection, and stale-response
 protection.
+
+Backend hotfix implemented: removed the unit-agnostic
+MIN_XYK_RESERVE_ATOMIC_UNITS guard from both local XYK quote paths. Zero-
+reserve rejection, exact integer XYK math, nonzero-output rejection,
+curated/factory allowlisting, and normal slippage protection remain unchanged.
+Added the live UnitFlow reserve regression in
+crates/api-server/tests/chakra_venues_test.rs for direct EURC↔cirBTC and
+USDC↔cirBTC multihop directions.
