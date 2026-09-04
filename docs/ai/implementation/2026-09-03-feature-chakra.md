@@ -17,3 +17,8 @@ curated/factory allowlisting, and normal slippage protection remain unchanged.
 Added the live UnitFlow reserve regression in
 crates/api-server/tests/chakra_venues_test.rs for direct EURC↔cirBTC and
 USDC↔cirBTC multihop directions.
+
+Readiness follow-up: route diagnostics now lowercase the three catalog token
+addresses before graph lookup, matching the canonical lowercase snapshot
+topology. Regression `route_health_matches_lowercase_snapshot_addresses`
+protects all six readiness directions without changing the API contract.

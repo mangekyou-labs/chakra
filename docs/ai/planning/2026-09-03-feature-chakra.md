@@ -22,13 +22,16 @@ reconciled 2026-09-04.
 
 7. XYK dust policy regression: curated, factory-allowlisted pools with both
    nonzero reserves and nonzero exact integer output are eligible, regardless
-   of token decimal scale. — done locally; live acceptance pending.
+   of token decimal scale. — implemented, regression-tested, deployed, and
+   live-accepted.
 
 ## Rollout status
 
 - **Stage 1 backend merged.** `chakra/main` carries the stage-1 backend at
   `d937a69` (PR #2, merge commit) plus the discovery hotfix at `8d36f69`
-  (PR #3). Only Rust, Render config, QA tooling, and lifecycle docs were
+  (PR #3), the thin-reserve hotfix at `9c5c41a` (PR #4), and the readiness
+  diagnostics fix at `834a65b` (PR #5). Only Rust, Render config, QA tooling,
+  and lifecycle docs were
   committed; dashboard files stay uncommitted until stage 2.
 - **Post-merge incidents fixed (new scope):**
   - *Discovery starvation* (worker published once at boot, then never —
@@ -53,36 +56,33 @@ reconciled 2026-09-04.
 
 ## Blockers
 
-- **RESOLVED LOCALLY:** the live-reserve regression now quotes all four cirBTC
+- **RESOLVED:** the live-reserve regression now quotes all four cirBTC
   directions. The old `MIN_XYK_RESERVE_ATOMIC_UNITS = 100_000_000` floor was
   sized for 6-dp stablecoins and rejected the live UnitFlow cirBTC side
   (`122,883` atoms). The hotfix removes only that guard from local XYK paths;
   zero reserves, zero exact output, factory policy, and slippage remain
-  enforced. Deployment and live acceptance are still required.
-- Observation window (15 min, no retry storm, lag ≤100, freshness <300), strict
-  `/ready`, and the QA-wallet swap + analytics attribution remain queued behind
-  the hotfix deploy.
+  enforced. The fix is live and accepted on Render.
+- The 15-minute observation, strict `/ready`, and six-direction live quote
+  gates passed. The QA-wallet swap + analytics attribution remains approval-
+  gated before stage 2.
 
-## Next steps (after the dust-floor fix merges + redeploys)
+## Next steps
 
-1. Commit and release the focused backend hotfix, then verify all six directed
-   quotes succeed and strict `/ready` returns 200 with the expected live pools.
-2. Observe health, freshness, lag, and retry behavior for 15 minutes.
-3. Execute exactly one QA-wallet USDC→cirBTC swap (1,000,000 atomic USDC,
+1. Execute exactly one QA-wallet USDC→cirBTC swap (1,000,000 atomic USDC,
    50 bps, canonical multihop through EURC + UnitFlow) and confirm the
-   attributed analytics record after 12 confirmations.
-4. Stage 2: commit the dashboard + final docs, PR → merge, confirm the
+   attributed analytics record after 12 confirmations. Current dry-run is
+   safely blocked by the existing 100-bps impact guard: the live quote is
+   1,462 bps, so no approval or transaction has been sent; retry only when a
+   safe quote is available or after an explicit policy decision.
+2. Stage 2: commit the dashboard + final docs, PR → merge, confirm the
    chakra-arc-dex Vercel deploy reaches Ready (both production aliases),
    recheck Render health/readiness after the main merge.
 
 ## Summary
 
 Implementation is complete and green (tasks 1-5 plus the dust-policy regression);
-stage 1 merged and deployed twice with two post-merge fixes (discovery starvation,
-env regression), and the worker on Render is healthy: discovery republishes every
-10 minutes,
-pool state is written continuously, analytics is live with lag 0. The local
-hotfix removes the flat 6-dp dust floor that rejected the real (thin) UnitFlow
-EURC/cirBTC pool. The live-reserve test now proves direct and multihop cirBTC
-quotes; deploy, six-direction live readiness, observation, and the
-approval-gated QA swap remain before stage 2 dashboard release.
+stage 1 is merged and deployed with the discovery, thin-reserve, and readiness
+fixes. The worker on Render is healthy: discovery republishes every 10 minutes,
+pool state is written continuously, analytics is live with lag 0, and the
+15-minute acceptance window passed. The approval-gated QA swap and then the
+separate stage 2 dashboard release remain.
