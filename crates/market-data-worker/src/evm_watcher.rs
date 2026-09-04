@@ -987,54 +987,30 @@ impl EvmRunner {
         self.watch = Some(watch.clone());
         self.watch_revision.fetch_add(1, Ordering::Relaxed);
 
-        enum ArcEvent {
-            Log(EvmLog),
-            Poll,
-            Discovery,
-        }
-        let (tx, mut rx) = mpsc::channel::<ArcEvent>(1024);
-
-        if self.config.ws_enabled {
+        // WS logs arrive on their own channel while poll/discovery ticks drive
+        // the loop inline below. The loop is `select!`-driven (never an mpsc
+        // event queue) so a slow `poll_once` can not backlog Poll events past
+        // a due Discovery tick: interval ticks are skipped while an arm is
+        // busy instead of accumulating in an unbounded queue that starves
+        // discovery and WS log handling.
+        let mut ws_log_rx = if self.config.ws_enabled {
             let ws_urls = self.config.ws_urls.clone();
             let revision = self.watch_revision.clone();
-            let (ws_log_tx, mut ws_log_rx) = mpsc::channel::<EvmLog>(1024);
+            let (ws_log_tx, ws_log_rx) = mpsc::channel::<EvmLog>(1024);
             tokio::spawn(ws_watch_loop(ws_urls, watch, revision, ws_log_tx, WS_ACK_TIMEOUT));
-            let forward = tx.clone();
-            tokio::spawn(async move {
-                while let Some(log) = ws_log_rx.recv().await {
-                    if forward.send(ArcEvent::Log(log)).await.is_err() {
-                        break;
-                    }
-                }
-            });
-        }
+            Some(ws_log_rx)
+        } else {
+            None
+        };
 
-        let poll_tx = tx.clone();
-        let poll_interval = self.config.poll_interval;
-        tokio::spawn(async move {
-            let mut poll = tokio::time::interval(poll_interval);
-            poll.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
-            poll.tick().await;
-            loop {
-                poll.tick().await;
-                if poll_tx.send(ArcEvent::Poll).await.is_err() {
-                    break;
-                }
-            }
-        });
-        let discovery_tx = tx.clone();
-        let discovery_interval = Duration::from_secs(self.config.discovery_interval_secs);
-        tokio::spawn(async move {
-            let mut discovery = tokio::time::interval(discovery_interval);
-            discovery.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
-            discovery.tick().await;
-            loop {
-                discovery.tick().await;
-                if discovery_tx.send(ArcEvent::Discovery).await.is_err() {
-                    break;
-                }
-            }
-        });
+        let mut poll_timer = tokio::time::interval(self.config.poll_interval);
+        poll_timer.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
+        poll_timer.tick().await; // consume the immediate first tick
+
+        let mut discovery_timer =
+            tokio::time::interval(Duration::from_secs(self.config.discovery_interval_secs));
+        discovery_timer.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
+        discovery_timer.tick().await; // consume the immediate first tick
 
         let pool_count = {
             let guard = self.shared.read().await;
@@ -1050,19 +1026,27 @@ impl EvmRunner {
         );
 
         loop {
-            match rx.recv().await {
-                Some(ArcEvent::Log(log)) => {
-                    let touched = self.ingest_logs(vec![log]).await;
-                    if touched > 0 {
-                        debug!(touched, "WS touch ingested");
+            tokio::select! {
+                log = recv_ws_log(&mut ws_log_rx), if ws_log_rx.is_some() => {
+                    match log {
+                        Some(log) => {
+                            let touched = self.ingest_logs(vec![log]).await;
+                            if touched > 0 {
+                                debug!(touched, "WS touch ingested");
+                            }
+                        }
+                        None => {
+                            warn!("Arc WS log channel closed; disabling WS ingest");
+                            ws_log_rx = None;
+                        }
                     }
                 }
-                Some(ArcEvent::Poll) => {
+                _ = poll_timer.tick() => {
                     if let Err(error) = self.poll_once().await {
                         warn!("Arc poll failed: {error}");
                     }
                 }
-                Some(ArcEvent::Discovery) => {
+                _ = discovery_timer.tick() => {
                     if let Err(error) = self.discover_once().await {
                         warn!("Arc discovery failed: {error}");
                     }
@@ -1071,13 +1055,17 @@ impl EvmRunner {
                     }
                     self.enqueue_all_discovered().await;
                 }
-                None => {
-                    warn!("Arc event channel closed");
-                    break;
-                }
             }
         }
-        Ok(())
+    }
+}
+
+/// Await the next WS log notification, or never resolve once WS ingest has
+/// been disabled (channel closed). Used as the WS arm of the `select!` loop.
+async fn recv_ws_log(rx: &mut Option<mpsc::Receiver<EvmLog>>) -> Option<EvmLog> {
+    match rx {
+        Some(rx) => rx.recv().await,
+        None => futures::future::pending().await,
     }
 }
 
@@ -2671,6 +2659,64 @@ pub(crate) mod tests {
             runner.verified_factories.read().unwrap().len(),
             0,
             "unverified venue must not be in the published factory set"
+        );
+    }
+
+    /// Regression: a poll that runs slower than its own tick cadence must never
+    /// starve the discovery cycle. The old run loop funneled 500 ms poll ticks
+    /// through an mpsc queue; whenever `poll_once` took longer than one tick
+    /// the backlog pushed Discovery events out for hours (a live worker
+    /// published its bootstrap snapshot once at boot and never again). The
+    /// select!-driven loop skips missed poll ticks instead of queueing them,
+    /// so discovery keeps its cadence no matter how slow polls get.
+    #[tokio::test]
+    async fn slow_poll_never_starves_discovery_cycle() {
+        let discovery_probes = std::sync::Arc::new(std::sync::atomic::AtomicUsize::new(0));
+        let probes = discovery_probes.clone();
+        let (url, _server) = spawn_fixture_rpc(move |method, _params| match method {
+            "eth_getCode" => {
+                // One bytecode check per discovery cycle: counting these tells
+                // us how many discovery cycles actually ran.
+                probes.fetch_add(1, AtomicOrdering::SeqCst);
+                Ok(json!("0x60")) // verified venue bytecode present
+            }
+            // Slow the poll path so every poll_once (eth_blockNumber + up to
+            // two eth_getLogs batches) outlasts the 10 ms poll tick.
+            "eth_blockNumber" => {
+                std::thread::sleep(std::time::Duration::from_millis(40));
+                Ok(json!("0x64"))
+            }
+            "eth_getLogs" => {
+                std::thread::sleep(std::time::Duration::from_millis(40));
+                Ok(json!([]))
+            }
+            // Discovery's pair probes find no pool for any catalog pair.
+            _other => Ok(json!(word(0))),
+        });
+        let config = EvmConfig {
+            seed_factories: vec![FactoryConfig::parse(&format!("{XYK_FACTORY}:xyk"), true).unwrap()],
+            ws_enabled: false,
+            poll_interval: std::time::Duration::from_millis(10),
+            discovery_interval_secs: 1,
+            ..Default::default()
+        };
+        let client = EvmRpcClient::single(&url).unwrap();
+        let shared = Arc::new(RwLock::new(WorkerShared {
+            sources: Vec::new(),
+            clmm_pools: Vec::new(),
+        }));
+        let runner = EvmRunner::new(config, client, shared, None);
+        let handle = tokio::spawn(async move {
+            let _ = runner.run().await;
+        });
+        // Long enough for the boot discovery plus two full 1 s discovery
+        // cycles while polls fire every 10 ms and each takes ~40-120 ms+.
+        tokio::time::sleep(std::time::Duration::from_millis(3200)).await;
+        let cycles = discovery_probes.load(AtomicOrdering::SeqCst);
+        handle.abort();
+        assert!(
+            cycles >= 3,
+            "expected boot + >=2 periodic discovery cycles, got {cycles}: slow polls starved discovery"
         );
     }
 }
