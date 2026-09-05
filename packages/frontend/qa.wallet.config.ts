@@ -22,7 +22,8 @@ if (existsSync(ENV_FILE)) {
 
 export default defineConfig({
   testDir: './qa/wallet',
-  timeout: 240_000,
+  testMatch: '**/*.spec.ts',
+  timeout: 360_000,
   expect: { timeout: 10_000 },
   fullyParallel: false, // wallet tests must run serially
   retries: 0,

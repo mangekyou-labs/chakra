@@ -221,18 +221,23 @@ impl AnalyticsStore {
     pub async fn put_swap(&self, summary: &SwapSummary) -> Result<bool> {
         let mut conn = self.client.get_multiplexed_async_connection().await?;
         let key = format!("{}:swap:{}", self.namespace, summary.tx_hash);
+        let index = format!("{}:by_time", self.namespace);
         let payload = serde_json::to_string(summary)?;
-        let inserted: bool = conn.set_nx(&key, payload).await?;
-        if inserted {
-            let _: () = conn
-                .zadd(
-                    format!("{}:by_time", self.namespace),
-                    &summary.tx_hash,
-                    summary.timestamp as f64,
-                )
-                .await?;
-        }
-        Ok(inserted)
+        // SET NX and ZADD in one MULTI/EXEC so a crash cannot hide a record
+        // from `by_time`. ZADD always runs so replay heals an orphaned key.
+        let (set_nx, _zadd): (Option<String>, i64) = redis::pipe()
+            .atomic()
+            .cmd("SET")
+            .arg(&key)
+            .arg(&payload)
+            .arg("NX")
+            .cmd("ZADD")
+            .arg(&index)
+            .arg(summary.timestamp as f64)
+            .arg(&summary.tx_hash)
+            .query_async(&mut conn)
+            .await?;
+        Ok(set_nx.is_some())
     }
     pub async fn cursor(&self) -> Result<Option<u64>> {
         let mut conn = self.client.get_multiplexed_async_connection().await?;
@@ -254,7 +259,9 @@ impl AnalyticsStore {
         let _: () = conn
             .set(format!("{}:confirmed_head", self.namespace), confirmed_head)
             .await?;
-        let _: () = conn.set(format!("{}:indexed_head", self.namespace), indexed_head).await?;
+        let _: () = conn
+            .set(format!("{}:indexed_head", self.namespace), indexed_head)
+            .await?;
         Ok(())
     }
 
@@ -306,6 +313,26 @@ impl AnalyticsStore {
             .map(|payload| serde_json::from_str(&payload).context("invalid analytics swap record"))
             .collect()
     }
+}
+
+/// In-memory model of Redis `SET NX` + `ZADD` for one swap. Production
+/// [`AnalyticsStore::put_swap`] must run the same pair in one MULTI/EXEC.
+#[cfg(test)]
+pub(crate) fn index_swap(
+    records: &mut std::collections::HashMap<String, String>,
+    by_time: &mut std::collections::HashMap<String, u64>,
+    tx_hash: &str,
+    payload: String,
+    timestamp: u64,
+) -> bool {
+    let inserted = if records.contains_key(tx_hash) {
+        false
+    } else {
+        records.insert(tx_hash.to_string(), payload);
+        true
+    };
+    by_time.insert(tx_hash.to_string(), timestamp);
+    inserted
 }
 
 /// Backend consumed by the analytics indexer. [`AnalyticsStore`] (Redis) is
@@ -623,6 +650,43 @@ mod tests {
         assert_eq!(confirmed_target(0, 12), 0);
     }
 
+    #[test]
+    fn index_swap_inserts_the_record_and_the_time_index() {
+        let mut records = std::collections::HashMap::new();
+        let mut by_time = std::collections::HashMap::new();
+        assert!(index_swap(
+            &mut records,
+            &mut by_time,
+            "0xtx",
+            "{\"tx\":\"0xtx\"}".into(),
+            1_700_000_000,
+        ));
+        assert_eq!(records.get("0xtx").map(String::as_str), Some("{\"tx\":\"0xtx\"}"));
+        assert_eq!(by_time.get("0xtx").copied(), Some(1_700_000_000));
+    }
+
+    #[test]
+    fn index_swap_replay_is_idempotent_and_does_not_overwrite_payload() {
+        let mut records = std::collections::HashMap::from([("0xtx".into(), "first".into())]);
+        let mut by_time = std::collections::HashMap::from([("0xtx".into(), 1)]);
+        assert!(!index_swap(&mut records, &mut by_time, "0xtx", "second".into(), 2));
+        assert_eq!(records.get("0xtx").map(String::as_str), Some("first"));
+        assert_eq!(by_time.get("0xtx").copied(), Some(2), "replay still refreshes by_time");
+    }
+
+    #[test]
+    fn index_swap_heals_a_missing_by_time_entry_when_the_record_already_exists() {
+        let mut records = std::collections::HashMap::from([("0xtx".into(), "payload".into())]);
+        let mut by_time = std::collections::HashMap::new();
+        assert!(!index_swap(&mut records, &mut by_time, "0xtx", "ignored".into(), 42,));
+        assert_eq!(records.get("0xtx").map(String::as_str), Some("payload"));
+        assert_eq!(
+            by_time.get("0xtx").copied(),
+            Some(42),
+            "crash between SET NX and ZADD must not hide the swap from by_time after replay"
+        );
+    }
+
     #[tokio::test]
     async fn poll_records_heads_cursor_and_freshness_after_catch_up() {
         let calls = std::sync::Arc::new(std::sync::Mutex::new(Vec::<(String, String)>::new()));
@@ -719,5 +783,4 @@ mod tests {
         assert_eq!(backend.heads().await.unwrap(), Some((200, 195, 195)));
         assert!(backend.polled_at().await.unwrap().is_some());
     }
-
 }

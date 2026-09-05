@@ -150,9 +150,9 @@ pub async fn all_routes_healthy(engine: &router_engine::QuoteEngine) -> bool {
 }
 
 pub fn empty(range: String, aggregator: String) -> StatsResponse {
-    let usdc = market_snapshot::decimals::USDC_ERC20.to_string();
-    let eurc = market_snapshot::decimals::EURC.to_string();
-    let cirbtc = market_snapshot::decimals::CIRBTC.to_string();
+    let usdc = market_snapshot::decimals::USDC_ERC20.to_ascii_lowercase();
+    let eurc = market_snapshot::decimals::EURC.to_ascii_lowercase();
+    let cirbtc = market_snapshot::decimals::CIRBTC.to_ascii_lowercase();
     let mut route_health = Vec::new();
     for (a, b) in [(&usdc, &eurc), (&usdc, &cirbtc), (&eurc, &cirbtc)] {
         route_health.push(RouteHealth {
@@ -393,6 +393,32 @@ mod tests {
     }
 
     #[test]
+    fn empty_route_health_uses_lowercase_catalog_addresses() {
+        let response = empty("30d".to_string(), "0xaggregator".to_string());
+        let usdc = market_snapshot::decimals::USDC_ERC20.to_ascii_lowercase();
+        let eurc = market_snapshot::decimals::EURC.to_ascii_lowercase();
+        let cirbtc = market_snapshot::decimals::CIRBTC.to_ascii_lowercase();
+        assert!(
+            response.route_health.iter().all(|route| {
+                route.token_in == route.token_in.to_ascii_lowercase()
+                    && route.token_out == route.token_out.to_ascii_lowercase()
+            }),
+            "empty() route_health must match the lowercase snapshot topology"
+        );
+        let pairs: Vec<(String, String)> = response
+            .route_health
+            .iter()
+            .map(|route| (route.token_in.clone(), route.token_out.clone()))
+            .collect();
+        assert!(pairs.contains(&(usdc.clone(), eurc.clone())));
+        assert!(pairs.contains(&(eurc.clone(), usdc.clone())));
+        assert!(pairs.contains(&(usdc.clone(), cirbtc.clone())));
+        assert!(pairs.contains(&(cirbtc.clone(), usdc)));
+        assert!(pairs.contains(&(eurc.clone(), cirbtc.clone())));
+        assert!(pairs.contains(&(cirbtc, eurc)));
+    }
+
+    #[test]
     fn head_meta_follows_the_chain_confirmed_indexed_lag_contract() {
         let mut response = empty("30d".to_string(), "0xaggregator".to_string());
         // Worker just caught up: chain 200, confirmed target 195, cursor 195.
@@ -403,7 +429,10 @@ mod tests {
             1_700_000_030,
         );
         assert_eq!(response.meta.chain_head, 200, "chain_head is the latest observed block");
-        assert_eq!(response.meta.confirmed_head, 195, "confirmed_head is the confirmation-adjusted target");
+        assert_eq!(
+            response.meta.confirmed_head, 195,
+            "confirmed_head is the confirmation-adjusted target"
+        );
         assert_eq!(response.meta.indexed_head, 195, "indexed_head is the committed cursor");
         assert_eq!(response.meta.lag_blocks, 0);
         // Freshness tracks the poll, not the newest swap.

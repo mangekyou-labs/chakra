@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  chartGeometry,
   formatBpsPercent,
   formatCompactCount,
   formatMicrosUsd,
@@ -35,6 +36,10 @@ describe('formatMicrosUsd (BigInt money)', () => {
   it('never renders sub-cent amounts as 1M-style units', () => {
     expect(formatMicrosUsd('50')).toBe('$0.00');
   });
+
+  it('treats API junk as zero instead of throwing', () => {
+    expect(formatMicrosUsd('not-a-number')).toBe('$0.00');
+  });
 });
 
 describe('formatUsdCompact (chart labels)', () => {
@@ -45,6 +50,10 @@ describe('formatUsdCompact (chart labels)', () => {
   it('compacts only above $1,000', () => {
     expect(formatUsdCompact('1200000000')).toBe('$1.2K');
     expect(formatUsdCompact('1500000000000000')).toBe('$1.5B');
+  });
+
+  it('treats API junk as zero instead of throwing', () => {
+    expect(formatUsdCompact('not-a-number')).toBe('$0.00');
   });
 });
 
@@ -105,6 +114,43 @@ describe('microsBigInt', () => {
     expect(microsBigInt('9007199254740993')).toBe(9007199254740993n);
     expect(microsBigInt(null)).toBe(0n);
     expect(microsBigInt('not-a-number')).toBe(0n);
+  });
+});
+
+describe('chartGeometry (BigInt scale before Number)', () => {
+  const point = (micros: string, day = '2026-09-04') => ({
+    day,
+    stablecoin_notional_micros: micros,
+    swaps: 1,
+  });
+
+  it('returns empty points for an empty series', () => {
+    expect(chartGeometry([])).toEqual({ points: '' });
+  });
+
+  it('places a single nonzero point at the left pad and top of the plot', () => {
+    expect(chartGeometry([point('1000000')])).toEqual({
+      points: '',
+      onePoint: { x: 10, y: 12 },
+    });
+  });
+
+  it('puts a max=0 series on the baseline', () => {
+    expect(chartGeometry([point('0')])).toEqual({
+      points: '',
+      onePoint: { x: 10, y: 138 },
+    });
+    expect(chartGeometry([point('0'), point('0')])).toEqual({
+      points: '10,138 790,138',
+    });
+  });
+
+  it('scales a multi-point series with BigInt division before Number', () => {
+    const huge = '1000000000000000000';
+    const half = '500000000000000000';
+    expect(chartGeometry([point('0', 'a'), point(half, 'b'), point(huge, 'c')])).toEqual({
+      points: '10,138 400,75 790,12',
+    });
   });
 });
 

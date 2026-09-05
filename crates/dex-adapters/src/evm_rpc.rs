@@ -243,17 +243,11 @@ impl EvmRpcClient {
     }
 
     async fn post_once(&self, url: &str, body: &Value) -> std::result::Result<Value, RpcError> {
-        let response = self
-            .http
-            .post(url)
-            .json(body)
-            .send()
-            .await
-            .map_err(|error| RpcError {
-                url: url.to_string(),
-                code: None,
-                detail: format!("{error}"),
-            })?;
+        let response = self.http.post(url).json(body).send().await.map_err(|error| RpcError {
+            url: url.to_string(),
+            code: None,
+            detail: format!("{error}"),
+        })?;
         if !response.status().is_success() {
             return Err(RpcError {
                 url: url.to_string(),
@@ -261,14 +255,11 @@ impl EvmRpcClient {
                 detail: format!("HTTP {}", response.status()),
             });
         }
-        let value: Value = response
-            .json()
-            .await
-            .map_err(|error| RpcError {
-                url: url.to_string(),
-                code: None,
-                detail: format!("response parse failed: {error}"),
-            })?;
+        let value: Value = response.json().await.map_err(|error| RpcError {
+            url: url.to_string(),
+            code: None,
+            detail: format!("response parse failed: {error}"),
+        })?;
         if let Some(error) = value.get("error") {
             return Err(RpcError {
                 url: url.to_string(),
@@ -887,7 +878,11 @@ mod tests {
         });
         let client = EvmRpcClient::single(&url).unwrap();
         assert_eq!(client.eth_block_number().await.unwrap(), 42);
-        assert_eq!(calls.load(Ordering::Relaxed), 2, "exactly one bounded retry after -32005");
+        assert_eq!(
+            calls.load(Ordering::Relaxed),
+            2,
+            "exactly one bounded retry after -32005"
+        );
     }
 
     #[tokio::test]

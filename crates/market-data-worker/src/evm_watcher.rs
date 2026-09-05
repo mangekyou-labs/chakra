@@ -1007,8 +1007,7 @@ impl EvmRunner {
         poll_timer.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
         poll_timer.tick().await; // consume the immediate first tick
 
-        let mut discovery_timer =
-            tokio::time::interval(Duration::from_secs(self.config.discovery_interval_secs));
+        let mut discovery_timer = tokio::time::interval(Duration::from_secs(self.config.discovery_interval_secs));
         discovery_timer.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
         discovery_timer.tick().await; // consume the immediate first tick
 
@@ -2202,28 +2201,26 @@ pub(crate) mod tests {
         });
         let requests = Arc::new(std::sync::Mutex::new(Vec::<usize>::new()));
         let requests_inside = requests.clone();
-        let (url, _server) = spawn_fixture_rpc(move |method, params| {
-            match method {
-                "eth_blockNumber" => Ok(json!("0x11")),
-                "eth_getLogs" => {
-                    let topics = params[0]["topics"][0].as_array().unwrap().clone();
-                    let mut guard = requests_inside.lock().unwrap();
-                    guard.push(topics.len());
-                    let index = guard.len() - 1;
-                    drop(guard);
-                    if index == 0 {
-                        assert_eq!(topics.len(), 10, "first batch must hold the touch signatures");
-                        Ok(json!([]))
-                    } else {
-                        assert_eq!(topics.len(), 3, "second batch must hold the creation signatures");
-                        assert!(topics.iter().any(|t| {
-                            t.as_str() == Some(event_topic0_hex(dex_adapters::evm_logs::XYK_PAIR_CREATED_SIG).as_str())
-                        }));
-                        Ok(json!([created.clone()]))
-                    }
+        let (url, _server) = spawn_fixture_rpc(move |method, params| match method {
+            "eth_blockNumber" => Ok(json!("0x11")),
+            "eth_getLogs" => {
+                let topics = params[0]["topics"][0].as_array().unwrap().clone();
+                let mut guard = requests_inside.lock().unwrap();
+                guard.push(topics.len());
+                let index = guard.len() - 1;
+                drop(guard);
+                if index == 0 {
+                    assert_eq!(topics.len(), 10, "first batch must hold the touch signatures");
+                    Ok(json!([]))
+                } else {
+                    assert_eq!(topics.len(), 3, "second batch must hold the creation signatures");
+                    assert!(topics.iter().any(|t| {
+                        t.as_str() == Some(event_topic0_hex(dex_adapters::evm_logs::XYK_PAIR_CREATED_SIG).as_str())
+                    }));
+                    Ok(json!([created.clone()]))
                 }
-                other => Err(json!(format!("unexpected method {other}"))),
             }
+            other => Err(json!(format!("unexpected method {other}"))),
         });
         let client = EvmRpcClient::single(&url).unwrap();
         let config = EvmConfig {
@@ -2239,7 +2236,11 @@ pub(crate) mod tests {
         assert_eq!(runner.poll_once().await.unwrap(), 0);
         {
             let guard = requests.lock().unwrap();
-            assert_eq!(guard.as_slice(), &[10, 3], "13 topics must become two requests of at most ten");
+            assert_eq!(
+                guard.as_slice(),
+                &[10, 3],
+                "13 topics must become two requests of at most ten"
+            );
         }
         // Logs returned only by the second batch were ingested: the created
         // pool now exists in the shared topology and the window was consumed.
@@ -2253,18 +2254,16 @@ pub(crate) mod tests {
     async fn poll_keeps_cursor_when_any_topic_batch_fails() {
         let fail_batch_two = Arc::new(std::sync::atomic::AtomicBool::new(true));
         let flag = fail_batch_two.clone();
-        let (url, _server) = spawn_fixture_rpc(move |method, _params| {
-            match method {
-                "eth_blockNumber" => Ok(json!("0x11")),
-                "eth_getLogs" => {
-                    if flag.load(std::sync::atomic::Ordering::Relaxed) {
-                        Err(json!("second batch simulated failure"))
-                    } else {
-                        Ok(json!([]))
-                    }
+        let (url, _server) = spawn_fixture_rpc(move |method, _params| match method {
+            "eth_blockNumber" => Ok(json!("0x11")),
+            "eth_getLogs" => {
+                if flag.load(std::sync::atomic::Ordering::Relaxed) {
+                    Err(json!("second batch simulated failure"))
+                } else {
+                    Ok(json!([]))
                 }
-                other => Err(json!(format!("unexpected method {other}"))),
             }
+            other => Err(json!(format!("unexpected method {other}"))),
         });
         let client = EvmRpcClient::single(&url).unwrap();
         let config = EvmConfig {
@@ -2408,11 +2407,7 @@ pub(crate) mod tests {
     /// fails the handshake per `failure`; the second connection acknowledges
     /// both batches and emits `notification` (frames stay ordered, so the
     /// notification is consumed by the forwarding loop, never the handshake).
-    async fn run_reconnect_server(
-        listener: TcpListener,
-        failure: WsHandshakeFailure,
-        notification: serde_json::Value,
-    ) {
+    async fn run_reconnect_server(listener: TcpListener, failure: WsHandshakeFailure, notification: serde_json::Value) {
         use futures::{SinkExt, StreamExt};
         let mut accepted = 0u64;
         loop {

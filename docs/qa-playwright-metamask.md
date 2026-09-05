@@ -43,14 +43,17 @@ From `packages/frontend/`:
 
 ## Test Flow (Critical Path)
 
-1. **Bootstrap:** Launches headed Chromium, initializes MetaMask with `QA_WALLET_SECRET`.
-2. **Network Setup:** Adds and switches to Arc Testnet (`5042002`).
-3. **Connect:** Navigates to `DAPP_URL`, clicks Connect, selects MetaMask, approves in extension.
-4. **Quote:** Enters swap size (e.g. `1.0` USDC -> EURC), verifies routes and 0.00% protocol fee.
-5. **Permit2 Approval:** Approves ERC-20 Permit2 allowance if required.
-6. **Swap Execution:** Clicks Swap, signs EIP-712 PermitSingle typed data, confirms `splitSwap` transaction (`value = 0n`).
-7. **Verification:** Waits for 1 confirmation, verifies Arcscan link and `localStorage` recent swaps.
-8. **Skip Safety:** If `QA_WALLET_SECRET` is unset, the spec automatically skips without failing CI.
+1. **Bootstrap:** Launches headed Chromium, initializes MetaMask with `QA_WALLET_SECRET`. Keep `wallet.page` on MetaMask home. Do not navigate that tab to the DApp — dappwright’s stray-`home.html` closer races Connect otherwise.
+2. **DApp tab:** `context.newPage()` → `DAPP_URL`. Wait for the injected provider.
+3. **Connect:** Click Connect. `confirmMetaMaskPromptsUntil` clicks MetaMask 13 `notification.html` buttons (`confirm-footer-button` / Next / Connect). After 3s idle it opens `chrome-extension://gadekpdjmpjjnnemgnhkbjgnjpdaakgh/notification.html`.
+4. **Network:** Header chip “Switch to Arc Testnet” if the primary button is not already `Enter amount` / `Swap` (`5042002`).
+5. **Quote:** Enters swap size (e.g. `1.0` USDC -> EURC), verifies Route and Protocol fee rows.
+6. **Permit2 Approval:** Approves ERC-20 Permit2 allowance if required.
+7. **Swap Execution:** Clicks Swap, signs EIP-712 PermitSingle typed data, confirms `splitSwap` transaction (`value = 0n`).
+8. **Verification:** Waits for 1 confirmation, verifies Arcscan link and `localStorage` recent swaps.
+9. **Skip Safety:** If `QA_WALLET_SECRET` is unset, the spec automatically skips without failing CI.
+
+Playwright config `qa.wallet.config.ts` uses `testMatch: '**/*.spec.ts'` so it does not import Vitest helper tests. Helper unit tests live in `qa/wallet/metamask-prompt.test.ts`.
 
 ## Security & Artifact Sanitization
 

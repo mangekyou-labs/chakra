@@ -28,7 +28,7 @@ services:
       - key: CHAKRA_CHAIN_ID
         value: "5042002"
       - key: CHAKRA_CORS_ORIGINS
-        value: "https://chakra-ag.vercel.app,https://chakra-arc-dex.vercel.app,https://frontend-ruddy-two-90.vercel.app,https://chakra-arc-dex-gadillacers-projects.vercel.app,http://localhost:3000"
+        value: "https://chakra-ag.vercel.app,https://chakra-arc-dex.vercel.app,http://localhost:3000"
       - key: CHAKRA_LISTEN_ADDR
         value: "0.0.0.0:10000"
       - key: CHAKRA_AGGREGATOR
