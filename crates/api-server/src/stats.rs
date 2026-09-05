@@ -150,9 +150,9 @@ pub async fn all_routes_healthy(engine: &router_engine::QuoteEngine) -> bool {
 }
 
 pub fn empty(range: String, aggregator: String) -> StatsResponse {
-    let usdc = market_snapshot::decimals::USDC_ERC20.to_string();
-    let eurc = market_snapshot::decimals::EURC.to_string();
-    let cirbtc = market_snapshot::decimals::CIRBTC.to_string();
+    let usdc = market_snapshot::decimals::USDC_ERC20.to_ascii_lowercase();
+    let eurc = market_snapshot::decimals::EURC.to_ascii_lowercase();
+    let cirbtc = market_snapshot::decimals::CIRBTC.to_ascii_lowercase();
     let mut route_health = Vec::new();
     for (a, b) in [(&usdc, &eurc), (&usdc, &cirbtc), (&eurc, &cirbtc)] {
         route_health.push(RouteHealth {
@@ -390,6 +390,32 @@ mod tests {
             .iter()
             .all(|route| !route.direct && !route.multihop));
         assert_eq!(response.meta.deployment_block, 59_424_918);
+    }
+
+    #[test]
+    fn empty_route_health_uses_lowercase_catalog_addresses() {
+        let response = empty("30d".to_string(), "0xaggregator".to_string());
+        let usdc = market_snapshot::decimals::USDC_ERC20.to_ascii_lowercase();
+        let eurc = market_snapshot::decimals::EURC.to_ascii_lowercase();
+        let cirbtc = market_snapshot::decimals::CIRBTC.to_ascii_lowercase();
+        assert!(
+            response.route_health.iter().all(|route| {
+                route.token_in == route.token_in.to_ascii_lowercase()
+                    && route.token_out == route.token_out.to_ascii_lowercase()
+            }),
+            "empty() route_health must match the lowercase snapshot topology"
+        );
+        let pairs: Vec<(String, String)> = response
+            .route_health
+            .iter()
+            .map(|route| (route.token_in.clone(), route.token_out.clone()))
+            .collect();
+        assert!(pairs.contains(&(usdc.clone(), eurc.clone())));
+        assert!(pairs.contains(&(eurc.clone(), usdc.clone())));
+        assert!(pairs.contains(&(usdc.clone(), cirbtc.clone())));
+        assert!(pairs.contains(&(cirbtc.clone(), usdc)));
+        assert!(pairs.contains(&(eurc.clone(), cirbtc.clone())));
+        assert!(pairs.contains(&(cirbtc, eurc)));
     }
 
     #[test]

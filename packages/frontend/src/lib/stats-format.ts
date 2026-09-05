@@ -33,7 +33,7 @@ export function groupThousands(digits: string): string {
 
 /** Micros → "$1.00". Half-up to the cent, entirely in BigInt arithmetic. */
 export function formatMicrosUsd(micros: string | bigint | number): string {
-  const value = typeof micros === 'bigint' ? micros : BigInt(micros || '0');
+  const value = microsBigInt(micros);
   const roundedCents = (value * CENTS_PER_USD + MICROS_PER_USD / 2n) / MICROS_PER_USD;
   const dollars = roundedCents / CENTS_PER_USD;
   const cents = roundedCents % CENTS_PER_USD;
@@ -53,7 +53,7 @@ const USD_UNITS: ReadonlyArray<readonly [bigint, string]> = [
  * compacting only applies above $1,000, and the axis uses these labels.
  */
 export function formatUsdCompact(micros: string | bigint | number): string {
-  const value = typeof micros === 'bigint' ? micros : BigInt(micros || '0');
+  const value = microsBigInt(micros);
   const usd = value / MICROS_PER_USD;
   for (const [unit, suffix] of USD_UNITS) {
     if (usd >= unit) {
@@ -129,4 +129,39 @@ export function microsBigInt(micros: string | bigint | number | null | undefined
   } catch {
     return 0n;
   }
+}
+
+export const CHART_HEIGHT = 150;
+export const CHART_WIDTH = 800;
+export const CHART_PAD = 10;
+
+type ChartDailyPoint = { stablecoin_notional_micros: string };
+
+/** Integer-based chart coordinates: BigInt division first, Number last. */
+export function chartGeometry(daily: ChartDailyPoint[]): {
+  points: string;
+  onePoint?: { x: number; y: number };
+} {
+  if (daily.length === 0) return { points: '' };
+  const max = daily.reduce((top, d) => {
+    const value = microsBigInt(d.stablecoin_notional_micros);
+    return value > top ? value : top;
+  }, 0n);
+  const vertical = 1_000_000n; // integer resolution before Number conversion
+  const coordinates = daily.map((d, index) => {
+    const value = microsBigInt(d.stablecoin_notional_micros);
+    const x =
+      daily.length === 1
+        ? CHART_PAD
+        : CHART_PAD + Math.round((index / (daily.length - 1)) * (CHART_WIDTH - 2 * CHART_PAD));
+    const scaled = max === 0n ? 0n : (value * vertical) / max;
+    const y = Math.round(
+      CHART_PAD + 2 + (1 - Number(scaled) / Number(vertical)) * (CHART_HEIGHT - 24),
+    );
+    return { x, y };
+  });
+  if (coordinates.length === 1) {
+    return { points: '', onePoint: coordinates[0] };
+  }
+  return { points: coordinates.map(({ x, y }) => `${x},${y}`).join(' ') };
 }

@@ -2,6 +2,10 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
+  CHART_HEIGHT,
+  CHART_PAD,
+  CHART_WIDTH,
+  chartGeometry,
   formatBpsPercent,
   formatCompactCount,
   formatMicrosUsd,
@@ -73,39 +77,6 @@ const RANGE_GROUP_LABEL: Record<StatsRange, string> = {
   '90d': 'Last 90 days',
   all: 'All time',
 };
-
-const CHART_HEIGHT = 150;
-const CHART_WIDTH = 800;
-const CHART_PAD = 10;
-
-/** Integer-based chart coordinates: BigInt division first, Number last. */
-function chartGeometry(daily: DailyPoint[]): {
-  points: string;
-  onePoint?: { x: number; y: number };
-} {
-  if (daily.length === 0) return { points: '' };
-  const max = daily.reduce((top, d) => {
-    const value = microsBigInt(d.stablecoin_notional_micros);
-    return value > top ? value : top;
-  }, 0n);
-  const vertical = 1_000_000n; // integer resolution before Number conversion
-  const coordinates = daily.map((d, index) => {
-    const value = microsBigInt(d.stablecoin_notional_micros);
-    const x =
-      daily.length === 1
-        ? CHART_PAD
-        : CHART_PAD + Math.round((index / (daily.length - 1)) * (CHART_WIDTH - 2 * CHART_PAD));
-    const scaled = max === 0n ? 0n : (value * vertical) / max;
-    const y = Math.round(
-      CHART_PAD + 2 + (1 - Number(scaled) / Number(vertical)) * (CHART_HEIGHT - 24),
-    );
-    return { x, y };
-  });
-  if (coordinates.length === 1) {
-    return { points: '', onePoint: coordinates[0] };
-  }
-  return { points: coordinates.map(({ x, y }) => `${x},${y}`).join(' ') };
-}
 
 function SkeletonBar({ className }: { className?: string }) {
   return (

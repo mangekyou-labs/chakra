@@ -67,18 +67,8 @@ const ERC20_ABI = [
 // ── CLI parsing ──────────────────────────────────────────────────────────────
 
 const args = process.argv.slice(2);
-const flags = {
-  broadcast: args.includes('--broadcast'),
-  amountIn: '1000000', // 1 USDC atomic by default
-  slippageBps: 50,
-};
-for (let i = 0; i < args.length; i += 1) {
-  if (args[i] === '--amount-in') flags.amountIn = args[++i];
-  if (args[i] === '--slippage-bps') flags.slippageBps = Number(args[++i]);
-  if (args[i] === '--api') flags.apiUrl = args[++i];
-  if (args[i] === '--rpc') flags.rpcUrl = args[++i];
-  if (args[i] === '--help' || args[i] === '-h') {
-    console.log(`Chakra QA swap smoke — atomic USDC → EURC → cirBTC.
+if (args.includes('--help') || args.includes('-h')) {
+  console.log(`Chakra QA swap smoke — atomic USDC → EURC → cirBTC.
   QA_WALLET_SECRET must be exported (mnemonic or private key). Never read
   from a file, never printed.
   Flags:
@@ -87,8 +77,27 @@ for (let i = 0; i < args.length; i += 1) {
     --slippage-bps N  Slippage in bps (default 50).
     --api URL         Chakra API base (default ${DEFAULT_API_URL}).
     --rpc URL         Arc RPC (default ${DEFAULT_RPC_URL}).`);
-    process.exit(0);
+  process.exit(0);
+}
+
+function requireFlagValue(flag, value) {
+  if (value === undefined || String(value).startsWith('--')) {
+    console.error(`❌ ${flag} requires a value`);
+    process.exit(1);
   }
+  return value;
+}
+
+const flags = {
+  broadcast: args.includes('--broadcast'),
+  amountIn: '1000000', // 1 USDC atomic by default
+  slippageBps: 50,
+};
+for (let i = 0; i < args.length; i += 1) {
+  if (args[i] === '--amount-in') flags.amountIn = requireFlagValue('--amount-in', args[++i]);
+  if (args[i] === '--slippage-bps') flags.slippageBps = Number(requireFlagValue('--slippage-bps', args[++i]));
+  if (args[i] === '--api') flags.apiUrl = requireFlagValue('--api', args[++i]);
+  if (args[i] === '--rpc') flags.rpcUrl = requireFlagValue('--rpc', args[++i]);
 }
 
 const API_URL = (flags.apiUrl || process.env.QA_API_URL || DEFAULT_API_URL).replace(/\/$/, '');

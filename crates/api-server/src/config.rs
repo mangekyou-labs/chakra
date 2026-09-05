@@ -207,6 +207,37 @@ mod tests {
     }
 
     #[test]
+    fn render_cors_allowlist_is_production_and_localhost() {
+        let yaml = include_str!("../../../render.yaml");
+        let after_key = yaml
+            .split("CHAKRA_CORS_ORIGINS")
+            .nth(1)
+            .expect("render.yaml must set CHAKRA_CORS_ORIGINS");
+        let value_line = after_key
+            .lines()
+            .find(|line| line.trim_start().starts_with("value:"))
+            .expect("CHAKRA_CORS_ORIGINS must have a value");
+        let raw = value_line
+            .split_once(':')
+            .map(|(_, value)| value.trim().trim_matches('"'))
+            .expect("CORS value");
+        let origins: Vec<&str> = raw.split(',').map(str::trim).collect();
+        assert_eq!(
+            origins,
+            [
+                "https://chakra-ag.vercel.app",
+                "https://chakra-arc-dex.vercel.app",
+                "http://localhost:3000",
+            ]
+        );
+        assert!(
+            !origins.iter().any(|origin| origin.contains("frontend-ruddy-two-90")
+                || origin.contains("gadillacers-projects")),
+            "preview aliases must not stay on the production CORS allowlist"
+        );
+    }
+
+    #[test]
     fn runtime_mode_parses_embedded_aliases() {
         assert_eq!(RuntimeMode::parse("embedded"), Some(RuntimeMode::Embedded));
         assert_eq!(RuntimeMode::parse("memory"), Some(RuntimeMode::Embedded));
