@@ -397,20 +397,19 @@ mod tests {
         let sigs = watched_event_signatures();
         assert_eq!(sigs.len(), 13, "10 pool-touch + 3 pool-creation signatures");
         let batches = watched_topic0_batches();
-        assert_eq!(batches.len(), 2, "13 topics must become 10 + 3, never one oversized filter");
+        assert_eq!(
+            batches.len(),
+            2,
+            "13 topics must become 10 + 3, never one oversized filter"
+        );
         assert!(batches
             .iter()
             .all(|batch| !batch.is_empty() && batch.len() <= ARC_TOPIC_LIMIT));
         assert_eq!(batches[0].len(), 10);
         assert_eq!(batches[1].len(), 3);
-        assert!(batches[0]
-            .iter()
-            .all(|topic| is_pool_touch_topic(topic)));
-        assert!(batches[1]
-            .iter()
-            .all(|topic| is_created_event_topic(topic)));
-        let expected: std::collections::HashSet<String> =
-            sigs.iter().map(|sig| event_topic0_hex(sig)).collect();
+        assert!(batches[0].iter().all(|topic| is_pool_touch_topic(topic)));
+        assert!(batches[1].iter().all(|topic| is_created_event_topic(topic)));
+        let expected: std::collections::HashSet<String> = sigs.iter().map(|sig| event_topic0_hex(sig)).collect();
         let all: std::collections::HashSet<&String> = batches.iter().flatten().collect();
         assert_eq!(all.len(), 13, "batches must not overlap");
         assert!(all.into_iter().all(|topic| expected.contains(topic)));

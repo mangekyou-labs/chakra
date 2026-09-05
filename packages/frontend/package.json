@@ -28,13 +28,16 @@
     "wagmi": "^3.7.6"
   },
   "devDependencies": {
+    "@playwright/test": "^1.52.0",
     "@tailwindcss/postcss": "^4.0.0",
-    "@testing-library/react": "^16.3.2",
+    "@tenkeylabs/dappwright": "^2.13.0",
     "@testing-library/dom": "^10.4.1",
+    "@testing-library/react": "^16.3.2",
     "@testing-library/user-event": "^14.6.6",
     "@types/node": "20.17.6",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
+    "@vitest/coverage-v8": "^4.1.11",
     "es-object-atoms": "^1.1.2",
     "eslint": "^9.39.5",
     "eslint-config-next": "^16.3.3",
@@ -44,8 +47,6 @@
     "prettier": "^3.9.5",
     "tailwindcss": "^4.0.0",
     "typescript": "^5.4.0",
-    "vitest": "^4.1.11",
-    "@playwright/test": "^1.52.0",
-    "@tenkeylabs/dappwright": "^2.13.0"
+    "vitest": "^4.1.11"
   }
 }

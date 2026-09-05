@@ -231,8 +231,9 @@ mod tests {
             ]
         );
         assert!(
-            !origins.iter().any(|origin| origin.contains("frontend-ruddy-two-90")
-                || origin.contains("gadillacers-projects")),
+            !origins
+                .iter()
+                .any(|origin| origin.contains("frontend-ruddy-two-90") || origin.contains("gadillacers-projects")),
             "preview aliases must not stay on the production CORS allowlist"
         );
     }

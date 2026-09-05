@@ -205,7 +205,7 @@ until the next `render.yaml` deploy.
    `render_cors_allowlist_is_production_and_localhost` via
    `include_str!("../../../render.yaml")`.
 
-### Leftovers (unchanged)
+### Leftovers (unchanged at P3 commit; see follow-up section below)
 
 - T11.10 / T11.11 headed MetaMask remain blocked. The 2026-09-04 viem CLI
   tx `0x2df6e81aa9ff0805aad7d49241ccdd9e979dd7c0dae1b261c51ed469542236c5` is
@@ -230,4 +230,87 @@ until the next `render.yaml` deploy.
   forge 88 were the Phase 9 review gates, not re-run for this P3 pass.
 - Docs: this section plus the testing Phase 9 record.
 
-Ready to push and open a PR when asked. Do not commit unless asked.
+P3 nits plus Phase 7–9 docs were committed as `68953e3` (PR #10, not merged).
+
+## Follow-ups after PR #10 (2026-09-05)
+
+Worktree cwd. Uncommitted delta on `feature-chakra` after HEAD `68953e3`.
+
+### Live CORS
+
+`render.yaml` already lists
+`https://chakra-ag.vercel.app,https://chakra-arc-dex.vercel.app,http://localhost:3000`.
+Live `CHAKRA_CORS_ORIGINS` was updated on Render service `srv-da8g4non74is73ds1jgg`
+(env PUT, existing image; no merge required). OPTIONS `/api/v1/health`:
+
+- `https://chakra-ag.vercel.app` → allow-origin echo
+- `https://chakra-arc-dex.vercel.app` → allow-origin echo
+- `http://localhost:3000` → allow-origin echo
+- `https://frontend-ruddy-two-90.vercel.app` → no allow-origin
+- `https://chakra-arc-dex-gadillacers-projects.vercel.app` → no allow-origin
+- `https://evil.example` → no allow-origin
+
+### rustfmt
+
+`rustfmt.toml` keeps only stable 1.88.0 options (`max_width=120`,
+`fn_params_layout=Tall`, `reorder_imports`, `use_field_init_shorthand`).
+Nightly keys (`group_imports`, `imports_granularity`, `wrap_comments`,
+`format_code_in_doc_comments`, `binop_separator`, `trailing_comma`,
+`imports_layout`) were dropped so stable rustfmt matches the file. Wrapping
+diffs in `crates/api-server/src/{config,stats}.rs`,
+`crates/dex-adapters/src/{evm_logs,evm_rpc}.rs`, and
+`crates/market-data-worker/src/{analytics,evm_watcher}.rs` were formatted
+under that config. `cargo fmt --all -- --check` exit 0.
+
+### Frontend coverage-v8
+
+`packages/frontend` declares `@vitest/coverage-v8` `^4.1.11` (same as
+`vitest`). `coverage/` is gitignored. Vitest include is
+`src/**/*.test.{ts,tsx}` plus `qa/**/*.test.{ts,tsx}`.
+
+### T11.10 / T11.11 headed MetaMask
+
+Root cause of the Connect hang: the spec navigated `wallet.page` to the DApp,
+destroying MetaMask home and racing dappwright’s stray-`home.html` closer.
+Fix: keep `wallet.page` on extension home; `context.newPage()` for the DApp;
+`confirmMetaMaskPromptsUntil` on `notification.html` with a 3s
+`notification.html` fallback. `qa.wallet.config.ts` `testMatch: '**/*.spec.ts'`
+so Playwright does not import the Vitest helper tests.
+
+Helper: `packages/frontend/qa/wallet/metamask-prompt.ts` plus
+`metamask-prompt.test.ts` (8 tests). Headed `npm run qa:wallet` on
+`https://chakra-ag.vercel.app`: 1 passed, 39.1s. Prompt sequence: Connect,
+add-chain, Permit2 EIP-712 signature, `splitSwap` confirm. UI: 1.0 USDC →
+1.627293 EURC quote, banner `Swap confirmed! View on Arcscan`, wallet
+`0xc6…CE76`.
+
+On-chain receipt (Arcscan, re-fetched this session):
+`0xee7bc19a990ce6691a68e9b387585baee13edc846cbf3a43551ab3dd7cfcda6c`,
+block 60563600, 2026-09-05T10:24:14Z, status ok, method `0x2e3be0c1`
+(`splitSwap`), value 0, gas 207294, from
+`0xc603C39102b84c101f21F3b9723780F8F84dCE76` to aggregator
+`0xeb12351602c56D47c4EE955193335848952b29d8`. Transfers: 1_000_000 USDC in
+→ pool `0x5794a8284A29493871Fbfa3c4f343D42001424D6` → 1_629_188 EURC back.
+The 2026-09-04 viem CLI tx remains a different path.
+
+### T11.12 (still open)
+
+Do not manufacture liquidity. Live `GET /api/v1/stats?range=all`:
+`confirmed_swaps` 3, notional `"3000000"` micros, `split_swaps` 0,
+`attributed_swaps` 2, daily 2026-09-05 one 1_000_000-micros swap.
+USDC↔EURC `usable_pools` 2; USDC↔cirBTC `usable_pools` 3. Quotes at 1 / 100
+/ 1000 USDC and EURC↔USDC / cirBTC sizes all returned `is_split: false`
+(`max_splits` 5, single `sub_routes` entry). The headed 1 USDC swap was
+single-path `presto-hub`.
+
+### Checklist
+
+- Design match: yes.
+- Security: env-only `QA_WALLET_SECRET`; live CORS is production aliases +
+  localhost.
+- Tests: rustfmt check green; frontend vitest + v8 coverage 104 / 14 files;
+  helper 8 passed; headed wallet 1 passed with Arcscan receipt.
+- Leftover: T11.12 only.
+
+Ready to commit / push onto PR #10 when asked. Do not merge. Do not claim
+T11.12 closed.

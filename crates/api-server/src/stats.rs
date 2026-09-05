@@ -429,7 +429,10 @@ mod tests {
             1_700_000_030,
         );
         assert_eq!(response.meta.chain_head, 200, "chain_head is the latest observed block");
-        assert_eq!(response.meta.confirmed_head, 195, "confirmed_head is the confirmation-adjusted target");
+        assert_eq!(
+            response.meta.confirmed_head, 195,
+            "confirmed_head is the confirmation-adjusted target"
+        );
         assert_eq!(response.meta.indexed_head, 195, "indexed_head is the committed cursor");
         assert_eq!(response.meta.lag_blocks, 0);
         // Freshness tracks the poll, not the newest swap.

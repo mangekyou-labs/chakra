@@ -38,4 +38,7 @@
 1. Fresh Rust, Foundry, SDK, and frontend verification.
 2. Successful npm authentication, pack dry run, publish, and registry install.
 3. Temporary-mirror history cleanup and fresh-clone scan.
-4. Render redeploy, Vercel production deploy, hosted smoke, and wallet evidence.
+4. Render redeploy, Vercel production deploy, and hosted smoke — done.
+   Headed MetaMask wallet evidence (T11.10 / T11.11) — done, receipt
+   `0xee7bc19a990ce6691a68e9b387585baee13edc846cbf3a43551ab3dd7cfcda6c`.
+   T11.12 split-route live evidence is still open (`split_swaps` 0).

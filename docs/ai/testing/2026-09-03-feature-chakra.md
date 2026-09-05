@@ -345,5 +345,87 @@ Live `/health` `/ready` `/stats` and playwright `/stats` were not
 re-walked for this P3 pass. Live Render CORS still has preview aliases
 until `render.yaml` is redeployed.
 
-Next: commit / `dev-pr` when asked. Do not claim T11.10 / T11.11 / T11.12
-closed.
+P3 nits plus Phase 7–9 docs were committed as `68953e3` (PR #10, not merged).
+Do not claim T11.12 closed.
+
+## Follow-up verification (2026-09-05)
+
+Worktree `/Users/kyler/repos/avax-dex-agg/.worktrees/feature-chakra` on
+`feature-chakra` at HEAD `68953e3` plus the uncommitted follow-up delta.
+Commands used the worktree cwd. Task tracing is unavailable
+(`npx ai-devkit@latest task` → `unknown command 'task'`).
+
+### Local gates
+
+- `/Users/kyler/.cargo/bin/cargo fmt --all -- --check`: exit 0.
+- `cd packages/frontend && npx vitest run --coverage`: 104 passed / 14 files,
+  exit 0, `Coverage enabled with v8`. Helper
+  `qa/wallet/metamask-prompt.test.ts` 8 passed. Overall statements 71.48%.
+  `coverage/` is gitignored.
+
+### Live CORS
+
+`OPTIONS https://chakra-api-0a5i.onrender.com/api/v1/health` with
+`Access-Control-Request-Method: GET`:
+
+| Origin | `Access-Control-Allow-Origin` |
+| --- | --- |
+| `https://chakra-ag.vercel.app` | echo |
+| `https://chakra-arc-dex.vercel.app` | echo |
+| `http://localhost:3000` | echo |
+| `https://frontend-ruddy-two-90.vercel.app` | absent |
+| `https://chakra-arc-dex-gadillacers-projects.vercel.app` | absent |
+| `https://evil.example` | absent |
+
+### T11.10 / T11.11 headed MetaMask
+
+`cd packages/frontend && npm run qa:wallet` (headed Chromium, dappwright
+MetaMask 13.17.0, `QA_WALLET_SECRET` from gitignored env, never printed):
+1 passed, 39.1s. Spec keeps `wallet.page` on extension home and drives
+`https://chakra-ag.vercel.app` from `context.newPage()`. Playwright asserted
+`Swap confirmed!`, Arcscan link, and `chakra:recent-swaps` localStorage.
+
+Arcscan `GET /api/v2/transactions/0xee7bc19a990ce6691a68e9b387585baee13edc846cbf3a43551ab3dd7cfcda6c`
+(UA `Mozilla/5.0 chakra-qa`), re-fetched this session: status `ok`, result
+`success`, block 60563600, timestamp `2026-09-05T10:24:14.000000Z`, method
+`0x2e3be0c1`, value `0`, gas_used `207294`, from
+`0xc603C39102b84c101f21F3b9723780F8F84dCE76` to
+`0xeb12351602c56D47c4EE955193335848952b29d8`. Token transfers: 1_000_000
+USDC in, 1_629_188 EURC out via pool
+`0x5794a8284A29493871Fbfa3c4f343D42001424D6`.
+
+### T11.12 (still open)
+
+`GET /api/v1/health` 200. `GET /api/v1/ready` 200, `ready: true`,
+`pool_keys: []`. `GET /api/v1/stats?range=all` 200:
+
+- heads: `chain_head` 60564088, `confirmed_head` / `indexed_head` 60564076,
+  `lag_blocks` 0, `freshness_secs` 24
+- overview: notional `"3000000"` micros, `confirmed_swaps` 3,
+  `unique_traders` 1, `split_swaps` 0
+- daily 2026-09-05: 1 swap, `"1000000"` micros, `split_swaps` 0
+- venues: `presto-hub` (2 participations), `unitflow-v25` (1)
+- route_health: USDC↔EURC 2 usable pools; USDC↔cirBTC 3; EURC↔cirBTC 1
+
+Quotes, all HTTP 200, all `is_split: false`, `max_splits` 5, one sub-route:
+
+| Pair | `amount_in` | `expected_output` | source |
+| --- | --- | --- | --- |
+| USDC→EURC | 1e6 | 1627293 | presto-hub |
+| USDC→EURC | 1e8 | 162275570 | presto-hub |
+| USDC→EURC | 1e9 | 1582633849 | presto-hub |
+| EURC→USDC | 1e6 | 1254643 | xylo-stable |
+| EURC→USDC | 1e8 | 125459140 | xylo-stable |
+| USDC→cirBTC | 1e6 | 547 | presto-hub → unitflow-v25 |
+| USDC→cirBTC | 1e8 | 39994 | presto-hub → unitflow-v25 |
+| EURC→cirBTC | 1e6 | 337 | unitflow-v25 |
+| EURC→cirBTC | 1e8 | 27499 | unitflow-v25 |
+
+No manufactured liquidity. T11.12 stays a follow-up until a live quote
+returns `is_split: true` or stats `split_swaps` increments.
+
+### Verdict
+
+Follow-ups 1 (live CORS), 2 (T11.10 / T11.11), 4 (rustfmt), and 5
+(coverage-v8) are evidenced. Follow-up 3 (T11.12) is not closed. Next:
+commit / push onto PR #10 when asked. Do not merge.

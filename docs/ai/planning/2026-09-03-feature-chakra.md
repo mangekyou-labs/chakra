@@ -4,13 +4,15 @@ Status: implementation complete; stage 1 backend and stage 2 `/stats`
 dashboard are live. Phase 7 Check Implementation and Phase 9 `dev-review`
 on 2026-09-05 confirmed HEAD `318de72` (plus the uncommitted Phase 7/8
 delta) against the 2026-09-03 design with no product-code miss. The five
-Phase 9 P3 nits were then fixed in the same worktree (uncommitted).
+Phase 9 P3 nits are on `feature-chakra` at `68953e3` (PR #10, not merged).
+Follow-ups 1, 2, 4, and 5 from that PR are done in the uncommitted worktree
+delta; T11.12 split-route live evidence remains open (`split_swaps` 0).
 
 - [x] Watcher topic batches, merge/dedupe, WS acks, -32005/-32012
 - [x] Additive analytics, six-probe `/ready`, `GET /api/v1/stats`
 - [x] Viem QA smoke CLI (env-only secret, dry-run default)
 - [x] `/stats` dashboard + BigInt USD + URL range
-- [x] Local/live gates (`cargo fmt --check` still red on wrapping drift)
+- [x] Local/live gates (`cargo fmt --all -- --check` green after stable-only rustfmt.toml)
 - [x] Two-stage rollout
 - [x] XYK dust policy / thin cirBTC reserves
 - [x] Controlled QA swap + analytics attribution
@@ -29,10 +31,10 @@ Phase 9 P3 nits were then fixed in the same worktree (uncommitted).
    production aliases (`dpl_A1v6Nt3McDZjFXh7gf5MsqsJgDFn`).
 5. Gates: fmt, workspace tests, clippy -D warnings, forge, frontend
    tests/typecheck/lint/prettier, production build, Docker (rust:1.88),
-   live Arc worker smoke (3 pools, 2 topic batches, no -32012). — all passed
-   except `cargo fmt --all -- --check`, which remains red on wrapping/import
-   drift in this feature's files (stable rustfmt vs nightly rustfmt.toml
-   options). Not mass-formatted.
+   live Arc worker smoke (3 pools, 2 topic batches, no -32012). — all passed.
+   `cargo fmt --all -- --check` is green after `rustfmt.toml` dropped
+   nightly-only keys and the wrapping diffs were formatted under stable
+   1.88.0.
 6. Rollout (two-stage) — done. Stage 1 backend + hotfixes on Render; stage 2
    dashboard live on both Vercel production aliases. See rollout status.
 
@@ -123,8 +125,25 @@ implementation doc; fresh gates and the production `/stats` walk are in
 the testing doc. The five P3 nits from that review are now fixed in the
 uncommitted delta (TDD red then green; evidence in the testing doc).
 
-Next lifecycle step: commit the uncommitted Phase 7–9 docs, P3 fixes, and
-test delta, then `dev-pr`, when asked. Live Render CORS still needs a
-`render.yaml` redeploy. Do not mass-format rustfmt wrapping drift. Do not
-add frontend `@vitest/coverage-v8`. Do not treat T11.10 / T11.11 / T11.12
-as closed.
+P3 nits plus Phase 7–9 docs were committed as `68953e3` and opened as PR #10.
+Do not merge that PR unless asked.
+
+## Follow-ups after PR #10 (2026-09-05)
+
+Authorized leftover list after the PR: live Render CORS, T11.10 / T11.11
+headed MetaMask, T11.12 live `split_swaps`, rustfmt wrapping, frontend
+`@vitest/coverage-v8`.
+
+1. Live CORS: production aliases + `http://localhost:3000` allowed; leftover
+   preview aliases no longer echo `Access-Control-Allow-Origin`.
+2. T11.10 / T11.11: headed MetaMask 1 USDC → EURC settled. Receipt
+   `0xee7bc19a990ce6691a68e9b387585baee13edc846cbf3a43551ab3dd7cfcda6c`.
+3. T11.12: still open. Live `split_swaps` is 0; probed quotes are
+   `is_split: false`. Do not manufacture liquidity.
+4. rustfmt: `rustfmt.toml` is stable-only; `cargo fmt --all -- --check`
+   exit 0.
+5. `@vitest/coverage-v8` `^4.1.11` is a declared frontend devDependency;
+   `npx vitest run --coverage` reports v8 coverage (104 tests / 14 files).
+
+Next: commit / push this uncommitted follow-up delta onto PR #10 when asked.
+Do not merge. Do not claim T11.12 closed.

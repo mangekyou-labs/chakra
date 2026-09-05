@@ -29,9 +29,26 @@ responsive browser review passed on the active aliases. CORS preflight for
 `https://chakra-ag.vercel.app` now returns the matching allow-origin header.
 
 The authenticated wallet run used the existing local `QA_WALLET_SECRET` and
-the canonical `https://chakra-ag.vercel.app` alias. The harness reached the
-current Chakra UI, connected the wallet, switched to Arc, and resolved the
-live 1 USDC to EURC quote (`805774` expected; `801745` minimum; `xylo-stable`).
-The run then blocked at the MetaMask transaction notification: no provider
-confirmation page appeared, so no swap was submitted and no receipt was
-fabricated. Split-route and thin-pool scenarios remain honest follow-up checks.
+the canonical `https://chakra-ag.vercel.app` alias. An earlier harness run
+reached the UI, connected, switched to Arc, and quoted, then blocked at the
+MetaMask notification with no fabricated receipt.
+
+## Headed MetaMask settlement (2026-09-05)
+
+`packages/frontend` `npm run qa:wallet` (headed Chromium, dappwright MetaMask
+13.17.0): 1 passed, 39.1s. The spec keeps `wallet.page` on extension home and
+opens the DApp in `context.newPage()`. `QA_WALLET_SECRET` was not printed
+(`qa:wallet:validate` reported a 24-word mnemonic only).
+
+On-chain receipt, Arcscan
+`0xee7bc19a990ce6691a68e9b387585baee13edc846cbf3a43551ab3dd7cfcda6c`:
+status ok, block 60563600, 2026-09-05T10:24:14Z, method `0x2e3be0c1`
+(`splitSwap`), value 0, from `0xc603C39102b84c101f21F3b9723780F8F84dCE76` to
+aggregator `0xeb12351602c56D47c4EE955193335848952b29d8`. Transfers:
+1_000_000 USDC in → pool `0x5794a8284A29493871Fbfa3c4f343D42001424D6` →
+1_629_188 EURC back. UI quote on that run was 1.0 USDC → 1.627293 EURC
+(single-path `presto-hub`). T11.10 and T11.11 are closed.
+
+Split-route live evidence remains an honest follow-up: hosted `split_swaps`
+is 0 and probed catalog quotes return `is_split: false`. Do not manufacture
+liquidity.

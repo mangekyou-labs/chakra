@@ -26,6 +26,11 @@ import {
   QA_STORAGE_PREFIX,
   QA_SWAP_CONFIRMED_TEXT,
 } from './constants';
+import {
+  confirmMetaMaskPromptsUntil,
+  dumpContextPages,
+  waitForInjectedProvider,
+} from './metamask-prompt';
 
 const DAPP_URL = process.env.DAPP_URL || 'https://chakra-ag.vercel.app';
 const _API_URL = process.env.QA_API_URL || 'https://chakra-api-0a5i.onrender.com';
@@ -33,6 +38,7 @@ const QA_WALLET_SECRET = process.env.QA_WALLET_SECRET || '';
 
 test.describe('Chakra Arc Testnet — MetaMask Critical Path (T9.4)', () => {
   test('MetaMask real wallet swap flow (skip when unconfigured)', async () => {
+    test.setTimeout(360_000);
     // 1. Skip check: do not fail when secrets are missing
     if (!QA_WALLET_SECRET || QA_WALLET_SECRET.trim().length === 0) {
       test.skip(true, 'QA_WALLET_SECRET is not set — skipping live MetaMask headed run');
@@ -49,7 +55,10 @@ test.describe('Chakra Arc Testnet — MetaMask Critical Path (T9.4)', () => {
       version: MetaMaskWallet.recommendedVersion,
       headless: false,
     });
-    const page = wallet.page;
+    const walletPage = wallet.page;
+    // Keep the extension home tab intact. Navigating wallet.page to the DApp
+    // destroys MetaMask's UI and races dAppwright's stray-home closer, which
+    // left the previous headed run stuck on "Connecting…".
 
     await wallet.setup(
       {
@@ -103,41 +112,29 @@ test.describe('Chakra Arc Testnet — MetaMask Critical Path (T9.4)', () => {
 
       // 3. Navigation / connection is app-driven: MetaMask may not know Arc yet,
       //    so the UI's switchToArc handles wallet_addEthereumChain via the app.
+      const page = await context.newPage();
       await page.goto(DAPP_URL, { waitUntil: 'domcontentloaded' });
       await expect(page).toHaveTitle(/Chakra/i);
+      await waitForInjectedProvider(page);
 
       // 4. Connect wallet (EIP-6963 injected connector — no RainbowKit modal)
       const connectBtn = page.getByRole('button', { name: /connect/i }).first();
       await expect(connectBtn).toBeVisible({ timeout: 15_000 });
-      // Register the popup listener before clicking Connect. MetaMask can open
-      // the notification synchronously, which would otherwise race dAppwright's
-      // approve() implementation and leave the dApp on "Connecting…" forever.
-      const connectionPopup = context
-        .waitForEvent('page', { timeout: 60_000 })
-        .then((popup) => ({ kind: 'popup' as const, popup }))
-        .catch(() => ({ kind: 'connected' as const }));
-      const connectionSettled = page
-        .getByRole('button', { name: /connect/i })
-        .first()
-        .waitFor({ state: 'hidden', timeout: 60_000 })
-        .then(() => ({ kind: 'connected' as const }))
-        .catch(() => ({ kind: 'timeout' as const }));
+      dumpContextPages(context, 'pre-connect');
       await connectBtn.click();
-
-      // Approve connection in MetaMask.
-      const connectionResult = await Promise.race([connectionPopup, connectionSettled]);
-      if (connectionResult.kind === 'popup') {
-        await connectionResult.popup.bringToFront();
-        const connectionConfirm = connectionResult.popup
-          .locator('[data-testid="confirm-btn"]')
-          .or(connectionResult.popup.locator('[data-testid="allow-authorize-button"]'))
-          .or(connectionResult.popup.getByRole('button', { name: /^(connect|approve|confirm)$/i }));
-        await connectionConfirm.first().click();
-        await connectionResult.popup.waitForEvent('close', { timeout: 15_000 }).catch(() => {});
-      }
+      await confirmMetaMaskPromptsUntil(context, {
+        walletPage,
+        timeoutMs: 45_000,
+        done: async () =>
+          page
+            .getByRole('button', { name: /connect/i })
+            .first()
+            .isHidden()
+            .catch(() => false),
+      });
       await page.bringToFront();
       await expect(page.getByRole('button', { name: /connect/i }).first()).toBeHidden({
-        timeout: 30_000,
+        timeout: 10_000,
       });
 
       // 5. Primary button drives state: Connect -> Switch to Arc Testnet -> Swap.
@@ -152,72 +149,32 @@ test.describe('Chakra Arc Testnet — MetaMask Critical Path (T9.4)', () => {
       await expect(page.getByRole('button', { name: /^0x/ }).first()).toBeVisible({
         timeout: 20_000,
       });
-      const addrChip = page.getByRole('button', { name: /^0x/ }).first();
-      await addrChip.click();
-      await expect(
-        page.getByRole('button', { name: /switch to arc testnet/i }).first(),
-      ).toBeVisible({
-        timeout: 10_000,
-      });
-      const switchMenuItem = page.getByRole('button', { name: /switch to arc testnet/i });
-      await switchMenuItem.first().click();
-      // The wallet_switchEthereumChain -> wallet_addEthereumChain flow opens a
-      // MetaMask notification popup with Cancel/Confirm. The add-chain flow can
-      // require TWO confirms (add network, then switch) — loop until no popup remains.
-      for (let attempt = 0; attempt < 8; attempt += 1) {
-        await page.waitForTimeout(2_000).catch(() => {});
-        const popup = context
-          .pages()
-          .filter((p) => p !== page)
-          .at(-1);
-        if (!popup) {
-          console.log(`[switch] attempt ${attempt}: no popup`);
-          break;
-        }
-        let handledAlert = false;
-        const reviewAlertBtn = popup.getByRole('button', { name: /review alert/i });
-        if (await reviewAlertBtn.isVisible({ timeout: 2_000 }).catch(() => false)) {
-          console.log(`[switch] attempt ${attempt}: reviewing MetaMask network alert`);
-          await reviewAlertBtn.click();
-          await popup.waitForTimeout(500);
-          handledAlert = true;
-        }
-        const riskCheckbox = popup.getByRole('checkbox');
-        if (await riskCheckbox.isVisible({ timeout: 2_000 }).catch(() => false)) {
-          console.log(`[switch] attempt ${attempt}: acknowledging MetaMask risk alert`);
-          await riskCheckbox.check();
-          handledAlert = true;
-        }
-        const gotItBtn = popup.getByRole('button', { name: /got it/i });
-        if (await gotItBtn.isVisible({ timeout: 2_000 }).catch(() => false)) {
-          await gotItBtn.click();
-          await popup.waitForTimeout(500);
-          handledAlert = true;
-        }
-        const confirmBtn = popup
-          .getByRole('button', {
-            name: /^(confirm|approve|next|add|continue|connect anyway|i understand)$/i,
-          })
-          .or(popup.locator('[data-testid="confirm-footer-button"]'))
-          .or(popup.locator('[data-testid="confirm-btn"]'))
-          .or(popup.locator('[data-testid="page-container-footer-next"]'));
-        if (await confirmBtn.isVisible({ timeout: 5_000 }).catch(() => false)) {
-          console.log(`[switch] attempt ${attempt}: confirming ${popup.url().slice(-30)}`);
-          await confirmBtn.click();
-          await confirmBtn.waitFor({ state: 'detached', timeout: 10_000 }).catch(() => {});
-        } else if (handledAlert) {
-          const popupText = await popup
-            .locator('body')
-            .innerText()
-            .catch(() => '');
-          console.log(
-            `[switch] attempt ${attempt}: alert flow still open: ${popupText.slice(0, 240).replace(/\s+/g, ' ')}`,
-          );
-          continue;
-        } else {
-          console.log(`[switch] attempt ${attempt}: popup no confirm btn`);
-          break;
-        }
+      const onArcAlready = await page
+        .locator('button.btn-primary')
+        .first()
+        .innerText()
+        .then((text) => /^(Enter amount|Finding route|Swap)/.test(text.trim()))
+        .catch(() => false);
+      if (!onArcAlready) {
+        const addrChip = page.getByRole('button', { name: /^0x/ }).first();
+        await addrChip.click();
+        await expect(
+          page.getByRole('button', { name: /switch to arc testnet/i }).first(),
+        ).toBeVisible({
+          timeout: 10_000,
+        });
+        await page.getByRole('button', { name: /switch to arc testnet/i }).first().click();
+        // wallet_switchEthereumChain -> wallet_addEthereumChain can take two confirms.
+        await confirmMetaMaskPromptsUntil(context, {
+          walletPage,
+          timeoutMs: 60_000,
+          done: async () => {
+            const text = (
+              await page.locator('button.btn-primary').first().innerText().catch(() => '')
+            ).trim();
+            return /^(Enter amount|Finding route|Swap)/.test(text);
+          },
+        });
       }
       await page.bringToFront().catch(() => {});
       // Wait for the swap card's primary button to become actionable (on Arc):
@@ -255,59 +212,15 @@ test.describe('Chakra Arc Testnet — MetaMask Critical Path (T9.4)', () => {
 
       // 10. Sequence MetaMask popups to match handlePrimary:
       //     optional ERC-20 approve confirm -> EIP-712 PermitSingle sign -> splitSwap confirm
-      for (let attempt = 0; attempt < 15; attempt += 1) {
-        await page.waitForTimeout(2_000);
-        if (
-          await page
+      await confirmMetaMaskPromptsUntil(context, {
+        walletPage,
+        timeoutMs: 120_000,
+        done: async () =>
+          page
             .locator(`text=${QA_SWAP_CONFIRMED_TEXT}`)
             .isVisible()
-            .catch(() => false)
-        ) {
-          console.log('[swap] swap confirmed banner visible');
-          break;
-        }
-        const popup = context
-          .pages()
-          .filter((p) => p !== page)
-          .at(-1);
-        if (!popup) {
-          continue;
-        }
-        await popup.bringToFront().catch(() => {});
-
-        // Handle scroll down button if present on EIP-712 sign requests
-        const scrollBtn = popup.locator('[data-testid="signature-request-scroll-button"]');
-        if (await scrollBtn.isVisible({ timeout: 1_000 }).catch(() => false)) {
-          console.log(`[swap] attempt ${attempt}: clicking signature scroll button`);
-          await scrollBtn.click().catch(() => {});
-          await popup.waitForTimeout(500);
-        }
-
-        // Click Sign / Confirm / Next / Approve / confirm-footer-button
-        const actionBtn = popup
-          .getByRole('button', { name: /^(sign|confirm|approve|next)$/i })
-          .or(popup.locator('[data-testid="confirm-footer-button"]'))
-          .or(popup.locator('[data-testid="confirm-btn"]'))
-          .or(popup.locator('[data-testid="page-container-footer-next"]'));
-
-        if (
-          await actionBtn
-            .first()
-            .isVisible({ timeout: 2_000 })
-            .catch(() => false)
-        ) {
-          const btnText = await actionBtn
-            .first()
-            .innerText()
-            .catch(() => 'action');
-          console.log(`[swap] attempt ${attempt}: clicking '${btnText}' button in popup`);
-          await actionBtn
-            .first()
-            .click()
-            .catch(() => {});
-          await page.waitForTimeout(1_000).catch(() => {});
-        }
-      }
+            .catch(() => false),
+      });
       await page.bringToFront().catch(() => {});
       // 11. Verify transaction success state — capture hash BEFORE the 3s banner hide
       const successBanner = page.locator(`text=${QA_SWAP_CONFIRMED_TEXT}`);

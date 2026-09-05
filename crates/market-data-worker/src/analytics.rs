@@ -259,7 +259,9 @@ impl AnalyticsStore {
         let _: () = conn
             .set(format!("{}:confirmed_head", self.namespace), confirmed_head)
             .await?;
-        let _: () = conn.set(format!("{}:indexed_head", self.namespace), indexed_head).await?;
+        let _: () = conn
+            .set(format!("{}:indexed_head", self.namespace), indexed_head)
+            .await?;
         Ok(())
     }
 
@@ -676,13 +678,7 @@ mod tests {
     fn index_swap_heals_a_missing_by_time_entry_when_the_record_already_exists() {
         let mut records = std::collections::HashMap::from([("0xtx".into(), "payload".into())]);
         let mut by_time = std::collections::HashMap::new();
-        assert!(!index_swap(
-            &mut records,
-            &mut by_time,
-            "0xtx",
-            "ignored".into(),
-            42,
-        ));
+        assert!(!index_swap(&mut records, &mut by_time, "0xtx", "ignored".into(), 42,));
         assert_eq!(records.get("0xtx").map(String::as_str), Some("payload"));
         assert_eq!(
             by_time.get("0xtx").copied(),
@@ -787,5 +783,4 @@ mod tests {
         assert_eq!(backend.heads().await.unwrap(), Some((200, 195, 195)));
         assert!(backend.polled_at().await.unwrap().is_some());
     }
-
 }
