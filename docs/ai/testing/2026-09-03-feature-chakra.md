@@ -429,3 +429,28 @@ returns `is_split: true` or stats `split_swaps` increments.
 Follow-ups 1 (live CORS), 2 (T11.10 / T11.11), 4 (rustfmt), and 5
 (coverage-v8) are evidenced. Follow-up 3 (T11.12) is not closed. Next:
 commit / push onto PR #10 when asked. Do not merge.
+
+## T11.12 local red/green evidence (2026-09-06)
+
+- Red: each of `presto_off_peg_reports_size_impact_vs_pool_spot`,
+  `xylo_off_peg_reports_size_impact_vs_pool_spot`, and
+  `stable_off_peg_reports_size_impact_vs_pool_spot` failed because the old
+  1:1 comparison returned zero impact for output above the peg.
+- Green: the three tests pass with reserve-ratio pool-spot impact. The
+  verification regression cycle restored the old blocks and reproduced all
+  three failures, then restored the helper calls and reproduced all passes.
+- Live-shaped red: with old impact logic, the 1-USDC Presto/Xylo fixture had
+  best-single impact 0, skipped Brent, and returned
+  `below_threshold_and_not_competitive`.
+- Live-shaped green: with default thresholds unchanged, best-single impact is
+  30 bps versus threshold 5, `split_attempted` is true across distinct
+  `presto-hub` and `xylo-stable` pools, and the honest result is
+  `no_improvement` rather than a forced split.
+- Targeted regressions passed: engine SC-2, Chakra-stable hydration, REST SC-2,
+  canonical USDC/EURC candidates, and the USDC/EURC/cirBTC multihop fixture.
+- Final local gates passed from the feature worktree: Chakra feature lint;
+  router-engine's 55 library tests; the 12 Chakra REST and 7 venue tests;
+  all 285 workspace tests; rustfmt check; workspace clippy with warnings
+  denied; and `git diff --check`.
+- No hosted re-probe was performed before deployment approval. The last live
+  evidence remains `split_swaps` 0; T11.12 stays open pending D-F.

@@ -52,3 +52,18 @@ aggregator `0xeb12351602c56D47c4EE955193335848952b29d8`. Transfers:
 Split-route live evidence remains an honest follow-up: hosted `split_swaps`
 is 0 and probed catalog quotes return `is_split: false`. Do not manufacture
 liquidity.
+
+## T11.12 local split evidence (2026-09-06)
+
+TDD and regression-proof verification cover the three stable-family hop types:
+off-peg Presto, Xylo, and Chakra-stable tests fail under the old 1:1 impact
+logic and pass with pool-spot impact. A live-shaped 1-USDC Presto/Xylo engine
+fixture also fails under the old early return, then passes with 30 bps
+best-single impact, split optimization attempted at the unchanged 5-bps
+threshold, and an honest `no_improvement` result. Existing engine and REST
+SC-2 tests plus canonical venue and cirBTC multihop tests remain green.
+Final local verification passed Chakra feature lint, all 55 router-engine
+library tests, all 12 Chakra REST and 7 venue tests, all 285 workspace tests,
+rustfmt check, workspace clippy with warnings denied, and `git diff --check`.
+No Render deploy or transaction was attempted; live `split_swaps` remains 0
+until approval-gated T11.12-D-F.

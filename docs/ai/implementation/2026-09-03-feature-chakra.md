@@ -314,3 +314,17 @@ single-path `presto-hub`.
 
 Ready to commit / push onto PR #10 when asked. Do not merge. Do not claim
 T11.12 closed.
+
+## T11.12 pool-spot split follow-up (2026-09-06)
+
+- `crates/router-engine/src/quote_engine.rs`: Presto, Xylo, and
+  Chakra-stable hops now reuse `evm_quote_math::price_impact_bps` with reserves
+  oriented to the quoted token direction. This replaces the incorrect 1:1-peg
+  comparison and leaves all split thresholds unchanged.
+- Added three off-peg hop regressions proving nonzero impact at size and larger
+  impact than a tiny quote, even when output remains above the nominal 1:1 peg.
+- Added a live-shaped engine fixture with separate Presto and Xylo pools. At
+  1 USDC, default `SplitConfig` observes 30 bps best-single impact, attempts
+  two-path Brent, and returns the honest `no_improvement` result.
+- No public `RouteDebug` surface, liquidity seeding, deployment, wallet script,
+  or broadcast behavior changed. T11.12 remains open pending D-F.

@@ -28,7 +28,7 @@ work. Split-route live evidence remains an explicitly tracked follow-up.
 | T11.9 | Build the production container from a clean Docker builder. | T11.2; Docker daemon | `docker buildx build --no-cache --file Dockerfile .`; exported image digest recorded in testing evidence | Done |
 | T11.10 | Exercise the CLI-first MetaMask wallet harness through chain add/connect, quote, approve/sign, submit, and confirmation. | T11.4; headed browser; disposable QA wallet; live API | Wallet setup/validate/cleanup artifacts, expected Arc chain, screenshots, receipt, and secret-free artifact scan | Done |
 | T11.11 | Retain authenticated production evidence for the healthy 1 USDC to EURC route. | T11.10; funded disposable wallet and provider confirmation | Quote, approval/sign, submit, and confirmed receipt | Done |
-| T11.12 | Revisit split-route and cirBTC scenarios only when live reserves provide multiple healthy routes. | External liquidity and adequate reserves | Honest quote/route evidence; no manufactured liquidity | Follow-up |
+| T11.12 | Produce honest live split-route evidence. Local A-C are done: pool-spot impact plus a live-shaped Presto/Xylo optimizer-attempt fixture and lockstep docs. D-F remain approval/liquidity gated. | External liquidity, approved Render deploy, fundable split quote, explicit broadcast approval | Local red/green impact and optimizer tests; then live `is_split: true`, one Arcscan split receipt with at least two sub-routes, and `split_swaps` increment | Follow-up |
 
 ## Current progress summary
 
@@ -49,9 +49,14 @@ performed.
 
 ## Next actions
 
-1. Monitor live reserves and add split-route evidence only after a hosted
-   quote returns `is_split: true` or stats `split_swaps` increments. Do not
-   manufacture liquidity.
+1. Obtain explicit approval before deploying the pool-spot impact change to
+   Render (T11.12-D).
+2. After an approved deploy, re-probe health, readiness, stats, and the
+   documented USDC/EURC sizes; record an honest `no_improvement` outcome or
+   the smallest fundable `is_split: true` quote (T11.12-E).
+3. Only with a fundable split quote and separate broadcast approval, execute
+   one atomic split and require an Arcscan receipt plus `split_swaps` increment
+   before closing T11.12 (T11.12-F). Do not manufacture liquidity.
 
 ## Risks and sequencing notes
 
@@ -64,3 +69,13 @@ performed.
   bundle outside the repository, and explicit `--force-with-lease` values.
 - Release evidence must continue to avoid printing or committing local
   credentials.
+
+## Phase 6 update — T11.12 A-C (2026-09-06)
+
+T11.12-A, B, and C are done locally. Presto, Xylo, and Chakra-stable impact is
+now integer bps against hydrated reserve-ratio spot via the existing quote-math
+helper. The live-shaped 1-USDC Presto/Xylo fixture reports 30 bps best-single
+impact against the unchanged 5-bps threshold, attempts two-path Brent across
+distinct pools, and honestly rejects with `no_improvement`. SC-2 remains green.
+Live analytics remains at the previously observed `split_swaps` 0 until the
+approval-gated D-F sequence, so T11.12 remains Follow-up.

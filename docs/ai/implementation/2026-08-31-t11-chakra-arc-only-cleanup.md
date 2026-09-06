@@ -42,3 +42,13 @@
    Headed MetaMask wallet evidence (T11.10 / T11.11) — done, receipt
    `0xee7bc19a990ce6691a68e9b387585baee13edc846cbf3a43551ab3dd7cfcda6c`.
    T11.12 split-route live evidence is still open (`split_swaps` 0).
+
+## T11.12 local implementation (2026-09-06)
+
+Local sub-tasks A-C are complete. The Presto, Xylo, and Chakra-stable hop
+calculations now reuse the same integer reserve-ratio spot-impact helper as the
+existing XYK path. Off-peg tests and a live-shaped two-pool Presto/Xylo fixture
+cover the regression at default split thresholds. The fixture attempts Brent
+and honestly returns `no_improvement`; no threshold or public API changed.
+Render deployment, hosted re-probe, and any broadcast remain separate
+approval-gated work, so T11.12 itself is not closed.

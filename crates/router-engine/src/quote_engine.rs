@@ -622,14 +622,14 @@ impl QuoteEngine {
         let state = hydration?
             .stable_pools
             .get(&QuoteHydration::stable_pool_key(source, pool_address))?;
-        let (i, j) = if token_in.canonical().eq_ignore_ascii_case(&state.token_a)
+        let (i, j, reserve_in, reserve_out) = if token_in.canonical().eq_ignore_ascii_case(&state.token_a)
             && token_out.canonical().eq_ignore_ascii_case(&state.token_b)
         {
-            (0, 1)
+            (0, 1, state.balance_a, state.balance_b)
         } else if token_in.canonical().eq_ignore_ascii_case(&state.token_b)
             && token_out.canonical().eq_ignore_ascii_case(&state.token_a)
         {
-            (1, 0)
+            (1, 0, state.balance_b, state.balance_a)
         } else {
             return None;
         };
@@ -637,14 +637,9 @@ impl QuoteEngine {
         if amount_out == 0 {
             return None;
         }
-        // Impact vs the 1:1 spot price of the equal-decimals stable pool (the
-        // 4 bps venue fee is always paid, so impact >= fee_bps).
-        let spot_out = amount_in;
-        let price_impact_bps = if spot_out > amount_out {
-            ((spot_out - amount_out) * 10_000 / spot_out) as u32
-        } else {
-            0
-        };
+        // Report impact against the hydrated pool's reserve-ratio spot price.
+        let price_impact_bps =
+            dex_adapters::evm_quote_math::price_impact_bps(reserve_in, reserve_out, amount_in, amount_out);
         Some(dex_adapters::AdapterQuote {
             amount_out,
             fee_bps: state.fee_bps,
@@ -684,14 +679,9 @@ impl QuoteEngine {
         if amount_out == 0 {
             return None;
         }
-        // Impact vs the on-peg 1:1 spot (equal-decimals stableswap); the
-        // 4 bps output fee is always paid.
-        let spot_out = amount_in;
-        let price_impact_bps = if spot_out > amount_out {
-            ((spot_out - amount_out) * 10_000 / spot_out) as u32
-        } else {
-            0
-        };
+        // Report impact against the hydrated pool's reserve-ratio spot price.
+        let price_impact_bps =
+            dex_adapters::evm_quote_math::price_impact_bps(reserve_in, reserve_out, amount_in, amount_out);
         Some(dex_adapters::AdapterQuote {
             amount_out,
             fee_bps: state.fee_bps,
@@ -732,12 +722,9 @@ impl QuoteEngine {
         if amount_out == 0 {
             return None;
         }
-        let spot_out = amount_in;
-        let price_impact_bps = if spot_out > amount_out {
-            ((spot_out - amount_out) * 10_000 / spot_out) as u32
-        } else {
-            0
-        };
+        // Report impact against the hydrated pool's reserve-ratio spot price.
+        let price_impact_bps =
+            dex_adapters::evm_quote_math::price_impact_bps(reserve_in, reserve_out, amount_in, amount_out);
         Some(dex_adapters::AdapterQuote {
             amount_out,
             fee_bps: state.fee_bps,
@@ -1045,6 +1032,252 @@ mod tests {
                 Some(&hydration),
             )
             .await
+    }
+
+    #[test]
+    fn presto_off_peg_reports_size_impact_vs_pool_spot() {
+        let engine = QuoteEngine::new(PathFinderConfig::default(), SplitConfig::default());
+        let pool = "presto-off-peg";
+        let hydration = QuoteHydration {
+            stable_pools: HashMap::from([(
+                StablePoolStateValue::pool_key("presto-hub", pool),
+                StablePoolStateValue::new(
+                    "presto-hub",
+                    pool,
+                    USDC_ERC20,
+                    EURC,
+                    200_000_000_000,
+                    400_000_000_000,
+                    1,
+                    30,
+                ),
+            )]),
+            ..Default::default()
+        };
+
+        let tiny = engine
+            .local_presto_quote(
+                &token(USDC_ERC20),
+                &token(EURC),
+                1_000_000,
+                pool,
+                "presto-hub",
+                Some(&hydration),
+            )
+            .unwrap();
+        let large = engine
+            .local_presto_quote(
+                &token(USDC_ERC20),
+                &token(EURC),
+                50_000_000_000,
+                pool,
+                "presto-hub",
+                Some(&hydration),
+            )
+            .unwrap();
+
+        assert!(tiny.amount_out > 1_000_000, "fixture must quote above the 1:1 peg");
+        assert!(large.price_impact_bps > 0);
+        assert!(large.price_impact_bps > tiny.price_impact_bps);
+    }
+
+    #[test]
+    fn xylo_off_peg_reports_size_impact_vs_pool_spot() {
+        let engine = QuoteEngine::new(PathFinderConfig::default(), SplitConfig::default());
+        let pool = "xylo-live-shaped";
+        let hydration = QuoteHydration {
+            stable_pools: HashMap::from([(
+                StablePoolStateValue::pool_key("xylo-stable", pool),
+                StablePoolStateValue::new(
+                    "xylo-stable",
+                    pool,
+                    USDC_ERC20,
+                    EURC,
+                    9_323_185_000_000,
+                    613_516_000_000,
+                    200,
+                    4,
+                ),
+            )]),
+            ..Default::default()
+        };
+
+        let tiny = engine
+            .local_xylo_quote(
+                &token(EURC),
+                &token(USDC_ERC20),
+                1_000_000,
+                pool,
+                "xylo-stable",
+                Some(&hydration),
+            )
+            .unwrap();
+        let large = engine
+            .local_xylo_quote(
+                &token(EURC),
+                &token(USDC_ERC20),
+                100_000_000_000,
+                pool,
+                "xylo-stable",
+                Some(&hydration),
+            )
+            .unwrap();
+
+        assert!(tiny.amount_out > 1_000_000, "fixture must quote above the 1:1 peg");
+        assert!(large.price_impact_bps > 0);
+        assert!(large.price_impact_bps > tiny.price_impact_bps);
+    }
+
+    #[test]
+    fn stable_off_peg_reports_size_impact_vs_pool_spot() {
+        let engine = QuoteEngine::new(PathFinderConfig::default(), SplitConfig::default());
+        let pool = "stable-off-peg";
+        let hydration = QuoteHydration {
+            stable_pools: HashMap::from([(
+                StablePoolStateValue::pool_key("chakra-stable", pool),
+                StablePoolStateValue::new(
+                    "chakra-stable",
+                    pool,
+                    USDC_ERC20,
+                    EURC,
+                    200_000_000_000,
+                    400_000_000_000,
+                    100,
+                    4,
+                ),
+            )]),
+            ..Default::default()
+        };
+
+        let tiny = engine
+            .local_stable_quote(
+                &token(USDC_ERC20),
+                &token(EURC),
+                1_000_000,
+                pool,
+                "chakra-stable",
+                Some(&hydration),
+            )
+            .unwrap();
+        let large = engine
+            .local_stable_quote(
+                &token(USDC_ERC20),
+                &token(EURC),
+                50_000_000_000,
+                pool,
+                "chakra-stable",
+                Some(&hydration),
+            )
+            .unwrap();
+
+        assert!(tiny.amount_out > 1_000_000, "fixture must quote above the 1:1 peg");
+        assert!(large.price_impact_bps > 0);
+        assert!(large.price_impact_bps > tiny.price_impact_bps);
+    }
+
+    #[tokio::test]
+    async fn live_shaped_presto_xylo_attempts_split_at_default_thresholds() {
+        const PRESTO_POOL: &str = "presto-hub";
+        const XYLO_POOL: &str = "xylo-stable";
+        const AMOUNT_IN: u128 = 1_000_000; // smallest standard live probe: 1 USDC
+
+        let engine = QuoteEngine::new(PathFinderConfig::default(), SplitConfig::default());
+        engine
+            .update_pairs_from_cache(
+                "presto-hub",
+                &[pair_with_tokens(
+                    "presto-hub",
+                    PRESTO_POOL,
+                    USDC_ERC20,
+                    EURC,
+                    200_000_000_000,
+                    400_000_000_000,
+                )],
+            )
+            .await;
+        engine
+            .update_pairs_from_cache(
+                "xylo-stable",
+                &[pair_with_tokens(
+                    "xylo-stable",
+                    XYLO_POOL,
+                    USDC_ERC20,
+                    EURC,
+                    9_323_185_000_000,
+                    613_516_000_000,
+                )],
+            )
+            .await;
+
+        let hydration = QuoteHydration {
+            stable_pools: HashMap::from([
+                (
+                    StablePoolStateValue::pool_key("presto-hub", PRESTO_POOL),
+                    StablePoolStateValue::new(
+                        "presto-hub",
+                        PRESTO_POOL,
+                        USDC_ERC20,
+                        EURC,
+                        200_000_000_000,
+                        400_000_000_000,
+                        1,
+                        30,
+                    ),
+                ),
+                (
+                    StablePoolStateValue::pool_key("xylo-stable", XYLO_POOL),
+                    StablePoolStateValue::new(
+                        "xylo-stable",
+                        XYLO_POOL,
+                        USDC_ERC20,
+                        EURC,
+                        9_323_185_000_000,
+                        613_516_000_000,
+                        200,
+                        4,
+                    ),
+                ),
+            ]),
+            ..Default::default()
+        };
+        let request = RouteRequest {
+            token_in: token(USDC_ERC20),
+            token_out: token(EURC),
+            amount_in: AMOUNT_IN,
+            slippage_bps: Some(50),
+            max_hops: Some(1),
+            max_splits: Some(5),
+        };
+        let paths = engine.find_candidate_paths(&request).await;
+        let route = engine.get_route_with_paths(&request, &paths, Some(&hydration)).await;
+        let debug = route.debug.as_ref().expect("engine route debug");
+
+        assert!(
+            debug.best_single_impact_bps >= debug.split_threshold_bps,
+            "pool-spot impact must clear the default split threshold: {debug:?}"
+        );
+        assert!(
+            debug.split_attempted,
+            "optimizer must attempt the two-venue split: {debug:?}"
+        );
+        assert_ne!(
+            debug.split_rejected_reason.as_deref(),
+            Some("below_threshold_and_not_competitive")
+        );
+        assert!(
+            !route.is_split,
+            "the 1 USDC live-shaped fixture has no honest split win"
+        );
+        assert_eq!(debug.split_rejected_reason.as_deref(), Some("no_improvement"));
+        let candidate_pools: std::collections::HashSet<&str> = debug
+            .candidate_routes
+            .iter()
+            .flat_map(|candidate| candidate.pool_addresses.iter().map(String::as_str))
+            .collect();
+        assert_eq!(
+            candidate_pools,
+            std::collections::HashSet::from([PRESTO_POOL, XYLO_POOL])
+        );
     }
 
     #[tokio::test]

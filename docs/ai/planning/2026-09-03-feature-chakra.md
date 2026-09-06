@@ -138,8 +138,11 @@ headed MetaMask, T11.12 live `split_swaps`, rustfmt wrapping, frontend
    preview aliases no longer echo `Access-Control-Allow-Origin`.
 2. T11.10 / T11.11: headed MetaMask 1 USDC → EURC settled. Receipt
    `0xee7bc19a990ce6691a68e9b387585baee13edc846cbf3a43551ab3dd7cfcda6c`.
-3. T11.12: still open. Live `split_swaps` is 0; probed quotes are
-   `is_split: false`. Do not manufacture liquidity.
+3. T11.12: local follow-ups A-C are done. Presto, Xylo, and Chakra-stable now
+   report impact against hydrated pool spot; the live-shaped two-venue fixture
+   clears the unchanged 5-bps threshold and attempts Brent at 1 USDC, then
+   honestly rejects with `no_improvement`. Live `split_swaps` is still 0, so
+   T11.12 remains open. Do not manufacture liquidity.
 4. rustfmt: `rustfmt.toml` is stable-only; `cargo fmt --all -- --check`
    exit 0.
 5. `@vitest/coverage-v8` `^4.1.11` is a declared frontend devDependency;
@@ -147,3 +150,27 @@ headed MetaMask, T11.12 live `split_swaps`, rustfmt wrapping, frontend
 
 Next: commit / push this uncommitted follow-up delta onto PR #10 when asked.
 Do not merge. Do not claim T11.12 closed.
+
+## Phase 6 update — T11.12 local split execution (2026-09-06)
+
+- [x] T11.12-A: use the existing integer pool-spot impact helper for Presto,
+  Xylo, and Chakra-stable hops; off-peg small/large regressions pass.
+- [x] T11.12-B: live-shaped Presto + Xylo fixture at default `SplitConfig`;
+  best-single impact is 30 bps versus the 5-bps threshold, split optimization
+  is attempted across two distinct pools, and Brent honestly returns
+  `no_improvement` at the smallest standard 1-USDC probe.
+- [x] T11.12-C: planning, implementation, and testing records updated in
+  lockstep; SC-2 and canonical venue/multihop regressions remain green.
+- [ ] T11.12-D: blocked on explicit user approval for a Render deploy.
+- [ ] T11.12-E: blocked on D; re-probe hosted health/readiness/stats and
+  fundable USDC/EURC quote sizes after deploy.
+- [ ] T11.12-F: blocked on a live `is_split: true` quote plus explicit
+  broadcast approval; require one atomic split receipt and a `split_swaps`
+  increment before closure.
+
+Progress summary: the local diagnosis is implemented without changing
+`split_threshold_bps`, `min_split_improvement_bps`, or `max_splits`. Off-peg
+venue impact can now trigger split consideration, while the live-shaped local
+fixture records the optimizer's honest non-winning result. The remaining risk
+is external liquidity after deployment; T11.12 stays Follow-up until the live
+quote, Arcscan receipt, and analytics increment all exist.
