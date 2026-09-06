@@ -49,12 +49,12 @@ performed.
 
 ## Next actions
 
-1. Obtain explicit approval before deploying the pool-spot impact change to
-   Render (T11.12-D).
-2. After an approved deploy, re-probe health, readiness, stats, and the
-   documented USDC/EURC sizes; record an honest `no_improvement` outcome or
-   the smallest fundable `is_split: true` quote (T11.12-E).
-3. Only with a fundable split quote and separate broadcast approval, execute
+1. T11.12-D/E are complete: Render deploy `dep-daenql8u01pc73f9prfg` is live
+   from `d4c443a`; health/readiness and the quote matrix passed. The smallest
+   observed split was 21,467 USDC, while 21,466 USDC remained single-route.
+2. Obtain sufficient legitimate QA-wallet USDC or wait for a lower fundable
+   split window; the current 1.949753-USDC balance cannot fund the quote.
+3. Only with a fundable split quote and explicit broadcast approval, execute
    one atomic split and require an Arcscan receipt plus `split_swaps` increment
    before closing T11.12 (T11.12-F). Do not manufacture liquidity.
 
@@ -63,8 +63,9 @@ performed.
 - T11.10 and T11.11 are closed with the headed MetaMask receipt above. Do not
   treat the viem CLI tx as a substitute for that path.
 - Split-route and cirBTC split validation depends on external liquidity and
-  must not be forced with synthetic balances. Live quotes at 1 / 100 / 1000
-  USDC remain `is_split: false`; `split_swaps` is 0.
+  must not be forced with synthetic balances. Live quotes at 1 / 100 / 1000 /
+  10,000 USDC remain `is_split: false`; a two-pool split appears around
+  21,467 USDC, but `split_swaps` remains 0 because it is unfundable.
 - Any future branch rewrite requires a fresh remote-head check, a local-only
   bundle outside the repository, and explicit `--force-with-lease` values.
 - Release evidence must continue to avoid printing or committing local
@@ -77,5 +78,6 @@ now integer bps against hydrated reserve-ratio spot via the existing quote-math
 helper. The live-shaped 1-USDC Presto/Xylo fixture reports 30 bps best-single
 impact against the unchanged 5-bps threshold, attempts two-path Brent across
 distinct pools, and honestly rejects with `no_improvement`. SC-2 remains green.
-Live analytics remains at the previously observed `split_swaps` 0 until the
-approval-gated D-F sequence, so T11.12 remains Follow-up.
+T11.12-D/E subsequently deployed `d4c443a` and proved a live Presto+Xylo split
+at 21,467 USDC. The QA wallet holds only 1.949753 USDC, so T11.12-F remains
+blocked without a broadcast and T11.12 remains Follow-up.

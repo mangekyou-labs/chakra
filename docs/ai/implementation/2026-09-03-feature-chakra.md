@@ -326,5 +326,14 @@ T11.12 closed.
 - Added a live-shaped engine fixture with separate Presto and Xylo pools. At
   1 USDC, default `SplitConfig` observes 30 bps best-single impact, attempts
   two-path Brent, and returns the honest `no_improvement` result.
-- No public `RouteDebug` surface, liquidity seeding, deployment, wallet script,
-  or broadcast behavior changed. T11.12 remains open pending D-F.
+- No public `RouteDebug` surface, liquidity seeding, wallet script, or
+  broadcast behavior changed.
+
+### T11.12 live rollout
+
+Commit `d4c443a` was pushed to `feature-chakra` and deployed explicitly by
+commit ID to Render as `dep-daenql8u01pc73f9prfg`. The deployment reached
+`live`. Post-deploy probing found a genuine Presto+Xylo split window, with the
+smallest observed split at 21,467 USDC and 21,466 USDC still single-route.
+The documented QA wallet has 1.949753 USDC, so no transaction was built or
+broadcast. T11.12 remains open at F pending a fundable split and live receipt.

@@ -65,5 +65,10 @@ SC-2 tests plus canonical venue and cirBTC multihop tests remain green.
 Final local verification passed Chakra feature lint, all 55 router-engine
 library tests, all 12 Chakra REST and 7 venue tests, all 285 workspace tests,
 rustfmt check, workspace clippy with warnings denied, and `git diff --check`.
-No Render deploy or transaction was attempted; live `split_swaps` remains 0
-until approval-gated T11.12-D-F.
+Render deploy `dep-daenql8u01pc73f9prfg` reached `live` from `d4c443a`.
+Health/readiness returned HTTP 200, the required bidirectional quote matrix
+passed, and live analytics remained at 3 confirmed swaps and `split_swaps` 0.
+The smallest observed USDC→EURC split was 21,467 USDC (21,466 was
+single-route), across distinct Presto and Xylo pools. The QA wallet balance is
+only 1.949753 USDC, so no unfundable transaction was built or broadcast and
+T11.12-F remains open.

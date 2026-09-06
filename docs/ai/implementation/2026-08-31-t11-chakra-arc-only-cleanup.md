@@ -50,5 +50,7 @@ calculations now reuse the same integer reserve-ratio spot-impact helper as the
 existing XYK path. Off-peg tests and a live-shaped two-pool Presto/Xylo fixture
 cover the regression at default split thresholds. The fixture attempts Brent
 and honestly returns `no_improvement`; no threshold or public API changed.
-Render deployment, hosted re-probe, and any broadcast remain separate
-approval-gated work, so T11.12 itself is not closed.
+The follow-up was deployed as Render deploy `dep-daenql8u01pc73f9prfg` from
+commit `d4c443a`. Hosted re-probing found a real Presto+Xylo split at 21,467
+USDC, but the QA wallet holds only 1.949753 USDC. No unfundable transaction was
+built or broadcast, so T11.12 itself is not closed.

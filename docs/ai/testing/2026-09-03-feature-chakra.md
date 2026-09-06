@@ -452,5 +452,17 @@ commit / push onto PR #10 when asked. Do not merge.
   router-engine's 55 library tests; the 12 Chakra REST and 7 venue tests;
   all 285 workspace tests; rustfmt check; workspace clippy with warnings
   denied; and `git diff --check`.
-- No hosted re-probe was performed before deployment approval. The last live
-  evidence remains `split_swaps` 0; T11.12 stays open pending D-F.
+- Render deploy `dep-daenql8u01pc73f9prfg`, pinned to `d4c443a`, reached
+  `live`. Fresh `/health` and `/ready` checks returned HTTP 200 and analytics
+  remained at 3 confirmed swaps and `split_swaps` 0.
+- Required post-deploy USDC→EURC quotes at 1 / 100 / 1,000 / 10,000 USDC were
+  single-route Presto with pool-spot impact 30 / 60 / 327 / 2,376 bps. The
+  reverse EURC→USDC quotes were single-route Xylo with impact 9,425 / 9,425 /
+  9,425 / 9,429 bps.
+- A bounded USDC→EURC sweep found the first observed split at 21,467 USDC;
+  21,466 USDC remained single-route. The split uses distinct Presto
+  `0x5794a8284a29493871fbfa3c4f343d42001424d6` and Xylo
+  `0x3df3966f5138143dce7a9cfddc2c0310ce083bb1` pools.
+- Public on-chain balance checks returned 1.949753 USDC and
+  1.949753248 native units for the QA wallet. The live split is unfundable, so
+  no transaction was built or broadcast and T11.12-F remains open.

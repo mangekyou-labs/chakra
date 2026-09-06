@@ -161,16 +161,20 @@ Do not merge. Do not claim T11.12 closed.
   `no_improvement` at the smallest standard 1-USDC probe.
 - [x] T11.12-C: planning, implementation, and testing records updated in
   lockstep; SC-2 and canonical venue/multihop regressions remain green.
-- [ ] T11.12-D: blocked on explicit user approval for a Render deploy.
-- [ ] T11.12-E: blocked on D; re-probe hosted health/readiness/stats and
-  fundable USDC/EURC quote sizes after deploy.
-- [ ] T11.12-F: blocked on a live `is_split: true` quote plus explicit
-  broadcast approval; require one atomic split receipt and a `split_swaps`
-  increment before closure.
+- [x] T11.12-D: deployed commit `d4c443a` to Render as
+  `dep-daenql8u01pc73f9prfg`; the deployment reached `live`.
+- [x] T11.12-E: health and readiness returned HTTP 200, analytics remained at
+  `split_swaps` 0, and the required bidirectional quote matrix was recorded.
+  USDC→EURC first returned a split in the bounded search at 21,467 USDC
+  (21,466 USDC was single-route), across Presto and Xylo.
+- [ ] T11.12-F: blocked because the QA wallet has only 1.949753 USDC versus
+  the 21,467-USDC split input. No unfundable broadcast was attempted; require
+  one atomic split receipt and a `split_swaps` increment before closure.
 
 Progress summary: the local diagnosis is implemented without changing
 `split_threshold_bps`, `min_split_improvement_bps`, or `max_splits`. Off-peg
 venue impact can now trigger split consideration, while the live-shaped local
-fixture records the optimizer's honest non-winning result. The remaining risk
-is external liquidity after deployment; T11.12 stays Follow-up until the live
-quote, Arcscan receipt, and analytics increment all exist.
+fixture records the optimizer's honest non-winning result. Deployment proved
+that current live liquidity does produce a two-pool split, but only far above
+the QA wallet balance. T11.12 stays Follow-up until a fundable live split,
+Arcscan receipt, and analytics increment all exist.
