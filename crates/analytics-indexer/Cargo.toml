@@ -1,0 +1,33 @@
+[package]
+name = "analytics-indexer"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[[bin]]
+name = "lumagg-analytics-indexer"
+path = "src/main.rs"
+
+[[bin]]
+name = "fetch-fixture"
+path = "src/bin/fetch_fixture.rs"
+
+[dependencies]
+dex-adapters = { path = "../dex-adapters" }
+lumagg-config = { path = "../lumagg-config" }
+stellar-xdr.workspace = true
+stellar-strkey.workspace = true
+
+tokio.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+anyhow.workspace = true
+tracing.workspace = true
+tracing-subscriber.workspace = true
+chrono.workspace = true
+base64.workspace = true
+rusqlite = { version = "0.32", features = ["bundled"] }
+reqwest.workspace = true
+
+[dev-dependencies]
+tempfile = "3"

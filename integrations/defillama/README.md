@@ -1,0 +1,34 @@
+# DefiLlama listing (LumAgg)
+
+LumAgg is listed as a **DEX Aggregator** (volume), not TVL.
+
+## Metric
+
+| Field | Value |
+|-------|--------|
+| Dashboard | [Aggregators](https://defillama.com/aggregators) · [Stellar](https://defillama.com/dex-aggregators/chain/stellar) |
+| Dimension | `dailyVolume` |
+| Definition | **Entry notional** (`token_in` × `amount_in`), **not** hop-weighted routed volume |
+| API | `GET https://api.lumagg.xyz/api/v1/stats?day=YYYY-MM-DD` |
+| Aggregator | `CC6QAV7JEG5MYRSPO5Z65E5G2M4ZB64BEG2ZXIZXL55TQT35JDI2LC6K` |
+| Start | `2026-07-13` |
+
+## Adapter
+
+Upstream adapter source: [`aggregators/lumagg/index.ts`](./aggregators/lumagg/index.ts)
+
+Imports like `../../adapters/types` only exist in [DefiLlama/dimension-adapters](https://github.com/DefiLlama/dimension-adapters). This folder mirrors those paths with **local IDE stubs** (`adapters/`, `helpers/`, `utils/`) so TypeScript in this repo resolves; **do not include the stubs in the upstream PR** — copy only `aggregators/lumagg/index.ts`.
+
+Local test against upstream tree (already verified):
+
+```text
+Daily volume: ~1.02k USD (sample day)
+```
+
+## PR
+
+Merged upstream: https://github.com/DefiLlama/dimension-adapters/pull/8330
+
+- Merged at: `2026-07-30T08:01:31Z`
+- Merge commit: `5b114036adcc22e6e8383f9db9b41cf7221d159b`
+- Dashboard path: [DefiLlama DEX aggregators / Stellar](https://defillama.com/dex-aggregators/chain/stellar)

@@ -1,0 +1,2 @@
+[      92ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:8080/api/v1/tokens:0
+[    1095ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:8080/api/v1/tokens:0

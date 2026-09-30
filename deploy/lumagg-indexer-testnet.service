@@ -1,0 +1,14 @@
+[Unit]
+Description=LumAgg Analytics Indexer (testnet order-escrow)
+After=network.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/opt/stellar-dex-aggregator
+ExecStart=/opt/stellar-dex-aggregator/target/release/lumagg-analytics-indexer-testnet --config /opt/stellar-dex-aggregator/deploy/indexer-testnet.toml run
+Restart=on-failure
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target

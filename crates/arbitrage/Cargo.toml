@@ -1,0 +1,49 @@
+[package]
+name = "arbitrage"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Round-trip arbitrage scanner via aggregator.round_trip_swap"
+
+[[bin]]
+name = "lumagg-arbitrage-bot"
+path = "src/main.rs"
+
+[[bin]]
+name = "diag_simulate"
+path = "src/bin/diag_simulate.rs"
+
+[[bin]]
+name = "clean_caller_trustlines"
+path = "src/bin/clean_caller_trustlines.rs"
+
+[[bin]]
+name = "quote-sim-probe"
+path = "src/bin/quote_sim_probe.rs"
+
+[dependencies]
+market-snapshot = { path = "../market-snapshot" }
+router-engine = { path = "../router-engine" }
+dex-adapters = { path = "../dex-adapters" }
+lumagg-alerts = { path = "../lumagg-alerts" }
+lumagg-config = { path = "../lumagg-config" }
+
+tokio.workspace = true
+anyhow.workspace = true
+tracing.workspace = true
+tracing-subscriber.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+stellar-xdr.workspace = true
+stellar-strkey.workspace = true
+soroban-client.workspace = true
+stellar-baselib.workspace = true
+reqwest.workspace = true
+bip39 = "2"
+slip10_ed25519 = "0.1"
+hex.workspace = true
+burberry.workspace = true
+async-trait.workspace = true
+async-channel = "2.5"
+async-stream = "0.3"
+futures.workspace = true

@@ -1,0 +1,124 @@
+name: Release LumAgg Binaries
+
+on:
+  push:
+    tags:
+      - "swap-api-v*"
+
+permissions:
+  contents: write
+
+jobs:
+  linux-x86_64:
+    name: Linux x86_64
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Install Rust
+        run: |
+          rustup toolchain install stable --profile minimal
+          rustup default stable
+
+      - name: Build release binaries
+        run: |
+          cargo build --locked --release -p lumagg-swap-api -p api-server -p market-data-worker -p analytics-indexer -p limit-keeper
+          cargo build --locked --release -p arbitrage --bin lumagg-arbitrage-bot
+
+      - name: Verify tag and binary version
+        run: |
+          tag_version="${GITHUB_REF_NAME#swap-api-v}"
+          binary_version="$(target/release/lumagg-swap-api --version | awk '{print $2}')"
+          test "$tag_version" = "$binary_version"
+
+      - name: Package release
+        run: |
+          swap_dir=lumagg-swap-api-linux-x86_64
+          cluster_dir=lumagg-aggregator-linux-x86_64
+          arb_dir=lumagg-arbitrage-bot-linux-x86_64
+          keeper_dir=lumagg-limit-keeper-linux-x86_64
+
+          mkdir "$swap_dir" "$cluster_dir" "$cluster_dir/systemd" "$arb_dir" "$keeper_dir"
+
+          install -m 0755 target/release/lumagg-swap-api "$swap_dir/lumagg-swap-api"
+          install -m 0644 LICENSE "$swap_dir/LICENSE"
+          install -m 0644 docs/lumagg-swap-api.md "$swap_dir/README.md"
+          install -m 0644 docs/openapi.yaml "$swap_dir/openapi.yaml"
+          install -m 0644 packaging/lumagg-swap-api.toml "$swap_dir/lumagg-swap-api.toml"
+          install -m 0644 packaging/lumagg-swap-api.service "$swap_dir/lumagg-swap-api.service"
+
+          install -m 0755 target/release/lumagg-api-server "$cluster_dir/lumagg-api-server"
+          install -m 0755 target/release/lumagg-market-data-worker "$cluster_dir/lumagg-market-data-worker"
+          install -m 0755 target/release/lumagg-analytics-indexer "$cluster_dir/lumagg-analytics-indexer"
+          install -m 0644 LICENSE "$cluster_dir/LICENSE"
+          install -m 0644 docs/aggregator-deployment.md "$cluster_dir/README.md"
+          install -m 0644 docs/aggregator-deployment.md "$cluster_dir/aggregator-deployment.md"
+          install -m 0644 docs/deployment-overview.md "$cluster_dir/deployment-overview.md"
+          install -m 0644 docs/lumagg-swap-api.md "$cluster_dir/lumagg-swap-api.md"
+          install -m 0644 docs/arbitrage-deployment.md "$cluster_dir/arbitrage-deployment.md"
+          install -m 0644 docs/arbitrage-configuration.md "$cluster_dir/arbitrage-configuration.md"
+          install -m 0644 docs/contracts-deployment.md "$cluster_dir/contracts-deployment.md"
+          install -m 0644 docs/round-trip-arb.md "$cluster_dir/round-trip-arb.md"
+          install -m 0644 docs/integrator-guide.md "$cluster_dir/integrator-guide.md"
+          install -m 0644 docs/api-reference.md "$cluster_dir/api-reference.md"
+          install -m 0644 docs/scf-venue-comparison.md "$cluster_dir/scf-venue-comparison.md"
+          install -m 0644 docs/scf-benchmark-results.md "$cluster_dir/scf-benchmark-results.md"
+          install -m 0644 docs/aggregator-configuration.md "$cluster_dir/aggregator-configuration.md"
+          install -m 0644 docs/analytics-indexer.md "$cluster_dir/analytics-indexer.md"
+          install -m 0644 docs/arb-operator.md "$cluster_dir/arb-operator.md"
+          install -m 0644 docs/sample-indexer-export.json "$cluster_dir/sample-indexer-export.json"
+          install -m 0644 docs/openapi.yaml "$cluster_dir/openapi.yaml"
+          install -m 0644 packaging/lumagg-aggregator.toml "$cluster_dir/lumagg-aggregator.toml"
+          install -m 0644 packaging/lumagg-market-data-worker.service "$cluster_dir/systemd/"
+          install -m 0644 packaging/lumagg-api@.service "$cluster_dir/systemd/"
+          install -m 0644 packaging/lumagg-analytics-indexer.service "$cluster_dir/systemd/"
+
+          install -m 0755 target/release/lumagg-arbitrage-bot "$arb_dir/lumagg-arbitrage-bot"
+          install -m 0644 LICENSE "$arb_dir/LICENSE"
+          install -m 0644 docs/arbitrage-deployment.md "$arb_dir/README.md"
+          install -m 0644 docs/arbitrage-deployment.md "$arb_dir/arbitrage-deployment.md"
+          install -m 0644 docs/arbitrage-configuration.md "$arb_dir/arbitrage-configuration.md"
+          install -m 0644 docs/aggregator-deployment.md "$arb_dir/aggregator-deployment.md"
+          install -m 0644 docs/aggregator-configuration.md "$arb_dir/aggregator-configuration.md"
+          install -m 0644 docs/lumagg-swap-api.md "$arb_dir/lumagg-swap-api.md"
+          install -m 0644 docs/integrator-guide.md "$arb_dir/integrator-guide.md"
+          install -m 0644 docs/api-reference.md "$arb_dir/api-reference.md"
+          install -m 0644 docs/scf-venue-comparison.md "$arb_dir/scf-venue-comparison.md"
+          install -m 0644 docs/scf-benchmark-results.md "$arb_dir/scf-benchmark-results.md"
+          install -m 0644 docs/contracts-deployment.md "$arb_dir/contracts-deployment.md"
+          install -m 0644 docs/round-trip-arb.md "$arb_dir/round-trip-arb.md"
+          install -m 0644 docs/arb-operator.md "$arb_dir/arb-operator.md"
+          install -m 0644 docs/analytics-indexer.md "$arb_dir/analytics-indexer.md"
+          install -m 0644 packaging/lumagg-arbitrage.toml "$arb_dir/lumagg-arbitrage.toml"
+          install -m 0644 packaging/lumagg-arbitrage.service "$arb_dir/lumagg-arbitrage.service"
+
+          install -m 0755 target/release/limit-keeper "$keeper_dir/lumagg-limit-keeper"
+          install -m 0644 LICENSE "$keeper_dir/LICENSE"
+          install -m 0644 docs/limit-dca-keeper.md "$keeper_dir/README.md"
+          install -m 0644 crates/limit-keeper/README.md "$keeper_dir/limit-keeper-reference.md"
+          install -m 0644 packaging/lumagg-limit-keeper.toml "$keeper_dir/lumagg-limit-keeper.toml"
+          install -m 0644 packaging/lumagg-limit-keeper.service "$keeper_dir/lumagg-limit-keeper.service"
+
+          tar -czf "$swap_dir.tar.gz" "$swap_dir"
+          tar -czf "$cluster_dir.tar.gz" "$cluster_dir"
+          tar -czf "$arb_dir.tar.gz" "$arb_dir"
+          tar -czf "$keeper_dir.tar.gz" "$keeper_dir"
+          sha256sum "$swap_dir.tar.gz" "$cluster_dir.tar.gz" "$arb_dir.tar.gz" "$keeper_dir.tar.gz" > SHA256SUMS
+
+      - name: Smoke packaged archives
+        run: ./scripts/smoke-release-archives.sh
+
+      - name: Publish GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" \
+            --verify-tag \
+            --generate-notes \
+            --title "LumAgg ${GITHUB_REF_NAME#swap-api-v}" \
+            lumagg-swap-api-linux-x86_64.tar.gz \
+            lumagg-aggregator-linux-x86_64.tar.gz \
+            lumagg-arbitrage-bot-linux-x86_64.tar.gz \
+            lumagg-limit-keeper-linux-x86_64.tar.gz \
+            SHA256SUMS

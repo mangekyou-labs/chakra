@@ -1,0 +1,26 @@
+[Unit]
+Description=LumAgg API server on port %i
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=simple
+User=lumagg
+Group=lumagg
+WorkingDirectory=/var/lib/lumagg
+StateDirectory=lumagg
+ExecStart=/usr/local/bin/lumagg-api-server --config /etc/lumagg/lumagg-aggregator.toml --listen-addr 127.0.0.1:%i
+Restart=on-failure
+RestartSec=5
+UMask=0027
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectHome=true
+ProtectSystem=strict
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+
+[Install]
+WantedBy=multi-user.target
