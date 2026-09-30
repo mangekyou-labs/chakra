@@ -746,7 +746,7 @@ mod tests {
                 is_split: false,
                 legs: vec![ParsedLeg {
                     leg_index: 0,
-                    dex_source: "Arc venue".into(),
+                    dex_source: "soroswap".into(),
                     pool_address: "POOL".into(),
                     token_in: Some("TOKEN_IN".into()),
                     token_out: Some("TOKEN_OUT".into()),
@@ -890,7 +890,7 @@ mod tests {
         event_record.parsed.legs = vec![
             ParsedLeg {
                 leg_index: 0,
-                dex_source: "Arc venue".into(),
+                dex_source: "soroswap".into(),
                 pool_address: "POOL_1".into(),
                 token_in: None,
                 token_out: None,
@@ -900,7 +900,7 @@ mod tests {
             },
             ParsedLeg {
                 leg_index: 1,
-                dex_source: "Arc venue".into(),
+                dex_source: "phoenix".into(),
                 pool_address: "POOL_2".into(),
                 token_in: None,
                 token_out: None,

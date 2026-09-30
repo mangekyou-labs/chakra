@@ -1,4 +1,4 @@
-//! Arc RPC client wrapper for DEX adapter interactions.
+//! Soroban RPC client wrapper for DEX adapter interactions.
 //!
 //! Provides contract simulation (read-only calls), ledger entry queries,
 //! and the `events` / `transactions` submodules.
@@ -10,19 +10,19 @@ use {
     anyhow::{anyhow, Result},
     reqwest::Client,
     serde_json::{json, Value},
-    Arc_xdr::curr as xdr,
+    stellar_xdr::curr as xdr,
 };
 
-/// Lightweight Arc RPC client focused on what DEX adapters need:
+/// Lightweight Soroban RPC client focused on what DEX adapters need:
 /// - simulateTransaction (for read-only contract calls)
 /// - getLedgerEntries (for reading pool state)
-pub struct ArcRpc {
+pub struct SorobanRpc {
     url: String,
     client: Client,
     network_passphrase: String,
 }
 
-impl ArcRpc {
+impl SorobanRpc {
     pub fn new(url: &str, network_passphrase: &str) -> Self {
         let client = Client::builder()
             .timeout(std::time::Duration::from_secs(30))
@@ -40,8 +40,8 @@ impl ArcRpc {
     /// Mainnet default
     pub fn mainnet() -> Self {
         Self::new(
-            "https://Arc-rpc.mainnet.Arc.gateway.fm",
-            "Public Global Arc Network ; September 2015",
+            "https://soroban-rpc.mainnet.stellar.gateway.fm",
+            "Public Global Stellar Network ; September 2015",
         )
     }
 
@@ -98,10 +98,10 @@ impl ArcRpc {
         function_name: &str,
         args: Vec<xdr::ScVal>,
     ) -> Result<xdr::ScVal> {
-        use Arc_xdr::curr::{Limits, ReadXdr, WriteXdr};
+        use stellar_xdr::curr::{Limits, ReadXdr, WriteXdr};
 
         // Build a dummy transaction for simulation
-        let contract_hash = Arc_strkey::Contract::from_string(contract_address)
+        let contract_hash = stellar_strkey::Contract::from_string(contract_address)
             .map_err(|e| anyhow!("Invalid contract address: {:?}", e))?
             .0;
 
@@ -197,7 +197,7 @@ impl ArcRpc {
 
     /// Get ledger entries by key.
     pub async fn get_ledger_entries(&self, keys: Vec<xdr::LedgerKey>) -> Result<Vec<LedgerEntryResult>> {
-        use Arc_xdr::curr::{Limits, ReadXdr, WriteXdr};
+        use stellar_xdr::curr::{Limits, ReadXdr, WriteXdr};
 
         let key_xdrs: Vec<String> = keys
             .iter()
@@ -251,9 +251,9 @@ impl ArcRpc {
     /// `AccountEntry` in the `xdr` field — try all shapes (same as arb
     /// prepare).
     pub async fn get_account_sequence(&self, public_key: &str) -> Result<i64> {
-        use Arc_xdr::curr::{Limits, ReadXdr, WriteXdr};
+        use stellar_xdr::curr::{Limits, ReadXdr, WriteXdr};
 
-        let pk = Arc_strkey::ed25519::PublicKey::from_string(public_key)
+        let pk = stellar_strkey::ed25519::PublicKey::from_string(public_key)
             .map_err(|e| anyhow!("Invalid public key: {:?}", e))?;
         let account_id = xdr::AccountId(xdr::PublicKey::PublicKeyTypeEd25519(xdr::Uint256(pk.0)));
         let key = xdr::LedgerKey::Account(xdr::LedgerKeyAccount { account_id });
@@ -455,7 +455,7 @@ pub fn scval_to_u32(val: &xdr::ScVal) -> Result<u32> {
 }
 
 /// Parse fee fields that may be U32/I32/U64/I64/I128 depending on contract.
-/// Used for Arc venue `total_fee_bps`, Arc venue `get_fee_fraction`, Sushi `fee`,
+/// Used for Phoenix `total_fee_bps`, Aquarius `get_fee_fraction`, Sushi `fee`,
 /// etc.
 pub fn parse_fee_bps_u32(val: &xdr::ScVal) -> Option<u32> {
     match val {
@@ -487,11 +487,11 @@ pub fn scval_to_i128(val: &xdr::ScVal) -> Result<i128> {
 pub fn scval_to_address(val: &xdr::ScVal) -> Result<String> {
     match val {
         xdr::ScVal::Address(xdr::ScAddress::Contract(xdr::ContractId(xdr::Hash(hash)))) => {
-            Ok(format!("{}", Arc_strkey::Contract(*hash)))
+            Ok(format!("{}", stellar_strkey::Contract(*hash)))
         }
         xdr::ScVal::Address(xdr::ScAddress::Account(xdr::AccountId(xdr::PublicKey::PublicKeyTypeEd25519(
             xdr::Uint256(key),
-        )))) => Ok(format!("{}", Arc_strkey::ed25519::PublicKey(*key))),
+        )))) => Ok(format!("{}", stellar_strkey::ed25519::PublicKey(*key))),
         _ => Err(anyhow!("Expected Address, got {:?}", std::mem::discriminant(val))),
     }
 }

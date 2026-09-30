@@ -13,9 +13,9 @@ Expose **max hops** and **max splits** to retail users, and move full slippage c
 | Topic | Choice |
 |-------|--------|
 | Card chrome | Single chip: `{slippage}%` + settings icon → opens modal |
-| Slippage in modal | Presets `0.5%` / `1%` + Custom (not Arc venue Auto/Custom) |
+| Slippage in modal | Presets `0.5%` / `1%` + Custom (not Soroswap Auto/Custom) |
 | Routing | `Max hops` (1–4, default 3), `Max splits` (1–5, default 3) |
-| Persistence | `localStorage` key `Chakra.swapSettings` |
+| Persistence | `localStorage` key `lumagg.swapSettings` |
 | API | Pass `slippage`, `max_hops`, `max_splits` on `GET /api/v1/quote` (already supported) |
 | Out of scope | Ultra/Manual, priority fees, AMM source toggles, card footer “Route: Auto” line (v1) |
 

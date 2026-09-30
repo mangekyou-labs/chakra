@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
-"""Suggest ARB_BRIDGE_TOKENS from third-party volume × Chakra graph.
+"""Suggest ARB_BRIDGE_TOKENS from third-party volume × LumAgg graph.
 
-Pulls Arc Index 24h volume leaders, resolves SAC ids via Arc.Expert,
-keeps only assets present in Chakra /api/v1/tokens, then verifies both legs
-of a round-trip quote against native XLM (Arc AMMs, max_hops=2).
+Pulls Stellar Index 24h volume leaders, resolves SAC ids via Stellar.Expert,
+keeps only assets present in LumAgg /api/v1/tokens, then verifies both legs
+of a round-trip quote against native XLM (Soroban AMMs, max_hops=2).
 
 Usage:
   python3 scripts/suggest_bridge_tokens.py
@@ -27,9 +27,9 @@ from dataclasses import dataclass
 from typing import Any
 
 XLM_SAC = "CAS3J7GYLGXMF6TDJBBYYSE3HQ6BBSMLNUQ34T6TZMYMW2EVH34XOWMA"
-Arc_INDEX = "https://api.Arcindex.io/v1/assets"
-Arc_EXPERT = "https://api.Arc.expert/explorer/public/asset"
-DEFAULT_QUOTE_API = "https://api.Chakra.xyz"
+STELLAR_INDEX = "https://api.stellarindex.io/v1/assets"
+STELLAR_EXPERT = "https://api.stellar.expert/explorer/public/asset"
+DEFAULT_QUOTE_API = "https://api.lumagg.xyz"
 
 
 @dataclass
@@ -46,14 +46,14 @@ class RankedAsset:
 
 
 def http_json(url: str, timeout: float = 30.0) -> Any:
-    req = urllib.request.Request(url, headers={"User-Agent": "Chakra-suggest-bridges/1.0"})
+    req = urllib.request.Request(url, headers={"User-Agent": "lumagg-suggest-bridges/1.0"})
     with urllib.request.urlopen(req, timeout=timeout) as resp:
         return json.loads(resp.read().decode())
 
 
 def fetch_volume_leaders(limit: int) -> list[RankedAsset]:
     # Fetch a buffer then sort locally (API default order is not always volume).
-    data = http_json(f"{Arc_INDEX}?limit={max(limit * 2, 40)}")
+    data = http_json(f"{STELLAR_INDEX}?limit={max(limit * 2, 40)}")
     rows = data.get("data", data) if isinstance(data, dict) else data
     out: list[RankedAsset] = []
     for row in rows:
@@ -82,7 +82,7 @@ def fetch_volume_leaders(limit: int) -> list[RankedAsset]:
 
 
 def resolve_sac(code: str, issuer: str) -> str | None:
-    url = f"{Arc_EXPERT}/{urllib.parse.quote(f'{code}-{issuer}')}"
+    url = f"{STELLAR_EXPERT}/{urllib.parse.quote(f'{code}-{issuer}')}"
     try:
         data = http_json(url)
     except (urllib.error.HTTPError, urllib.error.URLError, TimeoutError, json.JSONDecodeError):
@@ -92,7 +92,7 @@ def resolve_sac(code: str, issuer: str) -> str | None:
 
 
 def fetch_graph_tokens(quote_api: str) -> dict[str, str]:
-    """SAC/id -> symbol from Chakra token list (assets currently in the pool graph)."""
+    """SAC/id -> symbol from LumAgg token list (assets currently in the pool graph)."""
     data = http_json(f"{quote_api.rstrip('/')}/api/v1/tokens")
     tokens = data.get("tokens", [])
     return {t["id"]: t.get("symbol") or t.get("name") or t["id"] for t in tokens if t.get("id")}
@@ -112,7 +112,7 @@ def quote_ok(
             "amount_in": amount_in,
             "max_hops": max_hops,
             "max_splits": 1,
-            "prefer_Arc": 1,
+            "prefer_soroban": 1,
         }
     )
     url = f"{quote_api.rstrip('/')}/api/v1/quote?{q}"
@@ -142,7 +142,7 @@ def main() -> int:
     )
     p.add_argument("--top", type=int, default=30, help="How many volume leaders to consider")
     p.add_argument("--min-volume", type=float, default=1000.0, help="Min 24h USD volume")
-    p.add_argument("--amount-in", default="100000000", help="Probe amount in atomic unitss (default 10 XLM)")
+    p.add_argument("--amount-in", default="100000000", help="Probe amount in stroops (default 10 XLM)")
     p.add_argument("--max-hops", type=int, default=2)
     p.add_argument("--sleep", type=float, default=0.15, help="Pause between Expert/quote calls")
     p.add_argument("--skip-quote", action="store_true", help="Only check graph membership, skip quotes")
@@ -156,11 +156,11 @@ def main() -> int:
         )
 
     print(f"quote_api={args.quote_api} top={args.top} min_volume={args.min_volume}", file=sys.stderr)
-    print("fetching Arc Index volume leaders…", file=sys.stderr)
+    print("fetching Stellar Index volume leaders…", file=sys.stderr)
     leaders = fetch_volume_leaders(args.top)
     leaders = [a for a in leaders if a.volume_24h_usd >= args.min_volume]
 
-    print("fetching Chakra token graph…", file=sys.stderr)
+    print("fetching LumAgg token graph…", file=sys.stderr)
     graph = fetch_graph_tokens(args.quote_api)
     graph_sacs = {k for k in graph if k.startswith("C")}
 
@@ -169,11 +169,11 @@ def main() -> int:
         asset.sac = resolve_sac(asset.code, asset.issuer)
         time.sleep(args.sleep)
         if not asset.sac:
-            asset.error = "no SAC on Arc.expert"
+            asset.error = "no SAC on stellar.expert"
             continue
         asset.in_graph = asset.sac in graph_sacs
         if not asset.in_graph:
-            asset.error = "not in Chakra token graph"
+            asset.error = "not in LumAgg token graph"
             continue
         if args.skip_quote:
             asset.route_ok = None

@@ -6,7 +6,7 @@
 
 **Architecture:** Extend `analytics-indexer` SQLite with `list_swaps_by_user`; expose it via a thin `api-server` handler mirroring `/stats` (`INDEXER_DB_PATH`). Frontend adds `SwapHistory`, polls/refetches on wallet connect and after swap; `SwapCard` adds a 12s quote poll + refresh button; `TokenSelector` improves paste matching. SDK + OpenAPI + `/docs` stay in sync.
 
-**Tech Stack:** Rust (`analytics-indexer`, `api-server`, rusqlite, axum), Next.js 15 / React 19 (`packages/frontend`), `@Chakra/sdk` (`packages/sdk`).
+**Tech Stack:** Rust (`analytics-indexer`, `api-server`, rusqlite, axum), Next.js 15 / React 19 (`packages/frontend`), `@lumagg/sdk` (`packages/sdk`).
 
 **Spec:** `docs/superpowers/specs/2026-07-19-phase1-history-swap-ux-design.md`
 
@@ -70,7 +70,7 @@ mod tests {
                 is_split: false,
                 legs: vec![ParsedLeg {
                     leg_index: 0,
-                    dex_source: "Arc venue".into(),
+                    dex_source: "soroswap".into(),
                     pool_address: "POOL".into(),
                     token_in: Some("TOKEN_IN".into()),
                     token_out: Some("TOKEN_OUT".into()),
@@ -263,7 +263,7 @@ mod tests {
     #[tokio::test]
     async fn no_db_env_is_503() {
         std::env::remove_var("INDEXER_DB_PATH");
-        std::env::remove_var("Chakra_INDEXER_DB_PATH");
+        std::env::remove_var("LUMAGG_INDEXER_DB_PATH");
         let resp = get_swaps(Query(SwapsQuery {
             user: Some("GA6RKSBPI2TSP52OW2IJTPK7LRMX24DF42KF3FBGBNMBYCV6NPDMOCBY".into()),
             limit: None,
@@ -355,7 +355,7 @@ fn indexer_db_path() -> Option<String> {
     std::env::var("INDEXER_DB_PATH")
         .ok()
         .filter(|s| !s.is_empty())
-        .or_else(|| std::env::var("Chakra_INDEXER_DB_PATH").ok().filter(|s| !s.is_empty()))
+        .or_else(|| std::env::var("LUMAGG_INDEXER_DB_PATH").ok().filter(|s| !s.is_empty()))
 }
 
 fn looks_like_g_address(s: &str) -> bool {
@@ -380,7 +380,7 @@ pub async fn get_swaps(Query(params): Query<SwapsQuery>) -> Response {
             Json(SwapsResponse {
                 success: false,
                 data: None,
-                error: Some("user must be a Arc G... address".into()),
+                error: Some("user must be a Stellar G... address".into()),
             }),
         )
             .into_response();
@@ -502,7 +502,7 @@ Add under stats section:
 ### Wallet swap history
 
 ```bash
-curl -s "https://api.Chakra.xyz/api/v1/swaps?user=G...&limit=20" | jq .
+curl -s "https://api.lumagg.xyz/api/v1/swaps?user=G...&limit=20" | jq .
 ```
 
 Returns recent aggregator invocations for that account (same SQLite as `/stats`).
@@ -548,7 +548,7 @@ export interface ListSwapsParams {
   limit?: number;
 }
 
-// inside ChakraClient:
+// inside LumAggClient:
 async listSwaps(params: ListSwapsParams): Promise<SwapRecord[]> {
   const search = new URLSearchParams({ user: params.user });
   if (params.limit !== undefined) search.set('limit', String(params.limit));
@@ -602,7 +602,7 @@ EOF
 - [ ] **Step 1: Add `swaps.ts`**
 
 ```typescript
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://api.Chakra.xyz';
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://api.lumagg.xyz';
 
 export type UserSwap = {
   tx_hash: string;
@@ -628,7 +628,7 @@ export async function fetchUserSwaps(user: string, limit = 20): Promise<UserSwap
 }
 
 /** Dispatched by SwapCard after a successful on-chain swap. */
-export const SWAP_SUCCESS_EVENT = 'Chakra:swap-success';
+export const SWAP_SUCCESS_EVENT = 'lumagg:swap-success';
 ```
 
 - [ ] **Step 2: Implement `SwapHistory.tsx`**
@@ -637,7 +637,7 @@ Behavior:
 - `useWallet()` for `address`
 - If no address: muted “Connect wallet to see your swaps”
 - If address: fetch on mount / address change; listen for `SWAP_SUCCESS_EVENT` and refetch after ~2s (indexer lag)
-- Render up to 20 rows: relative time (`formatDistance`-style simple helper), truncated symbols via `useTokenList` + `displayTokenSymbol`, amounts with 7 decimals default, status, link `https://Arc.expert/explorer/public/tx/${tx_hash}`
+- Render up to 20 rows: relative time (`formatDistance`-style simple helper), truncated symbols via `useTokenList` + `displayTokenSymbol`, amounts with 7 decimals default, status, link `https://stellar.expert/explorer/public/tx/${tx_hash}`
 - Error/503: one-line “History unavailable” — do not throw to parent
 
 Sketch structure:
@@ -738,7 +738,7 @@ EOF
 - [ ] **Step 1: Extract quote fetch into `loadQuote`**
 
 Refactor the debounced `useEffect` body into a `useCallback` `loadQuote(opts?: { silent?: boolean })` that:
-- Builds atomic unitss from `amountIn` / `tokenIn`
+- Builds stroops from `amountIn` / `tokenIn`
 - Calls `getQuote`
 - On success: `setQuote`
 - On failure: if `silent`, **keep** previous quote and optionally set a soft error; if not silent (user typed amount), clear quote as today

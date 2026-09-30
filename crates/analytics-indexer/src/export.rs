@@ -444,7 +444,7 @@ mod tests {
                     legs: vec![
                         ParsedLeg {
                             leg_index: 0,
-                            dex_source: "Arc venue".into(),
+                            dex_source: "soroswap".into(),
                             pool_address: "POOL_1".into(),
                             token_in: Some("TOKEN_A".into()),
                             token_out: Some("TOKEN_B".into()),
@@ -454,7 +454,7 @@ mod tests {
                         },
                         ParsedLeg {
                             leg_index: 1,
-                            dex_source: "Arc venue".into(),
+                            dex_source: "phoenix".into(),
                             pool_address: "POOL_2".into(),
                             token_in: Some("TOKEN_B".into()),
                             token_out: Some("TOKEN_C".into()),

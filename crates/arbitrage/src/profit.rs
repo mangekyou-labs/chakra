@@ -10,14 +10,14 @@ pub struct ProfitWindow {
     pub failed: u64,
     pub submitted: u64,
     /// Sum of (simulated_amount_out - amount_in) on SUCCESS.
-    pub gross_profit_atomic unitss: u128,
+    pub gross_profit_stroops: u128,
     /// Sum of estimated (inclusion + resource) fees on SUCCESS.
-    pub fee_atomic unitss: u128,
+    pub fee_stroops: u128,
 }
 
 impl ProfitWindow {
-    pub fn net_profit_atomic unitss(&self) -> i128 {
-        self.gross_profit_atomic unitss as i128 - self.fee_atomic unitss as i128
+    pub fn net_profit_stroops(&self) -> i128 {
+        self.gross_profit_stroops as i128 - self.fee_stroops as i128
     }
 
     pub fn take(&mut self) -> Self {
@@ -55,11 +55,11 @@ impl ProfitBook {
     pub fn record_success(&self, hash: &str, amount_in: u128, gross_profit: u128, fee: u128) {
         let mut g = self.inner.lock().unwrap();
         g.session.succeeded += 1;
-        g.session.gross_profit_atomic unitss = g.session.gross_profit_atomic unitss.saturating_add(gross_profit);
-        g.session.fee_atomic unitss = g.session.fee_atomic unitss.saturating_add(fee);
+        g.session.gross_profit_stroops = g.session.gross_profit_stroops.saturating_add(gross_profit);
+        g.session.fee_stroops = g.session.fee_stroops.saturating_add(fee);
         g.hour.succeeded += 1;
-        g.hour.gross_profit_atomic unitss = g.hour.gross_profit_atomic unitss.saturating_add(gross_profit);
-        g.hour.fee_atomic unitss = g.hour.fee_atomic unitss.saturating_add(fee);
+        g.hour.gross_profit_stroops = g.hour.gross_profit_stroops.saturating_add(gross_profit);
+        g.hour.fee_stroops = g.hour.fee_stroops.saturating_add(fee);
         g.recent.push_front(RecentTx {
             hash: hash.to_string(),
             amount_in,
@@ -87,9 +87,9 @@ impl ProfitBook {
     }
 }
 
-pub fn format_xlm4(atomic unitss: i128) -> String {
-    let neg = atomic unitss < 0;
-    let abs = atomic unitss.unsigned_abs();
+pub fn format_xlm4(stroops: i128) -> String {
+    let neg = stroops < 0;
+    let abs = stroops.unsigned_abs();
     let whole = abs / 10_000_000;
     let frac = abs % 10_000_000;
     // 4 decimal places
@@ -101,8 +101,8 @@ pub fn format_xlm4(atomic unitss: i128) -> String {
     }
 }
 
-pub fn format_xlm4_u(atomic unitss: u128) -> String {
-    format_xlm4(atomic unitss as i128)
+pub fn format_xlm4_u(stroops: u128) -> String {
+    format_xlm4(stroops as i128)
 }
 
 #[cfg(test)]

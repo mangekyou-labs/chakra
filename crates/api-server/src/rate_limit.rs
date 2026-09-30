@@ -65,7 +65,7 @@ pub struct RateLimitState {
 
 impl RateLimitState {
     pub fn from_env() -> Self {
-        let partner_keys: HashSet<String> = std::env::var("Chakra_PARTNER_API_KEYS")
+        let partner_keys: HashSet<String> = std::env::var("LUMAGG_PARTNER_API_KEYS")
             .unwrap_or_default()
             .split(',')
             .map(str::trim)

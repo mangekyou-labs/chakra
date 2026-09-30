@@ -5,7 +5,7 @@ use {
     anyhow::Result,
     dex_adapters::{
         pool_index::{touched_pools_from_events, KnownPoolIndex, PoolRef},
-        rpc::{events::EventFilterSpec, ArcRpc},
+        rpc::{events::EventFilterSpec, SorobanRpc},
     },
     market_snapshot::{ClmmPoolSnapshot, SourceSnapshot},
     std::collections::HashSet,
@@ -69,13 +69,13 @@ pub fn ledger_max_touched_refresh_from_env() -> usize {
 
 /// Tracks ledger sequence and ingests contract events for known pool contracts.
 pub struct LedgerWatcher {
-    rpc: ArcRpc,
+    rpc: SorobanRpc,
     last_ledger: Option<u32>,
     max_catchup_ledgers: u32,
 }
 
 impl LedgerWatcher {
-    pub fn new(rpc: ArcRpc) -> Self {
+    pub fn new(rpc: SorobanRpc) -> Self {
         Self {
             rpc,
             last_ledger: None,

@@ -5,6 +5,6 @@
         "num_operations": 1,
         "fee": "100000",
         "contract": "CC6QAV7JEG5MYRSPO5Z65E5G2M4ZB64BEG2ZXIZXL55TQT35JDI2LC6K",
-        "execution": "Arc"
+        "execution": "soroban"
     }
 }

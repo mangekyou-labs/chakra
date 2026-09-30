@@ -9,5 +9,5 @@ if [[ -f .env.production.local ]]; then
   set +a
 fi
 npm run build
-# npx wrangler pages project create Chakra
-npx wrangler pages deploy out --project-name=Chakra --commit-dirty=true
+# npx wrangler pages project create lumagg
+npx wrangler pages deploy out --project-name=lumagg --commit-dirty=true

@@ -1,4 +1,4 @@
-# Chakra Phase 1: Swap History + Swap UX Polish
+# LumAgg Phase 1: Swap History + Swap UX Polish
 
 **Date:** 2026-07-19  
 **Status:** Approved for planning  
@@ -6,7 +6,7 @@
 
 ## Goal
 
-Make the Chakra homepage feel closer to Titan/Jupiter for **market swaps only**: wallet-scoped recent swap history under the swap card, quote auto-refresh, and paste-CA / token search — without building Limit, DCA, Portfolio, or Charts yet.
+Make the LumAgg homepage feel closer to Titan/Jupiter for **market swaps only**: wallet-scoped recent swap history under the swap card, quote auto-refresh, and paste-CA / token search — without building Limit, DCA, Portfolio, or Charts yet.
 
 ## Non-goals (explicit)
 
@@ -14,7 +14,7 @@ Make the Chakra homepage feel closer to Titan/Jupiter for **market swaps only**:
 - Exact-out quotes, venue include/exclude, route preference knobs
 - Dedicated `/history` page, filters, CSV export of personal history
 - Portfolio / PnL / price charts / token detail pages
-- Non–Chakra-aggregator trades (direct DEX or Classic-only fills)
+- Non–LumAgg-aggregator trades (direct DEX or Classic-only fills)
 - WebSocket quote streaming
 
 These are deferred to Phase 2 (Portfolio + Charts) and Phase 3 (Limit + DCA) per product roadmap.
@@ -61,7 +61,7 @@ Single source of truth for personal history: all `swap_invocations` rows for `us
 
 | Param | Required | Notes |
 |-------|----------|--------|
-| `user` | yes | Arc account `G…` (reject invalid format with 400) |
+| `user` | yes | Stellar account `G…` (reject invalid format with 400) |
 | `limit` | no | Default 20, max 50 |
 | `cursor` | no | **MVP: omit** — only `limit`. Add keyset cursor in a follow-up if lists grow. |
 
@@ -106,7 +106,7 @@ Single source of truth for personal history: all `swap_invocations` rows for `us
 
 - New handler module or extend `stats.rs` patterns in `api-server`
 - Route in `lib.rs`: `.route("/api/v1/swaps", get(…))`
-- Env: reuse `INDEXER_DB_PATH` / `Chakra_INDEXER_DB_PATH`
+- Env: reuse `INDEXER_DB_PATH` / `LUMAGG_INDEXER_DB_PATH`
 
 ### Token paste / resolve
 
@@ -115,7 +115,7 @@ Single source of truth for personal history: all `swap_invocations` rows for `us
 
 ### SDK / docs
 
-- `@Chakra/sdk`: `listSwaps({ user, limit })`
+- `@lumagg/sdk`: `listSwaps({ user, limit })`
 - `/docs` Try It entry for `/api/v1/swaps`
 
 ## Frontend
@@ -132,7 +132,7 @@ Order in the centered ~420px column:
 
 ### `SwapHistory`
 
-- Connected: fetch swaps for wallet public key; show relative time, in→out amounts (resolve decimals/symbols via token list when possible; fallback to truncated contract ids), status, ArcExpert link
+- Connected: fetch swaps for wallet public key; show relative time, in→out amounts (resolve decimals/symbols via token list when possible; fallback to truncated contract ids), status, StellarExpert link
 - Disconnected: prompt to connect
 - After successful swap: refetch shortly (or optimistic row)
 - Failures/503: non-blocking message; never disable SwapCard
@@ -165,7 +165,7 @@ Order in the centered ~420px column:
 
 **Acceptance**
 
-1. After a successful Chakra aggregator swap, that wallet sees the row under History once indexer has ingested it  
+1. After a successful LumAgg aggregator swap, that wallet sees the row under History once indexer has ingested it  
 2. History outage does not break swap  
 3. No Exact-out / venue filter / Limit / DCA shipped in this phase  
 
@@ -175,7 +175,7 @@ Order in the centered ~420px column:
 |------|----------------|
 | Indexer query + index | `crates/analytics-indexer/src/store.rs` |
 | HTTP API | `crates/api-server/src/lib.rs`, new or extended swaps handler, mirror `stats.rs` |
-| SDK | `packages/sdk` (`@Chakra/sdk`) |
+| SDK | `packages/sdk` (`@lumagg/sdk`) |
 | UI | `packages/frontend/src/app/page.tsx`, `SwapCard.tsx`, `TokenSelector.tsx`, new `SwapHistory.tsx` |
 | Docs page | `packages/frontend/src/app/docs/…` |
 

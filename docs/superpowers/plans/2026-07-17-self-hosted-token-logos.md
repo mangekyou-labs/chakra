@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Download available token logos, generate deterministic fallbacks for the rest, and serve every routed token logo from `https://api.Chakra.xyz/logos/...`.
+**Goal:** Download available token logos, generate deterministic fallbacks for the rest, and serve every routed token logo from `https://api.lumagg.xyz/logos/...`.
 
 **Architecture:** `dex-adapters` owns a filesystem-backed logo cache shared by the worker and API. The worker enriches every token metadata record with a self-hosted URL and stores files under `data/logos`; the API serves that directory with Axum/Tower HTTP. Remote images are accepted only when they are small raster images; otherwise a locally generated SVG fallback is used.
 
@@ -36,7 +36,7 @@ Test that:
 ```rust
 #[test]
 fn cache_path_is_deterministic_and_safe() {
-    let cache = TokenLogoCache::new("data/logos", "https://api.Chakra.xyz/logos");
+    let cache = TokenLogoCache::new("data/logos", "https://api.lumagg.xyz/logos");
     let first = cache.fallback_path("CA/unsafe:token");
     let second = cache.fallback_path("CA/unsafe:token");
     assert_eq!(first, second);
@@ -56,7 +56,7 @@ fn only_supported_raster_content_types_are_accepted() {
     assert_eq!(extension_for_content_type("image/png"), Some("png"));
     assert_eq!(extension_for_content_type("image/jpeg"), Some("jpg"));
     assert_eq!(extension_for_content_type("image/webp"), Some("webp"));
-    assert_eq!(extension_for_content_type("image/svg+document"), None);
+    assert_eq!(extension_for_content_type("image/svg+xml"), None);
     assert_eq!(extension_for_content_type("text/html"), None);
 }
 ```
@@ -97,7 +97,7 @@ impl TokenLogoCache {
 Requirements:
 
 - `TOKEN_LOGO_DIR` defaults to `data/logos`.
-- `TOKEN_LOGO_BASE_URL` defaults to `https://api.Chakra.xyz/logos`.
+- `TOKEN_LOGO_BASE_URL` defaults to `https://api.lumagg.xyz/logos`.
 - Filename is SHA-256 of `token_id`, so token-controlled text never enters a path.
 - Accept only successful `image/png`, `image/jpeg`, or `image/webp` responses no larger than 1 MiB.
 - Use a 10-second request timeout.
@@ -273,7 +273,7 @@ Write a temporary `sample.svg`, request `/logos/sample.svg` with `tower::Service
 assert_eq!(response.status(), StatusCode::OK);
 assert_eq!(
     response.headers().get(CONTENT_TYPE).unwrap(),
-    "image/svg+document"
+    "image/svg+xml"
 );
 ```
 
@@ -290,7 +290,7 @@ Expected: PASS.
 **Files:**
 - Modify: `packages/frontend/src/components/TokenSelector.tsx`
 
-- [ ] **Step 1: Remove hard-coded Arc.expert logo URLs**
+- [ ] **Step 1: Remove hard-coded stellar.expert logo URLs**
 
 Delete `WELL_KNOWN_CONTRACT_LOGOS`. Priority tokens should receive logos from `/api/v1/tokens`; before the API response, render the existing deterministic initial-letter avatar.
 
@@ -301,7 +301,7 @@ cd packages/frontend
 npm run build
 ```
 
-Expected: static build PASS, with no `Arc.expert/explorer/public/asset` reference in `TokenSelector.tsx`.
+Expected: static build PASS, with no `stellar.expert/explorer/public/asset` reference in `TokenSelector.tsx`.
 
 ### Task 6: Deployment Persistence and Documentation
 
@@ -325,7 +325,7 @@ The source rsync targets `${REMOTE_SRC}`, so it must not overwrite `${REMOTE_APP
 Document that `/api/v1/tokens[].logo` is either empty only during startup enrichment or an absolute self-hosted URL under:
 
 ```text
-https://api.Chakra.xyz/logos/
+https://api.lumagg.xyz/logos/
 ```
 
 - [ ] **Step 3: Run full verification**
@@ -355,7 +355,7 @@ Expected: all commands PASS without warnings.
 
 ```bash
 ssh root@88.198.16.144 \
-  'journalctl -u Chakra-worker --since "10 minutes ago" --no-pager | grep "token metadata enrichment"'
+  'journalctl -u lumagg-worker --since "10 minutes ago" --no-pager | grep "token metadata enrichment"'
 ```
 
 Expected: snapshot republished after metadata enrichment.
@@ -363,12 +363,12 @@ Expected: snapshot republished after metadata enrichment.
 - [ ] **Step 3: Verify logo coverage and ownership**
 
 ```bash
-curl -fsS https://api.Chakra.xyz/api/v1/tokens | jq '
+curl -fsS https://api.lumagg.xyz/api/v1/tokens | jq '
   (.data // .tokens // .) as $tokens |
   {
     total: ($tokens | length),
     with_logo: ([$tokens[] | select(.logo != "")] | length),
-    self_hosted: ([$tokens[] | select(.logo | startswith("https://api.Chakra.xyz/logos/"))] | length)
+    self_hosted: ([$tokens[] | select(.logo | startswith("https://api.lumagg.xyz/logos/"))] | length)
   }'
 ```
 
@@ -381,7 +381,7 @@ Expected:
 - [ ] **Step 4: Verify representative files**
 
 ```bash
-curl -fsSI "$(curl -fsS https://api.Chakra.xyz/api/v1/tokens |
+curl -fsSI "$(curl -fsS https://api.lumagg.xyz/api/v1/tokens |
   jq -r '(.data // .tokens // .)[0].logo')"
 ```
 
@@ -389,4 +389,4 @@ Expected: HTTP 200 and `Content-Type: image/*`.
 
 - [ ] **Step 5: Confirm the frontend**
 
-Open `https://Chakra.xyz`, search several tokens, and confirm real images or deterministic self-hosted fallback avatars render without third-party image requests.
+Open `https://lumagg.xyz`, search several tokens, and confirm real images or deterministic self-hosted fallback avatars render without third-party image requests.

@@ -1,9 +1,9 @@
-# Chakra self-host kit (Tranche 3 close-out).
-# Requires: Docker, a reachable Arc RPC, and built release binaries or images.
+# LumAgg self-host kit (Tranche 3 close-out).
+# Requires: Docker, a reachable Soroban RPC, and built release binaries or images.
 #
 # Quick start:
 #   cp scripts/arb.env.example deploy/arb.env   # optional arb
-#   export Arc_RPC_URL=https://Arc-rpc.mainnet.Arc.gateway.fm
+#   export SOROBAN_RPC_URL=https://soroban-rpc.mainnet.stellar.gateway.fm
 #   docker compose -f docker-compose.selfhost.yml up -d redis
 #   # Build locally: cargo build -p market-data-worker -p api-server -p analytics-indexer --release
 #   # Then run worker + api on host pointing at this Redis (see README).
@@ -15,7 +15,7 @@ services:
     ports:
       - "6379:6379"
     volumes:
-      - Chakra-redis:/data
+      - lumagg-redis:/data
     healthcheck:
       test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD:-changeme}", "ping"]
       interval: 10s
@@ -30,7 +30,7 @@ services:
       - ./target/release/analytics-indexer:/usr/local/bin/analytics-indexer:ro
       - ./data:/data
     environment:
-      INDEXER_RPC_URL: ${Arc_RPC_URL:-http://host.docker.internal:8003}
+      INDEXER_RPC_URL: ${SOROBAN_RPC_URL:-http://host.docker.internal:8003}
       AGGREGATOR_CONTRACT: ${AGGREGATOR_CONTRACT:-CC6QAV7JEG5MYRSPO5Z65E5G2M4ZB64BEG2ZXIZXL55TQT35JDI2LC6K}
       INDEXER_DB_PATH: /data/analytics-indexer.db
       INDEXER_MODE: events
@@ -39,4 +39,4 @@ services:
     restart: unless-stopped
 
 volumes:
-  Chakra-redis:
+  lumagg-redis:

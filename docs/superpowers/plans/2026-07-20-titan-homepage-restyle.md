@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Restyle Chakra shell + homepage into a Titan-leaning charcoal/mint swap desk; remove marketing sections; keep swap logic.
+**Goal:** Restyle LumAgg shell + homepage into a Titan-leaning charcoal/mint swap desk; remove marketing sections; keep swap logic.
 
 **Architecture:** In-place CSS token swap + component chrome updates in `packages/frontend`. Homepage becomes nav + SwapCard + slim history.
 

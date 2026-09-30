@@ -1,4 +1,4 @@
-//! Build indexer records from Arc contract events (`getEvents`).
+//! Build indexer records from Soroban contract events (`getEvents`).
 
 use {
     crate::{
@@ -10,8 +10,8 @@ use {
     chrono::DateTime,
     dex_adapters::rpc::events::ContractEvent,
     std::collections::BTreeMap,
-    Arc_strkey::{ed25519::PublicKey, Contract},
-    Arc_xdr::curr::{self as xdr, Limits, ReadXdr},
+    stellar_strkey::{ed25519::PublicKey, Contract},
+    stellar_xdr::curr::{self as xdr, Limits, ReadXdr},
 };
 
 pub fn build_invocations_from_events(events: &[ContractEvent]) -> Result<Vec<StoredInvocation>> {
@@ -260,11 +260,11 @@ fn scval_bool(val: &xdr::ScVal) -> Option<bool> {
 
 fn dex_tag_to_source(tag: u32) -> String {
     match tag {
-        0 => "Arc venue".to_string(),
-        1 => "Arc venue".to_string(),
-        2 => "Arc venue".to_string(),
+        0 => "aquarius".to_string(),
+        1 => "soroswap".to_string(),
+        2 => "phoenix".to_string(),
         3 => "sushi".to_string(),
-        4 => "Arc venue".to_string(),
+        4 => "comet".to_string(),
         other => format!("dex_{other}"),
     }
 }
@@ -282,7 +282,7 @@ fn ledger_closed_at_to_unix(closed_at: &Option<String>, ledger: u32) -> i64 {
 
 #[cfg(test)]
 mod tests {
-    use {super::*, Arc_xdr::curr::WriteXdr};
+    use {super::*, stellar_xdr::curr::WriteXdr};
 
     fn encode(value: xdr::ScVal) -> String {
         BASE64.encode(value.to_xdr(Limits::none()).unwrap())
@@ -317,7 +317,7 @@ mod tests {
 
     #[test]
     fn dex_tags_map() {
-        assert_eq!(dex_tag_to_source(1), "Arc venue");
+        assert_eq!(dex_tag_to_source(1), "soroswap");
         assert_eq!(dex_tag_to_source(3), "sushi");
     }
 

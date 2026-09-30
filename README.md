@@ -1,14 +1,14 @@
-# Arc DEX Aggregator (Chakra)
+# Stellar DEX Aggregator (LumAgg)
 
-[![GitHub](https://img.shields.io/badge/GitHub-ligulfzhou%2FArc--dex--agg-181717?logo=github)](https://github.com/Chakra/Arc-dex-agg)
+[![GitHub](https://img.shields.io/badge/GitHub-ligulfzhou%2Fstellar--dex--agg-181717?logo=github)](https://github.com/Lum-Agg/stellar-dex-agg)
 [![License](https://img.shields.io/badge/License-Apache--2.0-blue.svg)](LICENSE)
 
-Multi-source liquidity aggregation for Arc's Arc DEX ecosystem.
+Multi-source liquidity aggregation for Stellar's Soroban DEX ecosystem.
 
-**Repository:** https://github.com/Chakra/Arc-dex-agg  
+**Repository:** https://github.com/Lum-Agg/stellar-dex-agg  
 **中文文档:** [README.zh-CN.md](README.zh-CN.md)
 
-Chakra routes swaps across **Arc venue**, **Arc venue** (xy=k, stable, CLMM), **Arc venue**, **Sushi V3**, and **Arc venue**, with optional comparison against **Classic DEX** (Horizon PathPayment). It supports multi-hop paths, split orders across venues, and atomic on-chain execution via an optional aggregator contract.
+LumAgg routes swaps across **Soroswap**, **Aquarius** (xy=k, stable, CLMM), **Phoenix**, **Sushi V3**, and **Comet**, with optional comparison against **Classic DEX** (Horizon PathPayment). It supports multi-hop paths, split orders across venues, and atomic on-chain execution via an optional aggregator contract.
 
 ## Contents
 
@@ -27,22 +27,25 @@ Chakra routes swaps across **Arc venue**, **Arc venue** (xy=k, stable, CLMM), **
 
 ## Architecture
 
+System architecture (components, quote, swap, round-trip, limits) with
+PlantUML diagrams: [`docs/architecture.md`](docs/architecture.md).
+
 ### Design principles
 
 | Principle | Implementation |
 |-----------|----------------|
 | **Topology vs state** | Routing graph (pairs, pool IDs, fees) is separate from live reserves / ticks |
-| **Single writer** | `Chakra-market-data-worker` owns all Redis writes; `Chakra-api-server` is stateless |
+| **Single writer** | `lumagg-market-data-worker` owns all Redis writes; `lumagg-api-server` is stateless |
 | **Event-driven freshness** | Ledger events refresh *touched* pools; no periodic full-market sweep |
 | **Cold pools stay valid** | Pools with no on-chain activity keep their last Redis value until overwritten |
 
-Pool state updates use three channels: **bootstrap** (worker start), **ledger watcher** (hot path, poll 0.1s), and **discovery** (~600s reconciliation). See [`docs/pool-state-architecture.md`](docs/pool-state-architecture.md) for details.
+Pool state updates use three channels: **bootstrap** (worker start), **ledger watcher** (hot path, poll 0.1s), and **discovery** (~600s reconciliation). See [`docs/architecture.md`](docs/architecture.md) for the system view and [`docs/pool-state-architecture.md`](docs/pool-state-architecture.md) for Redis keys and env vars.
 
 ### System overview
 
 Two paths share one Redis store.
 
-**1 — Pool state writes (`Chakra-market-data-worker`)**
+**1 — Pool state writes (`lumagg-market-data-worker`)**
 
 ```mermaid
 flowchart LR
@@ -54,7 +57,7 @@ flowchart LR
     SNAP --> POOL --> PUB
   end
 
-  subgraph worker ["Chakra-market-data-worker — single writer"]
+  subgraph worker ["lumagg-market-data-worker — single writer"]
     direction TB
     BD["Bootstrap + discovery<br/>~600s reconcile"]
     LW["Ledger watcher<br/>poll 0.1s · per-ledger getEvents"]
@@ -65,7 +68,7 @@ flowchart LR
     FP --> AD
   end
 
-  RPC[(Arc RPC)]
+  RPC[(Soroban RPC)]
 
   AD --> RPC
   LW --> RPC
@@ -76,11 +79,11 @@ flowchart LR
   FP -->|refresh| POOL
 ```
 
-**2 — Quote reads (`Chakra-api-server`)**
+**2 — Quote reads (`lumagg-api-server`)**
 
 ```mermaid
 flowchart LR
-  FE[Frontend / SDK] -->|REST /quote /build_tx| API[Chakra-api-server]
+  FE[Frontend / SDK] -->|REST /quote /build_tx| API[lumagg-api-server]
 
   subgraph RE [router-engine]
     PF[PathFinder<br/>BFS multi-hop]
@@ -104,19 +107,19 @@ After path discovery and Redis hydration, **QuoteEngine** quotes each candidate 
 
 | Key pattern | Contents |
 |-------------|----------|
-| `Chakra:snapshot:*` | Versioned graph + CLMM metadata (no reserves) |
-| `Chakra:pool:xyk:{source}:{pool}` | xy=k reserves |
-| `Chakra:pool:Arc venue:{pool}` | Arc venue N-token / stable reserves |
-| `Chakra:pool:Arc venue:{pool}` | Arc venue weighted pool (token balances + weights + fee) |
-| `Chakra:pool:clmm:{source}:{pool}` | CLMM slot0, liquidity, ticks |
-| `Chakra:snapshot:events` | Pub/Sub channel for snapshot hot-reload |
+| `lumagg:snapshot:*` | Versioned graph + CLMM metadata (no reserves) |
+| `lumagg:pool:xyk:{source}:{pool}` | xy=k reserves |
+| `lumagg:pool:aquarius:{pool}` | Aquarius N-token / stable reserves |
+| `lumagg:pool:comet:{pool}` | Comet weighted pool (token balances + weights + fee) |
+| `lumagg:pool:clmm:{source}:{pool}` | CLMM slot0, liquidity, ticks |
+| `lumagg:snapshot:events` | Pub/Sub channel for snapshot hot-reload |
 
 ### Data layers
 
 | Layer | Contents | Storage | Update cadence |
 |-------|----------|---------|----------------|
-| **Graph** | Token pairs, pool addresses, fee tiers; CLMM refs (no ticks) | `Chakra:snapshot:*` | Bootstrap; discovery ~600s |
-| **Pool state** | xy=k reserves; Arc venue multi-token; Arc venue weighted; CLMM slot0 + ticks + coverage | `Chakra:pool:*` | Ledger poll 0.1s for touched pools; bootstrap + discovery full publish |
+| **Graph** | Token pairs, pool addresses, fee tiers; CLMM refs (no ticks) | `lumagg:snapshot:*` | Bootstrap; discovery ~600s |
+| **Pool state** | xy=k reserves; Aquarius multi-token; Comet weighted; CLMM slot0 + ticks + coverage | `lumagg:pool:*` | Ledger poll 0.1s for touched pools; bootstrap + discovery full publish |
 
 The API does **not** keep a long-lived in-process pool cache. Each `/quote` reloads the graph from the last snapshot, then overlays pool state from Redis (`QUOTE_RPC_HYDRATE_ENABLED=false` by default).
 
@@ -134,7 +137,7 @@ sequenceDiagram
   C->>API: GET /api/v1/quote
   API->>PF: find_candidate_paths (in-memory graph)
   PF-->>API: candidate paths
-  API->>R: MGET pool keys (xyk + Arc venue + clmm + Arc venue)
+  API->>R: MGET pool keys (xyk + aquarius + clmm + comet)
   R-->>API: cached pool states
   API->>QE: quote each path at full amount
   QE-->>API: QuotedPath list
@@ -148,14 +151,14 @@ Steps in code:
 
 1. **Path discovery** — BFS on the routing graph; all candidate paths (no liquidity prune).
 2. **Collect pool keys** — unique `(source, pool_address)` across paths.
-3. **Hydrate pool state** (`pool_hydrate::hydrate_paths`) — Redis MGET for xy=k, Arc venue, CLMM, and Arc venue weighted state (written by worker). Optional Arc venue xy=k / Arc venue RPC fallback for Redis misses when `QUOTE_RPC_HYDRATE_ENABLED=true`.
-4. **Per-path quote** — local AMM / CLMM / Arc venue math at full `amount_in`; skip CLMM hops when `coverage.is_complete` is false.
+3. **Hydrate pool state** (`pool_hydrate::hydrate_paths`) — Redis MGET for xy=k, Aquarius, CLMM, and Comet weighted state (written by worker). Optional Soroswap xy=k / Comet RPC fallback for Redis misses when `QUOTE_RPC_HYDRATE_ENABLED=true`.
+4. **Per-path quote** — local AMM / CLMM / Comet math at full `amount_in`; skip CLMM hops when `coverage.is_complete` is false.
 5. **Split optimization** — `SplitOptimizer`: skip if impact below threshold; else Brent's method (2-path) or pairwise merge (N-path) to maximize total output.
-6. **Classic compare** — optional Horizon PathPayment benchmark vs best Arc route.
+6. **Classic compare** — optional Horizon PathPayment benchmark vs best Soroban route.
 
 ### Ledger watcher (hot path)
 
-Arc Arc RPC has no WebSocket / Geyser push — the worker **polls** `getLatestLedger` every **0.1s**, then fetches **one ledger at a time**:
+Stellar Soroban RPC has no WebSocket / Geyser push — the worker **polls** `getLatestLedger` every **0.1s**, then fetches **one ledger at a time**:
 
 ```text
 getLatestLedger
@@ -172,14 +175,14 @@ Active pools typically refresh within **~0.1–2s** after a swap / add / remove 
 
 ## Arbitrage & vault
 
-Operator-facing atomic round-trip stack (not a retail product). Trading principal can sit in a **vault** so hot wallets only pay Arc fees. Public deployment guide: [`docs/arbitrage-deployment.md`](docs/arbitrage-deployment.md). Contract detail: [`contracts/vault/README.md`](contracts/vault/README.md).
+Operator-facing atomic round-trip stack (not a retail product). Trading principal can sit in a **vault** so hot wallets only pay Soroban fees. Public deployment guide: [`docs/arbitrage-deployment.md`](docs/arbitrage-deployment.md). Contract detail: [`contracts/vault/README.md`](contracts/vault/README.md).
 
 ### Operator architecture
 
 ```mermaid
 flowchart LR
-  W[Chakra-market-data-worker] -->|Redis pool state| Q[Chakra-api-server ×N]
-  Q -->|GET /quote prefer_Arc| S[Chakra-arbitrage-bot]
+  W[lumagg-market-data-worker] -->|Redis pool state| Q[lumagg-api-server ×N]
+  Q -->|GET /quote prefer_soroban| S[lumagg-arbitrage-bot]
   S -->|simulate + sign| V[vault.execute_round_trip]
   V -->|CPI| A[aggregator.round_trip_swap]
   A --> D[DEX pools]
@@ -188,7 +191,7 @@ flowchart LR
 
 | Piece | Crate / contract | Role |
 |-------|------------------|------|
-| Quotes | `api-server` | Same `/quote` stack as the UI; arb sets `prefer_Arc=1`, usually `max_splits=1` |
+| Quotes | `api-server` | Same `/quote` stack as the UI; arb sets `prefer_soroban=1`, usually `max_splits=1` |
 | Scanner | `crates/arbitrage` | Bridge scan → size optimize → simulate → optional submit |
 | Vault | `contracts/vault` | Allowlisted callers; holds base (e.g. XLM SAC) float |
 | Aggregator | `contracts/aggregator` | `round_trip_swap` (leg_out + leg_back) |
@@ -228,47 +231,47 @@ bridges × base
 | Callers | Mnemonic indices or secrets; mutex + cooldown ~1 ledger after send |
 | Dedup | Skip same path within `ARB_SUBMIT_DEDUP_SECS` |
 | Safety | Default unit has `ARB_SUBMIT_TX=0`; enable via `deploy/arb.env` |
-| Monitoring | `journalctl -u Chakra-arb`; optional Telegram P&amp;L |
+| Monitoring | `journalctl -u lumagg-arb`; optional Telegram P&amp;L |
 
 ### Deploy arb
 
-Build and install `Chakra-arbitrage-bot` as a separate native service. Follow the
+Build and install `lumagg-arbitrage-bot` as a separate native service. Follow the
 [public deployment guide](docs/arbitrage-deployment.md), which starts in
 quote-only mode and requires an explicit staged rollout before live submission.
 
 | Unit | Role |
 |------|------|
-| `Chakra-arb.service` | Round-trip scanner (depends on Redis + quote APIs) |
+| `lumagg-arb.service` | Round-trip scanner (depends on Redis + quote APIs) |
 
 ## DEX sources
 
 | Source | Pool type | In routing graph | Pool state in Redis | Quote math |
 |--------|-----------|------------------|---------------------|------------|
-| **Arc venue** | xy=k | Yes | Discovery + ledger | Constant product |
-| **Arc venue** | xy=k + stable | Yes | Discovery + ledger | xy=k / stable |
-| **Arc venue** | xy=k | Yes | Discovery + ledger | Fee-on-output |
+| **soroswap** | xy=k | Yes | Discovery + ledger | Constant product |
+| **aquarius** | xy=k + stable | Yes | Discovery + ledger | xy=k / stable |
+| **phoenix** | xy=k | Yes | Discovery + ledger | Fee-on-output |
 | **sushi** | CLMM V3 | Yes | Discovery + ledger | Local `clmm_math` |
-| **Arc venue_clmm** | CLMM | Yes | Discovery + ledger | Local `clmm_math` |
-| **Arc venue** | Weighted | Yes | Discovery + ledger (`Chakra:pool:Arc venue:*`) | Balancer math |
+| **aquarius_clmm** | CLMM | Yes | Discovery + ledger | Local `clmm_math` |
+| **comet** | Weighted | Yes | Discovery + ledger (`lumagg:pool:comet:*`) | Balancer math |
 | **classic_dex** | Native orderbook | **No** | **Per quote** (Horizon) | Benchmark only |
 
 ## Key features
 
-- **Multi-source aggregation** across six Arc DEX families
+- **Multi-source aggregation** across six Soroban DEX families
 - **Multi-hop routing** — BFS through intermediate tokens (configurable max hops)
 - **Split orders** — Brent optimizer across paths when impact or competitiveness warrants it
 - **Event-driven pool state** — ledger watcher + discovery; no periodic full sweep
-- **Horizontally scalable API** — stateless `Chakra-api-server` instances behind a load balancer
+- **Horizontally scalable API** — stateless `lumagg-api-server` instances behind a load balancer
 - **Sub-2s hot pool freshness** — 0.1s ledger poll + fetch pipeline for touched pools
 - **Atomic on-chain execution** — optional aggregator contract (`split_swap`, `round_trip_swap`)
-- **Atomic arb operator stack** — vault-pooled capital + `Chakra-arbitrage-bot` round-trips (see [Arbitrage & vault](#arbitrage--vault))
-- **Classic benchmark** — Horizon PathPayment per quote without polluting the Arc graph
+- **Atomic arb operator stack** — vault-pooled capital + `lumagg-arbitrage-bot` round-trips (see [Arbitrage & vault](#arbitrage--vault))
+- **Classic benchmark** — Horizon PathPayment per quote without polluting the Soroban graph
 
 ## Why not Classic DEX routing?
 
-Arc's native PathPayment has **uncontrollable routing** — Arc Core decides how to split across orderbooks and pools. You cannot force a specific pool or path.
+Stellar's native PathPayment has **uncontrollable routing** — Stellar Core decides how to split across orderbooks and pools. You cannot force a specific pool or path.
 
-This aggregator targets **Arc DEXes** where each hop is a deterministic contract call. Classic DEX is a **per-quote benchmark** (and fallback for tokens only on the native DEX), not an edge in the pathfinder graph.
+This aggregator targets **Soroban DEXes** where each hop is a deterministic contract call. Classic DEX is a **per-quote benchmark** (and fallback for tokens only on the native DEX), not an edge in the pathfinder graph.
 
 ## Project structure
 
@@ -284,16 +287,18 @@ This aggregator targets **Arc DEXes** where each hop is a deterministic contract
 │   ├── api-server/             # REST API (/quote, /build_tx, /tokens)
 │   ├── arbitrage/              # Round-trip scanner (vault or direct aggregator)
 │   ├── analytics-indexer/      # On-chain aggregator tx indexer (SCF analytics v0)
-│   ├── Chakra-alerts/          # Telegram / monitoring alerts
+│   ├── lumagg-alerts/          # Telegram / monitoring alerts
 │   └── sdk/                    # Client SDK
 ├── docs/
+│   ├── architecture.md
+│   ├── diagrams/               # PlantUML sources + rendered SVGs
 │   ├── pool-state-architecture.md
 │   ├── aggregator-deployment.md
 │   ├── arbitrage-deployment.md
 │   └── analytics-indexer.md
 ├── packaging/                 # Public systemd and environment templates
 ├── thirdparty/                 # Optional local upstream clones (not tracked; see README there)
-├── deploy/                     # Chakra-operated infrastructure (not public templates)
+├── deploy/                     # LumAgg-operated infrastructure (not public templates)
 └── frontend/                   # SvelteKit demo UI
 ```
 
@@ -315,30 +320,30 @@ SNAPSHOT_DIR=data/snapshots cargo run -p market-data-worker
 SNAPSHOT_DIR=data/snapshots cargo run -p api-server
 
 # Self-host / Jupiter-like: one binary, in-process worker, memory stores (no Redis)
-Chakra_MODE=embedded \
-RPC_URL=https://mainnet.Arcrpc.com \
+LUMAGG_MODE=embedded \
+RPC_URL=https://mainnet.sorobanrpc.com \
 LISTEN_ADDR=127.0.0.1:3100 \
 cargo run -p api-server
 
 # Public self-host distribution (same embedded architecture)
-RPC_URL=https://mainnet.Arcrpc.com cargo run -p Chakra-swap-api
+RPC_URL=https://mainnet.sorobanrpc.com cargo run -p lumagg-swap-api
 
 # Local Redis-backed stack (production-style)
 redis-server --port 6380 --save "" --appendonly no
 
 SNAPSHOT_BACKEND=redis \
 SNAPSHOT_REDIS_URL=redis://127.0.0.1:6380/ \
-SNAPSHOT_REDIS_CHANNEL=Chakra:snapshot:events \
+SNAPSHOT_REDIS_CHANNEL=lumagg:snapshot:events \
 cargo run -p market-data-worker
 
 LISTEN_ADDR=127.0.0.1:3113 \
 SNAPSHOT_BACKEND=redis \
 SNAPSHOT_REDIS_URL=redis://127.0.0.1:6380/ \
-SNAPSHOT_REDIS_CHANNEL=Chakra:snapshot:events \
+SNAPSHOT_REDIS_CHANNEL=lumagg:snapshot:events \
 cargo run -p api-server
 ```
 
-`Chakra_MODE=embedded` reuses the **same** worker + quote code as cluster mode; only the store backend changes (memory vs Redis). Production should keep the Redis split (`Chakra_MODE=cluster`, default).
+`LUMAGG_MODE=embedded` reuses the **same** worker + quote code as cluster mode; only the store backend changes (memory vs Redis). Production should keep the Redis split (`LUMAGG_MODE=cluster`, default).
 **Utility binaries** (`dex-adapters`):
 
 ```bash
@@ -357,12 +362,12 @@ Choose the topology by workload:
 
 | Workload | Guide |
 |----------|-------|
-| Private quote API or integration testing | [`docs/Chakra-swap-api.md`](docs/Chakra-swap-api.md) |
+| Private quote API or integration testing | [`docs/lumagg-swap-api.md`](docs/lumagg-swap-api.md) |
 | Public, scalable Aggregator | [`docs/aggregator-deployment.md`](docs/aggregator-deployment.md) |
 | Independent arbitrage operator | [`docs/arbitrage-deployment.md`](docs/arbitrage-deployment.md) |
 
 Public native systemd and environment templates live in `packaging/`. Files in
-`deploy/` and the root deployment scripts describe Chakra-operated
+`deploy/` and the root deployment scripts describe LumAgg-operated
 infrastructure and are not portable installation interfaces.
 
 ## Configuration
@@ -371,16 +376,16 @@ infrastructure and are not portable installation interfaces.
 
 | Variable | Default | Meaning |
 |----------|---------|---------|
-| `RPC_URL` | mainnet gateway.fm | Arc JSON-RPC endpoint |
+| `RPC_URL` | mainnet gateway.fm | Soroban JSON-RPC endpoint |
 
 ### Snapshot & Redis
 
 | Variable | Default | Component | Meaning |
 |----------|---------|-----------|---------|
 | `SNAPSHOT_BACKEND` | — | worker, API | `file` or `redis` |
-| `Chakra_MODE` | `cluster` | API | `cluster` = Redis + separate worker; `embedded` = one process, memory stores |
+| `LUMAGG_MODE` | `cluster` | API | `cluster` = Redis + separate worker; `embedded` = one process, memory stores |
 | `SNAPSHOT_REDIS_URL` | — | worker, API | Redis URL (snapshots + pool state); not required for `embedded` |
-| `SNAPSHOT_REDIS_CHANNEL` | `Chakra:snapshot:events` | worker, API | Pub/Sub for snapshot hot-reload |
+| `SNAPSHOT_REDIS_CHANNEL` | `lumagg:snapshot:events` | worker, API | Pub/Sub for snapshot hot-reload |
 | `SNAPSHOT_POLL_INTERVAL_MS` | `1000` | API | Polling fallback if Pub/Sub missed |
 | `POOL_STATE_TTL_SECS` | `86400` | worker | Redis EX on pool keys (eviction, not freshness SLA) |
 
@@ -416,14 +421,14 @@ infrastructure and are not portable installation interfaces.
 | Variable | Default | Meaning |
 |----------|---------|---------|
 | `SUSHI_DISCOVERY_RPC` | public gateway | RPC for Sushi pool probes |
-| `Arc venue_FACTORY` | Blend mainnet factory | Arc venue factory contract |
-| `Arc venue_EXTRA_POOLS` | — | Comma-separated extra Arc venue pool IDs |
+| `COMET_FACTORY` | Blend mainnet factory | Comet factory contract |
+| `COMET_EXTRA_POOLS` | — | Comma-separated extra Comet pool IDs |
 
 ### Arbitrage bot (see also `docs/arbitrage-deployment.md`)
 
 | Variable | Default / notes | Meaning |
 |----------|-----------------|---------|
-| `ARB_AGGREGATOR_CONTRACT` | required for build | Chakra aggregator |
+| `ARB_AGGREGATOR_CONTRACT` | required for build | LumAgg aggregator |
 | `ARB_VAULT_CONTRACT` | optional | Vault mode; unset → direct `round_trip_swap` |
 | `ARB_QUOTE_API_URLS` | `http://127.0.0.1:3100,…` | Round-robin quote APIs |
 | `ARB_BRIDGE_TOKENS` | SAC list | Bridge hubs for XLM↔token↔XLM |
@@ -431,13 +436,13 @@ infrastructure and are not portable installation interfaces.
 | `ARB_MNEMONIC_PATH` + `ARB_CALLER_INDICES` | — | HD callers (fee wallets) |
 | `ARB_BUILD_TX` | `0` | Build/simulate path |
 | `ARB_SUBMIT_TX` | `0` | Live broadcast |
-| `ARB_MIN_PROFIT` | atomic unitss | Net profit floor after estimated fees |
+| `ARB_MIN_PROFIT` | stroops | Net profit floor after estimated fees |
 | `ARB_MAX_SPLITS` | often `1` for arb | Keep routes simple / cheaper fees |
 | `ARB_POLL_TX` | `0` | Background `getTransaction` for SUCCESS/FAILED stats |
 
 ## Split routing
 
-Production `deploy/Chakra-api@.service` sets split env vars explicitly.
+Production `deploy/lumagg-api@.service` sets split env vars explicitly.
 
 The **SplitOptimizer** (`crates/router-engine/src/split_optimizer.rs`) runs inside QuoteEngine after every path has been quoted at full size:
 
@@ -457,18 +462,19 @@ Brent tolerance defaults to `0.0001` (0.01%) with up to 18 iterations — simila
 
 | Doc | Topic |
 |-----|-------|
-| [`docs/integrator-guide.md`](docs/integrator-guide.md) | Partner quickstart — quote, build_tx, API keys, `prefer_Arc` |
+| [`docs/integrator-guide.md`](docs/integrator-guide.md) | Partner quickstart — quote, build_tx, API keys, `prefer_soroban` |
 | [`docs/openapi.yaml`](docs/openapi.yaml) | OpenAPI 3 spec for `/quote`, `/build_tx`, `/tokens`, `/health` |
 | [`docs/analytics-indexer.md`](docs/analytics-indexer.md) | On-chain analytics indexer v0 — attribution spec, env, export |
+| [`docs/architecture.md`](docs/architecture.md) | System architecture, PlantUML diagrams, quote/swap/arb/limit flows |
 | [`docs/pool-state-architecture.md`](docs/pool-state-architecture.md) | Pool state design, env tables, code pointers |
 | [`docs/aggregator-deployment.md`](docs/aggregator-deployment.md) | Native worker + Redis + API production deployment |
 | [`docs/arbitrage-deployment.md`](docs/arbitrage-deployment.md) | Native arbitrage bot install and staged rollout |
 | [`docs/contracts-deployment.md`](docs/contracts-deployment.md) | Aggregator and Vault deployment, upgrade, and external TTL maintenance |
 | [`docs/gitbook-deployment.md`](docs/gitbook-deployment.md) | Maintainer runbook for Git Sync, publishing, and custom domain setup |
-| [`docs/scf-venue-comparison.md`](docs/scf-venue-comparison.md) | Chakra vs Arc venue / Arc Broker — venue coverage & SCF differentiation evidence |
+| [`docs/scf-venue-comparison.md`](docs/scf-venue-comparison.md) | LumAgg vs Soroswap / Stellar Broker — venue coverage & SCF differentiation evidence |
 | [`docs/scf-resubmission-budget.md`](docs/scf-resubmission-budget.md) | SCF #44 resubmission — $80k tranche deliverables (copy-paste) |
-| [`docs/Chakra-swap-api.md`](docs/Chakra-swap-api.md) | Native all-in-one Swap API download and operation |
-| [`contracts/vault/README.md`](contracts/vault/README.md) | Vault API, fund flow, Arc auth notes |
+| [`docs/lumagg-swap-api.md`](docs/lumagg-swap-api.md) | Native all-in-one Swap API download and operation |
+| [`contracts/vault/README.md`](contracts/vault/README.md) | Vault API, fund flow, Soroban auth notes |
 | [`docs/arb-executor.md`](docs/arb-executor.md) | Historical naming → vault + `round_trip_swap` |
 
 ## License

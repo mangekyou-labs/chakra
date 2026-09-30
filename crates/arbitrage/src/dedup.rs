@@ -6,7 +6,7 @@ use std::{
     time::{Duration, Instant},
 };
 
-/// Default ~1 Arc ledger (~5s); Arc-arb uses 6s.
+/// Default ~1 Stellar ledger (~5s); stellar-arb uses 6s.
 pub const DEFAULT_DEDUP_TTL: Duration = Duration::from_secs(6);
 const RESERVATION_TTL: Duration = Duration::from_secs(120);
 

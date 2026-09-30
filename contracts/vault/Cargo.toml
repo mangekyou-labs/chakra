@@ -3,16 +3,16 @@ name = "vault-contract"
 version = "0.1.0"
 edition = "2021"
 license = "Apache-2.0"
-repository = "https://github.com/Chakra/Arc-dex-agg"
+repository = "https://github.com/Lum-Agg/stellar-dex-agg"
 
 [lib]
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
-Arc-sdk = "22.0.0"
-Chakra-contract-types = { path = "../shared-types" }
+soroban-sdk = "22.0.0"
+lumagg-contract-types = { path = "../shared-types" }
 
 [dev-dependencies]
-Arc-sdk = { version = "22.0.0", features = ["testutils"] }
+soroban-sdk = { version = "22.0.0", features = ["testutils"] }
 aggregator-contract = { path = "../aggregator", default-features = false }
-Chakra-contract-types = { path = "../shared-types" }
+lumagg-contract-types = { path = "../shared-types" }

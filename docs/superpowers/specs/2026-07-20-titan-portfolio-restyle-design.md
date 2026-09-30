@@ -1,4 +1,4 @@
-# Chakra Frontend: Titan-leaning Portfolio / Profile Restyle
+# LumAgg Frontend: Titan-leaning Portfolio / Profile Restyle
 
 **Date:** 2026-07-20  
 **Status:** Approved  
@@ -61,7 +61,7 @@ Rename route to `/profile`, move all wallet-centric views under a layout with ne
 │            GABC…full address…XYZ (mono, muted, truncate)    │
 ├─────────────────────────────────────────────────────────────┤
 │  $4.42                              (large, primary)        │
-│  ≈ priced via Chakra quotes         (muted subline)         │
+│  ≈ priced via LumAgg quotes         (muted subline)         │
 ├─────────────────────────────────────────────────────────────┤
 │  Holdings | Swap history | Limit orders Soon | DCA Soon     │
 ├─────────────────────────────────────────────────────────────┤
@@ -75,7 +75,7 @@ Rename route to `/profile`, move all wallet-centric views under a layout with ne
 - **Short address:** first 4 + last 4, `text-[20–22px] font-semibold`
 - **Full address:** mono, muted, single line truncate; copy-to-clipboard icon button
 - **Total USD:** `text-[36–44px]` tabular-nums; show `—` while pricing loads; same aggregation logic as today
-- **Subline:** e.g. “Valued via Chakra quotes” — not chain-native balance in SOL terms (Arc has no single native USD equivalent line like Titan’s SOL subline unless we add XLM notional — optional: show approximate XLM equivalent if XLM price known)
+- **Subline:** e.g. “Valued via LumAgg quotes” — not chain-native balance in SOL terms (Stellar has no single native USD equivalent line like Titan’s SOL subline unless we add XLM notional — optional: show approximate XLM equivalent if XLM price known)
 
 ### Tabs
 
@@ -113,7 +113,7 @@ Refactor `SwapHistory`:
 - **`variant="compact"`** — current home Activity card (unchanged behavior)
 - **`variant="profile"`** — profile tab panel:
   - No outer “Activity” card chrome / max-height cap
-  - Table or dense list: Time · Status · In → Out · link to Arc.expert
+  - Table or dense list: Time · Status · In → Out · link to stellar.expert
   - Full page width within profile container
   - Same empty / unavailable / refetch-error copy
 

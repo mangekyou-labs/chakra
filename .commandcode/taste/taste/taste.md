@@ -1,0 +1,37 @@
+# Taste
+- Work in a git worktree (e.g. `.worktrees/<feature>`), never in the repo's `main` branch. Confidence: 0.9
+- Do not commit or create PRs unless explicitly asked; a session executes the plan and leaves changes uncommitted in the worktree. Confidence: 0.9
+- Never pass secrets on the CLI (`--private-key`), never read wallet/keystore files, and keep `.env`/key material out of diffs and git status. Confidence: 0.95
+- Use a TDD cycle per task: write a failing test, add minimal code, make it green, refactor. Confidence: 0.85
+- Verify claims against fresh command output (fresh `forge test`, explicit exit codes), not cached or prior-run results. Confidence: 0.85
+- Keep documentation in lockstep with work: update planning / implementation / testing docs as each task completes. Confidence: 0.85
+- When the live/deployment half of a task is blocked (no key), mark it `local complete / live blocked` rather than fully done. Confidence: 0.8
+- Prefer vendoring upstream libraries verbatim over rewriting them. Confidence: 0.7
+- Record concrete evidence from runs (test counts, exit codes) in docs; no unverified claims. Confidence: 0.7
+- Execute strictly within the scoped task: out-of-scope work (later phases, unrelated subsystems, wholesale doc rewrites) stays untouched, and later phases do not start while the current queue still has work. Confidence: 0.8
+- When live infrastructure/keys are unavailable, design the work so it is provable offline (mocks, fixture pools, local services) and mark the live half "blocked" rather than stalling the task. Confidence: 0.75
+- Integration tests that depend on an external service (e.g., Redis) skip gracefully when that service is unavailable instead of failing the suite. Confidence: 0.7
+- When a documented/expected value or a plan's example turns out to be wrong or unobtainable, do not force it; lock the honest proven behavior in a test and record the mismatch as a documented deviation (with the fix deferred to a later task) rather than bending logic to match the plan. Confidence: 0.8
+- Prove "this code path never calls X" (e.g., quotes never touch RPC, an encoder never re-quotes) with a test double that panics on any unexpected call — the panic proves the absence, not just the happy path. Confidence: 0.75
+- Expose test-only fixtures/doubles to integration tests via a dedicated cargo feature (e.g., `test-fixture`) rather than unit-only `#[cfg(test)]` visibility. Confidence: 0.7
+- Uses `playwright-cli` for browser verification; never Playwright MCP and never agent-browser. Confidence: 0.85
+- Uses Conventional Commits for all commit messages (e.g., `feat(chakra): …`, `fix(market-snapshot): …`, `docs(chakra): …`). Confidence: 0.9
+- Verifies "it builds / it is hosted / tests pass" claims on a clean clone of the committed tree, not the dirty worktree — untracked leftover files can break `--all-targets` or mask what was actually committed. Confidence: 0.85
+- Stages only intended files explicitly; never blanket `git add -A` when untracked leftovers exist — keep legacy/out-of-scope files untracked and out of the commit. Confidence: 0.8
+- When working in a nested repo/worktree that has its own remote, push only from that nested repo to its own remote; never push parent-repo commits into it and never force-push. Confidence: 0.8
+- When required deployment tooling is missing or unauthenticated (e.g., `render` CLI absent, no API key), stop and ask the user how to proceed instead of improvising credentials or guessing access. Confidence: 0.85
+- Never commit planning/implementation status claims (e.g., "81 tests green", "task done") unless produced and verified in the current session; revert false `[x]` markers and reopen tasks honestly, flipping to done only with fresh smoke URLs / clean-clone evidence. Confidence: 0.85
+- Container/Docker build hygiene: pin the base image to the project toolchain version (e.g., `rust:1.88` to match `rust-toolchain.toml`), add a `.dockerignore` so untracked/leftover dirs never COPY into the image, and drop HEALTHCHECK commands that rely on tools absent from the runtime image (use the platform's health-check path instead). Confidence: 0.75
+- Deployment documentation includes public URLs, env var names (no secrets), health/ready endpoints, and an explicit rollback procedure (redeploy the previous GitHub SHA). Confidence: 0.7
+- Run lint/builds/tests from the nested worktree repo (the source of truth for a nested feature repo), not the parent — parent tooling such as `lint --feature x` misses worktree files and can report a false clean. Confidence: 0.85
+- Design API schemas as extensible string enums (e.g. `dex_types` as an open string enum, not a closed fixed set) so new venue/type values extend the schema without reopening or versioning the quote shape. Confidence: 0.75
+- When pinning live on-chain quote vectors in tests, capture reserves and the quoted output in the same block (batch `eth_call` at `latest`): live reserves drift between blocks, so vectors probed separately never reproduce exactly and force false "mismatch" churn. Confidence: 0.7
+ Distinguish the documented verification gate from whole-repo checks: pre-existing failures outside the gate (legacy bins/tests, unrelated clippy errors, branch-name lint checks) are reported as pre-existing and left untouched rather than fixed, while the batch is verified against the documented kept-crate/test gate. Confidence: 0.65
+- A Playwright skip/auto-pass is not a pass: `status: "passed"` with an empty test-results dir is a skip, not a live run — never treat harness-skip evidence as live proof; require a fresh pass log plus a transaction URL from the current session before marking a live QA task done. Confidence: 0.7
+- When a plan's literal instruction would discard committed work (e.g., a pinned base commit that omits a branch's later commits), stop and ask the user which base to use instead of silently following the plan. Confidence: 0.8
+- Recover stale/malformed git worktrees safely: rename the directory to a dated recovery dir (preserving `.env` and untracked files), prune the phantom/stale registration, recreate the worktree from the correct branch, verify parity before transferring unique files, and keep the recovery dir until the feature completes. Confidence: 0.75
+- On-chain deployment/broadcast is a separate authorization gate: after all local verification passes, stop before broadcasting and summarize the operator rollout for approval — never broadcast as part of the same execution. Confidence: 0.8
+- Testnet verification uses small faucet-sized amounts with realistic slippage; large liquidity reseeding is never a release gate because testnet liquidity depletes/resets. Confidence: 0.7
+- New external integrations/venues are recorded as explicit promotion candidates and never silently discovered or enabled. Confidence: 0.7
+- Never conceal unavailable routes/features behind artificial or placeholder substitutes; degrade honestly (e.g., explicit NO_ROUTE) instead. Confidence: 0.7
+- Documentation mirrors are not deployment registries: verify live addresses/contracts against primary sources (actual contract repos, RPC state, explorer) before locking a venue/integration decision. Confidence: 0.7

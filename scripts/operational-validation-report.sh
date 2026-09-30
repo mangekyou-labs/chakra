@@ -2,7 +2,7 @@
 set -euo pipefail
 
 # Build a grant/operations snapshot from the public API. No credentials are read.
-API_URL="${API_URL:-https://api.Chakra.xyz}"
+API_URL="${API_URL:-https://api.lumagg.xyz}"
 OUTPUT="${OUTPUT:--}"
 
 usage() {
@@ -10,7 +10,7 @@ usage() {
 Usage: scripts/operational-validation-report.sh [options]
 
 Options:
-  --api URL       API base URL (default: https://api.Chakra.xyz)
+  --api URL       API base URL (default: https://api.lumagg.xyz)
   --output FILE   Write Markdown report and FILE.json; default: stdout
   -h, --help      Show this help
 EOF
@@ -79,7 +79,7 @@ report_json="$(jq -c \
 echo "$report_json" | jq -e 'type == "object" and .indexer.days_indexed >= 0' >/dev/null
 
 markdown="$(echo "$report_json" | jq -r '
-  "# Chakra Operational Validation Report\n\n" +
+  "# LumAgg Operational Validation Report\n\n" +
   "Generated: `" + .generated_at + "`  \n" +
   "API: [" + .api_url + "](" + .api_url + ")\n\n" +
   "## Public service\n\n" +

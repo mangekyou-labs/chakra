@@ -1,6 +1,6 @@
-Chakra Tranche 1 — Deliverable 2 external integrator smoke
+LumAgg Tranche 1 — Deliverable 2 external integrator smoke
 
-API=https://api.Chakra.xyz
+API=https://api.lumagg.xyz
 USER_G=GDXRRY4HHIERMJBY62B4YJ25V3YNTMEOG3CQRLRHJ3P57Q57CYSJLPI2
 Role=external friend / non-founder G-address (docs-only path)
 Generated=2026-07-27T10:24Z
@@ -11,7 +11,7 @@ Tester verification:
 - The generated files were copied from ./output into this public evidence directory.
 
 Files:
-- quote.json       GET /api/v1/quote response (is_split=true, Arc venue + Arc venue CLMM)
+- quote.json       GET /api/v1/quote response (is_split=true, Soroswap + Aquarius CLMM)
 - build.json       POST /api/v1/build_tx request body (user_public_key = USER_G above)
 - build_resp.json  POST /api/v1/build_tx response (unsigned_tx_xdr present, success=true)
 

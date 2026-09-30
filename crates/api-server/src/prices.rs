@@ -233,7 +233,7 @@ mod tests {
             extract::{Query, State},
             http::StatusCode,
         },
-        dex_adapters::{rpc::ArcRpc, token_metadata::TokenMetadataStore},
+        dex_adapters::{rpc::SorobanRpc, token_metadata::TokenMetadataStore},
         router_engine::{path_finder::PathFinderConfig, split_optimizer::SplitConfig, QuoteEngine},
         serde_json::Value,
         std::sync::Arc,
@@ -243,7 +243,7 @@ mod tests {
 
     fn test_state(price_store: Option<Arc<PriceStore>>) -> AppState {
         let config = AppConfig::default();
-        let rpc = Arc::new(ArcRpc::new(&config.rpc_url, &config.network_passphrase));
+        let rpc = Arc::new(SorobanRpc::new(&config.rpc_url, &config.network_passphrase));
         AppState {
             engine: Arc::new(RwLock::new(Arc::new(QuoteEngine::new(
                 PathFinderConfig::default(),

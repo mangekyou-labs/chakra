@@ -5,7 +5,7 @@ use {
     sha2::{Digest, Sha256},
 };
 
-/// Compute the Arc Asset Contract (SAC) address for a classic asset.
+/// Compute the Stellar Asset Contract (SAC) address for a classic asset.
 /// SAC contract ID = SHA256(HashIdPreimage::ContractId(network_id, asset))
 pub fn compute_sac_contract_id(asset: &str, network_passphrase: &str) -> Result<String> {
     if asset == "native" {
@@ -17,7 +17,7 @@ pub fn compute_sac_contract_id(asset: &str, network_passphrase: &str) -> Result<
         .split_once(':')
         .ok_or_else(|| anyhow!("Invalid asset format: {}", asset))?;
 
-    let issuer_bytes = Arc_strkey::ed25519::PublicKey::from_string(issuer)
+    let issuer_bytes = stellar_strkey::ed25519::PublicKey::from_string(issuer)
         .map_err(|e| anyhow!("Invalid issuer: {:?}", e))?
         .0;
 
@@ -36,7 +36,7 @@ pub fn compute_sac_contract_id(asset: &str, network_passphrase: &str) -> Result<
     preimage.extend_from_slice(&xdr_asset);
 
     let hash = Sha256::digest(&preimage);
-    Ok(format!("{}", Arc_strkey::Contract(hash.into())))
+    Ok(format!("{}", stellar_strkey::Contract(hash.into())))
 }
 
 fn build_xdr_asset(code: &str, issuer: &[u8; 32]) -> Result<Vec<u8>> {
@@ -64,7 +64,7 @@ fn build_xdr_asset(code: &str, issuer: &[u8; 32]) -> Result<Vec<u8>> {
     Ok(buf)
 }
 
-/// Check if a string looks like a Arc contract address (C..., 56 chars).
+/// Check if a string looks like a Soroban contract address (C..., 56 chars).
 pub fn is_contract_address(s: &str) -> bool {
     s.starts_with('C') && s.len() == 56
 }

@@ -121,13 +121,13 @@ async fn main() -> Result<()> {
                     .saturating_sub(compute_profit_bps(amount_in, prepared.amount_out))
             );
             println!(
-                "resource_fee_atomic unitss={} (~{:.4} XLM)",
-                prepared.resource_fee_atomic unitss,
-                prepared.resource_fee_atomic unitss as f64 / 1e7
+                "resource_fee_stroops={} (~{:.4} XLM)",
+                prepared.resource_fee_stroops,
+                prepared.resource_fee_stroops as f64 / 1e7
             );
             println!(
-                "estimated_fee_atomic unitss={} (inclusion+resource)",
-                prepared.estimated_fee_atomic unitss
+                "estimated_fee_stroops={} (inclusion+resource)",
+                prepared.estimated_fee_stroops
             );
             println!(
                 "leg_out_splits={} leg_back_splits={}",
@@ -138,13 +138,13 @@ async fn main() -> Result<()> {
         Err(e) => {
             let err_str = e.to_string();
             let resource_fee = err_str
-                .split("resource_fee_atomic unitss=")
+                .split("resource_fee_stroops=")
                 .nth(1)
                 .and_then(|s| s.split(|c: char| !c.is_ascii_digit()).next())
                 .and_then(|s| s.parse::<u128>().ok());
             if let Some(fee) = resource_fee {
                 println!(
-                    "resource_fee_atomic unitss={} (~{:.4} XLM) [from trap/error path]",
+                    "resource_fee_stroops={} (~{:.4} XLM) [from trap/error path]",
                     fee,
                     fee as f64 / 1e7
                 );

@@ -3,7 +3,8 @@
 ## Overview
 
 - [Welcome](README.md)
-- [Architecture](pool-state-architecture.md)
+- [Architecture](architecture.md)
+  - [Pool state](pool-state-architecture.md)
 
 ## Integrate
 
@@ -15,7 +16,7 @@
 
 - [Deployment Overview](deployment-overview.md)
 - [Self-hosted Aggregator Quickstart](self-hosted-aggregator-quickstart.md)
-- [Chakra Swap API](Chakra-swap-api.md)
+- [LumAgg Swap API](lumagg-swap-api.md)
 - [Production Aggregator](aggregator-deployment.md)
   - [Configuration Reference](aggregator-configuration.md)
 - [Arbitrage](arbitrage-deployment.md)

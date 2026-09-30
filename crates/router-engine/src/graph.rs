@@ -237,7 +237,7 @@ mod tests {
     #[test]
     fn test_direct_path() {
         let mut graph = TokenGraph::new();
-        graph.add_pair(&xlm(), &usdc(), "Arc venue", "pool_1", 30);
+        graph.add_pair(&xlm(), &usdc(), "soroswap", "pool_1", 30);
 
         let paths = graph.find_paths(&xlm(), &usdc(), 4, 100, 0);
         assert_eq!(paths.len(), 1);
@@ -248,8 +248,8 @@ mod tests {
     #[test]
     fn test_multi_hop_path() {
         let mut graph = TokenGraph::new();
-        graph.add_pair(&xlm(), &usdc(), "Arc venue", "pool_1", 30);
-        graph.add_pair(&usdc(), &eth(), "Arc venue", "pool_2", 30);
+        graph.add_pair(&xlm(), &usdc(), "soroswap", "pool_1", 30);
+        graph.add_pair(&usdc(), &eth(), "aquarius", "pool_2", 30);
 
         let paths = graph.find_paths(&xlm(), &eth(), 4, 100, 0);
         // Should find: XLM -> USDC -> ETH (2 hops)
@@ -259,10 +259,10 @@ mod tests {
     #[test]
     fn test_multiple_paths() {
         let mut graph = TokenGraph::new();
-        graph.add_pair(&xlm(), &usdc(), "Arc venue", "pool_1", 30);
-        graph.add_pair(&xlm(), &usdc(), "Arc venue", "pool_2", 20);
-        graph.add_pair(&xlm(), &eth(), "Arc venue", "pool_3", 30);
-        graph.add_pair(&eth(), &usdc(), "Arc venue", "pool_4", 30);
+        graph.add_pair(&xlm(), &usdc(), "soroswap", "pool_1", 30);
+        graph.add_pair(&xlm(), &usdc(), "aquarius", "pool_2", 20);
+        graph.add_pair(&xlm(), &eth(), "soroswap", "pool_3", 30);
+        graph.add_pair(&eth(), &usdc(), "aquarius", "pool_4", 30);
 
         let paths = graph.find_paths(&xlm(), &usdc(), 4, 100, 0);
         // Direct: pool_1, pool_2; Indirect: XLM->ETH->USDC
@@ -273,7 +273,7 @@ mod tests {
     fn test_all_direct_paths_included_when_many_pools() {
         let mut graph = TokenGraph::new();
         for i in 0..15 {
-            graph.add_pair(&xlm(), &usdc(), "Arc venue", &format!("pool_{i}"), 30);
+            graph.add_pair(&xlm(), &usdc(), "aquarius", &format!("pool_{i}"), 30);
         }
         let paths = graph.find_paths(&xlm(), &usdc(), 3, 5, 0);
         assert_eq!(paths.len(), 15);
@@ -284,10 +284,10 @@ mod tests {
     fn test_multi_hop_capped_separately_from_direct() {
         let mut graph = TokenGraph::new();
         for i in 0..12 {
-            graph.add_pair(&xlm(), &usdc(), "Arc venue", &format!("direct_{i}"), 30);
+            graph.add_pair(&xlm(), &usdc(), "aquarius", &format!("direct_{i}"), 30);
         }
-        graph.add_pair(&xlm(), &eth(), "Arc venue", "bridge", 30);
-        graph.add_pair(&eth(), &usdc(), "Arc venue", "indirect", 30);
+        graph.add_pair(&xlm(), &eth(), "soroswap", "bridge", 30);
+        graph.add_pair(&eth(), &usdc(), "aquarius", "indirect", 30);
 
         let paths = graph.find_paths(&xlm(), &usdc(), 3, 2, 0);
         assert_eq!(paths.iter().filter(|p| p.hops == 1).count(), 12);
@@ -298,7 +298,7 @@ mod tests {
     #[test]
     fn test_no_path() {
         let mut graph = TokenGraph::new();
-        graph.add_pair(&xlm(), &usdc(), "Arc venue", "pool_1", 30);
+        graph.add_pair(&xlm(), &usdc(), "soroswap", "pool_1", 30);
 
         let paths = graph.find_paths(&xlm(), &eth(), 4, 100, 0);
         assert!(paths.is_empty());

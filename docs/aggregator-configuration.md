@@ -1,14 +1,14 @@
 # Aggregator Configuration Reference
 
-`Chakra-api-server`, `Chakra-market-data-worker`, and
-`Chakra-analytics-indexer` read the same TOML file.
-The release archive includes a complete `Chakra-aggregator.toml` template.
+`lumagg-api-server`, `lumagg-market-data-worker`, and
+`lumagg-analytics-indexer` read the same TOML file.
+The release archive includes a complete `lumagg-aggregator.toml` template.
 Unknown sections and unknown keys are rejected to catch spelling mistakes.
 
 ```bash
-./Chakra-market-data-worker --config ./aggregator.toml --check-config
-./Chakra-api-server --config ./aggregator.toml --check-config
-./Chakra-analytics-indexer --config ./aggregator.toml --check-config
+./lumagg-market-data-worker --config ./aggregator.toml --check-config
+./lumagg-api-server --config ./aggregator.toml --check-config
+./lumagg-analytics-indexer --config ./aggregator.toml --check-config
 ```
 
 The file can contain Redis credentials, partner keys, and Telegram credentials.
@@ -25,9 +25,9 @@ sections relevant to its role:
 
 | Process | Main sections used | Does not require |
 | --- | --- | --- |
-| `Chakra-market-data-worker` | `network`, `redis`, `worker`, `dex`, `monitoring` | `api.aggregator_contract`, `indexer` |
-| `Chakra-api-server` | `network`, `redis`, `api`, `routing`, `dex`, `access`, `features`, `indexer`, `monitoring` | `worker` runtime settings |
-| `Chakra-analytics-indexer` | `network`, `dex`, `indexer`, `monitoring` | `redis`, `worker`, `api` |
+| `lumagg-market-data-worker` | `network`, `redis`, `worker`, `dex`, `monitoring` | `api.aggregator_contract`, `indexer` |
+| `lumagg-api-server` | `network`, `redis`, `api`, `routing`, `dex`, `access`, `features`, `indexer`, `monitoring` | `worker` runtime settings |
+| `lumagg-analytics-indexer` | `network`, `dex`, `indexer`, `monitoring` | `redis`, `worker`, `api` |
 
 Keeping one shared file prevents network, contract, and database settings from
 drifting between processes. It does not mean every section is required by
@@ -37,10 +37,10 @@ every binary.
 
 | TOML key | Required/default | Description |
 | --- | --- | --- |
-| `network.rpc_url` | required | Arc JSON-RPC endpoint. Use a capacity-controlled endpoint in production. This can be hosted separately from Horizon. |
-| `network.passphrase` | mainnet | Arc network passphrase. It must match the RPC and deployed contracts. |
+| `network.rpc_url` | required | Soroban JSON-RPC endpoint. Use a capacity-controlled endpoint in production. This can be hosted separately from Horizon. |
+| `network.passphrase` | mainnet | Stellar network passphrase. It must match the RPC and deployed contracts. |
 | `redis.url` | required | Private Redis URL. Percent-encode reserved password characters. |
-| `redis.channel` | `Chakra:snapshot:events` | Snapshot Pub/Sub notification channel. |
+| `redis.channel` | `lumagg:snapshot:events` | Snapshot Pub/Sub notification channel. |
 | `redis.keep_latest` | `10` | Number of topology snapshot versions retained. Must be greater than zero. |
 | `redis.poll_interval_ms` | `1000` | API fallback interval for checking for a new topology snapshot. |
 | `redis.pool_state_ttl_secs` | `86400` | TTL of live pool-state entries. |
@@ -49,7 +49,7 @@ every binary.
 
 | TOML key | Program default | Description |
 | --- | --- | --- |
-| `worker.enabled_dex_sources` | all | Adapter allowlist: `Arc venue`, `Arc venue_clmm`, `Arc venue`, `Arc venue`, `sushi`, `Arc venue`, `classic_dex`. |
+| `worker.enabled_dex_sources` | all | Adapter allowlist: `aquarius`, `aquarius_clmm`, `soroswap`, `phoenix`, `sushi`, `comet`, `classic_dex`. |
 | `worker.discovery_interval_secs` | `600` | Full pool and topology rediscovery interval. |
 | `worker.refresh_interval_secs` | `30` | Full reserve refresh interval. |
 | `worker.pool_publish_interval_secs` | `2` | Cache-to-Redis interval used by the legacy pipeline. |
@@ -70,7 +70,7 @@ every binary.
 | `api.listen_addr` | `0.0.0.0:3100` | HTTP bind address. `--listen-addr` overrides it for a replica. |
 | `api.aggregator_contract` | unset | Contract used by `/build_tx`; omit for quote-only operation. |
 | `api.token_logo_dir` | `data/logos` | Local directory served under `/logos`. |
-| `api.token_logo_base_url` | Chakra API | Public URL written into resolved token metadata. |
+| `api.token_logo_base_url` | LumAgg API | Public URL written into resolved token metadata. |
 | `api.token_logo_list_urls` | built-in lists | Optional external token-list URLs. |
 | `api.instruction_leeway` | `100000000` | Extra simulation CPU instruction budget. |
 | `api.quote_on_chain_validate` | `false` | Enables on-chain hop validation by default. |
@@ -88,12 +88,12 @@ every binary.
 
 | TOML key | Program default | Description |
 | --- | --- | --- |
-| `dex.Arc venue_hydrate_concurrency` | `16` | Arc venue CLMM hydration concurrency. |
+| `dex.aquarius_hydrate_concurrency` | `16` | Aquarius CLMM hydration concurrency. |
 | `dex.horizon_url` | public Horizon | Horizon endpoint for the Classic DEX adapter and analytics envelope repair fallback. It is independent of `network.rpc_url`; use your own Horizon host when available. |
-| `dex.Arc venue_factory_contract` | built-in mainnet address | Arc venue factory override. |
-| `dex.Arc venue_factory` | built-in mainnet address | Arc venue factory override. |
-| `dex.Arc venue_extra_pools` | empty | Additional Arc venue pool addresses. |
-| `dex.Arc venue_factory_events_ledger_window` | `50000` | Recent factory-event scan window. |
+| `dex.soroswap_factory_contract` | built-in mainnet address | Soroswap factory override. |
+| `dex.comet_factory` | built-in mainnet address | Comet factory override. |
+| `dex.comet_extra_pools` | empty | Additional Comet pool addresses. |
+| `dex.comet_factory_events_ledger_window` | `50000` | Recent factory-event scan window. |
 | `dex.sushi_discovery_rpc` | public mainnet RPC | Dedicated Sushi discovery RPC. |
 
 ## Access and optional features
@@ -112,7 +112,7 @@ every binary.
 ## Analytics indexer
 
 The entire `[indexer]` section is optional. When present, the API reads the
-same SQLite database used by `Chakra-analytics-indexer` for stats, swap history,
+same SQLite database used by `lumagg-analytics-indexer` for stats, swap history,
 and order history.
 
 | TOML key | Program default | Description |
@@ -124,7 +124,7 @@ and order history.
 | `indexer.page_limit` | `10000` | Maximum events requested per RPC page. |
 | `indexer.start_ledger` | unset | Initial ledger when the database has no cursor. |
 
-When `indexer.envelope_fallback = true`, the indexer first tries Arc RPC
+When `indexer.envelope_fallback = true`, the indexer first tries Soroban RPC
 transaction data and then falls back to `dex.horizon_url` when old transaction
 envelopes are no longer available from the RPC. Use an archive-capable Horizon
 for historical repairs.

@@ -5,16 +5,16 @@ use {
         quote::{steps_from_api_sub_route, Quote, QuoteStep, QuoteSubRoute},
     },
     anyhow::{anyhow, Context, Result},
-    Arc_client::{
+    soroban_client::{
         keypair::{Keypair, KeypairBehavior},
-        Arc_rpc::{SendTransactionStatus, TransactionStatus},
+        soroban_rpc::{SendTransactionStatus, TransactionStatus},
         transaction::{assemble_transaction, AccountBehavior, Transaction, TransactionBehavior},
         transaction_builder::{TransactionBuilder, TransactionBuilderBehavior, TIMEOUT_INFINITE},
         Options, Server,
     },
     std::time::Duration,
-    Arc_strkey::Contract,
-    Arc_xdr::curr::{self as xdr, Limits, ReadXdr, WriteXdr},
+    stellar_strkey::Contract,
+    stellar_xdr::curr::{self as xdr, Limits, ReadXdr, WriteXdr},
 };
 
 const BASE_FEE: u32 = 100_000;
@@ -144,11 +144,11 @@ fn quote_sub_route_scval(route: &QuoteSubRoute) -> Result<xdr::ScVal> {
 
 fn quote_step_scval(step: &QuoteStep) -> Result<xdr::ScVal> {
     let dex_type = match step.dex_type.as_str() {
-        "Arc venue" | "Arc venue_clmm" => "Arc venue",
-        "Arc venue" => "Arc venuePair",
-        "Arc venue" => "Arc venue",
+        "aquarius" | "aquarius_clmm" => "Aquarius",
+        "soroswap" => "SoroswapPair",
+        "phoenix" => "Phoenix",
         "sushi" => "Sushi",
-        "Arc venue" => "Arc venueDex",
+        "comet" => "CometDex",
         other => return Err(anyhow!("unsupported keeper DEX route type: {other}")),
     };
     map_scval(vec![
@@ -222,12 +222,12 @@ fn rpc_server(rpc_url: &str) -> Result<Server> {
             ..Default::default()
         },
     )
-    .map_err(|e| anyhow!("create Arc RPC client: {e}"))
+    .map_err(|e| anyhow!("create Soroban RPC client: {e}"))
 }
 
 async fn fetch_account_sequence(rpc_url: &str, public_key: &str) -> Result<i64> {
     use serde_json::json;
-    let key = Arc_strkey::ed25519::PublicKey::from_string(public_key)
+    let key = stellar_strkey::ed25519::PublicKey::from_string(public_key)
         .map_err(|e| anyhow!("invalid keeper public key: {e:?}"))?;
     let ledger_key = xdr::LedgerKey::Account(xdr::LedgerKeyAccount {
         account_id: xdr::AccountId(xdr::PublicKey::PublicKeyTypeEd25519(xdr::Uint256(key.0))),
@@ -262,12 +262,12 @@ async fn simulate_and_assemble(
     sequence: u64,
     operation: xdr::Operation,
 ) -> Result<String> {
-    let mut account = Arc_client::account::Account::new(public_key, &sequence.to_string())
+    let mut account = soroban_client::account::Account::new(public_key, &sequence.to_string())
         .map_err(|e| anyhow!("create keeper account: {e}"))?;
     let bytes = operation.to_xdr(Limits::none()).context("encode fill operation")?;
     let operation = {
-        use Arc_client::xdr::{Limits as ClientLimits, ReadXdr};
-        Arc_client::xdr::Operation::from_xdr(bytes, ClientLimits::none()).context("decode fill operation")?
+        use soroban_client::xdr::{Limits as ClientLimits, ReadXdr};
+        soroban_client::xdr::Operation::from_xdr(bytes, ClientLimits::none()).context("decode fill operation")?
     };
     let mut builder = TransactionBuilder::new(&mut account, network_passphrase, None);
     builder.fee(BASE_FEE);
@@ -288,7 +288,7 @@ async fn simulate_and_assemble(
     }
     let assembled = assemble_transaction(&tx, simulation).map_err(|e| anyhow!("assemble fill transaction: {e:?}"))?;
     {
-        use Arc_client::xdr::{Limits as ClientLimits, WriteXdr};
+        use soroban_client::xdr::{Limits as ClientLimits, WriteXdr};
         assembled
             .to_envelope()
             .map_err(|e| anyhow!("fill envelope: {e}"))?
@@ -298,13 +298,13 @@ async fn simulate_and_assemble(
 }
 
 fn transaction_from_prepared_xdr(unsigned_xdr: &str, network_passphrase: &str) -> Result<Transaction> {
-    use Arc_baselib::xdr::{Limits as BaseLimits, ReadXdr, TransactionEnvelope, TransactionExt};
+    use stellar_baselib::xdr::{Limits as BaseLimits, ReadXdr, TransactionEnvelope, TransactionExt};
     let mut tx = Transaction::from_xdr_envelope(unsigned_xdr, network_passphrase);
     let envelope = TransactionEnvelope::from_xdr_base64(unsigned_xdr, BaseLimits::none())
         .context("parse assembled transaction")?;
     if let TransactionEnvelope::Tx(v1) = envelope {
         if let TransactionExt::V1(data) = v1.tx.ext {
-            tx.Arc_data = Some(data);
+            tx.soroban_data = Some(data);
         }
     }
     Ok(tx)

@@ -2,11 +2,11 @@
 # Quick demo script for SCF reviewers / local smoke test.
 set -euo pipefail
 
-API="${API:-https://api.Chakra.xyz}"
+API="${API:-https://api.lumagg.xyz}"
 XLM="CAS3J7GYLGXMF6TDJBBYYSE3HQ6BBSMLNUQ34T6TZMYMW2EVH34XOWMA"
 USDC="CCW67TSZV3SSS2HXMBQ5JFGCKJNXKZM7UQUWUZPUTHXSTZLEO7SJMI75"
 
-echo "=== Chakra SCF demo ==="
+echo "=== LumAgg SCF demo ==="
 echo "API=$API"
 echo
 

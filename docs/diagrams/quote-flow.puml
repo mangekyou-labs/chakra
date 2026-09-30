@@ -1,0 +1,29 @@
+@startuml quote-flow
+!include _theme.iuml
+skinparam linetype polyline
+title Quote
+caption GET /api/v1/quote. Local math over Redis; Classic via Horizon. Numbers match the Architecture page.
+
+actor Client
+participant "api-server" as API
+participant "PathFinder" as PF
+database Redis
+participant "QuoteEngine" as QE
+participant "SplitOptimizer" as SO
+participant Horizon as Horizon
+
+Client -> API : 1. GET /api/v1/quote
+API -> PF : 2. find_candidate_paths(graph)
+PF --> API : candidate paths\n(no liquidity prune)
+API -> Redis : 3. MGET pool keys\nxyk · aquarius · clmm · comet
+Redis --> API : cached pool state
+API -> QE : 4. quote each path at amount_in
+QE -> Horizon : 4. Classic PathPayment
+Horizon --> QE : classic output
+QE --> API : QuotedPath list
+API -> SO : 5. split Soroban paths if\nimpact or competitive delta warrants it
+SO --> API : Soroban OptimalRoute
+API -> API : 6. Classic if classic.out > soroban.out\nelse Soroban
+API --> Client : 7. expected_output · min_out · sub_routes
+
+@enduml

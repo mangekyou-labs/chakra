@@ -1,5 +1,5 @@
 use {
-    crate::{Arc_prepare::prepare_transaction_xdr, state::AppState},
+    crate::{soroban_prepare::prepare_transaction_xdr, state::AppState},
     axum::{
         extract::{Query, State},
         http::StatusCode,
@@ -11,7 +11,7 @@ use {
         types::{RouteRequest, TokenId},
     },
     serde::{Deserialize, Serialize},
-    Arc_xdr::{
+    stellar_xdr::{
         curr as xdr,
         curr::{Limits, WriteXdr},
     },
@@ -21,7 +21,7 @@ use {
 /// browser.
 pub async fn api_root() -> impl IntoResponse {
     Json(serde_json::json!({
-        "service": "Chakra API",
+        "service": "LumAgg API",
         "status": "ok",
         "endpoints": {
             "health": "/api/v1/health",
@@ -46,14 +46,14 @@ pub async fn api_root() -> impl IntoResponse {
             "price_history": "/api/v1/prices/history"
         },
         "docs": {
-            "openapi": "https://github.com/Chakra/Arc-dex-agg/blob/main/docs/openapi.yaml",
-            "integrator_guide": "https://github.com/Chakra/Arc-dex-agg/blob/main/docs/integrator-guide.md"
+            "openapi": "https://github.com/Lum-Agg/stellar-dex-agg/blob/main/docs/openapi.yaml",
+            "integrator_guide": "https://github.com/Lum-Agg/stellar-dex-agg/blob/main/docs/integrator-guide.md"
         },
         "rate_limits": {
             "anonymous": "10 requests/second per IP",
             "partner": "60 requests/second per X-API-Key (contact team for key)"
         },
-        "repository": "https://github.com/Chakra/Arc-dex-agg"
+        "repository": "https://github.com/Lum-Agg/stellar-dex-agg"
     }))
 }
 
@@ -68,10 +68,10 @@ pub struct QuoteQuery {
     pub amount_in: String,
     pub slippage: Option<f64>,
     pub debug: Option<u8>,
-    /// When `1`, Arc AMMs only (no Classic Arc / no Horizon).
-    /// Default may still return a pure classic route; mixed classic+Arc
+    /// When `1`, Soroban AMMs only (no Classic SDEX / no Horizon).
+    /// Default may still return a pure classic route; mixed classic+Soroban
     /// hops are never returned (unexecutable as one tx).
-    pub prefer_Arc: Option<u8>,
+    pub prefer_soroban: Option<u8>,
     /// Path-finder hop limit (pool hops). Omit = server default.
     pub max_hops: Option<usize>,
     /// Max parallel sub-routes in a split quote. Omit = server default.
@@ -106,7 +106,7 @@ mod quote_limit_tests {
             amount_in: "1".into(),
             slippage: None,
             debug: None,
-            prefer_Arc: None,
+            prefer_soroban: None,
             max_hops: Some(usize::MAX),
             max_splits: Some(usize::MAX),
             on_chain_validate: None,
@@ -126,7 +126,7 @@ pub struct QuoteResponse {
 
 #[derive(Serialize)]
 pub struct QuoteData {
-    /// Total input atomic unitss used for this quote (sum of sub-route amounts)
+    /// Total input stroops used for this quote (sum of sub-route amounts)
     pub amount_in: String,
     pub expected_output: String,
     pub minimum_output: String,
@@ -190,8 +190,8 @@ pub struct SubRouteData {
     pub path: Vec<String>,
     /// Pool addresses for each hop (same length as path - 1)
     pub pool_addresses: Vec<String>,
-    /// DEX types for each hop: "Arc venue", "Arc venue", "Arc venue", "sushi",
-    /// "Arc venue", "classic_dex"
+    /// DEX types for each hop: "aquarius", "soroswap", "phoenix", "sushi",
+    /// "comet", "classic_dex"
     pub dex_types: Vec<String>,
     /// Input token index for each hop (0 = token_a, 1 = token_b, etc.)
     pub in_indices: Vec<u32>,
@@ -258,7 +258,7 @@ pub async fn get_quote(State(state): State<AppState>, Query(params): Query<Quote
         slippage_bps: Some(slippage_bps),
         max_hops,
         max_splits,
-        prefer_Arc: params.prefer_Arc.map(|v| v != 0),
+        prefer_soroban: params.prefer_soroban.map(|v| v != 0),
     };
 
     let engine = state.current_engine().await;
@@ -394,7 +394,7 @@ pub async fn get_quote(State(state): State<AppState>, Query(params): Query<Quote
 
 /// Drop dust legs (< `MIN_DISPLAY_LEG_INPUT_BPS` of total input) and fold their
 /// `amount_in` into the largest kept leg. Matches frontend route display and
-/// avoids burning Arc CPU on near-zero parallel paths.
+/// avoids burning Soroban CPU on near-zero parallel paths.
 const BUILD_MIN_LEG_INPUT_BPS: u128 = 10;
 
 fn fold_dust_sub_routes(body: &BuildTxRequest) -> Result<BuildTxRequest, String> {
@@ -503,8 +503,8 @@ fn validate_build_tx_request(body: &BuildTxRequest) -> Result<(), String> {
     Ok(())
 }
 
-pub async fn build_tx_impl(body: &BuildTxRequest, rpc: &dex_adapters::rpc::ArcRpc) -> Result<BuildTxData, String> {
-    use Arc_xdr::{
+pub async fn build_tx_impl(body: &BuildTxRequest, rpc: &dex_adapters::rpc::SorobanRpc) -> Result<BuildTxData, String> {
+    use stellar_xdr::{
         curr as xdr,
         curr::{Limits, WriteXdr},
     };
@@ -513,7 +513,7 @@ pub async fn build_tx_impl(body: &BuildTxRequest, rpc: &dex_adapters::rpc::ArcRp
     let body = &body;
     validate_build_tx_request(body)?;
 
-    let user_key = Arc_strkey::ed25519::PublicKey::from_string(&body.user_public_key)
+    let user_key = stellar_strkey::ed25519::PublicKey::from_string(&body.user_public_key)
         .map_err(|e| format!("Invalid public key: {:?}", e))?;
     let amount_in: i128 = body.amount_in.parse().map_err(|_| "Invalid amount_in".to_string())?;
     let min_amount_out: i128 = body
@@ -523,7 +523,7 @@ pub async fn build_tx_impl(body: &BuildTxRequest, rpc: &dex_adapters::rpc::ArcRp
 
     let mut sub_routes_total: i128 = 0;
     let mut classic_subs: Vec<&BuildTxSubRoute> = Vec::new();
-    let mut Arc_subs: Vec<&BuildTxSubRoute> = Vec::new();
+    let mut soroban_subs: Vec<&BuildTxSubRoute> = Vec::new();
 
     for sub in &body.sub_routes {
         let leg_amount: i128 = sub
@@ -534,11 +534,11 @@ pub async fn build_tx_impl(body: &BuildTxRequest, rpc: &dex_adapters::rpc::ArcRp
 
         if sub_route_is_classic(sub) {
             classic_subs.push(sub);
-        } else if sub_route_is_Arc(sub) {
-            Arc_subs.push(sub);
+        } else if sub_route_is_soroban(sub) {
+            soroban_subs.push(sub);
         } else {
             return Err(
-                "Each sub-route must be all classic_dex or all Arc hops (no mixing within one leg)".to_string(),
+                "Each sub-route must be all classic_dex or all Soroban hops (no mixing within one leg)".to_string(),
             );
         }
     }
@@ -550,24 +550,24 @@ pub async fn build_tx_impl(body: &BuildTxRequest, rpc: &dex_adapters::rpc::ArcRp
         ));
     }
 
-    let execution = if !classic_subs.is_empty() && !Arc_subs.is_empty() {
+    let execution = if !classic_subs.is_empty() && !soroban_subs.is_empty() {
         "hybrid"
     } else if !classic_subs.is_empty() {
         "classic"
     } else {
-        "Arc"
+        "soroban"
     };
 
     if execution == "hybrid" {
         return Err(
-            "Hybrid classic_dex + Arc transactions are not supported on Arc: \
-             Arc simulation rejects transactions with more than one operation. \
-             Please use an all-Arc route or an all-classic route."
+            "Hybrid classic_dex + Soroban transactions are not supported on Stellar: \
+             Soroban simulation rejects transactions with more than one operation. \
+             Please use an all-Soroban route or an all-classic route."
                 .to_string(),
         );
     }
 
-    let contract_label = if Arc_subs.is_empty() {
+    let contract_label = if soroban_subs.is_empty() {
         DEX_CLASSIC.to_string()
     } else {
         AGGREGATOR_CONTRACT.to_string()
@@ -583,12 +583,12 @@ pub async fn build_tx_impl(body: &BuildTxRequest, rpc: &dex_adapters::rpc::ArcRp
         ops.push(build_path_payment_op(sub, &user_key, dest_min)?);
     }
 
-    if !Arc_subs.is_empty() {
-        let Arc_subs_owned: Vec<BuildTxSubRoute> = Arc_subs.iter().map(|s| (*s).clone()).collect();
+    if !soroban_subs.is_empty() {
+        let soroban_subs_owned: Vec<BuildTxSubRoute> = soroban_subs.iter().map(|s| (*s).clone()).collect();
         ops.push(build_aggregator_invoke_op(
             body,
             &user_key,
-            &Arc_subs_owned,
+            &soroban_subs_owned,
             min_amount_out,
         )?);
     }
@@ -619,13 +619,13 @@ pub async fn build_tx_impl(body: &BuildTxRequest, rpc: &dex_adapters::rpc::ArcRp
 
     let fee = base_fee.max(10_000);
     let rpc_url =
-        std::env::var("RPC_URL").unwrap_or_else(|_| "https://Arc-rpc.mainnet.Arc.gateway.fm".to_string());
+        std::env::var("RPC_URL").unwrap_or_else(|_| "https://soroban-rpc.mainnet.stellar.gateway.fm".to_string());
 
     let unsigned_tx_xdr = match execution {
         "classic" => envelope
             .to_xdr_base64(Limits::none())
             .map_err(|e| format!("XDR encode error: {:?}", e))?,
-        "Arc" => {
+        "soroban" => {
             let ops_vec: Vec<xdr::Operation> = ops.to_vec();
             prepare_transaction_xdr(&rpc_url, &body.user_public_key, seq_num as u64, &ops_vec, fee).await?
         }
@@ -639,7 +639,7 @@ pub async fn build_tx_impl(body: &BuildTxRequest, rpc: &dex_adapters::rpc::ArcRp
                 .cloned()
                 .collect();
             if invoke_ops.len() != 1 {
-                return Err("Hybrid tx must contain exactly one Arc invoke".to_string());
+                return Err("Hybrid tx must contain exactly one Soroban invoke".to_string());
             }
             let prepared_invoke =
                 prepare_transaction_xdr(&rpc_url, &body.user_public_key, seq_num as u64, &invoke_ops, fee).await?;
@@ -657,10 +657,10 @@ pub async fn build_tx_impl(body: &BuildTxRequest, rpc: &dex_adapters::rpc::ArcRp
     })
 }
 
-/// Copy ArcData + auth from a prepared single-invoke tx into a hybrid
+/// Copy sorobanData + auth from a prepared single-invoke tx into a hybrid
 /// envelope.
 fn merge_prepared_invoke_into_tx(full_tx_xdr: &str, prepared_invoke_xdr: &str) -> Result<String, String> {
-    use Arc_xdr::curr::ReadXdr;
+    use stellar_xdr::curr::ReadXdr;
 
     let mut full = xdr::TransactionEnvelope::from_xdr_base64(full_tx_xdr, Limits::none())
         .map_err(|e| format!("parse full tx: {:?}", e))?;
@@ -674,8 +674,8 @@ fn merge_prepared_invoke_into_tx(full_tx_xdr: &str, prepared_invoke_xdr: &str) -
         return Err("Unsupported prepared tx envelope".to_string());
     };
 
-    if let xdr::TransactionExt::V1(ref Arc_data) = prepared_v1.tx.ext {
-        full_v1.tx.ext = xdr::TransactionExt::V1(Arc_data.clone());
+    if let xdr::TransactionExt::V1(ref soroban_data) = prepared_v1.tx.ext {
+        full_v1.tx.ext = xdr::TransactionExt::V1(soroban_data.clone());
     }
     full_v1.tx.fee = full_v1.tx.fee.max(prepared_v1.tx.fee);
 
@@ -696,12 +696,12 @@ fn merge_prepared_invoke_into_tx(full_tx_xdr: &str, prepared_invoke_xdr: &str) -
 /// Build unsigned envelope XDR only (no RPC simulate). Used by tests and
 /// debugging.
 pub async fn build_unsigned_tx_xdr(body: &BuildTxRequest) -> Result<String, String> {
-    use Arc_xdr::curr::{Limits, WriteXdr};
+    use stellar_xdr::curr::{Limits, WriteXdr};
 
-    // Use a default ArcRpc for fetching sequence (test/debug only).
-    let rpc = dex_adapters::rpc::ArcRpc::mainnet();
+    // Use a default SorobanRpc for fetching sequence (test/debug only).
+    let rpc = dex_adapters::rpc::SorobanRpc::mainnet();
 
-    let user_key = Arc_strkey::ed25519::PublicKey::from_string(&body.user_public_key)
+    let user_key = stellar_strkey::ed25519::PublicKey::from_string(&body.user_public_key)
         .map_err(|e| format!("Invalid public key: {:?}", e))?;
     let amount_in: i128 = body.amount_in.parse().map_err(|_| "Invalid amount_in".to_string())?;
     let min_amount_out: i128 = body
@@ -711,7 +711,7 @@ pub async fn build_unsigned_tx_xdr(body: &BuildTxRequest) -> Result<String, Stri
 
     let mut sub_routes_total: i128 = 0;
     let mut classic_subs: Vec<&BuildTxSubRoute> = Vec::new();
-    let mut Arc_subs: Vec<&BuildTxSubRoute> = Vec::new();
+    let mut soroban_subs: Vec<&BuildTxSubRoute> = Vec::new();
 
     for sub in &body.sub_routes {
         let leg_amount: i128 = sub
@@ -722,11 +722,11 @@ pub async fn build_unsigned_tx_xdr(body: &BuildTxRequest) -> Result<String, Stri
 
         if sub_route_is_classic(sub) {
             classic_subs.push(sub);
-        } else if sub_route_is_Arc(sub) {
-            Arc_subs.push(sub);
+        } else if sub_route_is_soroban(sub) {
+            soroban_subs.push(sub);
         } else {
             return Err(
-                "Each sub-route must be all classic_dex or all Arc hops (no mixing within one leg)".to_string(),
+                "Each sub-route must be all classic_dex or all Soroban hops (no mixing within one leg)".to_string(),
             );
         }
     }
@@ -738,19 +738,19 @@ pub async fn build_unsigned_tx_xdr(body: &BuildTxRequest) -> Result<String, Stri
         ));
     }
 
-    let execution = if !classic_subs.is_empty() && !Arc_subs.is_empty() {
+    let execution = if !classic_subs.is_empty() && !soroban_subs.is_empty() {
         "hybrid"
     } else if !classic_subs.is_empty() {
         "classic"
     } else {
-        "Arc"
+        "soroban"
     };
 
     if execution == "hybrid" {
         return Err(
-            "Hybrid classic_dex + Arc transactions are not supported on Arc: \
-             Arc simulation rejects transactions with more than one operation. \
-             Please use an all-Arc route or an all-classic route."
+            "Hybrid classic_dex + Soroban transactions are not supported on Stellar: \
+             Soroban simulation rejects transactions with more than one operation. \
+             Please use an all-Soroban route or an all-classic route."
                 .to_string(),
         );
     }
@@ -765,12 +765,12 @@ pub async fn build_unsigned_tx_xdr(body: &BuildTxRequest) -> Result<String, Stri
         ops.push(build_path_payment_op(sub, &user_key, dest_min)?);
     }
 
-    if !Arc_subs.is_empty() {
-        let Arc_subs_owned: Vec<BuildTxSubRoute> = Arc_subs.iter().map(|s| (*s).clone()).collect();
+    if !soroban_subs.is_empty() {
+        let soroban_subs_owned: Vec<BuildTxSubRoute> = soroban_subs.iter().map(|s| (*s).clone()).collect();
         ops.push(build_aggregator_invoke_op(
             body,
             &user_key,
-            &Arc_subs_owned,
+            &soroban_subs_owned,
             min_amount_out,
         )?);
     }
@@ -816,7 +816,7 @@ pub struct TokenInfo {
     pub id: String,
     pub symbol: String,
     pub name: String,
-    /// Self-hosted logo URL (`https://api.Chakra.xyz/logos/...`) when enriched; empty otherwise.
+    /// Self-hosted logo URL (`https://api.lumagg.xyz/logos/...`) when enriched; empty otherwise.
     pub logo: String,
     /// `"official"` for SEP-42 downloaded icons, `"fallback"` for generated
     /// letter avatars.
@@ -863,7 +863,7 @@ pub async fn list_tokens(State(state): State<AppState>) -> impl IntoResponse {
                 TokenInfo {
                     id: addr,
                     symbol: "XLM".to_string(),
-                    name: "Arc Lumens".to_string(),
+                    name: "Stellar Lumens".to_string(),
                     logo: String::new(),
                     logo_kind: None,
                 }
@@ -940,7 +940,7 @@ pub struct BalanceResponse {
 pub struct BalancesResponse {
     pub success: bool,
     pub account: String,
-    /// `catalog` = quote-engine SACs ∪ curated common list (Arc RPC).
+    /// `catalog` = quote-engine SACs ∪ curated common list (Soroban RPC).
     pub scope: String,
     pub tokens_queried: Vec<String>,
     pub balances: std::collections::HashMap<String, String>,
@@ -966,7 +966,7 @@ fn simulate_indicates_missing_trustline(err: &str) -> bool {
 }
 
 async fn fetch_sac_balance_with_trustline(
-    rpc: &dex_adapters::rpc::ArcRpc,
+    rpc: &dex_adapters::rpc::SorobanRpc,
     token: &str,
     account_arg: &xdr::ScVal,
 ) -> (u128, Option<bool>) {
@@ -1000,11 +1000,11 @@ fn scval_to_i128(val: &xdr::ScVal) -> Option<i128> {
     }
 }
 
-fn parse_account_public_key(account: &str) -> Result<Arc_strkey::ed25519::PublicKey, String> {
-    Arc_strkey::ed25519::PublicKey::from_string(account.trim()).map_err(|_| "Invalid account address".to_string())
+fn parse_account_public_key(account: &str) -> Result<stellar_strkey::ed25519::PublicKey, String> {
+    stellar_strkey::ed25519::PublicKey::from_string(account.trim()).map_err(|_| "Invalid account address".to_string())
 }
 
-fn account_balance_scval(user_key: &Arc_strkey::ed25519::PublicKey) -> xdr::ScVal {
+fn account_balance_scval(user_key: &stellar_strkey::ed25519::PublicKey) -> xdr::ScVal {
     xdr::ScVal::Address(xdr::ScAddress::Account(xdr::AccountId(
         xdr::PublicKey::PublicKeyTypeEd25519(xdr::Uint256(user_key.0)),
     )))
@@ -1018,7 +1018,7 @@ pub(crate) fn collect_common_balance_token_ids() -> Vec<String> {
 }
 
 /// SAC ids to batch-balance: quote-engine catalog ∪ curated common list.
-/// Arc-only (no Horizon). Classic `CODE:ISSUER` / `native` aliases skipped.
+/// Soroban-only (no Horizon). Classic `CODE:ISSUER` / `native` aliases skipped.
 async fn collect_catalog_balance_token_ids(state: &AppState) -> Vec<String> {
     let engine = state.current_engine().await;
     let mut seen = std::collections::HashSet::new();
@@ -1052,7 +1052,7 @@ fn now_ms() -> u64 {
 }
 
 async fn fetch_balances_for_tokens(
-    rpc: std::sync::Arc<dex_adapters::rpc::ArcRpc>,
+    rpc: std::sync::Arc<dex_adapters::rpc::SorobanRpc>,
     account_arg: &xdr::ScVal,
     token_ids: Vec<String>,
 ) -> (
@@ -1184,7 +1184,7 @@ pub struct ClassicAssetResponse {
     pub error: Option<String>,
 }
 
-/// Parse Arc.expert `asset` field: `CODE-GISSUER[-domain]`.
+/// Parse stellar.expert `asset` field: `CODE-GISSUER[-domain]`.
 pub(crate) fn parse_expert_asset_field(asset: &str) -> Option<(String, String)> {
     let (code, rest) = asset.split_once('-')?;
     if code.is_empty() || code.len() > 12 {
@@ -1200,7 +1200,7 @@ pub(crate) fn parse_expert_asset_field(asset: &str) -> Option<(String, String)> 
     Some((code.to_string(), issuer))
 }
 
-/// Resolve a Arc Asset Contract to its classic code + issuer (for
+/// Resolve a Stellar Asset Contract to its classic code + issuer (for
 /// ChangeTrust).
 pub async fn get_classic_asset(Query(query): Query<ClassicAssetQuery>) -> impl IntoResponse {
     let contract = query.contract.trim();
@@ -1253,7 +1253,7 @@ pub async fn get_classic_asset(Query(query): Query<ClassicAssetQuery>) -> impl I
         }
     }
 
-    let url = format!("https://api.Arc.expert/explorer/public/contract/{}", contract);
+    let url = format!("https://api.stellar.expert/explorer/public/contract/{}", contract);
     let client = match reqwest::Client::builder()
         .timeout(std::time::Duration::from_secs(8))
         .build()
@@ -1322,7 +1322,7 @@ pub async fn get_classic_asset(Query(query): Query<ClassicAssetQuery>) -> impl I
 
 // ============================================================
 // GET /api/v1/account, /api/v1/ledger/latest, POST /api/v1/submit_tx
-// (Arc RPC proxy — keeps RPC_URL server-side)
+// (Soroban RPC proxy — keeps RPC_URL server-side)
 // ============================================================
 
 #[derive(Deserialize)]
@@ -1412,7 +1412,7 @@ fn validate_signed_tx_xdr(signed_tx_xdr: &str) -> Result<(), String> {
         ));
     }
 
-    use Arc_xdr::curr::{Limits, ReadXdr, TransactionEnvelope};
+    use stellar_xdr::curr::{Limits, ReadXdr, TransactionEnvelope};
     let envelope = TransactionEnvelope::from_xdr_base64(signed_tx_xdr, Limits::none())
         .map_err(|_| "signed_tx_xdr is not valid TransactionEnvelope XDR".to_string())?;
     match envelope {
@@ -1637,11 +1637,11 @@ mod readiness_tests {
 
         engine
             .update_pairs_from_cache(
-                "Arc venue",
+                "soroswap",
                 &[TradingPair {
                     token_a: TokenId::from_str_auto("TOKEN_A"),
                     token_b: TokenId::from_str_auto("TOKEN_B"),
-                    source: "Arc venue".into(),
+                    source: "soroswap".into(),
                     pool_address: "POOL".into(),
                     fee_bps: 30,
                     reserve_a: Some(1_000_000),
@@ -1662,20 +1662,20 @@ mod readiness_tests {
 const AGGREGATOR_CONTRACT: &str = "CC6QAV7JEG5MYRSPO5Z65E5G2M4ZB64BEG2ZXIZXL55TQT35JDI2LC6K";
 
 /// Build an unsigned transaction for the quoted route.
-/// Arc legs use aggregator `swap`; Classic legs use
+/// Soroban legs use aggregator `swap`; Classic legs use
 /// `PathPaymentStrictSend`. Mixed routes emit both operation types in one
 /// atomic transaction.
 #[derive(Clone, Deserialize)]
 pub struct BuildTxRequest {
-    /// User's Arc public key (G...)
+    /// User's Stellar public key (G...)
     pub user_public_key: String,
-    /// Total input amount (atomic unitss); must equal sum of sub-route amounts
+    /// Total input amount (stroops); must equal sum of sub-route amounts
     pub amount_in: String,
     /// Input token contract address
     pub token_in: String,
     /// Output token contract address (final output)
     pub token_out: String,
-    /// Minimum acceptable output (atomic unitss)
+    /// Minimum acceptable output (stroops)
     pub min_amount_out: String,
     /// Execution legs from the quote (single path = one entry)
     pub sub_routes: Vec<BuildTxSubRoute>,
@@ -1683,14 +1683,14 @@ pub struct BuildTxRequest {
 
 #[derive(Clone, Deserialize)]
 pub struct BuildTxSubRoute {
-    /// Input allocated to this leg (atomic unitss)
+    /// Input allocated to this leg (stroops)
     pub amount_in: String,
     pub steps: Vec<BuildTxStep>,
 }
 
 #[derive(Clone, Deserialize)]
 pub struct BuildTxStep {
-    /// DEX type: "Arc venue", "Arc venue", "Arc venue", "sushi", "Arc venue",
+    /// DEX type: "aquarius", "soroswap", "phoenix", "sushi", "comet",
     /// "classic_dex"
     pub dex_type: String,
     /// Pool contract address
@@ -1720,16 +1720,16 @@ pub struct BuildTxData {
     pub unsigned_tx_xdr: String,
     /// Number of operations in the transaction
     pub num_operations: usize,
-    /// Estimated fee in atomic unitss
+    /// Estimated fee in stroops
     pub fee: String,
     /// Primary contract (aggregator) or "classic_dex" for PathPayment-only txs
     pub contract: String,
-    /// "Arc" | "classic" | "hybrid"
+    /// "soroban" | "classic" | "hybrid"
     pub execution: String,
 }
 
-fn build_tx_step_scval(step: &BuildTxStep) -> Result<Arc_xdr::curr::ScVal, String> {
-    use Arc_xdr::curr as xdr;
+fn build_tx_step_scval(step: &BuildTxStep) -> Result<stellar_xdr::curr::ScVal, String> {
+    use stellar_xdr::curr as xdr;
 
     let dex_unit_enum = |name: &str| {
         xdr::ScVal::Vec(Some(xdr::ScVec(
@@ -1740,24 +1740,24 @@ fn build_tx_step_scval(step: &BuildTxStep) -> Result<Arc_xdr::curr::ScVal, Strin
     };
 
     let dex_type_val = match step.dex_type.as_str() {
-        "Arc venue" | "Arc venue_clmm" => dex_unit_enum("Arc venue"),
-        "Arc venue" => dex_unit_enum("Arc venuePair"),
-        "Arc venue" => dex_unit_enum("Arc venue"),
+        "aquarius" | "aquarius_clmm" => dex_unit_enum("Aquarius"),
+        "soroswap" => dex_unit_enum("SoroswapPair"),
+        "phoenix" => dex_unit_enum("Phoenix"),
         "sushi" => dex_unit_enum("Sushi"),
-        "Arc venue" => dex_unit_enum("Arc venueDex"),
+        "comet" => dex_unit_enum("CometDex"),
         "classic_dex" => {
             return Err("classic_dex steps must use PathPaymentStrictSend, not aggregator.swap".to_string());
         }
         other => return Err(format!("Unknown dex_type: {}", other)),
     };
 
-    let pool_hash = Arc_strkey::Contract::from_string(&step.pool_address)
+    let pool_hash = stellar_strkey::Contract::from_string(&step.pool_address)
         .map_err(|_| format!("Invalid pool_address: {}", step.pool_address))?
         .0;
-    let token_in_hash = Arc_strkey::Contract::from_string(&step.token_in)
+    let token_in_hash = stellar_strkey::Contract::from_string(&step.token_in)
         .map_err(|_| format!("Invalid token_in: {}", step.token_in))?
         .0;
-    let token_out_hash = Arc_strkey::Contract::from_string(&step.token_out)
+    let token_out_hash = stellar_strkey::Contract::from_string(&step.token_out)
         .map_err(|_| format!("Invalid token_out: {}", step.token_out))?
         .0;
 
@@ -1793,8 +1793,8 @@ fn build_tx_step_scval(step: &BuildTxStep) -> Result<Arc_xdr::curr::ScVal, Strin
     ))))
 }
 
-fn build_tx_sub_route_scval(sub: &BuildTxSubRoute) -> Result<Arc_xdr::curr::ScVal, String> {
-    use Arc_xdr::curr as xdr;
+fn build_tx_sub_route_scval(sub: &BuildTxSubRoute) -> Result<stellar_xdr::curr::ScVal, String> {
+    use stellar_xdr::curr as xdr;
 
     if sub.steps.is_empty() {
         return Err("Each sub-route must have at least one step".to_string());
@@ -1834,16 +1834,16 @@ fn sub_route_is_classic(sub: &BuildTxSubRoute) -> bool {
     !sub.steps.is_empty() && sub.steps.iter().all(|s| s.dex_type == DEX_CLASSIC)
 }
 
-fn sub_route_is_Arc(sub: &BuildTxSubRoute) -> bool {
+fn sub_route_is_soroban(sub: &BuildTxSubRoute) -> bool {
     !sub.steps.is_empty() && sub.steps.iter().all(|s| s.dex_type != DEX_CLASSIC)
 }
 
 /// Per-leg minimum output for Classic `PathPaymentStrictSend`.
-/// Arc core rejects the op when `dest_min <= 0`
+/// Stellar core rejects the op when `dest_min <= 0`
 /// (`PATH_PAYMENT_STRICT_SEND_MALFORMED`).
 fn classic_dest_min_for_sub(leg_amount_in: i128, total_amount_in: i128, min_amount_out: i128) -> Result<i64, String> {
     if min_amount_out <= 0 {
-        return Err("min_amount_out must be > 0 for Classic DEX swaps (Arc requires dest_min > 0)".to_string());
+        return Err("min_amount_out must be > 0 for Classic DEX swaps (Stellar requires dest_min > 0)".to_string());
     }
     if leg_amount_in <= 0 || total_amount_in <= 0 {
         return Err("amount_in must be positive".to_string());
@@ -1859,7 +1859,7 @@ fn classic_dest_min_for_sub(leg_amount_in: i128, total_amount_in: i128, min_amou
 
 fn build_path_payment_op(
     sub: &BuildTxSubRoute,
-    user_key: &Arc_strkey::ed25519::PublicKey,
+    user_key: &stellar_strkey::ed25519::PublicKey,
     dest_min: i64,
 ) -> Result<xdr::Operation, String> {
     let first = sub
@@ -1901,8 +1901,8 @@ fn build_path_payment_op(
 
 /// Parse a token identifier to XDR Asset.
 /// Handles: "native", contract addresses (maps to native for XLM SAC)
-fn parse_asset_xdr(token: &str) -> Result<Arc_xdr::curr::Asset, String> {
-    use Arc_xdr::curr as xdr;
+fn parse_asset_xdr(token: &str) -> Result<stellar_xdr::curr::Asset, String> {
+    use stellar_xdr::curr as xdr;
 
     if token == "CAS3J7GYLGXMF6TDJBBYYSE3HQ6BBSMLNUQ34T6TZMYMW2EVH34XOWMA" || token == "native" {
         return Ok(xdr::Asset::Native);
@@ -1910,7 +1910,7 @@ fn parse_asset_xdr(token: &str) -> Result<Arc_xdr::curr::Asset, String> {
 
     if token == "CCW67TSZV3SSS2HXMBQ5JFGCKJNXKZM7UQUWUZPUTHXSTZLEO7SJMI75" {
         let issuer =
-            Arc_strkey::ed25519::PublicKey::from_string("GA5ZSEJYB37JRC5AVCIA5MOP4RHTM335X2KGX3IHOJAPP5RE34K4KZVN")
+            stellar_strkey::ed25519::PublicKey::from_string("GA5ZSEJYB37JRC5AVCIA5MOP4RHTM335X2KGX3IHOJAPP5RE34K4KZVN")
                 .map_err(|e| format!("{:?}", e))?;
         let mut code = [0u8; 4];
         code[..4].copy_from_slice(b"USDC");
@@ -1922,7 +1922,7 @@ fn parse_asset_xdr(token: &str) -> Result<Arc_xdr::curr::Asset, String> {
 
     if token == "CDTKPWPLOURQA2SGTKTUQOWRCBZEORB4BWBOMJ3D3ZTQQSGE5F6JBQLV" {
         let issuer =
-            Arc_strkey::ed25519::PublicKey::from_string("GDHU6WRG4IEQXM5NZ4BMPKOXHW76MZM4Y2IEMFDVXBSDP6SJY4ITNPP2")
+            stellar_strkey::ed25519::PublicKey::from_string("GDHU6WRG4IEQXM5NZ4BMPKOXHW76MZM4Y2IEMFDVXBSDP6SJY4ITNPP2")
                 .map_err(|e| format!("{:?}", e))?;
         let mut code = [0u8; 4];
         code[..4].copy_from_slice(b"EURC");
@@ -1940,22 +1940,22 @@ fn parse_asset_xdr(token: &str) -> Result<Arc_xdr::curr::Asset, String> {
 
 fn build_aggregator_invoke_op(
     body: &BuildTxRequest,
-    user_key: &Arc_strkey::ed25519::PublicKey,
-    Arc_subs: &[BuildTxSubRoute],
+    user_key: &stellar_strkey::ed25519::PublicKey,
+    soroban_subs: &[BuildTxSubRoute],
     contract_min: i128,
 ) -> Result<xdr::Operation, String> {
-    let aggregator_hash = Arc_strkey::Contract::from_string(AGGREGATOR_CONTRACT)
+    let aggregator_hash = stellar_strkey::Contract::from_string(AGGREGATOR_CONTRACT)
         .map_err(|_| "Invalid aggregator contract address".to_string())?
         .0;
-    let token_in_hash = Arc_strkey::Contract::from_string(&body.token_in)
+    let token_in_hash = stellar_strkey::Contract::from_string(&body.token_in)
         .map_err(|_| format!("Invalid token_in: {}", body.token_in))?
         .0;
-    let token_out_hash = Arc_strkey::Contract::from_string(&body.token_out)
+    let token_out_hash = stellar_strkey::Contract::from_string(&body.token_out)
         .map_err(|_| format!("Invalid token_out: {}", body.token_out))?
         .0;
 
     let mut sub_routes_scval = Vec::new();
-    for sub in Arc_subs {
+    for sub in soroban_subs {
         sub_routes_scval.push(build_tx_sub_route_scval(sub)?);
     }
 
@@ -1971,7 +1971,7 @@ fn build_aggregator_invoke_op(
             xdr::ScVal::Vec(Some(xdr::ScVec(
                 sub_routes_scval
                     .try_into()
-                    .map_err(|_| "too many Arc sub-routes".to_string())?,
+                    .map_err(|_| "too many soroban sub-routes".to_string())?,
             ))),
             xdr::ScVal::I128(xdr::Int128Parts {
                 hi: (contract_min >> 64) as i64,
@@ -2014,7 +2014,7 @@ pub async fn build_tx(State(state): State<AppState>, Json(body): Json<BuildTxReq
         ),
         Err(e) => {
             // Simulate failed — do NOT return a broken raw XDR.
-            // A Arc tx without ArcData cannot be signed by any wallet.
+            // A Soroban tx without sorobanData cannot be signed by any wallet.
             // Categorize the error for a better UX message.
             let user_msg = if e.contains("Output below minimum") ||
                 e.contains("below minimum") ||
@@ -2024,7 +2024,7 @@ pub async fn build_tx(State(state): State<AppState>, Json(body): Json<BuildTxReq
                  common on split routes). Refresh the quote, increase slippage, or retry with a single-path route."
                     .to_string()
             } else if e.contains("ExceededLimit") || e.contains("Budget") {
-                "Swap simulation failed: this route is too heavy for Arc CPU limits \
+                "Swap simulation failed: this route is too heavy for Soroban CPU limits \
                  (too many split paths / hops). Refresh the quote — a simpler route should appear."
                     .to_string()
             } else if e.contains("EmptyPool") || e.contains("empty") {
@@ -2046,8 +2046,8 @@ pub async fn build_tx(State(state): State<AppState>, Json(body): Json<BuildTxReq
                  Keep ~0.5 XLM free for the new trustline reserve."
                     .to_string()
             } else if e.contains("Error(Auth, InvalidAction)") && e.contains("approve") {
-                "Swap failed: Arc venue pool token approval was rejected by simulation. \
-                 The on-chain aggregator may need an upgrade; try refreshing the quote or a route without Arc venue."
+                "Swap failed: Comet pool token approval was rejected by simulation. \
+                 The on-chain aggregator may need an upgrade; try refreshing the quote or a route without Comet."
                     .to_string()
             } else if e.contains("account not found") ||
                 e.contains("No sequence") ||
@@ -2073,9 +2073,9 @@ pub async fn build_tx(State(state): State<AppState>, Json(body): Json<BuildTxReq
     }
 }
 
-/// Fetch account sequence via the app's Arc RPC (`getLedgerEntries`).
+/// Fetch account sequence via the app's Soroban RPC (`getLedgerEntries`).
 pub(crate) async fn fetch_sequence_number(
-    rpc: &dex_adapters::rpc::ArcRpc,
+    rpc: &dex_adapters::rpc::SorobanRpc,
     public_key: &str,
 ) -> Result<i64, String> {
     rpc.get_account_sequence(public_key).await.map_err(|e| {
@@ -2104,7 +2104,7 @@ mod classic_dest_min_tests {
                 amount_in: "100".into(),
                 steps: vec![
                     BuildTxStep {
-                        dex_type: "Arc venue".into(),
+                        dex_type: "aquarius".into(),
                         pool_address: "POOL_1".into(),
                         token_in: "TOKEN_A".into(),
                         token_out: "TOKEN_B".into(),
@@ -2112,7 +2112,7 @@ mod classic_dest_min_tests {
                         out_idx: 1,
                     },
                     BuildTxStep {
-                        dex_type: "Arc venue".into(),
+                        dex_type: "aquarius".into(),
                         pool_address: "POOL_2".into(),
                         token_in: "TOKEN_B".into(),
                         token_out: "TOKEN_C".into(),

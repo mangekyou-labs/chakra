@@ -2,7 +2,7 @@
 
 use {
     crate::{quote_engine::QuoteEngine, types::OptimalRoute},
-    dex_adapters::{on_chain_quote, rpc::ArcRpc},
+    dex_adapters::{on_chain_quote, rpc::SorobanRpc},
     tracing::{debug, warn},
 };
 
@@ -21,10 +21,10 @@ fn apply_minimum_out(amount: u128, slippage_bps: u32, is_split: bool) -> u128 {
     }
 }
 
-/// Replace local hop amounts with on-chain `estimate_swap` / fresh Arc venue
+/// Replace local hop amounts with on-chain `estimate_swap` / fresh Soroswap
 /// reserves.
 pub async fn apply_on_chain_hop_validation(
-    rpc: &ArcRpc,
+    rpc: &SorobanRpc,
     engine: &QuoteEngine,
     mut route: OptimalRoute,
     slippage_bps: u32,

@@ -1,8 +1,8 @@
-# Chakra Arb Vault
+# LumAgg Arb Vault
 
 **中文文档:** [README.zh-CN.md](README.zh-CN.md)
 
-**This contract is for Chakra arbitrage bots only.** It is not a general-purpose vault or yield product for end users.
+**This contract is for LumAgg arbitrage bots only.** It is not a general-purpose vault or yield product for end users.
 
 For normal swaps, use the [aggregator](../aggregator/) `swap()` or `round_trip_swap()` with the user wallet holding tokens and signing. The vault solves **bot operations**: pool trading capital in one contract so multiple bot accounts only need native XLM for fees instead of each holding a large float (e.g. 1800 XLM).
 
@@ -11,7 +11,7 @@ For normal swaps, use the [aggregator](../aggregator/) `swap()` or `round_trip_s
 | Scenario | Contract |
 |----------|----------|
 | Frontend / wallet swap | `aggregator.swap` |
-| Chakra arb bot round-trip | `vault.execute_round_trip` → calls `aggregator.round_trip_swap` internally |
+| LumAgg arb bot round-trip | `vault.execute_round_trip` → calls `aggregator.round_trip_swap` internally |
 | One-off manual round-trip | `aggregator.round_trip_swap` (caller holds principal) |
 
 ## Execution flow
@@ -51,7 +51,7 @@ When `ARB_VAULT_CONTRACT` is set, `crates/arbitrage` builds a single-op `vault.e
 
 ```bash
 ARB_VAULT_CONTRACT=C...        # this vault
-ARB_AGGREGATOR_CONTRACT=C...   # Chakra aggregator
+ARB_AGGREGATOR_CONTRACT=C...   # LumAgg aggregator
 ARB_CALLER_SECRETS=...         # bot accounts; each only needs a small XLM balance for fees
 ARB_BUILD_TX=1
 ```
@@ -61,7 +61,7 @@ If `ARB_VAULT_CONTRACT` is unset, the bot falls back to `aggregator.round_trip_s
 ## Deploy & operate
 
 ```bash
-# First-time mainnet deploy (requires Arc CLI + admin key)
+# First-time mainnet deploy (requires stellar CLI + admin key)
 chmod +x contracts/vault/deploy.sh
 ADMIN=admin ADMIN_G=G... CALLER=G... ./contracts/vault/deploy.sh
 
@@ -72,7 +72,7 @@ VAULT=C... ./contracts/vault/upgrade.sh
 1. Deploy vault WASM and call `initialize(admin)` (or use `deploy.sh` above).
 2. `deposit` trading principal (e.g. XLM) into the vault.
 3. `add_caller` for each bot public key.
-4. Run the arb bot — callers **do not** need large trade-token balances, only native XLM for Arc fees.
+4. Run the arb bot — callers **do not** need large trade-token balances, only native XLM for Soroban fees.
 
 **Parallel callers:** concurrent submissions require vault balance ≥ `concurrent_txs × amount_in`. Example: three callers each using 500 XLM need ~1500 XLM available in the vault.
 

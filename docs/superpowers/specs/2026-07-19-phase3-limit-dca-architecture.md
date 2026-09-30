@@ -1,4 +1,4 @@
-# Chakra Phase 3: Limit + DCA Architecture Research
+# LumAgg Phase 3: Limit + DCA Architecture Research
 
 **Date:** 2026-07-19  
 **Status:** Research / architecture only — **no implementation in this phase**  
@@ -6,7 +6,7 @@
 
 ## Goal
 
-Decide how Chakra adds **limit orders** and **DCA** on Arc/Arc without bloating the arb vault or rewriting the aggregator. This document locks product/architecture defaults and an implementation roadmap for follow-on specs (`3a` contract, `3b` keeper, …).
+Decide how LumAgg adds **limit orders** and **DCA** on Stellar/Soroban without bloating the arb vault or rewriting the aggregator. This document locks product/architecture defaults and an implementation roadmap for follow-on specs (`3a` contract, `3b` keeper, …).
 
 ## Decisions locked in research
 
@@ -18,12 +18,12 @@ Decide how Chakra adds **limit orders** and **DCA** on Arc/Arc without bloating 
 | Limit semantics | Exact-in + **min out / limit price** → fill via `aggregator.swap` |
 | DCA | Same escrow, chunked timed fills |
 | Fill auth | **Permissionless** `fill` |
-| Fill incentive (MVP) | **None** — Chakra self-run bot calls open interface; tips/rebate later |
+| Fill incentive (MVP) | **None** — LumAgg self-run bot calls open interface; tips/rebate later |
 | Arb vault reuse | **No** for retail user funds |
 
 ## Non-goals (this research + early MVP slices)
 
-- Classic Arc-style bilateral order book UX
+- Classic SDEX-style bilateral order book UX
 - TWAP grids / auction-style fill markets
 - Fill rebates, spread-sharing, or MEV auctions (post-MVP)
 - Centralized custodian / off-chain balance ledger
@@ -31,7 +31,7 @@ Decide how Chakra adds **limit orders** and **DCA** on Arc/Arc without bloating 
 
 ## Why a new stack is required
 
-Arc has **no native price/time triggers**. Immediate `aggregator.swap` cannot “sit” until a price hits. Any limit/DCA needs:
+Soroban has **no native price/time triggers**. Immediate `aggregator.swap` cannot “sit” until a price hits. Any limit/DCA needs:
 
 1. Locked or pullable inventory (escrow or allowance)
 2. An off-chain (or permissionless) **filler** that submits a tx when conditions hold
@@ -81,7 +81,7 @@ Conceptual only — field names may change in `3a` implementation plan.
 | `expires_ledger` | Hard expiry |
 | `status` | Open / Filled / Cancelled / Expired |
 
-**Recommended limit encoding (MVP):** store `limit_rate` as “minimum `token_out` atomic unitss per 1e7 `token_in` atomic unitss” (or Q64-style rational). On fill of size `x`, require `min_amount_out >= floor(x * limit_rate / 1e7)`. Avoid freezing a single `min_amount_out` for the full size only — that breaks partial fills.
+**Recommended limit encoding (MVP):** store `limit_rate` as “minimum `token_out` stroops per 1e7 `token_in` stroops” (or Q64-style rational). On fill of size `x`, require `min_amount_out >= floor(x * limit_rate / 1e7)`. Avoid freezing a single `min_amount_out` for the full size only — that breaks partial fills.
 
 ### Entrypoints (draft)
 
@@ -122,7 +122,7 @@ Aggregator today: **user auth on `swap`**. Escrow fill must either:
 4. Simulate `fill` XDR; sign with keeper key; submit
 5. Pay resource fees from keeper account (no user tip in MVP)
 
-**Permissionless:** any third party may run the same path. MVP ops: Chakra runs at least one keeper for liveness; incentives deferred.
+**Permissionless:** any third party may run the same path. MVP ops: LumAgg runs at least one keeper for liveness; incentives deferred.
 
 **Reuse from arb:** prepare/simulate/submit, fee gates, Telegram failure alerts — not vault round-trip logic.
 

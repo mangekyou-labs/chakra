@@ -5,7 +5,7 @@
 //!   SNAPSHOT_REDIS_URL=redis://127.0.0.1:6379/ \
 //!     cargo run -p api-server --release --example verify_split_quote
 //!
-//!   API_URL=https://api.Chakra.xyz \
+//!   API_URL=https://api.lumagg.xyz \
 //!   AMOUNT_IN=10000000000000 \
 //!   SNAPSHOT_REDIS_URL=redis://... \
 //!     cargo run -p api-server --release --example verify_split_quote
@@ -21,7 +21,7 @@ use {
         pool_hydrate::{self, PoolHydrateConfig},
         snapshot_loader::build_engine_from_snapshot,
     },
-    dex_adapters::{classic_dex::ClassicDexAdapter, rpc::ArcRpc},
+    dex_adapters::{classic_dex::ClassicDexAdapter, rpc::SorobanRpc},
     market_snapshot::{
         pool_state_store::{build_pool_state_store, PoolStateStore},
         store::{build_snapshot_store, SnapshotStoreBackend},
@@ -111,7 +111,7 @@ async fn fetch_api_quote(api_url: &str, token_in: &str, token_out: &str, amount_
         api_url.trim_end_matches('/')
     );
     let client = reqwest::Client::builder()
-        .user_agent("Chakra-verify-split/1.0")
+        .user_agent("lumagg-verify-split/1.0")
         .build()?;
     let body: ApiQuoteEnvelope = client.get(url).send().await?.json().await?;
     if !body.success {
@@ -137,7 +137,7 @@ fn legs_from_quote(data: &ApiQuoteData) -> Result<Vec<LegPlan>> {
 
 async fn build_local_engine(
     config: &AppConfig,
-) -> Result<(Arc<QuoteEngine>, Arc<ArcRpc>, Arc<dyn PoolStateStore>)> {
+) -> Result<(Arc<QuoteEngine>, Arc<SorobanRpc>, Arc<dyn PoolStateStore>)> {
     let redis_url = config
         .snapshot_redis_url
         .as_deref()
@@ -153,7 +153,7 @@ async fn build_local_engine(
     let engine = Arc::new(build_engine_from_snapshot(config, &snapshot).await?);
     engine.register_adapter(Arc::new(ClassicDexAdapter::new(None))).await;
 
-    let rpc = Arc::new(ArcRpc::new(&config.rpc_url, &config.network_passphrase));
+    let rpc = Arc::new(SorobanRpc::new(&config.rpc_url, &config.network_passphrase));
     let pool_store = Arc::new(build_pool_state_store(redis_url)?);
     Ok((engine, rpc, pool_store))
 }
@@ -162,7 +162,7 @@ async fn hydrate_for_paths(
     engine: &QuoteEngine,
     paths: &[Path],
     pool_store: &dyn PoolStateStore,
-    rpc: &ArcRpc,
+    rpc: &SorobanRpc,
 ) -> router_engine::QuoteHydration {
     let rpc_hydrate = std::env::var("QUOTE_RPC_HYDRATE")
         .ok()
@@ -172,17 +172,17 @@ async fn hydrate_for_paths(
         rpc_hydrate_enabled: rpc_hydrate,
         ..PoolHydrateConfig::default()
     };
-    let (hydration, redis_miss, Arc venue_refs, _oldest_age_ms) =
+    let (hydration, redis_miss, soroswap_refs, _oldest_age_ms) =
         pool_hydrate::hydrate_paths(engine, paths, pool_store, rpc, &config).await;
-    engine.set_Arc venue_pools(hydration.Arc venue_pools.clone()).await;
+    engine.set_aquarius_pools(hydration.aquarius_pools.clone()).await;
     println!(
-        "Hydrated pools: xyk={} clmm={} Arc venue={} Arc venue={} (redis_miss_xyk={}/{} rpc_hydrate={})",
+        "Hydrated pools: xyk={} clmm={} aquarius={} comet={} (redis_miss_xyk={}/{} rpc_hydrate={})",
         hydration.xyk_pools.len(),
         hydration.clmm_pools.len(),
-        hydration.Arc venue_pools.len(),
-        hydration.Arc venue_pools.len(),
+        hydration.aquarius_pools.len(),
+        hydration.comet_pools.len(),
         redis_miss,
-        Arc venue_refs,
+        soroswap_refs,
         rpc_hydrate
     );
     hydration
@@ -191,7 +191,7 @@ async fn hydrate_for_paths(
 async fn quote_split_locally(
     engine: &QuoteEngine,
     pool_store: &dyn PoolStateStore,
-    rpc: &ArcRpc,
+    rpc: &SorobanRpc,
     token_in: &str,
     token_out: &str,
     amount_in: u128,
@@ -203,7 +203,7 @@ async fn quote_split_locally(
         slippage_bps: Some(50),
         max_hops: None,
         max_splits: None,
-        prefer_Arc: None,
+        prefer_soroban: None,
     };
     let paths = engine.find_candidate_paths(&request).await;
     let hydration = hydrate_for_paths(engine, &paths, pool_store, rpc).await;
@@ -239,7 +239,7 @@ async fn main() -> Result<()> {
         )
         .init();
 
-    let api_url = std::env::var("API_URL").unwrap_or_else(|_| "https://api.Chakra.xyz".to_string());
+    let api_url = std::env::var("API_URL").unwrap_or_else(|_| "https://api.lumagg.xyz".to_string());
     let token_in = std::env::var("TOKEN_IN").unwrap_or_else(|_| DEFAULT_USDC.to_string());
     let token_out = std::env::var("TOKEN_OUT").unwrap_or_else(|_| DEFAULT_XLM.to_string());
     let amount_in: u128 = std::env::var("AMOUNT_IN")

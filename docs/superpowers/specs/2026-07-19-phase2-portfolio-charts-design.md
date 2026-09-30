@@ -1,4 +1,4 @@
-# Chakra Phase 2: Portfolio + Quote-Sampled Charts
+# LumAgg Phase 2: Portfolio + Quote-Sampled Charts
 
 **Date:** 2026-07-19  
 **Status:** Approved for planning  
@@ -120,7 +120,7 @@ Empty points → 200 with `points: []` (UI shows `—`).
 
 ### SDK / docs
 
-- `@Chakra/sdk`: `getPrices`, `getPriceHistory`
+- `@lumagg/sdk`: `getPrices`, `getPriceHistory`
 - OpenAPI + integrator guide + `/docs` Try It
 
 ## Frontend

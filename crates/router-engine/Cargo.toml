@@ -5,8 +5,8 @@ edition.workspace = true
 license.workspace = true
 
 [dependencies]
-Arc-xdr.workspace = true
-Arc-strkey.workspace = true
+stellar-xdr.workspace = true
+stellar-strkey.workspace = true
 
 tokio.workspace = true
 async-trait.workspace = true

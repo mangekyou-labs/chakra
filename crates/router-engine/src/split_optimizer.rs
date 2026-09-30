@@ -780,7 +780,7 @@ fn split_amount_in_fraction_bps(amount_in: u128, total_amount: u128) -> u32 {
 }
 
 /// Leg implied rate must stay near the path's quote at the full trade size.
-/// Catches bogus micro-amount quotes (e.g. empty Arc venue pools showing fantasy
+/// Catches bogus micro-amount quotes (e.g. empty Soroswap pools showing fantasy
 /// output).
 fn leg_rate_matches_full_quote(
     quoted_path: &QuotedPath,
@@ -1191,7 +1191,7 @@ mod tests {
 
     #[test]
     fn leg_rate_rejects_fantasy_micro_quote() {
-        let path = test_path("Arc venue");
+        let path = test_path("soroswap");
         let qp = QuotedPath {
             path: path.clone(),
             quote: test_quote(&path, 10_000_000_000, 1_500_000_000, 5),

@@ -33,7 +33,7 @@ async fn quote_price(state: &AppState, token_in: &str, token_out: &str) -> Optio
             slippage_bps: Some(50),
             max_hops: None,
             max_splits: None,
-            prefer_Arc: None,
+            prefer_soroban: None,
         })
         .await;
 

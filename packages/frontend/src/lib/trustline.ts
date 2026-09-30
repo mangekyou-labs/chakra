@@ -2,12 +2,12 @@
  * Build and submit classic ChangeTrust for SAC-backed assets (frontend-only).
  */
 
-import { Account, Asset, BASE_FEE, Networks, Operation, TransactionBuilder } from '@Arc/Arc-sdk';
+import { Account, Asset, BASE_FEE, Networks, Operation, TransactionBuilder } from '@stellar/stellar-sdk';
 import { NATIVE_CONTRACT } from '@/lib/tokenDisplay';
 import { fetchAccountSequence } from '@/lib/rpc';
 
 const NETWORK_PASSPHRASE = Networks.PUBLIC;
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://api.Chakra.xyz';
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://api.lumagg.xyz';
 
 export interface ClassicAssetRef {
   code: string;
@@ -68,7 +68,7 @@ async function resolveViaApi(contractId: string): Promise<ClassicAssetRef | null
 
 async function resolveViaExpert(contractId: string): Promise<ClassicAssetRef | null> {
   const resp = await fetch(
-    `https://api.Arc.expert/explorer/public/contract/${contractId}`,
+    `https://api.stellar.expert/explorer/public/contract/${contractId}`,
   );
   if (!resp.ok) return null;
   const data = (await resp.json()) as { asset?: string };
@@ -78,7 +78,7 @@ async function resolveViaExpert(contractId: string): Promise<ClassicAssetRef | n
 
 /**
  * Resolve SAC → classic code/issuer for ChangeTrust.
- * Whitelist → Chakra API → Arc.expert (CORS *).
+ * Whitelist → LumAgg API → stellar.expert (CORS *).
  */
 export async function resolveClassicAssetForSac(
   contractId: string,
@@ -116,13 +116,13 @@ export async function buildChangeTrustXdr(
   asset: ClassicAssetRef,
 ): Promise<string> {
   const sequence = await fetchAccountSequence(accountId);
-  const ArcAsset = new Asset(asset.code, asset.issuer);
+  const stellarAsset = new Asset(asset.code, asset.issuer);
   const source = new Account(accountId, sequence);
   const tx = new TransactionBuilder(source, {
     fee: BASE_FEE,
     networkPassphrase: NETWORK_PASSPHRASE,
   })
-    .addOperation(Operation.changeTrust({ asset: ArcAsset }))
+    .addOperation(Operation.changeTrust({ asset: stellarAsset }))
     .setTimeout(300)
     .build();
   return tx.toXDR();

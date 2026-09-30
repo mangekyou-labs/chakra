@@ -1,5 +1,5 @@
 #![no_std]
-//! Chakra arb vault: holds trading float; authorized callers execute round-trip
+//! LumAgg arb vault: holds trading float; authorized callers execute round-trip
 //! swaps via the aggregator without pre-funding bot wallets with principal.
 //!
 //! Flow inside `execute_round_trip`:
@@ -8,7 +8,7 @@
 //! 3. Cross-call `aggregator.round_trip_swap(user = caller, ...)`
 //! 4. `transfer_from` reclaim of actual `base_total` (no exact-amount pre-sign)
 //!
-//! # Arc auth pitfall (do not regress)
+//! # Soroban auth pitfall (do not regress)
 //!
 //! Any value that ends up in a nested `require_auth` call (SAC `approve`,
 //! `transfer`, …) is **pinned into the signed auth tree at simulate time**.
@@ -36,8 +36,8 @@ mod types;
 #[cfg(test)]
 mod tests;
 
-use Arc_sdk::{contract, contractimpl, Address, BytesN, Env, Vec};
-use Chakra_contract_types::SubRoute;
+use soroban_sdk::{contract, contractimpl, Address, BytesN, Env, Vec};
+use lumagg_contract_types::SubRoute;
 
 pub use types::AggregatorContract;
 
@@ -84,7 +84,7 @@ impl VaultContract {
     /// vault → caller → aggregator → caller → vault.
     ///
     /// `allowance_expiration_ledger` — client-chosen SAC approve expiry (see
-    /// crate-level "Arc auth pitfall"). Must be ≥ current ledger and
+    /// crate-level "Soroban auth pitfall"). Must be ≥ current ledger and
     /// within network max entry TTL; bot typically sends `latest + ~100k`.
     pub fn execute_round_trip(
         env: Env,

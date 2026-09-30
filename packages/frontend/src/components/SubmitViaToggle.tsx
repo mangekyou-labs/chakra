@@ -15,7 +15,7 @@ export function SubmitViaToggle({ network: _network = 'public' }: { network?: Su
     setSubmitVia(getSubmitViaPreference());
   }, []);
 
-  const apiHost = 'api.Chakra.xyz';
+  const apiHost = 'api.lumagg.xyz';
 
   return (
     <label className="mt-4 flex items-start gap-2 cursor-pointer select-none text-[11px] leading-snug text-[var(--text-muted)]/70 hover:text-[var(--text-muted)]">
@@ -24,14 +24,14 @@ export function SubmitViaToggle({ network: _network = 'public' }: { network?: Su
         className="mt-0.5 accent-[var(--accent)]"
         checked={submitVia === 'official'}
         onChange={(e) => {
-          const next: SubmitVia = e.target.checked ? 'official' : 'Chakra';
+          const next: SubmitVia = e.target.checked ? 'official' : 'lumagg';
           setSubmitVia(next);
           setSubmitViaPreference(next);
         }}
       />
       <span>
-        Submit via Chakra API instead of direct RPC
-        {submitVia === 'Chakra' ? ` (${apiHost})` : ''}
+        Submit via LumAgg API instead of direct RPC
+        {submitVia === 'lumagg' ? ` (${apiHost})` : ''}
       </span>
     </label>
   );

@@ -1,4 +1,4 @@
-//! Rust client SDK for the Arc DEX Aggregator API.
+//! Rust client SDK for the Stellar DEX Aggregator API.
 //! The primary SDK is TypeScript (in /packages/sdk/); this is for integration
 //! testing.
 

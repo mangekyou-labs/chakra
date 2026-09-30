@@ -1,0 +1,150 @@
+- generic [ref=e1]:
+  - generic [ref=e2]:
+    - banner [ref=e3]:
+      - generic [ref=e4]:
+        - generic [ref=e5]:
+          - link "Chakra logo Chakra" [ref=e6] [cursor=pointer]:
+            - /url: /
+            - img "Chakra logo" [ref=e7]
+            - generic [ref=e12]: Chakra
+          - navigation [ref=e14]:
+            - link "Swap" [ref=e15] [cursor=pointer]:
+              - /url: /
+            - link "Stats" [ref=e16] [cursor=pointer]:
+              - /url: /stats
+            - button "Docs" [ref=e18]
+        - generic [ref=e21]:
+          - link "Docs" [ref=e22] [cursor=pointer]:
+            - /url: /docs
+          - link "GitHub" [ref=e23] [cursor=pointer]:
+            - /url: https://github.com/mangekyou-labs/chakra
+          - button "Connect Wallet" [ref=e26]
+    - main [ref=e27]:
+      - main [ref=e28]:
+        - generic [ref=e29]:
+          - generic [ref=e30]:
+            - paragraph [ref=e31]: Network analytics
+            - heading "Stats" [level=1] [ref=e32]
+            - paragraph [ref=e33]: Confirmed routing activity on Arc Testnet.
+          - group "Date range" [ref=e34]:
+            - button "Last 14 days" [ref=e35]: 14d
+            - button "Last 30 days" [ref=e36]: 30d
+            - button "Last 90 days" [active] [pressed] [ref=e37]: 90d
+            - button "All time" [ref=e38]: all
+        - generic [ref=e77]:
+          - region "Overview" [ref=e78]:
+            - generic [ref=e79]:
+              - paragraph [ref=e80]: Notional
+              - paragraph [ref=e81]: $2.00
+            - generic [ref=e82]:
+              - paragraph [ref=e83]: Confirmed swaps
+              - paragraph [ref=e84]: "2"
+            - generic [ref=e85]:
+              - paragraph [ref=e86]: Unique traders
+              - paragraph [ref=e87]: "1"
+            - generic [ref=e88]:
+              - paragraph [ref=e89]: Split share
+              - paragraph [ref=e90]: 0%
+          - region "Stablecoin notional by day" [ref=e91]:
+            - generic [ref=e92]:
+              - heading "Stablecoin notional" [level=2] [ref=e93]
+              - generic [ref=e94]: USD · Last 90 days
+            - img "Daily stablecoin notional chart" [ref=e95]:
+              - generic [ref=e96]: peak $1.00
+          - generic [ref=e97]:
+            - generic "Venue activity" [ref=e98]:
+              - heading "Venue activity" [level=2] [ref=e99]
+              - table [ref=e101]:
+                - rowgroup [ref=e102]:
+                  - row [ref=e103]:
+                    - columnheader "Venue" [ref=e104]
+                    - columnheader "Swaps" [ref=e105]
+                    - columnheader "Subroutes" [ref=e106]
+                    - columnheader "Hops" [ref=e107]
+                    - columnheader "Route share" [ref=e108]
+                - rowgroup [ref=e109]:
+                  - row [ref=e110]:
+                    - cell "presto-hub" [ref=e111]
+                    - cell "1" [ref=e112]
+                    - cell "1" [ref=e113]
+                    - cell "2" [ref=e114]
+                    - cell "100%" [ref=e115]
+                  - row [ref=e116]:
+                    - cell "unitflow-v25" [ref=e117]
+                    - cell "1" [ref=e118]
+                    - cell "1" [ref=e119]
+                    - cell "2" [ref=e120]
+                    - cell "100%" [ref=e121]
+            - generic "cirBTC route health" [ref=e122]:
+              - heading "cirBTC route health" [level=2] [ref=e123]
+              - paragraph [ref=e124]: Directed quotes for every USDC / EURC / cirBTC pair · direct or multihop.
+              - list [ref=e125]:
+                - listitem [ref=e126]:
+                  - generic [ref=e127]:
+                    - generic [ref=e128]: USDC
+                    - generic [ref=e129]: →
+                    - generic [ref=e130]: EURC
+                  - generic [ref=e131]:
+                    - generic [ref=e132]: 2 pools
+                    - generic [ref=e133]: Direct
+                - listitem [ref=e134]:
+                  - generic [ref=e135]:
+                    - generic [ref=e136]: EURC
+                    - generic [ref=e137]: →
+                    - generic [ref=e138]: USDC
+                  - generic [ref=e139]:
+                    - generic [ref=e140]: 2 pools
+                    - generic [ref=e141]: Direct
+                - listitem [ref=e142]:
+                  - generic [ref=e143]:
+                    - generic [ref=e144]: USDC
+                    - generic [ref=e145]: →
+                    - generic [ref=e146]: cirBTC
+                  - generic [ref=e147]:
+                    - generic [ref=e148]: 3 pools
+                    - generic [ref=e149]: Multihop
+                - listitem [ref=e150]:
+                  - generic [ref=e151]:
+                    - generic [ref=e152]: cirBTC
+                    - generic [ref=e153]: →
+                    - generic [ref=e154]: USDC
+                  - generic [ref=e155]:
+                    - generic [ref=e156]: 3 pools
+                    - generic [ref=e157]: Multihop
+                - listitem [ref=e158]:
+                  - generic [ref=e159]:
+                    - generic [ref=e160]: EURC
+                    - generic [ref=e161]: →
+                    - generic [ref=e162]: cirBTC
+                  - generic [ref=e163]:
+                    - generic [ref=e164]: 1 pool
+                    - generic [ref=e165]: Direct
+                - listitem [ref=e166]:
+                  - generic [ref=e167]:
+                    - generic [ref=e168]: cirBTC
+                    - generic [ref=e169]: →
+                    - generic [ref=e170]: EURC
+                  - generic [ref=e171]:
+                    - generic [ref=e172]: 1 pool
+                    - generic [ref=e173]: Direct
+          - paragraph [ref=e174]:
+            - generic [ref=e175]: Indexed head 60.4M
+            - generic [ref=e176]: ·
+            - generic [ref=e177]: confirmed 60.4M
+            - generic [ref=e178]: ·
+            - generic [ref=e179]: chain head 60.4M
+            - generic [ref=e180]: ·
+            - generic [ref=e181]: lag 0 blocks
+            - generic [ref=e182]: ·
+            - generic [ref=e183]: refreshed 4s ago
+            - generic [ref=e184]: ·
+            - generic [ref=e185]: 1 unattributed
+    - contentinfo [ref=e68]:
+      - generic [ref=e69]:
+        - generic [ref=e70]: Chakra — non-custodial best-execution routing across Arc Testnet venues
+        - generic [ref=e71]:
+          - link "Documentation" [ref=e72] [cursor=pointer]:
+            - /url: /docs
+          - link "Open source" [ref=e73] [cursor=pointer]:
+            - /url: https://github.com/mangekyou-labs/chakra
+  - alert [ref=e76]

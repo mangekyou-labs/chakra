@@ -21,8 +21,8 @@ const jetbrains = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
-  title: 'Chakra — Arc DEX Aggregator',
-  description: 'Best swap rates across Arc DEXes. Split orders for optimal execution.',
+  title: 'LumAgg — Stellar DEX Aggregator',
+  description: 'Best swap rates across Stellar DEXes. Split orders for optimal execution.',
   icons: {
     icon: '/icon.svg',
     shortcut: '/icon.svg',
@@ -42,15 +42,15 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                 <div className="flex items-center gap-6 md:gap-9 min-w-0">
                   <Link href="/" className="flex items-center gap-2.5 group shrink-0">
                     <Image
-                      src="/Chakra-mark.svg"
-                      alt="Chakra"
+                      src="/lumagg-mark.svg"
+                      alt="LumAgg"
                       width={36}
                       height={36}
                       priority
                       className="h-9 w-9 transition-transform duration-200 group-hover:scale-[1.04]"
                     />
                     <span className="text-[18px] sm:text-[19px] font-semibold tracking-tight text-[var(--text-primary)]">
-                      Chakra
+                      LumAgg
                     </span>
                   </Link>
                   <HeaderNav />
@@ -104,7 +104,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             <footer className="relative mt-auto w-full">
               <div className="w-full px-6 sm:px-8 lg:px-14 py-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-[14px] sm:text-[15px] text-[var(--text-secondary)]">
                 <span className="max-w-xl leading-relaxed">
-                  Aggregated routing across Arc DEXs · Best-effort quotes
+                  Aggregated routing across Stellar DEXs · Best-effort quotes
                 </span>
                 <div className="flex items-center gap-4 shrink-0">
                   <a

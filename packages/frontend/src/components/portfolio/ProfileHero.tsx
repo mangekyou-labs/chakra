@@ -83,7 +83,7 @@ export function ProfileHero({
           {formatUsd(total)}
         </div>
         <p className="mt-1 text-[13px] sm:text-[14px] text-[var(--text-muted)]">
-          {pricingLoading ? 'Updating prices…' : 'Valued via Chakra quotes'}
+          {pricingLoading ? 'Updating prices…' : 'Valued via LumAgg quotes'}
         </p>
       </div>
     </section>

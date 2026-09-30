@@ -1,8 +1,8 @@
 #![no_std]
-//! Arc DEX Aggregator Contract
+//! Stellar DEX Aggregator Contract
 //!
-//! Executes multi-hop and split-order swaps atomically across Arc DEXes
-//! (Arc venue, Arc venue, Arc venue, Sushi V3, Arc venue).
+//! Executes multi-hop and split-order swaps atomically across Soroban DEXes
+//! (Aquarius, Soroswap, Phoenix, Sushi V3, Comet).
 //!
 //! Main entry point:
 //! - `swap()`: Atomic swap via `sub_routes` (one leg = simple path; multiple =
@@ -25,8 +25,8 @@ mod validate;
 #[cfg(test)]
 mod tests;
 
-pub use Chakra_contract_types::{DexType, SubRoute, SwapStep};
-use Arc_sdk::{contract, contractimpl, Address, BytesN, Env, Vec};
+pub use lumagg_contract_types::{DexType, SubRoute, SwapStep};
+use soroban_sdk::{contract, contractimpl, Address, BytesN, Env, Vec};
 
 #[contract]
 pub struct AggregatorContract;

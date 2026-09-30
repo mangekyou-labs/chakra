@@ -24,15 +24,15 @@ use {
         },
         scanner::compute_profit_bps,
     },
-    dex_adapters::{on_chain_quote, rpc::ArcRpc},
+    dex_adapters::{on_chain_quote, rpc::SorobanRpc},
     router_engine::TokenId,
     serde_json::Value,
     std::env,
 };
 
 const DEFAULT_QUOTE_API: &str = "http://127.0.0.1:3100";
-const DEFAULT_RPC_URL: &str = "https://Arc-rpc.mainnet.Arc.gateway.fm";
-const Arc_MAINNET_PASSPHRASE: &str = "Public Global Arc Network ; September 2015";
+const DEFAULT_RPC_URL: &str = "https://soroban-rpc.mainnet.stellar.gateway.fm";
+const STELLAR_MAINNET_PASSPHRASE: &str = "Public Global Stellar Network ; September 2015";
 
 struct Cli {
     mode: String,
@@ -83,14 +83,14 @@ fn error_report(token_in: &str, token_out: &str, amount_in: u128, error: impl In
 
 async fn compare_quote_leg(
     quote_api: &str,
-    rpc: &ArcRpc,
+    rpc: &SorobanRpc,
     token_in: &str,
     token_out: &str,
     amount_in: u128,
     threshold_bps: i64,
 ) -> Result<ProbeSampleReport> {
     let url = format!(
-        "{quote_api}/api/v1/quote?token_in={token_in}&token_out={token_out}&amount_in={amount_in}&prefer_Arc=1&max_splits=1"
+        "{quote_api}/api/v1/quote?token_in={token_in}&token_out={token_out}&amount_in={amount_in}&prefer_soroban=1&max_splits=1"
     );
     let body: Value = match reqwest::get(&url).await {
         Ok(response) => match response.json().await {
@@ -340,7 +340,7 @@ async fn simulate_round_trip(
 
 async fn run_round_trip_sample(
     ctx: &ArbContext,
-    rpc: &ArcRpc,
+    rpc: &SorobanRpc,
     quote_api: &str,
     base: &TokenId,
     bridge: &str,
@@ -554,7 +554,7 @@ async fn main() -> Result<()> {
             bail!("no bridge tokens configured; set ARB_BRIDGE_TOKENS or pass --bridges");
         }
 
-        let rpc = ArcRpc::new(&ctx.config.rpc_url, Arc_MAINNET_PASSPHRASE);
+        let rpc = SorobanRpc::new(&ctx.config.rpc_url, STELLAR_MAINNET_PASSPHRASE);
         let quote_api = ctx
             .config
             .quote_api_urls
@@ -605,7 +605,7 @@ async fn main() -> Result<()> {
 
     let _ = (cli.samples, cli.seed, cli.simulate);
     let rpc_url = env::var("RPC_URL").unwrap_or_else(|_| DEFAULT_RPC_URL.into());
-    let rpc = ArcRpc::new(&rpc_url, Arc_MAINNET_PASSPHRASE);
+    let rpc = SorobanRpc::new(&rpc_url, STELLAR_MAINNET_PASSPHRASE);
     let report = compare_quote_leg(
         &quote_api_url(),
         &rpc,

@@ -3,7 +3,7 @@
 use {
     anyhow::{anyhow, Result},
     serde::Deserialize,
-    Arc_client::network::{NetworkPassphrase, Networks},
+    soroban_client::network::{NetworkPassphrase, Networks},
 };
 
 #[derive(Debug, Clone)]

@@ -8,9 +8,9 @@
       "round_trip_swap": 25
     },
     "by_dex": {
-      "Arc venue": 104,
-      "Arc venue": 17,
-      "Arc venue": 18,
+      "aquarius": 104,
+      "comet": 17,
+      "soroswap": 18,
       "sushi": 1
     },
     "split_swap_count": 0,
@@ -26,8 +26,8 @@
       "round_trip_swap": 1
     },
     "by_dex": {
-      "Arc venue": 5,
-      "Arc venue": 1
+      "aquarius": 5,
+      "comet": 1
     },
     "split_swap_count": 0,
     "success_count": 1,

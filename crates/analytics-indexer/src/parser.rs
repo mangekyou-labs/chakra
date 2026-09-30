@@ -1,10 +1,10 @@
-//! Parse aggregator contract invocations from Arc transaction XDR.
+//! Parse aggregator contract invocations from Soroban transaction XDR.
 
 use {
     anyhow::{anyhow, Context, Result},
     base64::{engine::general_purpose::STANDARD as BASE64, Engine as _},
-    Arc_strkey::{ed25519::PublicKey, Contract},
-    Arc_xdr::curr::{self as xdr, Limits, ReadXdr},
+    stellar_strkey::{ed25519::PublicKey, Contract},
+    stellar_xdr::curr::{self as xdr, Limits, ReadXdr},
 };
 
 /// One DEX hop extracted from on-chain `SwapStep`.
@@ -101,11 +101,11 @@ fn try_parse_aggregator_invoke(
 }
 
 fn find_aggregator_in_auth(
-    inv: &xdr::ArcAuthorizedInvocation,
+    inv: &xdr::SorobanAuthorizedInvocation,
     agg_hash: &[u8; 32],
     amount_out: Option<i128>,
 ) -> Result<Option<ParsedInvocation>> {
-    if let xdr::ArcAuthorizedFunction::ContractFn(cfn) = &inv.function {
+    if let xdr::SorobanAuthorizedFunction::ContractFn(cfn) = &inv.function {
         if let Some(parsed) = try_parse_aggregator_invoke(cfn, agg_hash, amount_out)? {
             return Ok(Some(parsed));
         }
@@ -251,18 +251,18 @@ fn parse_dex_type(val: &xdr::ScVal) -> Result<String> {
 
 fn symbol_dex_source(sym: &str) -> String {
     match sym {
-        "Arc venue" => "Arc venue",
-        "Arc venuePair" => "Arc venue",
-        "Arc venue" => "Arc venue",
+        "Aquarius" => "aquarius",
+        "SoroswapPair" => "soroswap",
+        "Phoenix" => "phoenix",
         "Sushi" => "sushi",
-        "Arc venueDex" => "Arc venue",
+        "CometDex" => "comet",
         other => other,
     }
     .to_string()
 }
 
 fn parse_success_return_i128(_result_xdr: &str) -> Option<i128> {
-    // Arc return values live in result meta (ScVal), not the legacy result XDR
+    // Soroban return values live in result meta (ScVal), not the legacy result XDR
     // hash. v0 leaves amount_out unset; T3 can hydrate from meta or simulation
     // if needed.
     None
@@ -324,7 +324,7 @@ fn get_map_i128(map: &xdr::ScMap, key: &str) -> Option<i128> {
 
 #[cfg(test)]
 mod tests {
-    use {super::*, Arc_strkey::ed25519::PublicKey, Arc_xdr::curr::WriteXdr};
+    use {super::*, stellar_strkey::ed25519::PublicKey, stellar_xdr::curr::WriteXdr};
 
     const AGG: &str = "CC6QAV7JEG5MYRSPO5Z65E5G2M4ZB64BEG2ZXIZXL55TQT35JDI2LC6K";
     const USER: &str = "GA5ZSEJYB37JRC5AVCIA5MOP4RHTM335X2KGX3IHOJAPP5RE34K4KZVN";
@@ -345,7 +345,7 @@ mod tests {
                 },
                 xdr::ScMapEntry {
                     key: xdr::ScVal::Symbol("dex_type".try_into().unwrap()),
-                    val: xdr::ScVal::Symbol("Arc venuePair".try_into().unwrap()),
+                    val: xdr::ScVal::Symbol("SoroswapPair".try_into().unwrap()),
                 },
                 xdr::ScMapEntry {
                     key: xdr::ScVal::Symbol("in_idx".try_into().unwrap()),
@@ -436,7 +436,7 @@ mod tests {
         assert!(!parsed.is_split);
         assert_eq!(parsed.amount_in, 1_000_000);
         assert_eq!(parsed.legs.len(), 1);
-        assert_eq!(parsed.legs[0].dex_source, "Arc venue");
+        assert_eq!(parsed.legs[0].dex_source, "soroswap");
     }
 
     /// Optional mainnet fixture when present (see `tests/fixtures/README.md`).

@@ -88,11 +88,11 @@ export function formatLegPercent(percentage: number): string {
  * Compute a human-readable exchange rate: "out-tokens per 1 in-token".
  *
  * Accounts for token decimals so the displayed rate matches what a user
- * expects — unlike a raw atomic units ratio which would be off by orders of
+ * expects — unlike a raw stroop ratio which would be off by orders of
  * magnitude when the two tokens use different decimal places.
  *
- * @param amountIn    Input atomic unitss for this leg.
- * @param amountOut   Output atomic unitss for this leg.
+ * @param amountIn    Input stroops for this leg.
+ * @param amountOut   Output stroops for this leg.
  * @param inDecimals  Decimal places of the input token (default 7).
  * @param outDecimals Decimal places of the output token (default 7).
  * @returns The exchange rate (out-units / in-units), or null if inputs are zero.

@@ -2,12 +2,12 @@
 //! when the quote-engine catalog is empty, and always **merged into** the
 //! catalog set (priority hubs).
 //!
-//! Primary scope is now the full quote-engine token catalog (Arc
+//! Primary scope is now the full quote-engine token catalog (Soroban
 //! `balance` simulates — no Horizon).
 //!
 //! Sources for this curated subset:
 //! - [`crate::classic_dex::CLASSIC_ASSETS`] — XLM / USDC / EURC classic +
-//!   Arc paths
+//!   Soroban paths
 //! - Frontend swap defaults (`TokenSelector` priority row)
 //! - [`crate::sushi`] pool-discovery hub list (BLND, yXLM, …)
 //! - High-volume mainnet SACs (BTC, etc.)
@@ -21,7 +21,7 @@ pub const COMMON_BALANCE_TOKEN_IDS: &[&str] = &[
     "CCW67TSZV3SSS2HXMBQ5JFGCKJNXKZM7UQUWUZPUTHXSTZLEO7SJMI75", // USDC
     "CDTKPWPLOURQA2SGTKTUQOWRCBZEORB4BWBOMJ3D3ZTQQSGE5F6JBQLV", // EURC
     "CAUIKL3IYGMERDRUN6YSCLWVAKIFG5Q4YJHUKM4S4NJZQIA3BAS6OJPK", // AQUA
-    // Arc venue / Sushi / Arc venue routing hubs
+    // Soroswap / Sushi / Comet routing hubs
     "CAS3FL6TLZKDGGSISDBWGGPXT3NRR4DYTZD7YOD3HMYO6LTJUVGRVEAM", // BLND
     "CBZVSNVB55ANF3LBFTU2LKGD3BJKFMHIGISKND7LBSPHYY3MAQH4AMPR", // yXLM
     "CAUIKL3IYGMERDRUN6YSCLWVAKIFG5Q4YJHUKM4S4MZLQO346H4GQ2O2", // FIDR

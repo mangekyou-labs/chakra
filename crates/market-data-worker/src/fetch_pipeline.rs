@@ -6,16 +6,16 @@
 //! ledger-touched pools (Jupiter-style event-driven updates).
 
 use {
-    crate::{clmm_metrics::ClmmCoverageMetrics, pool_state_publish::Arc venue_state_to_value, worker::WorkerShared},
+    crate::{clmm_metrics::ClmmCoverageMetrics, pool_state_publish::comet_state_to_value, worker::WorkerShared},
     anyhow::Result,
     dex_adapters::{
-        Arc venue::Arc venueAdapter, Arc venue_clmm::Arc venueClmmAdapter,
-        batch_refresh::batch_refresh_Arc venue_reserves_parallel, Arc venue::Arc venueAdapter, Arc venue::Arc venueAdapter,
-        pool_index::PoolRef, rpc::ArcRpc, Arc venue::Arc venueAdapter, sushi::SushiAdapter, DexAdapter,
+        aquarius::AquariusAdapter, aquarius_clmm::AquariusClmmAdapter,
+        batch_refresh::batch_refresh_soroswap_reserves_parallel, comet::CometAdapter, phoenix::PhoenixAdapter,
+        pool_index::PoolRef, rpc::SorobanRpc, soroswap::SoroswapAdapter, sushi::SushiAdapter, DexAdapter,
     },
     market_snapshot::{
         pool_state_store::{
-            should_publish_clmm_to_redis, Arc venuePoolStateValue, Arc venuePoolStateValue, PoolStateStore,
+            should_publish_clmm_to_redis, AquariusPoolStateValue, CometPoolStateValue, PoolStateStore,
             XykPoolStateValue,
         },
         ClmmPoolSnapshot, SourceSnapshot, TradingPairSnapshot,
@@ -33,10 +33,10 @@ use {
 
 #[derive(Debug, Clone)]
 pub enum FetchTask {
-    Arc venueBatch { pool_addresses: Vec<String> },
-    Arc venueBatch { pool_addresses: Vec<String> },
-    Arc venueBatch { pool_addresses: Vec<String> },
-    Arc venuePool { pool_address: String },
+    SoroswapBatch { pool_addresses: Vec<String> },
+    AquariusBatch { pool_addresses: Vec<String> },
+    PhoenixBatch { pool_addresses: Vec<String> },
+    CometPool { pool_address: String },
     ClmmPool { source: String, pool_address: String },
 }
 
@@ -81,8 +81,8 @@ impl FetchPipelineMetrics {
 #[derive(Debug)]
 enum PoolStateUpdate {
     Xyk(Vec<XykPoolStateValue>),
-    Arc venue(Vec<Arc venuePoolStateValue>),
-    Arc venue(Vec<Arc venuePoolStateValue>),
+    Aquarius(Vec<AquariusPoolStateValue>),
+    Comet(Vec<CometPoolStateValue>),
     Clmm(ClmmPoolSnapshot),
 }
 
@@ -142,23 +142,23 @@ impl FetchPipelineHandle {
     }
 }
 
-/// One batched task per xy=k/Arc venue/Arc venue source per poll; CLMM/Arc venue stay
+/// One batched task per xy=k/Aquarius/Phoenix source per poll; CLMM/Comet stay
 /// one-task-per-pool (heavier RPC).
 pub(crate) fn coalesce_touched_into_tasks(touched: HashSet<PoolRef>) -> Vec<FetchTask> {
-    let mut Arc venue = Vec::new();
-    let mut Arc venue = Vec::new();
-    let mut Arc venue = Vec::new();
+    let mut soroswap = Vec::new();
+    let mut aquarius = Vec::new();
+    let mut phoenix = Vec::new();
     let mut tasks = Vec::new();
 
     for pool in touched {
         match pool.source.as_str() {
-            "Arc venue" => Arc venue.push(pool.pool_address),
-            "Arc venue" => Arc venue.push(pool.pool_address),
-            "Arc venue" => Arc venue.push(pool.pool_address),
-            "Arc venue" => tasks.push(FetchTask::Arc venuePool {
+            "soroswap" => soroswap.push(pool.pool_address),
+            "aquarius" => aquarius.push(pool.pool_address),
+            "phoenix" => phoenix.push(pool.pool_address),
+            "comet" => tasks.push(FetchTask::CometPool {
                 pool_address: pool.pool_address,
             }),
-            "sushi" | "Arc venue_clmm" => tasks.push(FetchTask::ClmmPool {
+            "sushi" | "aquarius_clmm" => tasks.push(FetchTask::ClmmPool {
                 source: pool.source,
                 pool_address: pool.pool_address,
             }),
@@ -175,32 +175,32 @@ pub(crate) fn coalesce_touched_into_tasks(touched: HashSet<PoolRef>) -> Vec<Fetc
         addrs.sort();
         addrs.dedup();
         match source {
-            "Arc venue" => tasks.push(FetchTask::Arc venueBatch {
+            "soroswap" => tasks.push(FetchTask::SoroswapBatch {
                 pool_addresses: addrs,
             }),
-            "Arc venue" => tasks.push(FetchTask::Arc venueBatch {
+            "aquarius" => tasks.push(FetchTask::AquariusBatch {
                 pool_addresses: addrs,
             }),
-            "Arc venue" => tasks.push(FetchTask::Arc venueBatch {
+            "phoenix" => tasks.push(FetchTask::PhoenixBatch {
                 pool_addresses: addrs,
             }),
             _ => {}
         }
     };
-    push_batch("Arc venue", Arc venue);
-    push_batch("Arc venue", Arc venue);
-    push_batch("Arc venue", Arc venue);
+    push_batch("soroswap", soroswap);
+    push_batch("aquarius", aquarius);
+    push_batch("phoenix", phoenix);
     tasks
 }
 
 struct FetchWorkerContext {
-    rpc: Arc<ArcRpc>,
-    Arc venue: Arc<Arc venueAdapter>,
-    Arc venue: Arc<Arc venueAdapter>,
-    Arc venue: Arc<Arc venueAdapter>,
-    Arc venue: Arc<Arc venueAdapter>,
+    rpc: Arc<SorobanRpc>,
+    soroswap: Arc<SoroswapAdapter>,
+    aquarius: Arc<AquariusAdapter>,
+    phoenix: Arc<PhoenixAdapter>,
+    comet: Arc<CometAdapter>,
     sushi: Arc<SushiAdapter>,
-    Arc venue_clmm: Arc<Arc venueClmmAdapter>,
+    aquarius_clmm: Arc<AquariusClmmAdapter>,
     shared: Arc<RwLock<WorkerShared>>,
     refresh_concurrency: usize,
     clmm_metrics: Option<Arc<ClmmCoverageMetrics>>,
@@ -209,14 +209,14 @@ struct FetchWorkerContext {
 pub fn spawn_fetch_pipeline(
     config: FetchPipelineConfig,
     pool_store: Arc<dyn PoolStateStore>,
-    rpc: Arc<ArcRpc>,
+    rpc: Arc<SorobanRpc>,
     shared: Arc<RwLock<WorkerShared>>,
-    Arc venue: Arc<Arc venueAdapter>,
-    Arc venue: Arc<Arc venueAdapter>,
-    Arc venue: Arc<Arc venueAdapter>,
-    Arc venue: Arc<Arc venueAdapter>,
+    soroswap: Arc<SoroswapAdapter>,
+    aquarius: Arc<AquariusAdapter>,
+    phoenix: Arc<PhoenixAdapter>,
+    comet: Arc<CometAdapter>,
     sushi: Arc<SushiAdapter>,
-    Arc venue_clmm: Arc<Arc venueClmmAdapter>,
+    aquarius_clmm: Arc<AquariusClmmAdapter>,
     clmm_metrics: Option<Arc<ClmmCoverageMetrics>>,
 ) -> FetchPipelineHandle {
     let (high_tx, mut high_rx) = mpsc::channel::<FetchTask>(config.high_queue_capacity);
@@ -227,12 +227,12 @@ pub fn spawn_fetch_pipeline(
 
     let worker_ctx = Arc::new(FetchWorkerContext {
         rpc,
-        Arc venue,
-        Arc venue,
-        Arc venue,
-        Arc venue,
+        soroswap,
+        aquarius,
+        phoenix,
+        comet,
         sushi,
-        Arc venue_clmm,
+        aquarius_clmm,
         shared,
         refresh_concurrency: config.refresh_concurrency,
         clmm_metrics: clmm_metrics.clone(),
@@ -279,10 +279,10 @@ pub fn spawn_fetch_pipeline(
         while let Some(update) = redis_rx.recv().await {
             let result = match update {
                 PoolStateUpdate::Xyk(values) if !values.is_empty() => pool_store_sink.set_xyk_batch(&values).await,
-                PoolStateUpdate::Arc venue(values) if !values.is_empty() => {
-                    pool_store_sink.set_Arc venue_batch(&values).await
+                PoolStateUpdate::Aquarius(values) if !values.is_empty() => {
+                    pool_store_sink.set_aquarius_batch(&values).await
                 }
-                PoolStateUpdate::Arc venue(values) if !values.is_empty() => pool_store_sink.set_Arc venue_batch(&values).await,
+                PoolStateUpdate::Comet(values) if !values.is_empty() => pool_store_sink.set_comet_batch(&values).await,
                 PoolStateUpdate::Clmm(snapshot) => pool_store_sink.set_clmm_batch(&[snapshot]).await,
                 _ => Ok(()),
             };
@@ -321,25 +321,25 @@ pub fn spawn_fetch_pipeline(
 
 async fn execute_fetch_task(ctx: &FetchWorkerContext, task: FetchTask) -> Result<Vec<PoolStateUpdate>> {
     match task {
-        FetchTask::Arc venueBatch { pool_addresses } => {
+        FetchTask::SoroswapBatch { pool_addresses } => {
             let sources = ctx.shared.read().await.sources.clone();
             let results =
-                batch_refresh_Arc venue_reserves_parallel(ctx.rpc.as_ref(), &pool_addresses, ctx.refresh_concurrency)
+                batch_refresh_soroswap_reserves_parallel(ctx.rpc.as_ref(), &pool_addresses, ctx.refresh_concurrency)
                     .await?;
-            ctx.Arc venue.apply_batch_reserves(&results).await;
-            let values = xyk_values_from_batch(&sources, "Arc venue", &results);
+            ctx.soroswap.apply_batch_reserves(&results).await;
+            let values = xyk_values_from_batch(&sources, "soroswap", &results);
             Ok(if values.is_empty() {
                 vec![]
             } else {
                 vec![PoolStateUpdate::Xyk(values)]
             })
         }
-        FetchTask::Arc venueBatch { pool_addresses } => {
-            ctx.Arc venue.refresh_pool_addresses(&pool_addresses).await?;
-            let states = ctx.Arc venue.export_pool_quote_states_for(&pool_addresses).await;
-            let values: Vec<Arc venuePoolStateValue> = states
+        FetchTask::AquariusBatch { pool_addresses } => {
+            ctx.aquarius.refresh_pool_addresses(&pool_addresses).await?;
+            let states = ctx.aquarius.export_pool_quote_states_for(&pool_addresses).await;
+            let values: Vec<AquariusPoolStateValue> = states
                 .into_iter()
-                .map(|state| Arc venuePoolStateValue {
+                .map(|state| AquariusPoolStateValue {
                     pool_address: state.pool_address,
                     tokens: state.tokens,
                     reserves: state.reserves,
@@ -352,42 +352,42 @@ async fn execute_fetch_task(ctx: &FetchWorkerContext, task: FetchTask) -> Result
             Ok(if values.is_empty() {
                 vec![]
             } else {
-                vec![PoolStateUpdate::Arc venue(values)]
+                vec![PoolStateUpdate::Aquarius(values)]
             })
         }
-        FetchTask::Arc venueBatch { pool_addresses } => {
-            ctx.Arc venue.refresh_touched_pools(&pool_addresses).await?;
+        FetchTask::PhoenixBatch { pool_addresses } => {
+            ctx.phoenix.refresh_touched_pools(&pool_addresses).await?;
             let sources = ctx.shared.read().await.sources.clone();
             let values =
-                collect_xyk_from_adapter_cache(&sources, "Arc venue", &pool_addresses, ctx.Arc venue.as_ref()).await;
+                collect_xyk_from_adapter_cache(&sources, "phoenix", &pool_addresses, ctx.phoenix.as_ref()).await;
             Ok(if values.is_empty() {
                 vec![]
             } else {
                 vec![PoolStateUpdate::Xyk(values)]
             })
         }
-        FetchTask::Arc venuePool { pool_address } => {
-            if !ctx.Arc venue.refresh_pool(&pool_address).await? {
+        FetchTask::CometPool { pool_address } => {
+            if !ctx.comet.refresh_pool(&pool_address).await? {
                 return Ok(vec![]);
             }
-            let values: Vec<Arc venuePoolStateValue> = ctx
-                .Arc venue
+            let values: Vec<CometPoolStateValue> = ctx
+                .comet
                 .export_pool_quote_states_for(std::slice::from_ref(&pool_address))
                 .await
                 .into_iter()
                 .filter(|(_, state)| state.records.len() >= 2)
-                .map(|(addr, state)| Arc venue_state_to_value(&addr, &state))
+                .map(|(addr, state)| comet_state_to_value(&addr, &state))
                 .collect();
             Ok(if values.is_empty() {
                 vec![]
             } else {
-                vec![PoolStateUpdate::Arc venue(values)]
+                vec![PoolStateUpdate::Comet(values)]
             })
         }
         FetchTask::ClmmPool { source, pool_address } => {
             match source.as_str() {
                 "sushi" => ctx.sushi.ensure_pool_loaded(&pool_address).await?,
-                "Arc venue_clmm" => ctx.Arc venue_clmm.ensure_pool_loaded(&pool_address).await?,
+                "aquarius_clmm" => ctx.aquarius_clmm.ensure_pool_loaded(&pool_address).await?,
                 other => {
                     anyhow::bail!("unknown CLMM source {}", other);
                 }
@@ -395,7 +395,7 @@ async fn execute_fetch_task(ctx: &FetchWorkerContext, task: FetchTask) -> Result
 
             let exported = match source.as_str() {
                 "sushi" => ctx.sushi.export_clmm_snapshots().await,
-                "Arc venue_clmm" => ctx.Arc venue_clmm.export_clmm_snapshots().await,
+                "aquarius_clmm" => ctx.aquarius_clmm.export_clmm_snapshots().await,
                 _ => Vec::new(),
             };
             let Some(snapshot) = exported.into_iter().find(|s| s.pool_address == pool_address) else {
@@ -515,30 +515,30 @@ mod tests {
     }
 
     #[test]
-    fn coalesce_batches_Arc venue_and_Arc venue_per_poll() {
+    fn coalesce_batches_aquarius_and_soroswap_per_poll() {
         let touched = HashSet::from([
-            pref("Arc venue", "A2"),
-            pref("Arc venue", "A1"),
-            pref("Arc venue", "A1"),
-            pref("Arc venue", "S1"),
+            pref("aquarius", "A2"),
+            pref("aquarius", "A1"),
+            pref("aquarius", "A1"),
+            pref("soroswap", "S1"),
             pref("sushi", "CLMM1"),
-            pref("Arc venue", "C1"),
+            pref("comet", "C1"),
         ]);
         let tasks = coalesce_touched_into_tasks(touched);
-        let Arc venue = tasks.iter().find_map(|t| match t {
-            FetchTask::Arc venueBatch { pool_addresses } => Some(pool_addresses.clone()),
+        let aquarius = tasks.iter().find_map(|t| match t {
+            FetchTask::AquariusBatch { pool_addresses } => Some(pool_addresses.clone()),
             _ => None,
         });
-        assert_eq!(Arc venue.as_deref(), Some(["A1".to_string(), "A2".to_string()].as_slice()));
-        let Arc venue = tasks.iter().find_map(|t| match t {
-            FetchTask::Arc venueBatch { pool_addresses } => Some(pool_addresses.clone()),
+        assert_eq!(aquarius.as_deref(), Some(["A1".to_string(), "A2".to_string()].as_slice()));
+        let soroswap = tasks.iter().find_map(|t| match t {
+            FetchTask::SoroswapBatch { pool_addresses } => Some(pool_addresses.clone()),
             _ => None,
         });
-        assert_eq!(Arc venue.as_deref(), Some(["S1".to_string()].as_slice()));
+        assert_eq!(soroswap.as_deref(), Some(["S1".to_string()].as_slice()));
         assert_eq!(
             tasks
                 .iter()
-                .filter(|t| matches!(t, FetchTask::ClmmPool { .. } | FetchTask::Arc venuePool { .. }))
+                .filter(|t| matches!(t, FetchTask::ClmmPool { .. } | FetchTask::CometPool { .. }))
                 .count(),
             2
         );

@@ -12,8 +12,8 @@ Usage:
 
 Required:
   CONTRACT_ID       Deployed contract instance to extend
-  SOURCE            Funded Arc CLI identity or secret key
-  NETWORK           Arc CLI network name
+  SOURCE            Funded Stellar CLI identity or secret key
+  NETWORK           Stellar CLI network name
   WASM or WASM_HASH Exact WASM currently used by the deployed instance
 
 Optional:
@@ -73,13 +73,13 @@ run() {
   fi
 }
 
-run Arc contract extend \
+run stellar contract extend \
   --id "$CONTRACT_ID" \
   --source "$SOURCE" \
   --network "$NETWORK" \
   --ledgers-to-extend "$LEDGERS_TO_EXTEND"
 
-run Arc contract extend \
+run stellar contract extend \
   --wasm-hash "$WASM_HASH" \
   --source "$SOURCE" \
   --network "$NETWORK" \
@@ -91,7 +91,7 @@ if [[ -n "$PERSISTENT_KEY_XDRS" ]]; then
     key_xdr="${key_xdr#"${key_xdr%%[![:space:]]*}"}"
     key_xdr="${key_xdr%"${key_xdr##*[![:space:]]}"}"
     [[ -z "$key_xdr" ]] && continue
-    run Arc contract extend \
+    run stellar contract extend \
       --id "$CONTRACT_ID" \
       --key-xdr "$key_xdr" \
       --durability persistent \

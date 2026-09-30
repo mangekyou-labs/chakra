@@ -51,7 +51,7 @@ fn apply_slippage(amount: u128, slippage_bps: u32) -> u128 {
 
 /// Skip xy=k pools with dust reserves on either side (misleading quotes at
 /// small trade sizes).
-const MIN_XYK_RESERVE_atomic unitsS: u128 = 100_000_000;
+const MIN_XYK_RESERVE_STROOPS: u128 = 100_000_000;
 
 fn reserves_for_edge(token_in: &TokenId, token_out: &TokenId, hydrated: &XykPoolStateValue) -> Option<(u128, u128)> {
     let in_key = token_in.canonical();
@@ -71,10 +71,10 @@ fn reserves_for_edge(token_in: &TokenId, token_out: &TokenId, hydrated: &XykPool
 pub struct QuoteHydration {
     pub xyk_pools: HashMap<String, XykPoolStateValue>,
     pub clmm_pools: HashMap<String, SnapshotClmmQuoteState>,
-    /// Arc venue weighted pools (full token records + fee).
-    pub Arc venue_pools: HashMap<String, dex_adapters::Arc venuePoolQuoteState>,
-    /// Arc venue pools keyed by pool contract address.
-    pub Arc venue_pools: HashMap<String, dex_adapters::Arc venuePoolQuoteState>,
+    /// Comet weighted pools (full token records + fee).
+    pub comet_pools: HashMap<String, dex_adapters::CometPoolQuoteState>,
+    /// Aquarius pools keyed by pool contract address.
+    pub aquarius_pools: HashMap<String, dex_adapters::AquariusPoolQuoteState>,
 }
 
 impl QuoteHydration {
@@ -86,7 +86,7 @@ impl QuoteHydration {
         format!("{source}:{pool_address}")
     }
 
-    pub fn Arc venue_pool_key(pool_address: &str) -> String {
+    pub fn comet_pool_key(pool_address: &str) -> String {
         pool_address.to_string()
     }
 }
@@ -101,7 +101,7 @@ pub struct QuoteEngine {
     cached_pools: RwLock<Vec<TradingPair>>,
     clmm_quote_states: RwLock<HashMap<String, SnapshotClmmQuoteState>>,
     /// Populated per quote from Redis hydration (for pool index resolution).
-    Arc venue_pools: RwLock<HashMap<String, dex_adapters::Arc venuePoolQuoteState>>,
+    aquarius_pools: RwLock<HashMap<String, dex_adapters::AquariusPoolQuoteState>>,
 }
 
 impl QuoteEngine {
@@ -112,14 +112,14 @@ impl QuoteEngine {
             adapters: RwLock::new(Vec::new()),
             cached_pools: RwLock::new(Vec::new()),
             clmm_quote_states: RwLock::new(HashMap::new()),
-            Arc venue_pools: RwLock::new(HashMap::new()),
+            aquarius_pools: RwLock::new(HashMap::new()),
         }
     }
 
-    /// Per-request Arc venue pool state (from Redis) for `get_pool_indices`
+    /// Per-request Aquarius pool state (from Redis) for `get_pool_indices`
     /// during build_tx.
-    pub async fn set_Arc venue_pools(&self, pools: HashMap<String, dex_adapters::Arc venuePoolQuoteState>) {
-        *self.Arc venue_pools.write().await = pools;
+    pub async fn set_aquarius_pools(&self, pools: HashMap<String, dex_adapters::AquariusPoolQuoteState>) {
+        *self.aquarius_pools.write().await = pools;
     }
 
     fn clmm_quote_key(source: &str, pool_address: &str) -> String {
@@ -307,14 +307,14 @@ impl QuoteEngine {
         let start = std::time::Instant::now();
         let slippage_bps = request.slippage_bps.unwrap_or(50);
 
-        // Never return mixed classic+Arc hops — they cannot form one tx.
-        // prefer_Arc: Arc AMMs only (no classic / no Horizon).
-        // Default: pure classic OR pure Arc compete; Horizon only for classic.
-        let prefer_Arc = request.prefer_Arc.unwrap_or(false);
+        // Never return mixed classic+Soroban hops — they cannot form one tx.
+        // prefer_soroban: Soroban AMMs only (no classic / no Horizon).
+        // Default: pure classic OR pure Soroban compete; Horizon only for classic.
+        let prefer_soroban = request.prefer_soroban.unwrap_or(false);
         let paths: Vec<Path> = paths
             .iter()
             .filter(|path| {
-                if prefer_Arc {
+                if prefer_soroban {
                     !Self::path_contains_classic(path)
                 } else {
                     Self::path_is_executable(path)
@@ -345,9 +345,9 @@ impl QuoteEngine {
         debug!(paths = paths.len(), "Paths discovered");
 
         if let Some(h) = hydration {
-            self.set_Arc venue_pools(h.Arc venue_pools.clone()).await;
+            self.set_aquarius_pools(h.aquarius_pools.clone()).await;
         } else {
-            self.set_Arc venue_pools(HashMap::new()).await;
+            self.set_aquarius_pools(HashMap::new()).await;
         }
 
         // 2. Get quotes for each path at full amount (parallel — paths are
@@ -386,7 +386,7 @@ impl QuoteEngine {
 
         debug!(quoted = quoted_paths.len(), "Paths quoted");
 
-        let (classic_quoted_paths, Arc_quoted_paths): (Vec<QuotedPath>, Vec<QuotedPath>) = quoted_paths
+        let (classic_quoted_paths, soroban_quoted_paths): (Vec<QuotedPath>, Vec<QuotedPath>) = quoted_paths
             .into_iter()
             .partition(|quoted| Self::is_classic_only_path(&quoted.path));
 
@@ -413,7 +413,7 @@ impl QuoteEngine {
                 }
             });
 
-        let best_Arc_route = if Arc_quoted_paths.is_empty() {
+        let best_soroban_route = if soroban_quoted_paths.is_empty() {
             None
         } else {
             let adapters_clone = adapters.clone();
@@ -426,7 +426,7 @@ impl QuoteEngine {
             Some(
                 self.split_optimizer
                     .optimize(
-                        &Arc_quoted_paths,
+                        &soroban_quoted_paths,
                         request.amount_in,
                         slippage_bps,
                         request.max_splits,
@@ -457,16 +457,16 @@ impl QuoteEngine {
             )
         };
 
-        match (best_classic_route, best_Arc_route) {
-            (Some(classic), Some(Arc)) => {
-                if classic.total_expected_out > Arc.total_expected_out {
+        match (best_classic_route, best_soroban_route) {
+            (Some(classic), Some(soroban)) => {
+                if classic.total_expected_out > soroban.total_expected_out {
                     classic
                 } else {
-                    Arc
+                    soroban
                 }
             }
             (Some(classic), None) => classic,
-            (None, Some(Arc)) => Arc,
+            (None, Some(soroban)) => soroban,
             (None, None) => OptimalRoute {
                 sub_orders: vec![],
                 total_amount_in: request.amount_in,
@@ -489,7 +489,7 @@ impl QuoteEngine {
         path.sources.iter().any(|source| source == CLASSIC_SOURCE)
     }
 
-    /// Pure classic or pure Arc — never mixed hops (unexecutable as one tx).
+    /// Pure classic or pure Soroban — never mixed hops (unexecutable as one tx).
     fn path_is_executable(path: &Path) -> bool {
         Self::is_classic_only_path(path) || !Self::path_contains_classic(path)
     }
@@ -518,7 +518,7 @@ impl QuoteEngine {
             let adapter = adapters.iter().find(|a| a.id() == source);
 
             // CLMM: local math only during routing (fast). No per-hop RPC simulate.
-            let hop_result = if matches!(source.as_str(), "sushi" | "Arc venue_clmm") {
+            let hop_result = if matches!(source.as_str(), "sushi" | "aquarius_clmm") {
                 self.local_clmm_quote(
                     token_in,
                     token_out,
@@ -528,10 +528,10 @@ impl QuoteEngine {
                     &clmm_quote_states,
                     hydration,
                 )
-            } else if source == "Arc venue" {
-                self.local_Arc venue_quote(token_in, token_out, current_amount, pool_address, hydration)
-            } else if source == "Arc venue" {
-                self.local_Arc venue_quote(token_in, token_out, current_amount, pool_address, hydration)
+            } else if source == "comet" {
+                self.local_comet_quote(token_in, token_out, current_amount, pool_address, hydration)
+            } else if source == "aquarius" {
+                self.local_aquarius_quote(token_in, token_out, current_amount, pool_address, hydration)
             } else if source == CLASSIC_SOURCE {
                 if let Some(q) = self.local_quote(
                     token_in,
@@ -617,18 +617,18 @@ impl QuoteEngine {
             return Some(clmm_quote);
         }
 
-        if source == "Arc venue" {
-            return self.local_Arc venue_quote(token_in, token_out, amount_in, pool_address, hydration);
+        if source == "comet" {
+            return self.local_comet_quote(token_in, token_out, amount_in, pool_address, hydration);
         }
 
-        if source == "Arc venue" {
-            return self.local_Arc venue_quote(token_in, token_out, amount_in, pool_address, hydration);
+        if source == "aquarius" {
+            return self.local_aquarius_quote(token_in, token_out, amount_in, pool_address, hydration);
         }
 
         let pair = Self::find_pool_edge(cached_pools, pool_address, token_in, token_out)?;
         let hydrated = hydration.and_then(|h| h.xyk_pools.get(&QuoteHydration::xyk_pool_key(source, pool_address)));
         // Prefer live Redis fee when present — topology snapshot can lag (e.g.
-        // Arc venue total_fee_bps misparsed as default 30 while on-chain is 50).
+        // Phoenix total_fee_bps misparsed as default 30 while on-chain is 50).
         let fee_bps = hydrated.map(|h| h.fee_bps).unwrap_or(pair.fee_bps);
 
         let (reserve_in, reserve_out) = if let Some(hydrated) = hydrated {
@@ -643,23 +643,23 @@ impl QuoteEngine {
 
         if reserve_in == 0 ||
             reserve_out == 0 ||
-            reserve_in < MIN_XYK_RESERVE_atomic unitsS ||
-            reserve_out < MIN_XYK_RESERVE_atomic unitsS
+            reserve_in < MIN_XYK_RESERVE_STROOPS ||
+            reserve_out < MIN_XYK_RESERVE_STROOPS
         {
             return None;
         }
 
         // Apply appropriate AMM formula based on source
         let (amount_out, fee_bps) = match source {
-            "Arc venue" => {
-                // Arc venue: fee = ceil(amount_in * 3 / 1000)
+            "soroswap" => {
+                // Soroswap: fee = ceil(amount_in * 3 / 1000)
                 let fee = (amount_in * 3 + 999) / 1000;
                 let in_after_fee = amount_in - fee;
                 let out = in_after_fee * reserve_out / (reserve_in + in_after_fee);
                 (out, 30u32)
             }
-            "Arc venue" => {
-                // Arc venue: fee on output
+            "phoenix" => {
+                // Phoenix: fee on output
                 let gross = amount_in * reserve_out / (reserve_in + amount_in);
                 let commission = gross * fee_bps as u128 / 10_000;
                 (gross - commission, fee_bps)
@@ -692,7 +692,7 @@ impl QuoteEngine {
         })
     }
 
-    fn local_Arc venue_quote(
+    fn local_aquarius_quote(
         &self,
         token_in: &TokenId,
         token_out: &TokenId,
@@ -700,11 +700,11 @@ impl QuoteEngine {
         pool_address: &str,
         hydration: Option<&QuoteHydration>,
     ) -> Option<dex_adapters::AdapterQuote> {
-        let state = hydration.and_then(|h| h.Arc venue_pools.get(pool_address))?;
-        dex_adapters::quote_Arc venue_pool(state, &token_in.canonical(), &token_out.canonical(), amount_in)
+        let state = hydration.and_then(|h| h.aquarius_pools.get(pool_address))?;
+        dex_adapters::quote_aquarius_pool(state, &token_in.canonical(), &token_out.canonical(), amount_in)
     }
 
-    fn local_Arc venue_quote(
+    fn local_comet_quote(
         &self,
         token_in: &TokenId,
         token_out: &TokenId,
@@ -713,9 +713,9 @@ impl QuoteEngine {
         hydration: Option<&QuoteHydration>,
     ) -> Option<dex_adapters::AdapterQuote> {
         let state = hydration?
-            .Arc venue_pools
-            .get(&QuoteHydration::Arc venue_pool_key(pool_address))?;
-        dex_adapters::quote_Arc venue_pool(state, &token_in.canonical(), &token_out.canonical(), amount_in)
+            .comet_pools
+            .get(&QuoteHydration::comet_pool_key(pool_address))?;
+        dex_adapters::quote_comet_pool(state, &token_in.canonical(), &token_out.canonical(), amount_in)
     }
 
     fn local_clmm_quote(
@@ -728,7 +728,7 @@ impl QuoteEngine {
         clmm_quote_states: &HashMap<String, SnapshotClmmQuoteState>,
         hydration: Option<&QuoteHydration>,
     ) -> Option<dex_adapters::AdapterQuote> {
-        if source != "sushi" && source != "Arc venue_clmm" {
+        if source != "sushi" && source != "aquarius_clmm" {
             return None;
         }
 
@@ -781,7 +781,7 @@ impl QuoteEngine {
     ) -> Option<(u32, u32)> {
         let in_key = token_in.canonical();
         let out_key = token_out.canonical();
-        if let Some(state) = self.Arc venue_pools.read().await.get(pool_address) {
+        if let Some(state) = self.aquarius_pools.read().await.get(pool_address) {
             let in_idx = state.tokens.iter().position(|t| t == &in_key)? as u32;
             let out_idx = state.tokens.iter().position(|t| t == &out_key)? as u32;
             return Some((in_idx, out_idx));
@@ -958,7 +958,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn quote_prefers_best_classic_single_route_over_Arc_split() {
+    async fn quote_prefers_best_classic_single_route_over_soroban_split() {
         let engine = QuoteEngine::new(PathFinderConfig::default(), SplitConfig::default());
         engine
             .update_pairs_from_cache(
@@ -967,10 +967,10 @@ mod tests {
             )
             .await;
         engine
-            .update_pairs_from_cache("Arc venue", &[pair("Arc venue", "soro-pool", 10_000_000, 10_000_000)])
+            .update_pairs_from_cache("soroswap", &[pair("soroswap", "soro-pool", 10_000_000, 10_000_000)])
             .await;
         engine
-            .update_pairs_from_cache("Arc venue", &[pair("Arc venue", "aqua-pool", 10_000_000, 10_000_000)])
+            .update_pairs_from_cache("aquarius", &[pair("aquarius", "aqua-pool", 10_000_000, 10_000_000)])
             .await;
 
         let route = engine
@@ -981,7 +981,7 @@ mod tests {
                 slippage_bps: Some(50),
                 max_hops: Some(1),
                 max_splits: Some(5),
-                prefer_Arc: None,
+                prefer_soroban: None,
             })
             .await;
 
@@ -991,7 +991,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn quote_prefer_Arc_skips_classic_even_when_better() {
+    async fn quote_prefer_soroban_skips_classic_even_when_better() {
         let engine = QuoteEngine::new(PathFinderConfig::default(), SplitConfig::default());
         engine
             .update_pairs_from_cache(
@@ -1000,10 +1000,10 @@ mod tests {
             )
             .await;
         engine
-            .update_pairs_from_cache("Arc venue", &[pair("Arc venue", "soro-pool", 100_000_000, 100_000_000)])
+            .update_pairs_from_cache("soroswap", &[pair("soroswap", "soro-pool", 100_000_000, 100_000_000)])
             .await;
         engine
-            .update_pairs_from_cache("Arc venue", &[pair("Arc venue", "aqua-pool", 100_000_000, 100_000_000)])
+            .update_pairs_from_cache("aquarius", &[pair("aquarius", "aqua-pool", 100_000_000, 100_000_000)])
             .await;
 
         let route = engine
@@ -1014,7 +1014,7 @@ mod tests {
                 slippage_bps: Some(50),
                 max_hops: Some(1),
                 max_splits: Some(5),
-                prefer_Arc: Some(true),
+                prefer_soroban: Some(true),
             })
             .await;
 
@@ -1023,7 +1023,7 @@ mod tests {
             .sub_orders
             .iter()
             .all(|order| order.path.sources.iter().all(|source| source != CLASSIC_SOURCE)));
-        // Default routing would pick Classic for this size; prefer_Arc must not.
+        // Default routing would pick Classic for this size; prefer_soroban must not.
         let default_route = engine
             .get_route(&RouteRequest {
                 token_in: token("token-in"),
@@ -1032,7 +1032,7 @@ mod tests {
                 slippage_bps: Some(50),
                 max_hops: Some(1),
                 max_splits: Some(5),
-                prefer_Arc: None,
+                prefer_soroban: None,
             })
             .await;
         assert_eq!(
@@ -1042,9 +1042,9 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn quote_drops_mixed_classic_legs_even_without_prefer_Arc() {
+    async fn quote_drops_mixed_classic_legs_even_without_prefer_soroban() {
         let engine = QuoteEngine::new(PathFinderConfig::default(), SplitConfig::default());
-        // Only a mixed 2-hop path exists: classic + Arc venue — unexecutable as one tx.
+        // Only a mixed 2-hop path exists: classic + soroswap — unexecutable as one tx.
         engine
             .update_pairs_from_cache(
                 CLASSIC_SOURCE,
@@ -1060,9 +1060,9 @@ mod tests {
             .await;
         engine
             .update_pairs_from_cache(
-                "Arc venue",
+                "soroswap",
                 &[pair_with_tokens(
-                    "Arc venue",
+                    "soroswap",
                     "soro-mid-out",
                     "mid",
                     "token-out",
@@ -1080,12 +1080,12 @@ mod tests {
                 slippage_bps: Some(50),
                 max_hops: Some(2),
                 max_splits: Some(1),
-                prefer_Arc: Some(true),
+                prefer_soroban: Some(true),
             })
             .await;
         assert!(
             prefer.sub_orders.is_empty(),
-            "prefer_Arc must drop mixed classic+Arc paths (no pure Arc fallback here)"
+            "prefer_soroban must drop mixed classic+Soroban paths (no pure Soroban fallback here)"
         );
 
         let default_route = engine
@@ -1096,12 +1096,12 @@ mod tests {
                 slippage_bps: Some(50),
                 max_hops: Some(2),
                 max_splits: Some(1),
-                prefer_Arc: None,
+                prefer_soroban: None,
             })
             .await;
         assert!(
             default_route.sub_orders.is_empty(),
-            "default /quote must also drop mixed classic+Arc paths"
+            "default /quote must also drop mixed classic+Soroban paths"
         );
     }
 
@@ -1137,7 +1137,7 @@ mod tests {
                 slippage_bps: Some(50),
                 max_hops: Some(1),
                 max_splits: Some(1),
-                prefer_Arc: None,
+                prefer_soroban: None,
             })
             .await;
 
@@ -1179,7 +1179,7 @@ mod tests {
                 slippage_bps: Some(50),
                 max_hops: Some(1),
                 max_splits: Some(1),
-                prefer_Arc: None,
+                prefer_soroban: None,
             })
             .await;
 
@@ -1219,7 +1219,7 @@ mod tests {
                 slippage_bps: Some(50),
                 max_hops: Some(1),
                 max_splits: Some(1),
-                prefer_Arc: None,
+                prefer_soroban: None,
             })
             .await;
 
@@ -1258,7 +1258,7 @@ mod tests {
                 slippage_bps: Some(50),
                 max_hops: Some(1),
                 max_splits: Some(1),
-                prefer_Arc: None,
+                prefer_soroban: None,
             })
             .await;
 
@@ -1267,11 +1267,11 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn quote_uses_weighted_Arc venue_math_when_hydrated() {
+    async fn quote_uses_weighted_comet_math_when_hydrated() {
         use {
             dex_adapters::{
-                Arc venue_math::{Arc venueRecord, atomic units_SCALAR},
-                Arc venuePoolQuoteState,
+                comet_math::{CometRecord, STROOP_SCALAR},
+                CometPoolQuoteState,
             },
             std::collections::HashMap,
         };
@@ -1281,10 +1281,10 @@ mod tests {
         let usdc = "CCW67TSZV3SSS2HXMBQ5JFGCKJNXKZM7UQUWUZPUTHXSTZLEO7SJMI75";
         engine
             .update_pairs_from_cache(
-                "Arc venue",
+                "comet",
                 &[pair_with_tokens(
-                    "Arc venue",
-                    "Arc venue-pool",
+                    "comet",
+                    "comet-pool",
                     blnd,
                     usdc,
                     1_000_000,
@@ -1296,24 +1296,24 @@ mod tests {
         let mut records = HashMap::new();
         records.insert(
             blnd.to_string(),
-            Arc venueRecord {
+            CometRecord {
                 balance: 1_000_000,
                 weight: 1,
-                scalar: atomic units_SCALAR,
+                scalar: STROOP_SCALAR,
             },
         );
         records.insert(
             usdc.to_string(),
-            Arc venueRecord {
+            CometRecord {
                 balance: 2_000_000,
                 weight: 4,
-                scalar: atomic units_SCALAR,
+                scalar: STROOP_SCALAR,
             },
         );
         let hydration = QuoteHydration {
-            Arc venue_pools: HashMap::from([(
-                "Arc venue-pool".to_string(),
-                Arc venuePoolQuoteState {
+            comet_pools: HashMap::from([(
+                "comet-pool".to_string(),
+                CometPoolQuoteState {
                     records,
                     swap_fee: 30_000,
                 },
@@ -1321,7 +1321,7 @@ mod tests {
             ..Default::default()
         };
 
-        // Arc venue routes are included in PathFinder; verify local weighted math via
+        // Comet routes are included in PathFinder; verify local weighted math via
         // candidate path + hydration.
         let route = engine
             .get_route_with_paths(
@@ -1336,7 +1336,7 @@ mod tests {
                     slippage_bps: Some(50),
                     max_hops: Some(1),
                     max_splits: Some(1),
-                    prefer_Arc: None,
+                    prefer_soroban: None,
                 },
                 &engine
                     .find_candidate_paths(&RouteRequest {
@@ -1350,7 +1350,7 @@ mod tests {
                         slippage_bps: Some(50),
                         max_hops: Some(1),
                         max_splits: Some(1),
-                        prefer_Arc: None,
+                        prefer_soroban: None,
                     })
                     .await,
                 Some(&hydration),

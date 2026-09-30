@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState, type CSSProperties, type ReactNode } from
 import Link from 'next/link';
 import { displayTokenSymbol } from '@/lib/tokenDisplay';
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://api.Chakra.xyz';
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://api.lumagg.xyz';
 
 interface TokenVolume {
   token: string;
@@ -98,12 +98,12 @@ interface StatsPayload {
 }
 
 const DEX_COLORS: Record<string, string> = {
-  Arc venue: '#3dd6c6',
-  Arc venue_clmm: '#2fc4b4',
-  Arc venue: '#f59e0b',
-  Arc venue: '#22d3ee',
+  aquarius: '#3dd6c6',
+  aquarius_clmm: '#2fc4b4',
+  phoenix: '#f59e0b',
+  soroswap: '#22d3ee',
   sushi: '#34d399',
-  Arc venue: '#fb7185',
+  comet: '#fb7185',
 };
 
 function dexColor(name: string, index: number): string {
@@ -335,10 +335,10 @@ export default function StatsPage() {
       <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3">
         <div>
           <h1 className="text-2xl sm:text-3xl font-semibold tracking-tight text-[var(--text-primary)]">
-            Chakra-routed volume
+            LumAgg-routed volume
           </h1>
           <p className="text-[13px] text-[var(--text-primary)]0 mt-2 leading-relaxed max-w-xl">
-            Aggregator contract invocations only — volume Chakra routed onto Arc Arc DEXes,
+            Aggregator contract invocations only — volume LumAgg routed onto Stellar Soroban DEXes,
             not market-wide pool volume. Routed volume sums the actual input value processed by
             every executed DEX leg. Split routes use each pool&apos;s real allocation; multi-hop and
             round-trip legs are priced in their own input token (XLM = historical UTC day close;
@@ -348,7 +348,7 @@ export default function StatsPage() {
         {data && (
           <div className="self-start sm:self-auto flex flex-wrap items-center gap-2">
             <a
-              href="https://defillama.com/dex-aggregators/chain/Arc"
+              href="https://defillama.com/dex-aggregators/chain/stellar"
               target="_blank"
               rel="noopener noreferrer"
               className="text-[12px] px-3 py-1.5 rounded-lg border border-teal-400/25 bg-teal-400/5 text-teal-200 hover:border-teal-300/50 hover:bg-teal-400/10 transition-colors"
@@ -534,7 +534,7 @@ export default function StatsPage() {
           <div className="grid lg:grid-cols-3 gap-4">
             <SharePanel
               title="DEX legs"
-              subtitle="Hop counts via Chakra (not full-market volume)"
+              subtitle="Hop counts via LumAgg (not full-market volume)"
               entries={Object.entries(derived.dexTotals).sort((a, b) => b[1] - a[1])}
               colorFn={dexColor}
             />

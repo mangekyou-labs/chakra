@@ -1,20 +1,20 @@
-use Chakra_contract_types::SubRoute;
-use Arc_sdk::{Env, Vec};
+use lumagg_contract_types::SubRoute;
+use soroban_sdk::{Env, Vec};
 
-/// Arc venue fee: ceil(amount_in * 3 / 1000), matching pair swap K-check.
-pub(crate) fn Arc venue_fee(amount_in: i128) -> i128 {
+/// Soroswap fee: ceil(amount_in * 3 / 1000), matching pair swap K-check.
+pub(crate) fn soroswap_fee(amount_in: i128) -> i128 {
     if amount_in <= 0 {
         return 0;
     }
     (amount_in * 3 + 999) / 1000
 }
 
-/// Arc venue library `get_amount_out` (floor division on output).
-pub(crate) fn Arc venue_get_amount_out(amount_in: i128, reserve_in: i128, reserve_out: i128) -> i128 {
+/// Soroswap library `get_amount_out` (floor division on output).
+pub(crate) fn soroswap_get_amount_out(amount_in: i128, reserve_in: i128, reserve_out: i128) -> i128 {
     if amount_in <= 0 || reserve_in <= 0 || reserve_out <= 0 {
         return 0;
     }
-    let in_less = amount_in - Arc venue_fee(amount_in);
+    let in_less = amount_in - soroswap_fee(amount_in);
     if in_less <= 0 {
         return 0;
     }

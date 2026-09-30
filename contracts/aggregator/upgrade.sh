@@ -2,16 +2,16 @@
 # Build optimized WASM and upgrade the deployed aggregator contract on mainnet.
 #
 # Prerequisites:
-#   - Arc CLI (https://developers.Arc.org/docs/tools/cli)
-#   - Admin key configured: Arc keys add admin --source-file ...
+#   - stellar CLI (https://developers.stellar.org/docs/tools/cli)
+#   - Admin key configured: stellar keys add admin --source-file ...
 #
 # Usage:
 #   ./contracts/aggregator/upgrade.sh
 #   ADMIN=admin AGGREGATOR=CC6QAV7JEG5MYRSPO5Z65E5G2M4ZB64BEG2ZXIZXL55TQT35JDI2LC6K ./contracts/aggregator/upgrade.sh
 #
-# Arc CLI 25+ ships mainnet with a docs placeholder RPC URL (not usable).
+# Stellar CLI 25+ ships mainnet with a docs placeholder RPC URL (not usable).
 # Override RPC if needed:
-#   RPC_URL=https://mainnet.Arcrpc.com ./contracts/aggregator/upgrade.sh
+#   RPC_URL=https://mainnet.sorobanrpc.com ./contracts/aggregator/upgrade.sh
 #
 # CLI waits ~30s for ledger inclusion; upload on mainnet can take longer.
 # On "transaction submission timeout", this script polls the chain (TX_POLL_SECS).
@@ -23,8 +23,8 @@ cd "$ROOT/contracts/aggregator"
 
 ADMIN="${ADMIN:-admin}"
 AGGREGATOR="${AGGREGATOR:-CC6QAV7JEG5MYRSPO5Z65E5G2M4ZB64BEG2ZXIZXL55TQT35JDI2LC6K}"
-NETWORK_PASSPHRASE="${NETWORK_PASSPHRASE:-Public Global Arc Network ; September 2015}"
-RPC_URL="${RPC_URL:-https://mainnet.Arcrpc.com}"
+NETWORK_PASSPHRASE="${NETWORK_PASSPHRASE:-Public Global Stellar Network ; September 2015}"
+RPC_URL="${RPC_URL:-https://mainnet.sorobanrpc.com}"
 TX_POLL_SECS="${TX_POLL_SECS:-180}"
 # Prefer simulated resource fee (do not override unless needed). Manually setting
 # --resource-fee too low/high can cause InsufficientRefundableFee / fee-bump fails.
@@ -39,7 +39,7 @@ poll_tx() {
   local tx_hash="$1"
   local deadline=$((SECONDS + TX_POLL_SECS))
   echo "Polling getTransaction (up to ${TX_POLL_SECS}s): $tx_hash"
-  echo "  https://Arc.expert/explorer/public/tx/$tx_hash"
+  echo "  https://stellar.expert/explorer/public/tx/$tx_hash"
   while (( SECONDS < deadline )); do
     local resp status
     resp=$(curl -sS -X POST "$RPC_URL" \
@@ -63,8 +63,8 @@ poll_tx() {
   return 2
 }
 
-# Run Arc upload/invoke; on CLI submission timeout, poll by tx hash and continue if SUCCESS.
-run_Arc_tx() {
+# Run stellar upload/invoke; on CLI submission timeout, poll by tx hash and continue if SUCCESS.
+run_stellar_tx() {
   local label="$1"
   shift
   local log
@@ -100,8 +100,8 @@ run_Arc_tx() {
 }
 
 echo "=== Building aggregator WASM (release) ==="
-Arc contract build --optimize 2>/dev/null || {
-  echo "Arc contract build --optimize failed, trying cargo + Arc optimize..."
+stellar contract build --optimize 2>/dev/null || {
+  echo "stellar contract build --optimize failed, trying cargo + stellar optimize..."
   cargo build -p aggregator-contract --target wasm32v1-none --profile contract-release
   WASM=""
   for CANDIDATE in \
@@ -121,7 +121,7 @@ Arc contract build --optimize 2>/dev/null || {
     echo "ERROR: Could not find built WASM after cargo build."
     exit 1
   fi
-  Arc contract optimize --wasm "$WASM" --wasm-out "$WASM"
+  stellar contract optimize --wasm "$WASM" --wasm-out "$WASM"
 }
 
 WASM=""
@@ -160,12 +160,12 @@ UPLOAD_ARGS=(
 if [[ -n "${RESOURCE_FEE:-}" ]]; then
   UPLOAD_ARGS+=(--resource-fee "$RESOURCE_FEE")
 fi
-if ! run_Arc_tx "WASM upload" Arc contract upload "${UPLOAD_ARGS[@]}"; then
+if ! run_stellar_tx "WASM upload" stellar contract upload "${UPLOAD_ARGS[@]}"; then
   echo ""
   echo "Upload did not confirm. You can retry with another RPC:"
-  echo "  RPC_URL=https://Arc-rpc.mainnet.Arc.gateway.fm TX_POLL_SECS=300 ./contracts/aggregator/upgrade.sh"
+  echo "  RPC_URL=https://soroban-rpc.mainnet.stellar.gateway.fm TX_POLL_SECS=300 ./contracts/aggregator/upgrade.sh"
   echo "Or only upgrade if upload already succeeded:"
-  echo "  Arc contract invoke --id $AGGREGATOR --source $ADMIN \\"
+  echo "  stellar contract invoke --id $AGGREGATOR --source $ADMIN \\"
   echo "    --rpc-url $RPC_URL --network-passphrase \"$NETWORK_PASSPHRASE\" \\"
   echo "    -- upgrade --new_wasm_hash $WASM_HASH"
   exit 1
@@ -183,7 +183,7 @@ UPGRADE_ARGS=(
 if [[ -n "${UPGRADE_RESOURCE_FEE:-}" ]]; then
   UPGRADE_ARGS+=(--resource-fee "$UPGRADE_RESOURCE_FEE")
 fi
-if ! run_Arc_tx "contract upgrade" Arc contract invoke \
+if ! run_stellar_tx "contract upgrade" stellar contract invoke \
   "${UPGRADE_ARGS[@]}" \
   -- \
   upgrade \

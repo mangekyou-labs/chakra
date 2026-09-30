@@ -15,7 +15,7 @@ const MAX_LOGO_BYTES: u64 = 1024 * 1024; // 1 MiB
 const MAX_DOWNLOAD_BYTES: u64 = 4 * 1024 * 1024; // enough to normalize oversized source art
 const MAX_RASTER_DIMENSION: u32 = 512;
 const DEFAULT_DIR: &str = "data/logos";
-const DEFAULT_BASE_URL: &str = "https://api.Chakra.xyz/logos";
+const DEFAULT_BASE_URL: &str = "https://api.lumagg.xyz/logos";
 const CACHED_EXTENSIONS: &[&str] = &["png", "jpg", "webp", "gif", "svg"];
 
 pub struct TokenLogoCache {
@@ -233,7 +233,7 @@ pub fn extension_for_content_type(content_type: &str) -> Option<&'static str> {
         "image/jpeg" => Some("jpg"),
         "image/webp" => Some("webp"),
         "image/gif" => Some("gif"),
-        "image/svg+document" => Some("svg"),
+        "image/svg+xml" => Some("svg"),
         _ => None,
     }
 }
@@ -277,11 +277,11 @@ fn looks_like_html(bytes: &[u8]) -> bool {
 fn looks_like_svg(bytes: &[u8]) -> bool {
     let head = trim_leading_whitespace(bytes);
     let lower: Vec<u8> = head.iter().take(256).map(u8::to_ascii_lowercase).collect();
-    // Accept <?document ...><svg or bare <svg
+    // Accept <?xml ...><svg or bare <svg
     if lower.starts_with(b"<svg") {
         return true;
     }
-    if lower.starts_with(b"<?document") {
+    if lower.starts_with(b"<?xml") {
         return contains_ascii_ci(&lower, b"<svg");
     }
     false
@@ -531,7 +531,7 @@ fn scrub_tag_attributes(tag: &str) -> String {
     out
 }
 
-/// Deterministic SVG avatar with document-escaped symbol text and hash-derived
+/// Deterministic SVG avatar with XML-escaped symbol text and hash-derived
 /// colors.
 pub fn fallback_svg(symbol: &str, token_id: &str) -> String {
     let escaped = escape_xml(symbol);
@@ -582,7 +582,7 @@ mod tests {
 
     #[test]
     fn cache_path_is_deterministic_and_safe() {
-        let cache = TokenLogoCache::new("data/logos", "https://api.Chakra.xyz/logos");
+        let cache = TokenLogoCache::new("data/logos", "https://api.lumagg.xyz/logos");
         let first = cache.fallback_path("CA/unsafe:token");
         let second = cache.fallback_path("CA/unsafe:token");
         assert_eq!(first, second);
@@ -603,7 +603,7 @@ mod tests {
         assert_eq!(extension_for_content_type("image/jpeg"), Some("jpg"));
         assert_eq!(extension_for_content_type("image/webp"), Some("webp"));
         assert_eq!(extension_for_content_type("image/gif"), Some("gif"));
-        assert_eq!(extension_for_content_type("image/svg+document"), Some("svg"));
+        assert_eq!(extension_for_content_type("image/svg+xml"), Some("svg"));
         assert_eq!(extension_for_content_type("text/html"), None);
     }
 
@@ -622,7 +622,7 @@ mod tests {
         let gif = b"GIF89a............";
         assert_eq!(detect_image_ext(gif, ""), Some("gif"));
 
-        let svg = b"<?document version=\"1.0\"?><svg xmlns=\"http://www.w3.org/2000/svg\"></svg>";
+        let svg = b"<?xml version=\"1.0\"?><svg xmlns=\"http://www.w3.org/2000/svg\"></svg>";
         assert_eq!(detect_image_ext(svg, "image/png"), Some("svg"));
     }
 
@@ -632,7 +632,7 @@ mod tests {
         assert_eq!(detect_image_ext(html, "image/png"), None);
 
         let html2 = b"<html><head></head></html>";
-        assert_eq!(detect_image_ext(html2, "image/svg+document"), None);
+        assert_eq!(detect_image_ext(html2, "image/svg+xml"), None);
     }
 
     #[test]

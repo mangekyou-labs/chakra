@@ -1,15 +1,15 @@
 [workspace]
 members = [
-    "crates/Chakra-config",
+    "crates/lumagg-config",
     "crates/market-snapshot",
     "crates/market-data-worker",
     "crates/router-engine",
     "crates/dex-adapters",
     "crates/api-server",
-    "crates/Chakra-swap-api",
+    "crates/lumagg-swap-api",
     "crates/arbitrage",
     "crates/analytics-indexer",
-    "crates/Chakra-alerts",
+    "crates/lumagg-alerts",
     "crates/limit-keeper",
     "crates/sdk",
     "contracts/shared-types",
@@ -23,15 +23,15 @@ resolver = "2"
 version = "0.2.1"
 edition = "2021"
 license = "Apache-2.0"
-repository = "https://github.com/Chakra/Arc-dex-agg"
+repository = "https://github.com/Lum-Agg/stellar-dex-agg"
 
 [workspace.dependencies]
-# Arc
-Arc-xdr = "25.0.0"
-Arc-strkey = { version = "0.0.16", features = ["serde-decoded"] }
-Arc-baselib = "0.5.5"
-Arc-client = "0.5.4"
-Arc-rpc-client = "25.0.0"
+# Stellar
+stellar-xdr = "25.0.0"
+stellar-strkey = { version = "0.0.16", features = ["serde-decoded"] }
+stellar-baselib = "0.5.5"
+soroban-client = "0.5.4"
+stellar-rpc-client = "25.0.0"
 
 # Async
 tokio = { version = "1", features = ["full"] }
@@ -74,7 +74,7 @@ opt-level = 2
 lto = "thin"
 overflow-checks = true
 
-# Arc WASM release (workspace members cannot define [profile.*] locally).
+# Soroban WASM release (workspace members cannot define [profile.*] locally).
 [profile.contract-release]
 inherits = "release"
 opt-level = "z"

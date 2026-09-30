@@ -1,4 +1,4 @@
-# Chakra: Testnet Deploy for Limit Orders (Aggregator + Escrow)
+# LumAgg: Testnet Deploy for Limit Orders (Aggregator + Escrow)
 
 **Date:** 2026-07-19  
 **Status:** Approved for planning  
@@ -6,15 +6,15 @@
 
 ## Goal
 
-Deploy **aggregator** and **order-escrow** on **Arc testnet only**, initialize escrow against that aggregator, and document env + smoke steps so API / indexer / keeper can be pointed at the deployment. No UI, no mainnet.
+Deploy **aggregator** and **order-escrow** on **Stellar testnet only**, initialize escrow against that aggregator, and document env + smoke steps so API / indexer / keeper can be pointed at the deployment. No UI, no mainnet.
 
 ## Hard constraints
 
 | Rule | Detail |
 |------|--------|
-| Network | **Testnet only** — default passphrase `Test SDF Network ; September 2015`, default RPC `https://Arc-testnet.Arc.org` |
-| Mainnet | **Forbidden** for these scripts — refuse if `NETWORK_PASSPHRASE` contains `Public Global Arc Network` (or equivalent public mainnet marker) |
-| Secrets | Deploy uses local Arc CLI identity; no mainnet keys; do not commit private keys or funded secrets |
+| Network | **Testnet only** — default passphrase `Test SDF Network ; September 2015`, default RPC `https://soroban-testnet.stellar.org` |
+| Mainnet | **Forbidden** for these scripts — refuse if `NETWORK_PASSPHRASE` contains `Public Global Stellar Network` (or equivalent public mainnet marker) |
+| Secrets | Deploy uses local stellar CLI identity; no mainnet keys; do not commit private keys or funded secrets |
 | Scope | Scripts + docs + env template; not production `deploy_server.sh` cutover |
 
 ## Deliverables
@@ -24,7 +24,7 @@ Deploy **aggregator** and **order-escrow** on **Arc testnet only**, initialize e
 Path (proposed): `contracts/aggregator/deploy-testnet.sh`
 
 - Build/optimize aggregator WASM (same patterns as `upgrade.sh` / vault `deploy.sh`)
-- `Arc contract deploy` → capture `C…` id
+- `stellar contract deploy` → capture `C…` id
 - `initialize(--admin ADMIN_G)` once after deploy
 - Optional: `AGGREGATOR=C…` skip deploy and reuse an existing testnet aggregator (still validate network is testnet)
 - Save id to a **gitignored** local file e.g. `contracts/aggregator/.testnet-aggregator-id`
@@ -48,7 +48,7 @@ Path (proposed): `scripts/deploy-limit-testnet.sh`
 - Writes a single **env snippet** file (gitignored), e.g. `deploy/.env.limit-testnet.local`:
 
 ```bash
-Arc_RPC_URL=https://Arc-testnet.Arc.org
+SOROBAN_RPC_URL=https://soroban-testnet.stellar.org
 # or RPC_URL / INDEXER_RPC_URL / KEEPER_RPC_URL aliases as needed
 NETWORK_PASSPHRASE=Test SDF Network ; September 2015
 KEEPER_NETWORK=testnet
@@ -63,7 +63,7 @@ Path (proposed): `docs/limit-orders-testnet.md`
 
 Checklist:
 
-1. Prerequisites: Arc CLI, funded testnet identity (`ADMIN`), Friendbot if needed  
+1. Prerequisites: stellar CLI, funded testnet identity (`ADMIN`), Friendbot if needed  
 2. Run deploy scripts → record both contract ids  
 3. Point local api-server + analytics-indexer at testnet RPC + `ESCROW_CONTRACT` + `AGGREGATOR_CONTRACT` + shared `INDEXER_DB_PATH`  
 4. Smoke: `POST /orders/build_create` → wallet sign/submit → indexer catches `order_created` → `GET /orders?user=`  
@@ -75,7 +75,7 @@ Checklist:
 - Mainnet deploy of aggregator/escrow for limit orders  
 - Phase 3d Limit UI  
 - DCA  
-- Changing live `api.Chakra.xyz` / mainnet indexer  
+- Changing live `api.lumagg.xyz` / mainnet indexer  
 - Automated CI that submits funded txs (manual smoke only)  
 - Wiring production DEX pool registry for testnet liquidity (fill smoke may need known testnet pools; document gap if thin liquidity)
 

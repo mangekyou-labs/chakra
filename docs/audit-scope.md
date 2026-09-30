@@ -1,6 +1,6 @@
 # Smart contract audit — scope & budget (Tranche 3)
 
-**Grant line item:** **$16,000** (external firm or Arc audit bank + remediation engineering).  
+**Grant line item:** **$16,000** (external firm or Stellar audit bank + remediation engineering).  
 **Target completion:** Oct 1, 2026 (per [scf-resubmission-budget.md](./scf-resubmission-budget.md)).
 
 ## Contracts in scope
@@ -16,11 +16,11 @@ Source: `contracts/aggregator/`, `contracts/vault/`.
 
 - Off-chain `crates/arbitrage` (Rust bot — not on-chain)
 - `api-server` / `market-data-worker`
-- Third-party DEX contracts (Arc venue, Arc venue, etc.)
+- Third-party DEX contracts (Aquarius, Soroswap, etc.)
 
 ## What $16k typically buys
 
-For **two Arc WASM contracts** with CPI and fund flow:
+For **two Soroban WASM contracts** with CPI and fund flow:
 
 | Item | Rough range (USD) |
 |------|-------------------|
@@ -30,8 +30,8 @@ For **two Arc WASM contracts** with CPI and fund flow:
 
 The **$16k grant allocation** is realistic for:
 
-- Arc-ecosystem auditors (e.g. firms that have done Arc/SDF-adjacent work)
-- **Arc Community Fund audit bank** / panel-recommended vendors (if available for awarded projects)
+- Stellar-ecosystem auditors (e.g. firms that have done Soroban/SDF-adjacent work)
+- **Stellar Community Fund audit bank** / panel-recommended vendors (if available for awarded projects)
 - Scope limited to **aggregator + vault** (not entire monorepo)
 
 Remediation (fix + re-audit critical/high) is included in the grant line — budget **~2–4 XLM WASM uploads** (~$20 XLM each on mainnet) separately from auditor fee.
@@ -45,8 +45,8 @@ Remediation (fix + re-audit critical/high) is included in the grant line — bud
 
 ## Suggested vendors to quote
 
-- Arc-focused boutiques (search “Arc smart contract audit”)
-- SCF / Arc Foundation partner lists when award is active
+- Stellar-focused boutiques (search “Soroban smart contract audit”)
+- SCF / Stellar Foundation partner lists when award is active
 - Get **2 quotes** — one at ~$12k focused, one at ~$20k full — to validate $16k envelope
 
 ## If quotes exceed $16k

@@ -2,11 +2,11 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Ship a Arc `order-escrow` contract that can create/cancel/expire **limit** orders and permissionlessly `fill` them by invoking existing `aggregator.swap` — proven with unit tests (mock pool like vault tests). **No DCA, no keeper, no UI in this plan.**
+**Goal:** Ship a Soroban `order-escrow` contract that can create/cancel/expire **limit** orders and permissionlessly `fill` them by invoking existing `aggregator.swap` — proven with unit tests (mock pool like vault tests). **No DCA, no keeper, no UI in this plan.**
 
 **Architecture:** Escrow locks `token_in` on create. Filler calls `fill` with `sub_routes` + sizes; escrow verifies limit rate and expiry, then calls aggregator with `user = escrow` (preferred) after an **auth spike**. Fallback if auth fails: vault-like temporary caller path is **out of scope** — instead add a minimal `swap_from`/document invoker-auth fix on aggregator only if spike proves `user=escrow` impossible.
 
-**Tech Stack:** `Arc-sdk` 22 (match vault/aggregator), `Chakra-contract-types`, workspace member `contracts/order-escrow`, TDD with `Arc-sdk` testutils.
+**Tech Stack:** `soroban-sdk` 22 (match vault/aggregator), `lumagg-contract-types`, workspace member `contracts/order-escrow`, TDD with `soroban-sdk` testutils.
 
 **Spec:** `docs/superpowers/specs/2026-07-19-phase3-limit-dca-architecture.md` (default escrow; Limit only for 3a).
 
@@ -17,7 +17,7 @@
 | Rule | Value |
 |------|--------|
 | Order type | Limit only |
-| Limit encoding | `limit_out_per_in_e7`: min `token_out` atomic unitss required per `10_000_000` atomic unitss of `token_in` |
+| Limit encoding | `limit_out_per_in_e7`: min `token_out` stroops required per `10_000_000` stroops of `token_in` |
 | Fill check | For fill size `x`, require `min_amount_out >= (x * limit_out_per_in_e7) / 10_000_000` (i128 math, floor) |
 | Partial fills | Yes — reduce `amount_in_remaining` |
 | Cancel | Owner refunds remaining `token_in` |
@@ -60,13 +60,13 @@ license = "Apache-2.0"
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
-Arc-sdk = "22.0.0"
-Chakra-contract-types = { path = "../shared-types" }
+soroban-sdk = "22.0.0"
+lumagg-contract-types = { path = "../shared-types" }
 
 [dev-dependencies]
-Arc-sdk = { version = "22.0.0", features = ["testutils"] }
+soroban-sdk = { version = "22.0.0", features = ["testutils"] }
 aggregator-contract = { path = "../aggregator", default-features = false }
-Chakra-contract-types = { path = "../shared-types" }
+lumagg-contract-types = { path = "../shared-types" }
 ```
 
 Add to workspace `Cargo.toml` members: `"contracts/order-escrow"`.
@@ -75,7 +75,7 @@ Minimal `lib.rs` with `OrderEscrowContract` stub `initialize(admin)` so it regis
 
 - [ ] **Step 2: Write spike test** (may live in `lib.rs` `#[cfg(test)]`)
 
-Copy mock Arc venue 1:1 pool + SAC setup from `contracts/vault/src/lib.rs` tests.
+Copy mock Aquarius 1:1 pool + SAC setup from `contracts/vault/src/lib.rs` tests.
 
 Spike scenario:
 1. Register aggregator + initialize

@@ -1,4 +1,4 @@
-//! Fire-and-forget tx submit (Arc-arb TxExecutor pattern).
+//! Fire-and-forget tx submit (stellar-arb TxExecutor pattern).
 
 use {
     crate::{

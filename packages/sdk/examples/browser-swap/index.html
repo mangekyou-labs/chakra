@@ -3,25 +3,25 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Chakra wallet swap example</title>
+    <title>LumAgg Freighter swap example</title>
   </head>
   <body>
     <main>
-      <h1>Chakra · wallet swap</h1>
+      <h1>LumAgg · Freighter swap</h1>
       <p class="lead">
-        Minimal integrator demo: quote → build → wallet sign → submit → confirm (mainnet).
+        Minimal integrator demo: quote → build → Freighter sign → submit → confirm (mainnet).
       </p>
       <div class="row">
-        <button id="connect" type="button">Connect wallet</button>
+        <button id="connect" type="button">Connect Freighter</button>
         <span id="address" class="mono"></span>
       </div>
       <label>
-        Amount (atomic unitss, XLM)
+        Amount (stroops, XLM)
         <input id="amount" type="text" value="10000000" />
       </label>
       <label class="check">
         <input id="dryRun" type="checkbox" checked />
-        Dry-run (stop after wallet sign — no submit)
+        Dry-run (stop after Freighter sign — no submit)
       </label>
       <button id="swap" type="button" disabled>Swap XLM → USDC</button>
       <pre id="log"></pre>

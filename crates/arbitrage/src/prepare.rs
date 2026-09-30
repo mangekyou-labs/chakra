@@ -1,8 +1,8 @@
-//! Arc simulate + assemble via RPC (`simulateTransaction` + assemble).
+//! Soroban simulate + assemble via RPC (`simulateTransaction` + assemble).
 
 use {
     anyhow::{anyhow, Result},
-    Arc_client::{
+    soroban_client::{
         network::{NetworkPassphrase, Networks},
         transaction::{assemble_transaction, AccountBehavior, TransactionBehavior},
         transaction_builder::{TransactionBuilder, TransactionBuilderBehavior, TIMEOUT_INFINITE},
@@ -13,9 +13,9 @@ use {
         sync::Mutex,
         time::{Duration, Instant},
     },
-    Arc_xdr::{
+    stellar_xdr::{
         curr as sxdr,
-        curr::{Limits as ArcLimits, WriteXdr as ArcWriteXdr},
+        curr::{Limits as StellarLimits, WriteXdr as StellarWriteXdr},
     },
 };
 
@@ -25,10 +25,10 @@ use {
 pub struct PreparedSimulation {
     pub unsigned_tx_xdr: String,
     pub amount_out: u128,
-    /// Declared inclusion + `min_resource_fee` (atomic unitss).
-    pub estimated_fee_atomic unitss: u128,
-    /// Simulated Arc `min_resource_fee` only (atomic unitss).
-    pub resource_fee_atomic unitss: u128,
+    /// Declared inclusion + `min_resource_fee` (stroops).
+    pub estimated_fee_stroops: u128,
+    /// Simulated Soroban `min_resource_fee` only (stroops).
+    pub resource_fee_stroops: u128,
 }
 
 fn scval_i128_to_u128(val: &xdr::ScVal) -> Option<u128> {
@@ -42,7 +42,7 @@ fn scval_i128_to_u128(val: &xdr::ScVal) -> Option<u128> {
 }
 
 pub fn default_rpc_url() -> String {
-    std::env::var("RPC_URL").unwrap_or_else(|_| "https://Arc-rpc.mainnet.Arc.gateway.fm".to_string())
+    std::env::var("RPC_URL").unwrap_or_else(|_| "https://soroban-rpc.mainnet.stellar.gateway.fm".to_string())
 }
 
 pub fn rpc_server(rpc_url: &str) -> Result<Server> {
@@ -53,15 +53,15 @@ pub fn rpc_server(rpc_url: &str) -> Result<Server> {
             ..Default::default()
         },
     )
-    .map_err(|e| anyhow!("create Arc RPC client: {}", e))
+    .map_err(|e| anyhow!("create Soroban RPC client: {}", e))
 }
 
-/// Read account ledger entry XDR via Arc RPC `getLedgerEntries`.
+/// Read account ledger entry XDR via Soroban RPC `getLedgerEntries`.
 async fn fetch_account_entry_xdr(rpc_url: &str, public_key: &str) -> Result<String> {
     use {
         serde_json::json,
-        Arc_strkey::ed25519::PublicKey,
-        Arc_xdr::curr::{Limits, WriteXdr},
+        stellar_strkey::ed25519::PublicKey,
+        stellar_xdr::curr::{Limits, WriteXdr},
     };
 
     let pk = PublicKey::from_string(public_key).map_err(|e| anyhow!("invalid public key: {:?}", e))?;
@@ -99,7 +99,7 @@ async fn fetch_account_entry_xdr(rpc_url: &str, public_key: &str) -> Result<Stri
 }
 
 fn decode_account_entry_xdr(xdr_b64: &str) -> Result<sxdr::AccountEntry> {
-    use Arc_xdr::curr::{Limits, ReadXdr};
+    use stellar_xdr::curr::{Limits, ReadXdr};
 
     if let Ok(entry) = sxdr::LedgerEntry::from_xdr_base64(xdr_b64, Limits::none()) {
         if let sxdr::LedgerEntryData::Account(data) = entry.data {
@@ -121,14 +121,14 @@ fn decode_account_sequence_xdr(xdr_b64: &str) -> Result<i64> {
     Ok(decode_account_entry_xdr(xdr_b64)?.seq_num.0)
 }
 
-/// Read the account sequence from Arc RPC (`getLedgerEntries`). Arb is
-/// Arc-only — no Horizon / Arc.
+/// Read the account sequence from Soroban RPC (`getLedgerEntries`). Arb is
+/// Soroban-only — no Horizon / SDEX.
 pub async fn fetch_account_sequence(rpc_url: &str, public_key: &str) -> Result<i64> {
     let xdr_b64 = fetch_account_entry_xdr(rpc_url, public_key).await?;
     decode_account_sequence_xdr(&xdr_b64)
 }
 
-/// Latest closed ledger sequence from Arc RPC (`getLatestLedger`).
+/// Latest closed ledger sequence from Soroban RPC (`getLatestLedger`).
 pub async fn fetch_latest_ledger(rpc_url: &str) -> Result<u32> {
     use serde_json::json;
 
@@ -216,7 +216,7 @@ pub async fn vault_allowance_expiration_cached(cache: &LatestLedgerCache, rpc_ur
     Ok(vault_allowance_expiration(cache.get(rpc_url).await?))
 }
 
-/// Native XLM balance (atomic unitss) for a G... account via Arc RPC.
+/// Native XLM balance (stroops) for a G... account via Soroban RPC.
 pub async fn fetch_account_native_balance(rpc_url: &str, public_key: &str) -> Result<u128> {
     let xdr_b64 = fetch_account_entry_xdr(rpc_url, public_key).await?;
     let entry = decode_account_entry_xdr(&xdr_b64)?;
@@ -232,7 +232,7 @@ pub async fn prepare_transaction_xdr(
     operations: &[sxdr::Operation],
     fee: u32,
 ) -> Result<PreparedSimulation> {
-    let mut account = Arc_client::account::Account::new(public_key, &sequence.to_string())
+    let mut account = soroban_client::account::Account::new(public_key, &sequence.to_string())
         .map_err(|e| anyhow!("invalid account/sequence: {}", e))?;
 
     let mut builder = TransactionBuilder::new(&mut account, Networks::public(), None);
@@ -240,10 +240,10 @@ pub async fn prepare_transaction_xdr(
 
     for op in operations {
         let op_bytes = op
-            .to_xdr(ArcLimits::none())
+            .to_xdr(StellarLimits::none())
             .map_err(|e| anyhow!("encode operation: {:?}", e))?;
         let client_op = xdr::Operation::from_xdr(op_bytes, Limits::none())
-            .map_err(|e| anyhow!("decode operation for Arc_client: {:?}", e))?;
+            .map_err(|e| anyhow!("decode operation for soroban_client: {:?}", e))?;
         builder.add_operation(client_op);
     }
 
@@ -272,11 +272,11 @@ pub async fn prepare_transaction_xdr(
                 .clone()
                 .unwrap_or_else(|| "no simulation error detail".to_string());
             return Err(anyhow!(
-                "simulation missing i128 return value (resource_fee_atomic unitss={resource_fee}): {detail}"
+                "simulation missing i128 return value (resource_fee_stroops={resource_fee}): {detail}"
             ));
         }
     };
-    let estimated_fee_atomic unitss = u128::from(fee).saturating_add(resource_fee);
+    let estimated_fee_stroops = u128::from(fee).saturating_add(resource_fee);
 
     let prepared = assemble_transaction(&tx, sim_response).map_err(|e| anyhow!("assemble_transaction: {:?}", e))?;
 
@@ -289,8 +289,8 @@ pub async fn prepare_transaction_xdr(
     Ok(PreparedSimulation {
         unsigned_tx_xdr,
         amount_out,
-        estimated_fee_atomic unitss,
-        resource_fee_atomic unitss: resource_fee,
+        estimated_fee_stroops,
+        resource_fee_stroops: resource_fee,
     })
 }
 
@@ -469,7 +469,7 @@ mod tests {
 
     #[test]
     fn decodes_account_sequence_from_ledger_entry_data_xdr() {
-        use Arc_xdr::curr::{Limits, WriteXdr};
+        use stellar_xdr::curr::{Limits, WriteXdr};
 
         let entry = sxdr::AccountEntry {
             account_id: sxdr::AccountId(sxdr::PublicKey::PublicKeyTypeEd25519(sxdr::Uint256([1u8; 32]))),

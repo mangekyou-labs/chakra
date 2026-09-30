@@ -5,15 +5,15 @@
 
 use {
     dex_adapters::{
-        Arc venue::Arc venue_ROUTER,
+        aquarius::AQUARIUS_ROUTER,
         dex_event_kinds::{classify_topic_op, primary_topic_op, DexEventKind},
         pool_index::{touched_pools_from_events, KnownPoolIndex},
         router_events::pools_from_router_event,
         rpc::{
             events::{event_value_xdr, ContractEvent},
-            ArcRpc,
+            SorobanRpc,
         },
-        Arc venue::Arc venue_ROUTER,
+        soroswap::SOROSWAP_ROUTER,
     },
     market_snapshot::MarketSnapshot,
     std::collections::{HashMap, HashSet},
@@ -37,7 +37,7 @@ async fn main() -> anyhow::Result<()> {
         index.len()
     );
 
-    let rpc = ArcRpc::new(&rpc_url, "Public Global Arc Network ; September 2015");
+    let rpc = SorobanRpc::new(&rpc_url, "Public Global Stellar Network ; September 2015");
     let latest = rpc.get_latest_ledger().await?.sequence;
     println!("latest_ledger={latest} scanning_last={ledgers}\n");
 
@@ -86,10 +86,10 @@ fn count_dex_events(
 
         let source = if let Some(pool) = index.lookup_contract(&event.contract_id) {
             pool.source.clone()
-        } else if event.contract_id == Arc venue_ROUTER {
-            "Arc venue_router".to_string()
-        } else if event.contract_id == Arc venue_ROUTER {
-            "Arc venue_router".to_string()
+        } else if event.contract_id == AQUARIUS_ROUTER {
+            "aquarius_router".to_string()
+        } else if event.contract_id == SOROSWAP_ROUTER {
+            "soroswap_router".to_string()
         } else {
             continue;
         };
@@ -144,7 +144,7 @@ impl AuditTotals {
             "  pool_contract_events (contractId in index): {}",
             self.pool_contract_events
         );
-        println!("  router_events (Arc venue/Arc venue): {}", self.router_events);
+        println!("  router_events (aquarius/soroswap): {}", self.router_events);
         println!("  router_parsed_to_pool: {}", self.router_parsed);
         println!("  router_parse_failed: {}", self.router_parse_failed);
         println!("unique_touched pool_only: {}", self.touched_pool_only);
@@ -201,7 +201,7 @@ fn audit_ledger(events: &[ContractEvent], index: &KnownPoolIndex) -> LedgerStats
             stats.touched_pool_only.insert(event.contract_id.clone());
         }
 
-        let is_router = event.contract_id == Arc venue_ROUTER || event.contract_id == Arc venue_ROUTER;
+        let is_router = event.contract_id == AQUARIUS_ROUTER || event.contract_id == SOROSWAP_ROUTER;
         if is_router {
             stats.router_events += 1;
             let parsed = pools_from_router_event(
@@ -247,7 +247,7 @@ fn print_ledger(ledger: u32, s: &LedgerStats) {
     );
 }
 
-async fn fetch_ledger_events(rpc: &ArcRpc, ledger: u32) -> anyhow::Result<Vec<ContractEvent>> {
+async fn fetch_ledger_events(rpc: &SorobanRpc, ledger: u32) -> anyhow::Result<Vec<ContractEvent>> {
     use dex_adapters::rpc::events::{EventFilterSpec, DEFAULT_EVENTS_PAGE_LIMIT};
 
     let filters = vec![EventFilterSpec {
@@ -328,11 +328,11 @@ async fn load_snapshot_from_redis(redis_url: &str) -> anyhow::Result<MarketSnaps
     let client = redis::Client::open(redis_url)?;
     let mut conn = client.get_multiplexed_async_connection().await?;
     let current: String = redis::cmd("GET")
-        .arg("Chakra:snapshot:current")
+        .arg("lumagg:snapshot:current")
         .query_async(&mut conn)
         .await?;
     let raw: String = redis::cmd("GET")
-        .arg(format!("Chakra:snapshot:data:{current}"))
+        .arg(format!("lumagg:snapshot:data:{current}"))
         .query_async(&mut conn)
         .await?;
     Ok(serde_json::from_str(&raw)?)

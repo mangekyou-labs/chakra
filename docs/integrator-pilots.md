@@ -8,8 +8,8 @@ require onboarding two external partners.
 
 | Field | Path A: reference client | Path B: external validation |
 |-------|--------------------------|-----------------------------|
-| Name / category | Chakra SDK CLI example | External friend / non-founder tester |
-| Integration surface | `@Chakra/sdk` `0.2.0` | Published REST smoke script |
+| Name / category | LumAgg SDK CLI example | External friend / non-founder tester |
+| Integration surface | `@lumagg/sdk` `0.2.0` | Published REST smoke script |
 | Quote + build_tx | ✅ | ✅ |
 | Reproducible evidence | [`d7-reference-sdk`](./evidence/d7-reference-sdk/) | [`d2-integrator-smoke`](./evidence/d2-integrator-smoke/) |
 | Feedback incorporated | The CLI now fails unless it produces the full unsigned-XDR path | Public G-address only; no secret, signing, or submission required |
@@ -31,7 +31,7 @@ USER_G=G... npx tsx packages/sdk/examples/quote-build.ts
 
 On 2026-07-31 this path completed against the production API using the in-repo
 SDK `0.2.0`: a two-route split quote was returned and `build_tx` produced a
-Arc unsigned XDR. The captured command and output are in
+Soroban unsigned XDR. The captured command and output are in
 [`docs/evidence/d7-reference-sdk`](./evidence/d7-reference-sdk/).
 
 The example now requires `USER_G` and exits non-zero if the build cannot
@@ -40,8 +40,8 @@ complete. It no longer reports success after merely obtaining a quote.
 ## Path B: external validation
 
 The existing external validation was performed on 2026-07-27 by a non-founder
-tester using the published REST smoke script. It produced a split Arc venue plus
-Arc venue CLMM quote and a valid unsigned transaction XDR. The complete,
+tester using the published REST smoke script. It produced a split Soroswap plus
+Aquarius CLMM quote and a valid unsigned transaction XDR. The complete,
 publicly reproducible request and response files are in
 [`docs/evidence/d2-integrator-smoke`](./evidence/d2-integrator-smoke/).
 
@@ -62,15 +62,15 @@ are requested from the tester.
 
 ## Message template (send to friend)
 
-> Hi — I'm validating our Arc swap API for a grant deliverable. Could you run this once on your machine?
+> Hi — I'm validating our Stellar swap API for a grant deliverable. Could you run this once on your machine?
 >
-> 1. Clone https://github.com/Chakra/Arc-dex-agg (or pull latest)
+> 1. Clone https://github.com/Lum-Agg/stellar-dex-agg (or pull latest)
 > 2. `chmod +x scripts/integrator-smoke.sh`
-> 3. `USER_G=你的主网G地址 OUT=./Chakra-evidence ./scripts/integrator-smoke.sh`
+> 3. `USER_G=你的主网G地址 OUT=./lumagg-evidence ./scripts/integrator-smoke.sh`
 >
 > You need a funded mainnet account (sequence on chain); no need to sign/submit the tx.
 > Only the public G-address is used. Do not send a secret key.
-> Send me the terminal output or zip the `Chakra-evidence/` folder. Takes ~1 minute.
+> Send me the terminal output or zip the `lumagg-evidence/` folder. Takes ~1 minute.
 
 ## Completion
 

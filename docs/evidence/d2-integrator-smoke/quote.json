@@ -8,7 +8,7 @@
         "is_split": true,
         "sub_routes": [
             {
-                "source": "Arc venue → Arc venue",
+                "source": "soroswap → soroswap",
                 "path": [
                     "CAS3J7GYLGXMF6TDJBBYYSE3HQ6BBSMLNUQ34T6TZMYMW2EVH34XOWMA",
                     "CDDUMVV523T7ZBL53B76Q7UGE3YQAPDNJ2PMZSOLX56IV3KBYOK2YVHC",
@@ -19,8 +19,8 @@
                     "CBK3GR5PMPYFJWI7GLZFLMXJCYR6I7YHK4ZXUTH47OHTTE2IXBO4GHUW"
                 ],
                 "dex_types": [
-                    "Arc venue",
-                    "Arc venue"
+                    "soroswap",
+                    "soroswap"
                 ],
                 "in_indices": [
                     0,
@@ -35,7 +35,7 @@
                 "percentage": 49.37159
             },
             {
-                "source": "Arc venue_clmm",
+                "source": "aquarius_clmm",
                 "path": [
                     "CAS3J7GYLGXMF6TDJBBYYSE3HQ6BBSMLNUQ34T6TZMYMW2EVH34XOWMA",
                     "CCW67TSZV3SSS2HXMBQ5JFGCKJNXKZM7UQUWUZPUTHXSTZLEO7SJMI75"
@@ -44,7 +44,7 @@
                     "CBBMQBNHB2FYVZYV7VNHOJHUMTFJLR4PUMRVQYNW6RHIKZO2NQMIBUCV"
                 ],
                 "dex_types": [
-                    "Arc venue_clmm"
+                    "aquarius_clmm"
                 ],
                 "in_indices": [
                     0

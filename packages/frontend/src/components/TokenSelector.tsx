@@ -15,7 +15,7 @@ export interface Token {
   logo?: string;
 }
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://api.Chakra.xyz';
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://api.lumagg.xyz';
 
 // Colors for tokens based on first char
 const TOKEN_COLORS: Record<string, string> = {
@@ -42,7 +42,7 @@ const PRIORITY_TOKENS: Token[] = [
   {
     id: 'CAS3J7GYLGXMF6TDJBBYYSE3HQ6BBSMLNUQ34T6TZMYMW2EVH34XOWMA',
     symbol: 'XLM',
-    name: 'Arc Lumens',
+    name: 'Stellar Lumens',
     decimals: 7,
     color: '#14B8A6',
   },
@@ -63,7 +63,7 @@ const PRIORITY_TOKENS: Token[] = [
   {
     id: 'CAUIKL3IYGMERDRUN6YSCLWVAKIFG5Q4YJHUKM4S4NJZQIA3BAS6OJPK',
     symbol: 'AQUA',
-    name: 'Arc venue',
+    name: 'Aquarius',
     decimals: 7,
     color: '#06B6D4',
   },

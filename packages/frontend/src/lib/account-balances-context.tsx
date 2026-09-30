@@ -215,7 +215,7 @@ export function AccountBalancesProvider({ children }: { children: ReactNode }) {
         delete trustlineOverrides.current[tokenId];
         setHasTrustline((prev) => ({ ...prev, [tokenId]: true }));
       } else if (result.hasTrustline === false) {
-        // Do not clobber a post-ChangeTrust override (Arc RPC often lags).
+        // Do not clobber a post-ChangeTrust override (Soroban RPC often lags).
         if (trustlineOverrides.current[tokenId] !== true) {
           setHasTrustline((prev) => ({ ...prev, [tokenId]: false }));
         }

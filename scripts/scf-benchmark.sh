@@ -1,26 +1,26 @@
 #!/usr/bin/env bash
-# Compare Chakra quotes vs Arc venue API (optional) for SCF differentiation evidence.
+# Compare LumAgg quotes vs Soroswap API (optional) for SCF differentiation evidence.
 #
 # Usage:
 #   ./scripts/scf-benchmark.sh
-#   Arc venue_API_KEY=sk_... ./scripts/scf-benchmark.sh
+#   SOROSWAP_API_KEY=sk_... ./scripts/scf-benchmark.sh
 #   OUTPUT=docs/scf-benchmark-results.md ./scripts/scf-benchmark.sh
 #
 # Env:
-#   Chakra_API             default https://api.Chakra.xyz
-#   Chakra_PREFER_Arc  set to 1 for Arc-only Chakra quotes (recommended fair vs Arc venue)
-#   Arc venue_API_URL       default https://api.Arc venue.finance
-#   Arc venue_API_KEY       optional (register at https://api.Arc venue.finance/register)
-#   Arc venue_PROTOCOLS     comma-separated, default Arc venue,Arc venue,aqua (add Arc for full compare)
+#   LUMAGG_API             default https://api.lumagg.xyz
+#   LUMAGG_PREFER_SOROBAN  set to 1 for Soroban-only LumAgg quotes (recommended fair vs Soroswap)
+#   SOROSWAP_API_URL       default https://api.soroswap.finance
+#   SOROSWAP_API_KEY       optional (register at https://api.soroswap.finance/register)
+#   SOROSWAP_PROTOCOLS     comma-separated, default soroswap,phoenix,aqua (add sdex for full compare)
 #   OUTPUT                 if set, write markdown to this path (also printed to stdout)
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-export Chakra_API="${Chakra_API:-https://api.Chakra.xyz}"
-export Chakra_PREFER_Arc="${Chakra_PREFER_Arc:-}"
-export Arc venue_API_URL="${Arc venue_API_URL:-https://api.Arc venue.finance}"
-export Arc venue_API_KEY="${Arc venue_API_KEY:-}"
-export Arc venue_PROTOCOLS="${Arc venue_PROTOCOLS:-Arc venue,Arc venue,aqua}"
+export LUMAGG_API="${LUMAGG_API:-https://api.lumagg.xyz}"
+export LUMAGG_PREFER_SOROBAN="${LUMAGG_PREFER_SOROBAN:-}"
+export SOROSWAP_API_URL="${SOROSWAP_API_URL:-https://api.soroswap.finance}"
+export SOROSWAP_API_KEY="${SOROSWAP_API_KEY:-}"
+export SOROSWAP_PROTOCOLS="${SOROSWAP_PROTOCOLS:-soroswap,phoenix,aqua}"
 export OUTPUT="${OUTPUT:-}"
 
 python3 "$ROOT/scripts/scf_benchmark.py"

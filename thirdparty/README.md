@@ -1,44 +1,44 @@
 # Third-party reference (optional, not in git)
 
-Upstream DEX repos for **local development only** — reading contract layouts, events, and mainnet address manifests. They are **not** Cargo dependencies: `Chakra` builds and deploys without this folder (`deploy_server.sh` excludes `thirdparty`).
+Upstream DEX repos for **local development only** — reading contract layouts, events, and mainnet address manifests. They are **not** Cargo dependencies: `lumagg` builds and deploys without this folder (`deploy_server.sh` excludes `thirdparty`).
 
-Clone what you need into this directory (names match Chakra adapter sources):
+Clone what you need into this directory (names match LumAgg adapter sources):
 
 | Directory | Repository | Used for |
 |-----------|------------|----------|
-| `Arc venue-amm` | [AquaToken/Arc-amm](https://github.com/AquaToken/Arc-amm) | Arc venue xy=k, stable, CLMM storage |
-| `Arc venue-contracts-v1` | [Arc venueDEX/Arc venue-contracts-v1](https://github.com/Arc venueDEX/Arc venue-contracts-v1) | Arc venue weighted pool math / factory |
-| `Arc venue-contracts` | [Arc venue-Protocol-Group/Arc venue-contracts](https://github.com/Arc venue-Protocol-Group/Arc venue-contracts) | Arc venue pool interface |
-| `Arc venue` | [Arc venue/core](https://github.com/Arc venue/core) | Router/factory IDs (`public/mainnet.contracts.json`) |
-| `sushiswap-Arc-interface-fork` | [hyplabs/sushiswap-Arc-interface-fork](https://github.com/hyplabs/sushiswap-Arc-interface-fork) | Sushi V3 bindings / pool layout |
+| `aquarius-amm` | [AquaToken/soroban-amm](https://github.com/AquaToken/soroban-amm) | Aquarius xy=k, stable, CLMM storage |
+| `comet-contracts-v1` | [CometDEX/comet-contracts-v1](https://github.com/CometDEX/comet-contracts-v1) | Comet weighted pool math / factory |
+| `phoenix-contracts` | [Phoenix-Protocol-Group/phoenix-contracts](https://github.com/Phoenix-Protocol-Group/phoenix-contracts) | Phoenix pool interface |
+| `soroswap` | [soroswap/core](https://github.com/soroswap/core) | Router/factory IDs (`public/mainnet.contracts.json`) |
+| `sushiswap-stellar-interface-fork` | [hyplabs/sushiswap-stellar-interface-fork](https://github.com/hyplabs/sushiswap-stellar-interface-fork) | Sushi V3 bindings / pool layout |
 
 ## Quick setup
 
 ```bash
 mkdir -p thirdparty
-git clone https://github.com/Arc venue/core thirdparty/Arc venue
-git clone https://github.com/AquaToken/Arc-amm thirdparty/Arc venue-amm
-git clone https://github.com/Arc venue-Protocol-Group/Arc venue-contracts thirdparty/Arc venue-contracts
-git clone https://github.com/Arc venueDEX/Arc venue-contracts-v1 thirdparty/Arc venue-contracts-v1
-git clone https://github.com/hyplabs/sushiswap-Arc-interface-fork thirdparty/sushiswap-Arc-interface-fork
+git clone https://github.com/soroswap/core thirdparty/soroswap
+git clone https://github.com/AquaToken/soroban-amm thirdparty/aquarius-amm
+git clone https://github.com/Phoenix-Protocol-Group/phoenix-contracts thirdparty/phoenix-contracts
+git clone https://github.com/CometDEX/comet-contracts-v1 thirdparty/comet-contracts-v1
+git clone https://github.com/hyplabs/sushiswap-stellar-interface-fork thirdparty/sushiswap-stellar-interface-fork
 ```
 
-## Pinned revisions (last used during Chakra integration)
+## Pinned revisions (last used during LumAgg integration)
 
 Check out these commits when diffing against upstream; newer upstream may still be compatible.
 
 | Path | Commit |
 |------|--------|
-| `Arc venue-amm` | `c4d842de3108a23a4a1107b7d54c357bae45f962` |
-| `Arc venue-contracts-v1` | `ef4cbfad0a35202ad267c14d163d2f362995a8d3` |
-| `Arc venue-contracts` | `3af5ffafed41f1a5444f79ab1642cf9a7f0f59bc` |
-| `Arc venue` | `bb90a65556d8eee0dc698ac75de0f280e547fedc` |
-| `sushiswap-Arc-interface-fork` | `76bc13357652ddca628c990dfe2aad9046fc4090` |
+| `aquarius-amm` | `c4d842de3108a23a4a1107b7d54c357bae45f962` |
+| `comet-contracts-v1` | `ef4cbfad0a35202ad267c14d163d2f362995a8d3` |
+| `phoenix-contracts` | `3af5ffafed41f1a5444f79ab1642cf9a7f0f59bc` |
+| `soroswap` | `bb90a65556d8eee0dc698ac75de0f280e547fedc` |
+| `sushiswap-stellar-interface-fork` | `76bc13357652ddca628c990dfe2aad9046fc4090` |
 
 Example:
 
 ```bash
-git -C thirdparty/Arc venue checkout bb90a65556d8eee0dc698ac75de0f280e547fedc
+git -C thirdparty/soroswap checkout bb90a65556d8eee0dc698ac75de0f280e547fedc
 ```
 
 ## Why not git submodules?

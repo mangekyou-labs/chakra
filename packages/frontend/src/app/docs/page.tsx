@@ -1,12 +1,12 @@
 import Link from 'next/link';
 import { DOCUMENTATION_URL, GITHUB_REPO_URL } from '@/lib/site';
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://api.Chakra.xyz';
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://api.lumagg.xyz';
 
 const WHY_CARDS = [
   {
     title: 'Best route',
-    body: 'Quotes across Arc AMMs and Classic Arc with split routing when it helps execution.',
+    body: 'Quotes across Soroban AMMs and Classic SDEX with split routing when it helps execution.',
   },
   {
     title: 'Integrator-ready',
@@ -37,12 +37,12 @@ export default function DocsOverviewPage() {
       <header className="docs-intro">
         <h1 className="docs-title">Developer documentation</h1>
         <p className="docs-lead">
-          Integrate Chakra swap routing on Arc — quote, build unsigned XDR, and sign in your
+          Integrate LumAgg swap routing on Stellar — quote, build unsigned XDR, and sign in your
           wallet or bot.
         </p>
         <aside className="docs-guide-callout">
           <div>
-            <strong>Looking for the complete Chakra documentation?</strong>
+            <strong>Looking for the complete LumAgg documentation?</strong>
             <span>
               Visit the documentation site for integration, deployment, arbitrage, and contract
               guides.
@@ -135,8 +135,8 @@ export default function DocsOverviewPage() {
           </table>
         </div>
         <p className="docs-hint">
-          Use <code>prefer_Arc=1</code> on <code>/quote</code> for Arc AMMs only (no
-          Classic Arc). Default may return pure classic or pure Arc; never mixed hops.
+          Use <code>prefer_soroban=1</code> on <code>/quote</code> for Soroban AMMs only (no
+          Classic SDEX). Default may return pure classic or pure Soroban; never mixed hops.
         </p>
       </section>
 
@@ -144,12 +144,12 @@ export default function DocsOverviewPage() {
         <h2 className="docs-section-label">Supported DEXes</h2>
         <ul className="docs-dex-list">
           {[
-            ['Arc venue', 'AMM'],
-            ['Arc venue', 'AMM · Stable · CLMM'],
-            ['Arc venue', 'AMM'],
+            ['Soroswap', 'AMM'],
+            ['Aquarius', 'AMM · Stable · CLMM'],
+            ['Phoenix', 'AMM'],
             ['Sushi V3', 'CLMM'],
-            ['Arc venue', 'Weighted'],
-            ['Classic', 'Arc'],
+            ['Comet', 'Weighted'],
+            ['Classic', 'SDEX'],
           ].map(([name, type]) => (
             <li key={name}>
               <strong>{name}</strong>

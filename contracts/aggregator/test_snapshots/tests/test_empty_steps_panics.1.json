@@ -373,7 +373,7 @@
                 "durability": "persistent",
                 "val": {
                   "contract_instance": {
-                    "executable": "Arc_asset",
+                    "executable": "stellar_asset",
                     "storage": [
                       {
                         "key": {
@@ -485,7 +485,7 @@
                 "durability": "persistent",
                 "val": {
                   "contract_instance": {
-                    "executable": "Arc_asset",
+                    "executable": "stellar_asset",
                     "storage": [
                       {
                         "key": {

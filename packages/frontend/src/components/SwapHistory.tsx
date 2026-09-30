@@ -58,7 +58,7 @@ export function SwapHistory({ variant = 'compact' }: SwapHistoryProps) {
       <section className="rounded-2xl border border-[var(--border)] bg-[var(--surface)]/60 px-4 py-3.5">
         <div className="flex items-center justify-between gap-3">
           <div>
-            <h2 className="text-[15px] font-medium text-[var(--text-secondary)]">Chakra swaps</h2>
+            <h2 className="text-[15px] font-medium text-[var(--text-secondary)]">LumAgg swaps</h2>
             <p className="mt-0.5 text-[13px] text-[var(--text-muted)]">
               Aggregator contract only · connect to view
             </p>
@@ -81,7 +81,7 @@ export function SwapHistory({ variant = 'compact' }: SwapHistoryProps) {
       <section className="overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--surface)]/60">
         <div className="border-b border-[var(--border)] px-4 py-3 sm:px-5">
           <p className="text-[13px] text-[var(--text-muted)]">
-            Swaps executed through the Chakra aggregator contract (not other DEX UIs).
+            Swaps executed through the LumAgg aggregator contract (not other DEX UIs).
           </p>
         </div>
         {loading && swaps.length === 0 ? (
@@ -94,7 +94,7 @@ export function SwapHistory({ variant = 'compact' }: SwapHistoryProps) {
           <p className="px-4 py-6 text-[14px] text-[var(--text-muted)]">History unavailable</p>
         ) : swaps.length === 0 ? (
           <p className="px-4 py-6 text-[14px] text-[var(--text-muted)]">
-            No Chakra swaps yet. Only trades through the aggregator contract are listed.
+            No LumAgg swaps yet. Only trades through the aggregator contract are listed.
           </p>
         ) : (
           <>
@@ -145,7 +145,7 @@ export function SwapHistory({ variant = 'compact' }: SwapHistoryProps) {
                       </td>
                       <td className="px-4 py-3 text-right sm:px-5">
                         <a
-                          href={`https://Arc.expert/explorer/public/tx/${swap.tx_hash}`}
+                          href={`https://stellar.expert/explorer/public/tx/${swap.tx_hash}`}
                           target="_blank"
                           rel="noopener noreferrer"
                           className="text-[13px] text-[var(--text-secondary)] hover:text-[var(--accent)] transition-colors"
@@ -185,7 +185,7 @@ export function SwapHistory({ variant = 'compact' }: SwapHistoryProps) {
     <section className="rounded-2xl border border-[var(--border)] bg-[var(--surface)]/60 overflow-hidden max-h-64 overflow-y-auto">
       <div className="sticky top-0 flex items-center justify-between gap-3 px-4 py-2.5 border-b border-[var(--border)] bg-[var(--surface)]/95 backdrop-blur-sm">
         <div className="min-w-0">
-          <h2 className="text-[15px] font-medium text-[var(--text-secondary)]">Chakra swaps</h2>
+          <h2 className="text-[15px] font-medium text-[var(--text-secondary)]">LumAgg swaps</h2>
           <p className="text-[12px] text-[var(--text-muted)] truncate">
             Aggregator contract only
           </p>
@@ -197,7 +197,7 @@ export function SwapHistory({ variant = 'compact' }: SwapHistoryProps) {
         <p className="px-4 py-3 text-[13px] text-[var(--text-muted)]">History unavailable</p>
       ) : swaps.length === 0 && !loading ? (
         <p className="px-4 py-3 text-[13px] text-[var(--text-muted)]">
-          No Chakra swaps yet
+          No LumAgg swaps yet
         </p>
       ) : (
         <>
@@ -210,7 +210,7 @@ export function SwapHistory({ variant = 'compact' }: SwapHistoryProps) {
             {swaps.map((swap) => (
               <a
                 key={`${swap.tx_hash}-${swap.ledger}`}
-                href={`https://Arc.expert/explorer/public/tx/${swap.tx_hash}`}
+                href={`https://stellar.expert/explorer/public/tx/${swap.tx_hash}`}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="block px-4 py-2.5 hover:bg-white/[0.02] transition-colors"

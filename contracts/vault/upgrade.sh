@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Build optimized WASM and upgrade a deployed Chakra arb vault contract.
+# Build optimized WASM and upgrade a deployed LumAgg arb vault contract.
 #
 # Usage:
 #   VAULT=C... ./contracts/vault/upgrade.sh
@@ -17,8 +17,8 @@ VAULT="${VAULT:-}"
 if [[ -z "$VAULT" && -f "$ROOT/contracts/vault/.mainnet-vault-id" ]]; then
   VAULT=$(cat "$ROOT/contracts/vault/.mainnet-vault-id")
 fi
-NETWORK_PASSPHRASE="${NETWORK_PASSPHRASE:-Public Global Arc Network ; September 2015}"
-RPC_URL="${RPC_URL:-https://mainnet.Arcrpc.com}"
+NETWORK_PASSPHRASE="${NETWORK_PASSPHRASE:-Public Global Stellar Network ; September 2015}"
+RPC_URL="${RPC_URL:-https://mainnet.sorobanrpc.com}"
 TX_POLL_SECS="${TX_POLL_SECS:-180}"
 
 if [[ -z "$VAULT" ]]; then
@@ -34,7 +34,7 @@ poll_tx() {
   local tx_hash="$1"
   local deadline=$((SECONDS + TX_POLL_SECS))
   echo "Polling getTransaction (up to ${TX_POLL_SECS}s): $tx_hash"
-  echo "  https://Arc.expert/explorer/public/tx/$tx_hash"
+  echo "  https://stellar.expert/explorer/public/tx/$tx_hash"
   while (( SECONDS < deadline )); do
     local resp status
     resp=$(curl -sS -X POST "$RPC_URL" \
@@ -54,7 +54,7 @@ poll_tx() {
   return 2
 }
 
-run_Arc_tx() {
+run_stellar_tx() {
   local label="$1"
   shift
   local log
@@ -83,7 +83,7 @@ run_Arc_tx() {
 }
 
 echo "=== Building vault WASM (release) ==="
-Arc contract build --release --optimize 2>/dev/null || {
+stellar contract build --release --optimize 2>/dev/null || {
   cargo build -p vault-contract --target wasm32v1-none --profile contract-release
   WASM=""
   for CANDIDATE in \
@@ -95,7 +95,7 @@ Arc contract build --release --optimize 2>/dev/null || {
     [[ -f "$CANDIDATE" ]] && WASM="$CANDIDATE" && break
   done
   [[ -n "$WASM" ]] || { echo "ERROR: WASM not found"; exit 1; }
-  Arc contract optimize --wasm "$WASM" --wasm-out "$WASM"
+  stellar contract optimize --wasm "$WASM" --wasm-out "$WASM"
 }
 
 WASM=""
@@ -114,14 +114,14 @@ WASM_HASH=$(compute_wasm_hash "$WASM")
 echo "WASM hash: $WASM_HASH"
 
 echo "=== Uploading WASM ==="
-run_Arc_tx "WASM upload" Arc contract upload \
+run_stellar_tx "WASM upload" stellar contract upload \
   --rpc-url "$RPC_URL" \
   --network-passphrase "$NETWORK_PASSPHRASE" \
   --source "$ADMIN" \
   --wasm "$WASM"
 
 echo "=== Upgrading vault $VAULT ==="
-run_Arc_tx "contract upgrade" Arc contract invoke \
+run_stellar_tx "contract upgrade" stellar contract invoke \
   --id "$VAULT" \
   --source "$ADMIN" \
   --rpc-url "$RPC_URL" \

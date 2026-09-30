@@ -1,7 +1,7 @@
 use {
     analytics_indexer::{export, ingest, store::IndexStore, IndexerConfig},
     anyhow::{bail, Context, Result},
-    Chakra_config::aggregator::AggregatorConfig,
+    lumagg_config::aggregator::AggregatorConfig,
     std::path::PathBuf,
 };
 
@@ -17,14 +17,14 @@ struct Args {
 
 fn print_help() {
     println!(
-        "Chakra-analytics-indexer {}\n\n\
-         Usage: Chakra-analytics-indexer --config <FILE> [COMMAND] [OPTIONS]\n\n\
+        "lumagg-analytics-indexer {}\n\n\
+         Usage: lumagg-analytics-indexer --config <FILE> [COMMAND] [OPTIONS]\n\n\
          Commands:\n  run                         Continuously ingest events (default)\n  \
          backfill --start-ledger <N>  Backfill from a ledger and exit\n  \
          status                      Print the current database cursor\n  \
          export-daily [YYYY-MM-DD]   Export one day or all daily rollups\n  \
          repair-legs [--from-ts <N>] Repair stored leg attribution\n\n\
-         Options:\n  --config <FILE>       Chakra Aggregator TOML configuration\n  \
+         Options:\n  --config <FILE>       LumAgg Aggregator TOML configuration\n  \
          --check-config       Validate configuration and exit\n  -h, --help           Show this help\n  \
          -V, --version        Show version",
         env!("CARGO_PKG_VERSION")
@@ -72,7 +72,7 @@ fn parse_args() -> Result<Option<Args>> {
                 return Ok(None);
             }
             "-V" | "--version" => {
-                println!("Chakra-analytics-indexer {}", env!("CARGO_PKG_VERSION"));
+                println!("lumagg-analytics-indexer {}", env!("CARGO_PKG_VERSION"));
                 return Ok(None);
             }
             _ if args.command == "export-daily" && args.day.is_none() => args.day = Some(value),
@@ -88,7 +88,7 @@ async fn main() -> Result<()> {
         return Ok(());
     };
     let path = args.config.context("--config <FILE> is required")?;
-    let aggregator: AggregatorConfig = Chakra_config::load(path)?;
+    let aggregator: AggregatorConfig = lumagg_config::load(path)?;
     aggregator.validate_indexer()?;
     if args.check_config {
         println!("configuration is valid");

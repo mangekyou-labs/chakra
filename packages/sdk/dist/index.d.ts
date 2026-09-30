@@ -1,5 +1,5 @@
 /**
- * Chakra TypeScript SDK — quote, build_tx, wallet helpers, submit/poll.
+ * LumAgg TypeScript SDK — quote, build_tx, wallet helpers, submit/poll.
  */
 export interface ClientOptions {
     apiUrl: string;
@@ -11,8 +11,8 @@ export interface QuoteParams {
     tokenOut: string;
     amountIn: string;
     slippage?: number;
-    /** When true, exclude Classic Arc paths. */
-    preferArc?: boolean;
+    /** When true, exclude Classic SDEX paths. */
+    preferSoroban?: boolean;
     /** Maximum number of DEX hops in a route. */
     maxHops?: number;
     /** Maximum number of split route portions. */
@@ -221,7 +221,7 @@ export interface TokenInfo {
     /** `"official"` for SEP-42 icons, `"fallback"` for generated letter avatars. */
     logoKind?: "official" | "fallback";
 }
-export declare class ChakraClient {
+export declare class LumAggClient {
     private baseUrl;
     private apiKey?;
     constructor(options: ClientOptions);
@@ -277,8 +277,8 @@ export declare class ChakraClient {
     /** Public on-chain stats from analytics-indexer (Tranche 3). */
     getStats(params?: StatsParams): Promise<StatsResult | string>;
 }
-/** @deprecated Use ChakraClient */
-export declare class ArcAggregator extends ChakraClient {
+/** @deprecated Use LumAggClient */
+export declare class StellarAggregator extends LumAggClient {
     constructor(options: {
         apiUrl: string;
     });

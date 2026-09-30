@@ -1,13 +1,13 @@
 # Limit orders — testnet deploy & smoke
 
-**Network:** Arc **testnet only**. Do not point these scripts at mainnet.
+**Network:** Stellar **testnet only**. Do not point these scripts at mainnet.
 
-Scripts refuse `Public Global Arc Network` (mainnet) passphrases.
+Scripts refuse `Public Global Stellar Network` (mainnet) passphrases.
 
 ## Prerequisites
 
-- [Arc CLI](https://developers.Arc.org/docs/tools/cli)
-- Funded testnet identity (Friendbot) registered locally, e.g. `Arc keys add admin --secret-key …`
+- [stellar CLI](https://developers.stellar.org/docs/tools/cli)
+- Funded testnet identity (Friendbot) registered locally, e.g. `stellar keys add admin --secret-key …`
 - Working directory: repo root
 
 ## Deploy
@@ -34,7 +34,7 @@ Artifacts (gitignored):
 | `contracts/order-escrow/.testnet-escrow-id` | Escrow `C…` |
 | `deploy/.env.limit-testnet.local` | Env for API / indexer / keeper |
 
-Default RPC: `https://Arc-testnet.Arc.org`  
+Default RPC: `https://soroban-testnet.stellar.org`  
 Passphrase: `Test SDF Network ; September 2015`
 
 ## Point services at testnet
@@ -42,9 +42,9 @@ Passphrase: `Test SDF Network ; September 2015`
 The preferred keeper deployment uses a TOML file and a separate secret file:
 
 ```bash
-cp packaging/Chakra-limit-keeper.toml limit-keeper-testnet.toml
+cp packaging/lumagg-limit-keeper.toml limit-keeper-testnet.toml
 sed -i 's/network = "public"/network = "testnet"/' limit-keeper-testnet.toml
-sed -i 's#https://your-Arc-rpc.example.com#https://Arc-testnet.Arc.org#' limit-keeper-testnet.toml
+sed -i 's#https://your-stellar-rpc.example.com#https://soroban-testnet.stellar.org#' limit-keeper-testnet.toml
 # Set escrow_contract, aggregator_contract, quote_api_url, and cursor_path.
 ./target/release/limit-keeper --config limit-keeper-testnet.toml
 ```
@@ -57,7 +57,7 @@ retained for compatibility with the existing testnet deployment scripts.
 ```bash
 set -a && source deploy/.env.limit-testnet.local && set +a
 
-# Chakra-analytics-indexer (polls escrow events into indexer.db_path)
+# lumagg-analytics-indexer (polls escrow events into indexer.db_path)
 # api-server (GET /orders + build_create/build_cancel use indexer.db_path + features.escrow_contract)
 # limit-keeper (KEEPER_NETWORK=testnet, ESCROW_CONTRACT, AGGREGATOR_CONTRACT)
 ```
@@ -65,47 +65,47 @@ set -a && source deploy/.env.limit-testnet.local && set +a
 Use **testnet** token contract ids and a user account that exists on testnet for builds.
 
 On the server, copy the generated env to
-`/opt/Arc-dex-aggregator/deploy/.env.limit-testnet.local`, then install and
+`/opt/stellar-dex-aggregator/deploy/.env.limit-testnet.local`, then install and
 start the API and indexer units. The keeper starts in dry-run mode by default:
 
 ```bash
 RESET_TESTNET_DB=1 ./deploy_limit_testnet_server.sh
 ```
 
-The deployment uses separate `*-testnet` binary names, a Arc venue testnet
+The deployment uses separate `*-testnet` binary names, a Soroswap testnet
 worker, and Redis DB 15. It does not replace the running mainnet API, worker, or
 indexer binaries. Before the first deployment, create the server-only Redis
 configuration:
 
 ```bash
-sudo install -d -m 700 /etc/Chakra
+sudo install -d -m 700 /etc/lumagg
 sudo sh -c 'umask 077; printf "%s\n" \
   "SNAPSHOT_REDIS_URL=redis://default:PASSWORD@127.0.0.1:6379/15" \
-  > /etc/Chakra/testnet-redis.env'
+  > /etc/lumagg/testnet-redis.env'
 ```
 
 `RESET_TESTNET_DB=1` backs up the old testnet database and keeper cursor before
 starting from the newly deployed Escrow. For manual installation:
 
 ```bash
-sudo install -m 644 deploy/Chakra-api-testnet.service /etc/systemd/system/
-sudo install -m 644 deploy/Chakra-indexer-testnet.service /etc/systemd/system/
-sudo install -m 644 deploy/Chakra-limit-keeper-testnet.service /etc/systemd/system/
-sudo install -m 644 deploy/Chakra-worker-testnet.service /etc/systemd/system/
+sudo install -m 644 deploy/lumagg-api-testnet.service /etc/systemd/system/
+sudo install -m 644 deploy/lumagg-indexer-testnet.service /etc/systemd/system/
+sudo install -m 644 deploy/lumagg-limit-keeper-testnet.service /etc/systemd/system/
+sudo install -m 644 deploy/lumagg-worker-testnet.service /etc/systemd/system/
 sudo systemctl daemon-reload
-sudo systemctl enable --now Chakra-worker-testnet Chakra-api-testnet Chakra-indexer-testnet
-sudo systemctl enable --now Chakra-limit-keeper-testnet
+sudo systemctl enable --now lumagg-worker-testnet lumagg-api-testnet lumagg-indexer-testnet
+sudo systemctl enable --now lumagg-limit-keeper-testnet
 ```
 
 For live fills, place the funded keeper seed only on the server:
 
 ```bash
-sudo install -d -m 700 /etc/Chakra
+sudo install -d -m 700 /etc/lumagg
 sudo sh -c 'umask 077; printf "%s\n" \
   "KEEPER_SECRET=S..." \
   "KEEPER_DRY_RUN=0" \
-  > /etc/Chakra/limit-keeper-testnet.env'
-sudo systemctl restart Chakra-limit-keeper-testnet
+  > /etc/lumagg/limit-keeper-testnet.env'
+sudo systemctl restart lumagg-limit-keeper-testnet
 ```
 
 Never add `KEEPER_SECRET` to the generated shared env or repository.
@@ -127,18 +127,18 @@ Never add `KEEPER_SECRET` to the generated shared env or repository.
 - Escrow: `CDCNJOKHKC7HG5A46RKG7QSNBIU3ES2A5PFOYPORJTUQKP4WXMX4OFD6`
 - Aggregator: `CDJI26DXFQ4MD7VICA3Q6NEGWF53A3Z6IK7WTNMQ6UZUHL5XGQMEKJRE`
 - DCA fill transaction:
-  [`64f23f734397e88c17fc57dee91dcfdec7636c9a1a00f5a363ef6aa7657b689c`](https://Arc.expert/explorer/testnet/tx/64f23f734397e88c17fc57dee91dcfdec7636c9a1a00f5a363ef6aa7657b689c)
-- Route: XLM → XTAR → test-USDC across two Arc venue pairs
+  [`64f23f734397e88c17fc57dee91dcfdec7636c9a1a00f5a363ef6aa7657b689c`](https://stellar.expert/explorer/testnet/tx/64f23f734397e88c17fc57dee91dcfdec7636c9a1a00f5a363ef6aa7657b689c)
+- Route: XLM → XTAR → test-USDC across two Soroswap pairs
 - Result: `500000` input, `326666` output, `500000` remaining; the remainder was
   cancelled and refunded in transaction
-  [`ac487d9f416f19c34a449cf6e8114eeb6e3a98ac1fa080b66e76492a37ef93eb`](https://Arc.expert/explorer/testnet/tx/ac487d9f416f19c34a449cf6e8114eeb6e3a98ac1fa080b66e76492a37ef93eb).
+  [`ac487d9f416f19c34a449cf6e8114eeb6e3a98ac1fa080b66e76492a37ef93eb`](https://stellar.expert/explorer/testnet/tx/ac487d9f416f19c34a449cf6e8114eeb6e3a98ac1fa080b66e76492a37ef93eb).
 - Post-test balances: Escrow XLM/test-USDC = `0`/`0`; Aggregator
   XLM/test-USDC = `0`/`0`.
 
 ## Out of scope
 
 - Mainnet deploy of aggregator/escrow for limits  
-- Changing production `api.Chakra.xyz`
+- Changing production `api.lumagg.xyz`
 
 ## Frontend (Phase 3d)
 
@@ -149,9 +149,9 @@ price. Its API surface is `/api/v1/dca`, `/dca/build_create`, and
 
 | Piece | Value |
 |-------|--------|
-| Frontend env | `NEXT_PUBLIC_LIMIT_API_URL=https://api.Chakra.xyz/limit-testnet` |
-| Nginx | `api.Chakra.xyz/limit-testnet/` → `127.0.0.1:3200` |
-| systemd | `Chakra-worker-testnet`, `Chakra-api-testnet`, `Chakra-indexer-testnet`, `Chakra-limit-keeper-testnet` |
+| Frontend env | `NEXT_PUBLIC_LIMIT_API_URL=https://api.lumagg.xyz/limit-testnet` |
+| Nginx | `api.lumagg.xyz/limit-testnet/` → `127.0.0.1:3200` |
+| systemd | `lumagg-worker-testnet`, `lumagg-api-testnet`, `lumagg-indexer-testnet`, `lumagg-limit-keeper-testnet` |
 | Escrow | Read from `deploy/.env.limit-testnet.local` after each deployment |
 
 Wallet must be on **Testnet** when signing create/cancel. Instant still uses `NEXT_PUBLIC_API_URL` (mainnet).

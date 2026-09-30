@@ -1,0 +1,31 @@
+@startuml swap-execution
+!include _theme.iuml
+skinparam linetype polyline
+title Swap (Soroban)
+caption Quote to aggregator.swap. One InvokeHostFunction. Output returns to the user. Numbers match the Architecture page.
+
+actor User
+participant Wallet
+participant "api-server" as API
+participant "Soroban RPC" as RPC
+participant Aggregator
+participant "DEX pools" as Pools
+
+User -> API : 1. GET /api/v1/quote
+API --> User : 2. expected_output · sub_routes
+User -> API : 3. POST /api/v1/build_tx
+API -> RPC : 4. simulate aggregator.swap
+RPC --> API : footprint · auth · min resource fee
+API --> User : unsigned XDR
+User -> Wallet : 5. sign
+Wallet --> User : signed XDR
+User -> API : 6. POST /api/v1/submit_tx\n(or any same-network RPC)
+API -> RPC : sendTransaction
+RPC -> Aggregator : swap(user, token_in, token_out,\nsub_routes, min_amount_out)
+Aggregator -> Aggregator : 7. pull token_in from user
+Aggregator -> Pools : 7. execute each hop (CPI)
+Pools --> Aggregator : hop outputs
+Aggregator -> Aggregator : 7. require total_out >= min_amount_out
+Aggregator --> User : 7. transfer token_out
+
+@enduml

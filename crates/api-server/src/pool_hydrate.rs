@@ -3,12 +3,12 @@
 
 use {
     dex_adapters::{
-        batch_refresh::batch_refresh_Arc venue_reserves, clmm_math::clmm_pool_from_snapshot, Arc venue::Arc venueAdapter,
-        Arc venue_math::Arc venueRecord, rpc::ArcRpc, Arc venuePoolQuoteState, Arc venuePoolQuoteState,
+        batch_refresh::batch_refresh_soroswap_reserves, clmm_math::clmm_pool_from_snapshot, comet::CometAdapter,
+        comet_math::CometRecord, rpc::SorobanRpc, AquariusPoolQuoteState, CometPoolQuoteState,
     },
     market_snapshot::{
         pool_state_store::{
-            parse_quote_hydrate_max_pools_from_env, Arc venuePoolStateValue, Arc venuePoolStateValue, PoolStateStore,
+            parse_quote_hydrate_max_pools_from_env, AquariusPoolStateValue, CometPoolStateValue, PoolStateStore,
             XykPoolStateValue,
         },
         ClmmPoolSnapshot,
@@ -21,8 +21,8 @@ use {
     tracing::{debug, warn},
 };
 
-const CLMM_SOURCES: &[&str] = &["sushi", "Arc venue_clmm"];
-const BATCH_XYK_SOURCES: &[&str] = &["Arc venue"];
+const CLMM_SOURCES: &[&str] = &["sushi", "aquarius_clmm"];
+const BATCH_XYK_SOURCES: &[&str] = &["soroswap"];
 
 pub struct PoolHydrateConfig {
     /// When false, `/quote` uses Redis only (worker is the sole writer).
@@ -42,18 +42,18 @@ impl Default for PoolHydrateConfig {
 fn collect_pool_refs(paths: &[Path]) -> (Vec<(String, String)>, Vec<(String, String)>, Vec<String>, Vec<String>) {
     let mut xyk = HashSet::new();
     let mut clmm = HashSet::new();
-    let mut Arc venue = HashSet::new();
-    let mut Arc venue = HashSet::new();
+    let mut comet = HashSet::new();
+    let mut aquarius = HashSet::new();
 
     for path in paths {
         for (source, pool_address) in path.sources.iter().zip(path.pool_addresses.iter()) {
             if source == "classic_dex" {
                 continue;
             }
-            if source == "Arc venue" {
-                Arc venue.insert(pool_address.clone());
-            } else if source == "Arc venue" {
-                Arc venue.insert(pool_address.clone());
+            if source == "comet" {
+                comet.insert(pool_address.clone());
+            } else if source == "aquarius" {
+                aquarius.insert(pool_address.clone());
             } else if CLMM_SOURCES.contains(&source.as_str()) {
                 clmm.insert((source.clone(), pool_address.clone()));
             } else {
@@ -64,13 +64,13 @@ fn collect_pool_refs(paths: &[Path]) -> (Vec<(String, String)>, Vec<(String, Str
 
     let mut xyk: Vec<_> = xyk.into_iter().collect();
     let mut clmm: Vec<_> = clmm.into_iter().collect();
-    let mut Arc venue: Vec<_> = Arc venue.into_iter().collect();
-    let mut Arc venue: Vec<_> = Arc venue.into_iter().collect();
+    let mut comet: Vec<_> = comet.into_iter().collect();
+    let mut aquarius: Vec<_> = aquarius.into_iter().collect();
     xyk.sort();
     clmm.sort();
-    Arc venue.sort();
-    Arc venue.sort();
-    (xyk, clmm, Arc venue, Arc venue)
+    comet.sort();
+    aquarius.sort();
+    (xyk, clmm, comet, aquarius)
 }
 
 fn clmm_state_from_snapshot(snapshot: &ClmmPoolSnapshot) -> SnapshotClmmQuoteState {
@@ -85,8 +85,8 @@ fn clmm_state_from_snapshot(snapshot: &ClmmPoolSnapshot) -> SnapshotClmmQuoteSta
     }
 }
 
-fn Arc venue_quote_state(value: &Arc venuePoolStateValue) -> Arc venuePoolQuoteState {
-    Arc venuePoolQuoteState {
+fn aquarius_quote_state(value: &AquariusPoolStateValue) -> AquariusPoolQuoteState {
+    AquariusPoolQuoteState {
         pool_address: value.pool_address.clone(),
         tokens: value.tokens.clone(),
         reserves: value.reserves.clone(),
@@ -96,15 +96,15 @@ fn Arc venue_quote_state(value: &Arc venuePoolStateValue) -> Arc venuePoolQuoteS
     }
 }
 
-fn Arc venue_quote_state(value: &Arc venuePoolStateValue) -> Arc venuePoolQuoteState {
-    Arc venuePoolQuoteState {
+fn comet_quote_state(value: &CometPoolStateValue) -> CometPoolQuoteState {
+    CometPoolQuoteState {
         records: value
             .records
             .iter()
             .map(|(token, record)| {
                 (
                     token.clone(),
-                    Arc venueRecord {
+                    CometRecord {
                         balance: record.balance,
                         weight: record.weight,
                         scalar: record.scalar,
@@ -116,9 +116,9 @@ fn Arc venue_quote_state(value: &Arc venuePoolStateValue) -> Arc venuePoolQuoteS
     }
 }
 
-fn Arc venue_state_to_value(pool_address: &str, state: &Arc venuePoolQuoteState) -> Arc venuePoolStateValue {
-    use market_snapshot::pool_state_store::Arc venueTokenRecordValue;
-    Arc venuePoolStateValue {
+fn comet_state_to_value(pool_address: &str, state: &CometPoolQuoteState) -> CometPoolStateValue {
+    use market_snapshot::pool_state_store::CometTokenRecordValue;
+    CometPoolStateValue {
         pool_address: pool_address.to_string(),
         records: state
             .records
@@ -126,7 +126,7 @@ fn Arc venue_state_to_value(pool_address: &str, state: &Arc venuePoolQuoteState)
             .map(|(token, record)| {
                 (
                     token.clone(),
-                    Arc venueTokenRecordValue {
+                    CometTokenRecordValue {
                         balance: record.balance,
                         weight: record.weight,
                         scalar: record.scalar,
@@ -142,25 +142,25 @@ fn Arc venue_state_to_value(pool_address: &str, state: &Arc venuePoolQuoteState)
 /// Load per-pool state for candidate paths from Redis; optional batched xy=k
 /// RPC for misses.
 ///
-/// Returns `(hydration, redis_miss_xyk, Arc venue_refs, oldest_age_ms)`.
+/// Returns `(hydration, redis_miss_xyk, soroswap_refs, oldest_age_ms)`.
 /// `oldest_age_ms` is `None` when no stamped ages are present (legacy keys).
 pub async fn hydrate_paths(
     engine: &QuoteEngine,
     paths: &[Path],
     store: &dyn PoolStateStore,
-    rpc: &ArcRpc,
+    rpc: &SorobanRpc,
     config: &PoolHydrateConfig,
 ) -> (QuoteHydration, usize, usize, Option<u64>) {
-    let (xyk_refs, clmm_refs, Arc venue_pools, Arc venue_refs) = collect_pool_refs(paths);
-    let Arc venue_ref_count = xyk_refs.iter().filter(|(s, _)| s == "Arc venue").count();
-    if xyk_refs.is_empty() && clmm_refs.is_empty() && Arc venue_pools.is_empty() && Arc venue_refs.is_empty() {
+    let (xyk_refs, clmm_refs, comet_pools, aquarius_refs) = collect_pool_refs(paths);
+    let soroswap_ref_count = xyk_refs.iter().filter(|(s, _)| s == "soroswap").count();
+    if xyk_refs.is_empty() && clmm_refs.is_empty() && comet_pools.is_empty() && aquarius_refs.is_empty() {
         return (QuoteHydration::default(), 0, 0, None);
     }
 
     let mut xyk_pools = store.fetch_xyk(&xyk_refs).await.unwrap_or_default();
     let clmm_snapshots = store.fetch_clmm(&clmm_refs).await.unwrap_or_default();
-    let Arc venue_raw = store.fetch_Arc venue(&Arc venue_refs).await.unwrap_or_default();
-    let Arc venue_raw = store.fetch_Arc venue(&Arc venue_pools).await.unwrap_or_default();
+    let aquarius_raw = store.fetch_aquarius(&aquarius_refs).await.unwrap_or_default();
+    let comet_raw = store.fetch_comet(&comet_pools).await.unwrap_or_default();
 
     let now_ms = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
@@ -177,10 +177,10 @@ pub async fn hydrate_paths(
     for v in xyk_pools.values() {
         note_age(v.updated_at_ms);
     }
-    for v in Arc venue_raw.values() {
+    for v in aquarius_raw.values() {
         note_age(v.updated_at_ms);
     }
-    for v in Arc venue_raw.values() {
+    for v in comet_raw.values() {
         note_age(v.updated_at_ms);
     }
     let clmm_pools: HashMap<String, SnapshotClmmQuoteState> = clmm_snapshots
@@ -188,9 +188,9 @@ pub async fn hydrate_paths(
         .map(|(key, snapshot)| (key, clmm_state_from_snapshot(&snapshot)))
         .collect();
 
-    let Arc venue_pools: HashMap<String, Arc venuePoolQuoteState> = Arc venue_raw
+    let aquarius_pools: HashMap<String, AquariusPoolQuoteState> = aquarius_raw
         .into_iter()
-        .map(|(pool, value)| (pool, Arc venue_quote_state(&value)))
+        .map(|(pool, value)| (pool, aquarius_quote_state(&value)))
         .collect();
 
     let mut redis_miss_xyk = 0usize;
@@ -207,7 +207,7 @@ pub async fn hydrate_paths(
 
         if !rpc_candidates.is_empty() {
             let pool_addresses: Vec<String> = rpc_candidates.iter().map(|(_, pool)| pool.clone()).collect();
-            match batch_refresh_Arc venue_reserves(rpc, &pool_addresses).await {
+            match batch_refresh_soroswap_reserves(rpc, &pool_addresses).await {
                 Ok(results) => {
                     let cached = engine.cached_pool_edges().await;
                     let mut writeback: Vec<XykPoolStateValue> = Vec::new();
@@ -246,62 +246,62 @@ pub async fn hydrate_paths(
         }
     }
 
-    let mut redis_miss_Arc venue = 0usize;
-    for pool_address in &Arc venue_refs {
-        if !Arc venue_pools.contains_key(pool_address) {
-            redis_miss_Arc venue += 1;
+    let mut redis_miss_aquarius = 0usize;
+    for pool_address in &aquarius_refs {
+        if !aquarius_pools.contains_key(pool_address) {
+            redis_miss_aquarius += 1;
         }
     }
-    if redis_miss_Arc venue > 0 {
+    if redis_miss_aquarius > 0 {
         warn!(
-            redis_miss_Arc venue,
+            redis_miss_aquarius,
             paths = paths.len(),
-            "quote hydration: Arc venue Redis misses (worker should publish these pools)"
+            "quote hydration: Aquarius Redis misses (worker should publish these pools)"
         );
     }
 
-    let mut Arc venue_states: HashMap<String, Arc venuePoolQuoteState> = Arc venue_raw
+    let mut comet_states: HashMap<String, CometPoolQuoteState> = comet_raw
         .into_iter()
-        .map(|(pool, value)| (pool, Arc venue_quote_state(&value)))
+        .map(|(pool, value)| (pool, comet_quote_state(&value)))
         .collect();
 
-    let mut redis_miss_Arc venue = 0usize;
-    for pool_address in &Arc venue_pools {
-        if !Arc venue_states.contains_key(pool_address) {
-            redis_miss_Arc venue += 1;
+    let mut redis_miss_comet = 0usize;
+    for pool_address in &comet_pools {
+        if !comet_states.contains_key(pool_address) {
+            redis_miss_comet += 1;
         }
     }
-    if redis_miss_Arc venue > 0 {
+    if redis_miss_comet > 0 {
         warn!(
-            redis_miss_Arc venue,
+            redis_miss_comet,
             paths = paths.len(),
-            "quote hydration: Arc venue Redis misses (worker should publish weighted pool state)"
+            "quote hydration: Comet Redis misses (worker should publish weighted pool state)"
         );
     }
 
-    if config.rpc_hydrate_enabled && redis_miss_Arc venue > 0 {
-        let Arc venue = Arc venueAdapter::new(Arc::new(ArcRpc::new(rpc.url(), rpc.network_passphrase())));
-        let mut rpc_candidates: Vec<String> = Arc venue_pools
+    if config.rpc_hydrate_enabled && redis_miss_comet > 0 {
+        let comet = CometAdapter::new(Arc::new(SorobanRpc::new(rpc.url(), rpc.network_passphrase())));
+        let mut rpc_candidates: Vec<String> = comet_pools
             .iter()
-            .filter(|pool| !Arc venue_states.contains_key(*pool))
+            .filter(|pool| !comet_states.contains_key(*pool))
             .cloned()
             .collect();
         rpc_candidates.truncate(config.max_rpc_pools);
         let mut writeback = Vec::new();
         for pool_address in rpc_candidates {
-            match Arc venue.fetch_pool_quote_state(&pool_address).await {
+            match comet.fetch_pool_quote_state(&pool_address).await {
                 Ok(state) => {
-                    Arc venue_states.insert(pool_address.clone(), state.clone());
-                    writeback.push(Arc venue_state_to_value(&pool_address, &state));
+                    comet_states.insert(pool_address.clone(), state.clone());
+                    writeback.push(comet_state_to_value(&pool_address, &state));
                 }
                 Err(error) => {
-                    debug!("Arc venue hydrate failed for {}: {}", pool_address, error);
+                    debug!("Comet hydrate failed for {}: {}", pool_address, error);
                 }
             }
         }
         if !writeback.is_empty() {
-            if let Err(error) = store.set_Arc venue_batch(&writeback).await {
-                debug!("Arc venue hydrate writeback failed: {}", error);
+            if let Err(error) = store.set_comet_batch(&writeback).await {
+                debug!("Comet hydrate writeback failed: {}", error);
             }
         }
     }
@@ -318,11 +318,11 @@ pub async fn hydrate_paths(
     debug!(
         xyk = xyk_pools.len(),
         clmm = clmm_pools.len(),
-        Arc venue = Arc venue_states.len(),
-        Arc venue = Arc venue_pools.len(),
+        comet = comet_states.len(),
+        aquarius = aquarius_pools.len(),
         redis_miss_xyk,
-        redis_miss_Arc venue,
-        redis_miss_Arc venue,
+        redis_miss_aquarius,
+        redis_miss_comet,
         "hydrated pools for quote"
     );
 
@@ -330,11 +330,11 @@ pub async fn hydrate_paths(
         QuoteHydration {
             xyk_pools,
             clmm_pools,
-            Arc venue_pools: Arc venue_states,
-            Arc venue_pools,
+            comet_pools: comet_states,
+            aquarius_pools,
         },
         redis_miss_xyk,
-        Arc venue_ref_count,
+        soroswap_ref_count,
         oldest_age_ms,
     )
 }

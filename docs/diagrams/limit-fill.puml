@@ -1,0 +1,35 @@
+@startuml limit-fill
+!include _theme.iuml
+skinparam linetype polyline
+title Limit fill (testnet)
+caption Escrow holds unfilled input. fill is permissionless. Output goes to the order owner. Numbers match the Architecture page.
+
+actor Owner
+participant Wallet
+participant "api-server" as API
+participant Escrow
+participant "lumagg-limit-keeper" as Keeper
+participant Aggregator
+participant "DEX pools" as Pools
+
+Owner -> API : 1. POST /api/v1/orders/build_create
+API --> Owner : unsigned create_limit XDR
+Owner -> Wallet : sign
+Wallet -> Escrow : create_limit
+Escrow -> Escrow : pull token_in from owner
+Keeper -> Escrow : 2. watch order events
+Keeper -> API : 3. GET /quote token_in→token_out
+API --> Keeper : sub_routes · expected_output
+alt expected_output meets limit
+  Keeper -> Escrow : 4. fill(order_id, amount_in,\nsub_routes, min_amount_out)
+  Escrow -> Aggregator : 5. swap(user=escrow)
+  Aggregator -> Pools : execute hops
+  Pools --> Aggregator : amount_out
+  Aggregator --> Escrow : token_out
+  Escrow --> Owner : 6. transfer token_out
+  Escrow -> Escrow : 6. reduce remaining;\nFilled when remaining = 0
+else not fillable
+  Keeper -> Keeper : wait for next quote
+end
+
+@enduml

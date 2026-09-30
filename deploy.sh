@@ -1,19 +1,19 @@
 #!/bin/bash
-# Deploy Arc DEX Aggregator to server
+# Deploy Stellar DEX Aggregator to server
 # Usage: ./deploy.sh
 
 set -e
 
 SERVER="root@88.198.16.144"
 SSH_KEY="~/.ssh/id_rsa"
-REMOTE_DIR="/opt/Arc-dex-aggregator"
+REMOTE_DIR="/opt/stellar-dex-aggregator"
 
 echo "=== Building release binary ==="
 cargo build -p api-server --release
 
 echo "=== Uploading binary ==="
 ssh -i $SSH_KEY $SERVER "mkdir -p $REMOTE_DIR/data"
-scp -i $SSH_KEY target/release/Chakra-api-server $SERVER:$REMOTE_DIR/Chakra-api-server
+scp -i $SSH_KEY target/release/lumagg-api-server $SERVER:$REMOTE_DIR/lumagg-api-server
 
 echo "=== Uploading pool cache ==="
 if [ -f data/pool_cache.json ]; then
@@ -21,21 +21,21 @@ if [ -f data/pool_cache.json ]; then
 fi
 
 echo "=== Creating systemd service ==="
-ssh -i $SSH_KEY $SERVER "cat > /etc/systemd/system/Chakra-api.service << 'EOF'
+ssh -i $SSH_KEY $SERVER "cat > /etc/systemd/system/lumagg-api.service << 'EOF'
 [Unit]
-Description=Chakra DEX Aggregator API
-After=network.target Arc-rpc.service
+Description=LumAgg DEX Aggregator API
+After=network.target stellar-rpc.service
 
 [Service]
 Type=simple
 User=root
-WorkingDirectory=/opt/Arc-dex-aggregator
+WorkingDirectory=/opt/stellar-dex-aggregator
 Environment=RPC_URL=http://127.0.0.1:8003
 Environment=HORIZON_URL=http://144.76.79.46:8000
 Environment=LISTEN_ADDR=0.0.0.0:3100
 Environment=REFRESH_INTERVAL_SECS=5
 Environment=RUST_LOG=info
-ExecStart=/opt/Arc-dex-aggregator/Chakra-api-server
+ExecStart=/opt/stellar-dex-aggregator/lumagg-api-server
 Restart=on-failure
 RestartSec=5
 
@@ -44,7 +44,7 @@ WantedBy=multi-user.target
 EOF"
 
 echo "=== Starting service ==="
-ssh -i $SSH_KEY $SERVER "systemctl daemon-reload && systemctl enable Chakra-api && systemctl restart Chakra-api && sleep 2 && systemctl status Chakra-api | head -8"
+ssh -i $SSH_KEY $SERVER "systemctl daemon-reload && systemctl enable lumagg-api && systemctl restart lumagg-api && sleep 2 && systemctl status lumagg-api | head -8"
 
 echo "=== Testing ==="
 sleep 3

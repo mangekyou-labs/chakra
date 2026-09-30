@@ -1,4 +1,4 @@
-//! Live XLM→USDC mark for converting Arc XLM fees into USDC base units.
+//! Live XLM→USDC mark for converting Soroban XLM fees into USDC base units.
 
 use {
     crate::{

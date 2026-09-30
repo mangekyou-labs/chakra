@@ -1,6 +1,6 @@
-//! Classic DEX adapter: Arc native orderbook + liquidity pools.
+//! Classic DEX adapter: Stellar native orderbook + liquidity pools.
 //!
-//! Uses Horizon API `/paths/strict-send` to get quotes from Arc Core's
+//! Uses Horizon API `/paths/strict-send` to get quotes from Stellar Core's
 //! native routing engine. This covers both the orderbook and native LP pools.
 //!
 //! The Classic DEX is treated as a single "black box" liquidity source:
@@ -8,22 +8,22 @@
 //! for a given input, and we can include it in split optimization.
 //!
 //! Execution: PathPaymentStrictSend operation in the same transaction as
-//! Arc contract calls (Arc supports mixed Classic + Arc ops).
+//! Soroban contract calls (Stellar supports mixed Classic + Soroban ops).
 
 use {
     crate::traits::*,
     anyhow::{Context, Result},
     async_trait::async_trait,
     reqwest::Client,
-    Arc_xdr::curr::{self as xdr},
+    stellar_xdr::curr::{self as xdr},
     tokio::sync::RwLock,
     tracing::{debug, info},
 };
 
 /// Default public Horizon endpoint
-const DEFAULT_HORIZON_URL: &str = "https://horizon.Arc.org";
+const DEFAULT_HORIZON_URL: &str = "https://horizon.stellar.org";
 
-/// Rough effective reserve (input-token atomic unitss) for major classic paths when
+/// Rough effective reserve (input-token stroops) for major classic paths when
 /// Horizon does not expose pool reserves. Used for impact ≈ amount_in * 10_000
 /// / (2 * reserve).
 fn estimate_classic_impact_bps(amount_in: u128) -> u32 {
@@ -31,9 +31,9 @@ fn estimate_classic_impact_bps(amount_in: u128) -> u32 {
         return 0;
     }
     // ~500k XLM depth order-of-magnitude for XLM/USDC-class books (7-decimal
-    // atomic unitss).
-    const ESTIMATED_RESERVE_atomic unitsS: u128 = 5_000_000_000_000;
-    (amount_in.saturating_mul(10_000) / (2 * ESTIMATED_RESERVE_atomic unitsS)).min(10_000) as u32
+    // stroops).
+    const ESTIMATED_RESERVE_STROOPS: u128 = 5_000_000_000_000;
+    (amount_in.saturating_mul(10_000) / (2 * ESTIMATED_RESERVE_STROOPS)).min(10_000) as u32
 }
 
 /// Horizon strict-send quote including intermediate path assets (for
@@ -44,7 +44,7 @@ pub struct ClassicPathQuote {
     pub path: Vec<ClassicHorizonAsset>,
 }
 
-/// Arc Classic asset as returned by Horizon `/paths/*`.
+/// Stellar Classic asset as returned by Horizon `/paths/*`.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ClassicHorizonAsset {
     Native,
@@ -83,7 +83,7 @@ impl ClassicDexAdapter {
             .unwrap_or_else(|_| Client::new());
 
         // Prefer explicit arg, then HORIZON_URL, then public Horizon.
-        // New hosts often get 429 from horizon.Arc.org — point at local.
+        // New hosts often get 429 from horizon.stellar.org — point at local.
         let horizon_url = horizon_url
             .map(str::to_string)
             .or_else(|| {
@@ -133,7 +133,7 @@ impl ClassicDexAdapter {
         dest_asset: &ClassicHorizonAsset,
         amount: u128,
     ) -> Result<Option<ClassicPathQuote>> {
-        // Convert amount from atomic unitss to decimal string (7 decimals)
+        // Convert amount from stroops to decimal string (7 decimals)
         let whole = amount / 10_000_000;
         let frac = amount % 10_000_000;
         let amount_str = format!("{}.{:07}", whole, frac);
@@ -184,7 +184,7 @@ impl ClassicDexAdapter {
         if let Some(records) = records {
             if let Some(first) = records.first() {
                 if let Some(dest_amount_str) = first.get("destination_amount").and_then(|v| v.as_str()) {
-                    let amount_out = parse_Arc_amount(dest_amount_str)?;
+                    let amount_out = parse_stellar_amount(dest_amount_str)?;
                     let path = first
                         .get("path")
                         .and_then(|p| p.as_array())
@@ -254,7 +254,7 @@ pub fn classic_horizon_to_xdr(asset: &ClassicHorizonAsset) -> Result<xdr::Asset>
     match asset {
         ClassicHorizonAsset::Native => Ok(xdr::Asset::Native),
         ClassicHorizonAsset::Credit { code, issuer } => {
-            let issuer_pk = Arc_strkey::ed25519::PublicKey::from_string(issuer)
+            let issuer_pk = stellar_strkey::ed25519::PublicKey::from_string(issuer)
                 .with_context(|| format!("invalid issuer {}", issuer))?;
             let issuer_id = xdr::AccountId(xdr::PublicKey::PublicKeyTypeEd25519(xdr::Uint256(issuer_pk.0)));
             if code.len() <= 4 {
@@ -276,8 +276,8 @@ pub fn classic_horizon_to_xdr(asset: &ClassicHorizonAsset) -> Result<xdr::Asset>
     }
 }
 
-/// Parse Arc amount string (e.g., "15.1355107") to atomic unitss (u128).
-fn parse_Arc_amount(s: &str) -> Result<u128> {
+/// Parse Stellar amount string (e.g., "15.1355107") to stroops (u128).
+fn parse_stellar_amount(s: &str) -> Result<u128> {
     let parts: Vec<&str> = s.split('.').collect();
     let whole: u128 = parts[0].parse().unwrap_or(0);
     let frac: u128 = if parts.len() > 1 {
@@ -296,7 +296,7 @@ impl DexAdapter for ClassicDexAdapter {
     }
 
     fn name(&self) -> &str {
-        "Arc Classic DEX"
+        "Stellar Classic DEX"
     }
 
     fn protocol_type(&self) -> ProtocolType {
@@ -366,7 +366,7 @@ impl DexAdapter for ClassicDexAdapter {
             dest_asset: token_out.canonical(),
             send_amount: amount_in as i64,
             dest_min: min_amount_out as i64,
-            path: vec![], // Arc Core finds the path
+            path: vec![], // Stellar Core finds the path
         })
     }
 
@@ -381,11 +381,11 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_parse_Arc_amount() {
-        assert_eq!(parse_Arc_amount("15.1355107").unwrap(), 151355107);
-        assert_eq!(parse_Arc_amount("100.0000000").unwrap(), 1000000000);
-        assert_eq!(parse_Arc_amount("0.0000001").unwrap(), 1);
-        assert_eq!(parse_Arc_amount("1000").unwrap(), 10000000000);
+    fn test_parse_stellar_amount() {
+        assert_eq!(parse_stellar_amount("15.1355107").unwrap(), 151355107);
+        assert_eq!(parse_stellar_amount("100.0000000").unwrap(), 1000000000);
+        assert_eq!(parse_stellar_amount("0.0000001").unwrap(), 1);
+        assert_eq!(parse_stellar_amount("1000").unwrap(), 10000000000);
     }
 
     #[test]
@@ -429,7 +429,7 @@ mod tests {
             .unwrap();
 
         if let Some(q) = quote {
-            println!("100 XLM → {} USDC (atomic unitss)", q.amount_out);
+            println!("100 XLM → {} USDC (stroops)", q.amount_out);
             assert!(q.amount_out > 0);
         } else {
             println!("No Classic DEX path found (Horizon may be rate-limited)");

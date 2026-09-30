@@ -1,8 +1,8 @@
-# Chakra 套利 Vault
+# LumAgg 套利 Vault
 
 **English:** [README.md](README.md)
 
-**本合约仅用于 Chakra 套利 bot，不是面向普通用户的金库或理财合约。**
+**本合约仅用于 LumAgg 套利 bot，不是面向普通用户的金库或理财合约。**
 
 普通 swap 请直接使用 [aggregator](../aggregator/) 的 `swap()` / `round_trip_swap()`，由用户钱包持币并签名即可。Vault 解决的是 **bot 运营** 问题：把交易本金集中存放在合约里，多个 bot 账号只需少量原生 XLM 付 gas，不必每个账号都备足 1800 XLM 等 float。
 
@@ -11,7 +11,7 @@
 | 场景 | 使用哪个合约 |
 |------|----------------|
 | 前端 / 钱包用户 swap | `aggregator.swap` |
-| Chakra arb bot 往返套利 | `vault.execute_round_trip` → 内部调用 `aggregator.round_trip_swap` |
+| LumAgg arb bot 往返套利 | `vault.execute_round_trip` → 内部调用 `aggregator.round_trip_swap` |
 | 手动一次性 round-trip | `aggregator.round_trip_swap`（caller 自己持币） |
 
 ## 执行流程
@@ -51,7 +51,7 @@ vault ──transfer_from(base_total)──► caller   （走 allowance，金�
 
 ```bash
 ARB_VAULT_CONTRACT=C...        # 本 vault
-ARB_AGGREGATOR_CONTRACT=C...   # Chakra aggregator
+ARB_AGGREGATOR_CONTRACT=C...   # LumAgg aggregator
 ARB_CALLER_SECRETS=...         # 多个 bot 账号，各只需少量 XLM 作 fee
 ARB_BUILD_TX=1
 ```
@@ -69,7 +69,7 @@ ADMIN=admin ADMIN_G=G... CALLER=G... ./contracts/vault/deploy.sh
 1. 部署 vault WASM，`initialize(admin)`（或直接用 `deploy.sh`）。
 2. `deposit` 将套利本金（如 XLM）打入 vault。
 3. `add_caller` 为每个 bot 公钥授权。
-4. 启动 arb bot；caller 账号 **不需要** 持有大额 trade token，只需原生 XLM 付 Arc fee。
+4. 启动 arb bot；caller 账号 **不需要** 持有大额 trade token，只需原生 XLM 付 Soroban fee。
 
 **并行注意：** 多个 caller 同时提交时，vault 余额需覆盖 `并发笔数 × amount_in`。例如 3 个 caller 各跑 500 XLM，vault 至少需 ~1500 XLM 可用余额。
 

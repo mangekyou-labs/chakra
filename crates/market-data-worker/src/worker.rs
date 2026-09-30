@@ -1,13 +1,13 @@
 use {
     anyhow::Result,
     dex_adapters::{
-        Arc venue::Arc venueAdapter,
-        Arc venue_clmm::Arc venueClmmAdapter,
+        aquarius::AquariusAdapter,
+        aquarius_clmm::AquariusClmmAdapter,
         classic_dex::ClassicDexAdapter,
-        Arc venue::Arc venueAdapter,
-        Arc venue::Arc venueAdapter,
-        rpc::ArcRpc,
-        Arc venue::Arc venueAdapter,
+        comet::CometAdapter,
+        phoenix::PhoenixAdapter,
+        rpc::SorobanRpc,
+        soroswap::SoroswapAdapter,
         sushi::SushiAdapter,
         token_metadata::{LogoKind, TokenMetadata, TokenMetadataStore},
         traits::AdapterTradingPair,
@@ -48,14 +48,14 @@ pub struct WorkerConfig {
     pub snapshot_redis_url: Option<String>,
     pub snapshot_redis_channel: String,
     pub snapshot_redis_keep_latest: usize,
-    /// Heavy adapter.refresh_reserves() cadence (Arc venue batch can take
+    /// Heavy adapter.refresh_reserves() cadence (Aquarius batch can take
     /// 15–30s).
     pub refresh_interval_secs: u64,
     /// Fast Redis pool-state publish from adapter caches (independent of
     /// refresh duration).
     pub pool_publish_interval_secs: u64,
     /// Concurrent getLedgerEntries batches during xy=k refresh
-    /// (Arc venue/Arc venue).
+    /// (Soroswap/Aquarius).
     pub pool_state_refresh_concurrency: usize,
     pub discovery_interval_secs: u64,
     pub ledger_poll: std::time::Duration,
@@ -101,9 +101,9 @@ impl WorkerConfig {
         )?;
         Ok(Self {
             rpc_url: std::env::var("RPC_URL")
-                .unwrap_or_else(|_| "https://Arc-rpc.mainnet.Arc.gateway.fm".to_string()),
+                .unwrap_or_else(|_| "https://soroban-rpc.mainnet.stellar.gateway.fm".to_string()),
             network_passphrase: std::env::var("NETWORK_PASSPHRASE")
-                .unwrap_or_else(|_| "Public Global Arc Network ; September 2015".to_string()),
+                .unwrap_or_else(|_| "Public Global Stellar Network ; September 2015".to_string()),
             snapshot_backend,
             snapshot_dir: std::env::var("SNAPSHOT_DIR")
                 .map(PathBuf::from)
@@ -163,7 +163,7 @@ fn trading_pair_snapshot(pair: &AdapterTradingPair) -> TradingPairSnapshot {
 }
 
 fn sanitize_source_pairs(source: &str, pairs: Vec<TradingPairSnapshot>) -> Vec<TradingPairSnapshot> {
-    if source != "Arc venue" {
+    if source != "aquarius" {
         return pairs;
     }
 
@@ -195,7 +195,7 @@ async fn discover_adapter_source(adapter: Arc<dyn DexAdapter>) -> Option<SourceS
     }
 }
 
-/// Run adapter discovery concurrently (Arc venue + Arc venue no longer block each
+/// Run adapter discovery concurrently (Aquarius + Soroswap no longer block each
 /// other).
 async fn collect_sources_from_discovery(adapters: &[Arc<dyn DexAdapter>]) -> Vec<SourceSnapshot> {
     let tasks = adapters.iter().cloned().map(discover_adapter_source);
@@ -378,11 +378,11 @@ impl PoolRefreshInFlight {
 fn spawn_fast_pool_publish(
     shared: Arc<RwLock<WorkerShared>>,
     adapters: Vec<Arc<dyn DexAdapter>>,
-    Arc venue: Arc<Arc venueAdapter>,
-    Arc venue: Arc<Arc venueAdapter>,
+    aquarius: Arc<AquariusAdapter>,
+    comet: Arc<CometAdapter>,
     pool_state_store: Option<Arc<dyn PoolStateStore>>,
     metrics: Option<Arc<crate::monitor::WorkerMonitorMetrics>>,
-    telegram: Option<Arc<Chakra_alerts::TelegramAlerter>>,
+    telegram: Option<Arc<lumagg_alerts::TelegramAlerter>>,
 ) {
     tokio::spawn(async move {
         let clmm_pools = {
@@ -392,8 +392,8 @@ fn spawn_fast_pool_publish(
         if let Err(error) = publish_pool_state_only(
             pool_state_store.as_ref(),
             &adapters,
-            Arc venue.as_ref(),
-            Arc venue.as_ref(),
+            aquarius.as_ref(),
+            comet.as_ref(),
             &clmm_pools,
             metrics.as_ref(),
         )
@@ -412,18 +412,18 @@ fn spawn_fast_pool_publish(
 
 /// Slow path: refresh adapter reserves in background; coalesced via
 /// `in_flight`. When Redis is configured, write each chunk as soon as it is
-/// observed (write-through) so a long Arc venue sweep cannot clobber fresher
+/// observed (write-through) so a long Aquarius sweep cannot clobber fresher
 /// ledger-touch Redis writes.
 fn spawn_background_reserve_refresh(
     in_flight: Arc<PoolRefreshInFlight>,
     shared: Arc<RwLock<WorkerShared>>,
     adapters: Vec<Arc<dyn DexAdapter>>,
     sushi: Arc<SushiAdapter>,
-    Arc venue_clmm: Arc<Arc venueClmmAdapter>,
-    Arc venue: Arc<Arc venueAdapter>,
-    Arc venue: Arc<Arc venueAdapter>,
-    Arc venue: Arc<Arc venueAdapter>,
-    Arc venue: Arc<Arc venueAdapter>,
+    aquarius_clmm: Arc<AquariusClmmAdapter>,
+    aquarius: Arc<AquariusAdapter>,
+    comet: Arc<CometAdapter>,
+    phoenix: Arc<PhoenixAdapter>,
+    soroswap: Arc<SoroswapAdapter>,
     pool_state_store: Option<Arc<dyn PoolStateStore>>,
     refresh_clmm: bool,
     publish_redis: bool,
@@ -453,12 +453,12 @@ fn spawn_background_reserve_refresh(
             if let Some(ref store) = pool_state_store {
                 crate::pool_state_write_through::refresh_all_venues_write_through(
                     store.as_ref(),
-                    Arc venue.as_ref(),
-                    Arc venue.as_ref(),
-                    Arc venue.as_ref(),
-                    Arc venue.as_ref(),
+                    soroswap.as_ref(),
+                    aquarius.as_ref(),
+                    phoenix.as_ref(),
+                    comet.as_ref(),
                     sushi.as_ref(),
-                    Arc venue_clmm.as_ref(),
+                    aquarius_clmm.as_ref(),
                     refresh_clmm,
                 )
                 .await;
@@ -484,7 +484,7 @@ fn spawn_background_reserve_refresh(
                     sources
                 };
                 let clmm_pools = if refresh_clmm {
-                    collect_clmm_snapshots(sushi.as_ref(), Arc venue_clmm.as_ref(), Some(clmm_metrics.as_ref())).await
+                    collect_clmm_snapshots(sushi.as_ref(), aquarius_clmm.as_ref(), Some(clmm_metrics.as_ref())).await
                 } else {
                     shared.read().await.clmm_pools.clone()
                 };
@@ -501,7 +501,7 @@ fn spawn_background_reserve_refresh(
         // No Redis store: refresh in-memory only (embedded / legacy).
         let refreshed = refresh_sources_parallel(&adapters, sources).await;
         let clmm_pools = if refresh_clmm {
-            collect_clmm_snapshots(sushi.as_ref(), Arc venue_clmm.as_ref(), Some(clmm_metrics.as_ref())).await
+            collect_clmm_snapshots(sushi.as_ref(), aquarius_clmm.as_ref(), Some(clmm_metrics.as_ref())).await
         } else {
             shared.read().await.clmm_pools.clone()
         };
@@ -528,13 +528,13 @@ fn token_metadata_snapshot(meta: TokenMetadata) -> TokenMetadataSnapshot {
 
 async fn collect_clmm_snapshots(
     sushi: &SushiAdapter,
-    Arc venue_clmm: &Arc venueClmmAdapter,
+    aquarius_clmm: &AquariusClmmAdapter,
     clmm_metrics: Option<&crate::clmm_metrics::ClmmCoverageMetrics>,
 ) -> Vec<ClmmPoolSnapshot> {
-    let (sushi_pools, Arc venue_pools) =
-        tokio::join!(sushi.export_clmm_snapshots(), Arc venue_clmm.export_clmm_snapshots(),);
+    let (sushi_pools, aquarius_pools) =
+        tokio::join!(sushi.export_clmm_snapshots(), aquarius_clmm.export_clmm_snapshots(),);
     let mut clmm_pools = sushi_pools;
-    clmm_pools.extend(Arc venue_pools);
+    clmm_pools.extend(aquarius_pools);
     clmm_pools.sort_by(|a, b| {
         a.source
             .cmp(&b.source)
@@ -583,8 +583,8 @@ fn log_clmm_coverage_stats(
 async fn publish_pool_state_only(
     pool_state_store: Option<&Arc<dyn PoolStateStore>>,
     adapters: &[Arc<dyn DexAdapter>],
-    Arc venue: &Arc venueAdapter,
-    Arc venue: &Arc venueAdapter,
+    aquarius: &AquariusAdapter,
+    comet: &CometAdapter,
     clmm_states: &[ClmmPoolSnapshot],
     metrics: Option<&Arc<crate::monitor::WorkerMonitorMetrics>>,
 ) -> Result<()> {
@@ -592,25 +592,25 @@ async fn publish_pool_state_only(
         return Ok(());
     };
     let xyk_values = crate::pool_state_publish::collect_xyk_pool_state(adapters).await;
-    let Arc venue_values = crate::pool_state_publish::collect_Arc venue_pool_state(Arc venue).await;
-    let Arc venue_values = crate::pool_state_publish::collect_Arc venue_pool_state(Arc venue).await;
+    let aquarius_values = crate::pool_state_publish::collect_aquarius_pool_state(aquarius).await;
+    let comet_values = crate::pool_state_publish::collect_comet_pool_state(comet).await;
     let clmm_complete = clmm_states
         .iter()
         .filter(|p| market_snapshot::pool_state_store::should_publish_clmm_to_redis(p))
         .count();
     pool_store
-        .publish_pool_state(&xyk_values, clmm_states, &Arc venue_values, &Arc venue_values)
+        .publish_pool_state(&xyk_values, clmm_states, &aquarius_values, &comet_values)
         .await?;
     if let Some(m) = metrics {
         m.record_publish(
-            xyk_values.len() + Arc venue_values.len() + Arc venue_values.len(),
+            xyk_values.len() + aquarius_values.len() + comet_values.len(),
             clmm_complete,
         );
     }
     info!(
         xyk_pools = xyk_values.len(),
-        Arc venue_pools = Arc venue_values.len(),
-        Arc venue_pools = Arc venue_values.len(),
+        aquarius_pools = aquarius_values.len(),
+        comet_pools = comet_values.len(),
         clmm_pools = clmm_complete,
         "Published pool state"
     );
@@ -621,12 +621,12 @@ async fn publish_snapshot_and_pool_state(
     snapshot_store: &dyn market_snapshot::store::SnapshotStore,
     pool_state_store: Option<&Arc<dyn PoolStateStore>>,
     adapters: &[Arc<dyn DexAdapter>],
-    Arc venue: &Arc venueAdapter,
-    Arc venue: &Arc venueAdapter,
+    aquarius: &AquariusAdapter,
+    comet: &CometAdapter,
     topology: &MarketSnapshot,
     clmm_states: &[ClmmPoolSnapshot],
 ) -> Result<()> {
-    publish_pool_state_only(pool_state_store, adapters, Arc venue, Arc venue, clmm_states, None).await?;
+    publish_pool_state_only(pool_state_store, adapters, aquarius, comet, clmm_states, None).await?;
     snapshot_store.publish_snapshot(topology).await?;
     Ok(())
 }
@@ -661,24 +661,24 @@ pub async fn run(config: WorkerConfig) -> Result<()> {
             .transpose()?
             .map(|store| Arc::new(store) as Arc<dyn PoolStateStore>),
     };
-    let rpc = Arc::new(ArcRpc::new(&config.rpc_url, &config.network_passphrase));
+    let rpc = Arc::new(SorobanRpc::new(&config.rpc_url, &config.network_passphrase));
     let token_metadata = Arc::new(TokenMetadataStore::new(rpc.clone()));
-    let Arc venue = Arc::new(Arc venueAdapter::new(rpc.clone()));
-    let Arc venue = Arc::new(Arc venueAdapter::new(rpc.clone()));
-    let Arc venue = Arc::new(Arc venueAdapter::new(rpc.clone()));
+    let soroswap = Arc::new(SoroswapAdapter::new(rpc.clone()));
+    let aquarius = Arc::new(AquariusAdapter::new(rpc.clone()));
+    let phoenix = Arc::new(PhoenixAdapter::new(rpc.clone()));
     let sushi = Arc::new(SushiAdapter::new(rpc.clone()));
-    let Arc venue = Arc::new(Arc venueAdapter::new(rpc.clone()));
+    let comet = Arc::new(CometAdapter::new(rpc.clone()));
     let classic = Arc::new(ClassicDexAdapter::new(None));
-    let Arc venue_clmm = Arc::new(Arc venueClmmAdapter::new(rpc.clone()));
+    let aquarius_clmm = Arc::new(AquariusClmmAdapter::new(rpc.clone()));
     let adapters: Vec<Arc<dyn DexAdapter>> = filter_enabled_adapters(
         vec![
-            Arc venue.clone(),
-            Arc venue.clone(),
-            Arc venue.clone(),
+            soroswap.clone(),
+            aquarius.clone(),
+            phoenix.clone(),
             sushi.clone(),
-            Arc venue.clone(),
+            comet.clone(),
             classic.clone(),
-            Arc venue_clmm.clone(),
+            aquarius_clmm.clone(),
         ],
         enabled_dex_sources().as_ref(),
     );
@@ -700,7 +700,7 @@ pub async fn run(config: WorkerConfig) -> Result<()> {
     let ledger_watcher_enabled = config.ledger_watcher_enabled && pool_state_store.is_some();
     let ledger_watcher = if ledger_watcher_enabled {
         let mut watcher =
-            crate::ledger_watcher::LedgerWatcher::new(ArcRpc::new(&config.rpc_url, &config.network_passphrase));
+            crate::ledger_watcher::LedgerWatcher::new(SorobanRpc::new(&config.rpc_url, &config.network_passphrase));
         watcher.bootstrap().await?;
         Some(watcher)
     } else {
@@ -729,18 +729,18 @@ pub async fn run(config: WorkerConfig) -> Result<()> {
     let token_metadata_boot = token_metadata.clone();
     let adapters_boot = adapters.clone();
     let sushi_boot = sushi.clone();
-    let Arc venue_clmm_boot = Arc venue_clmm.clone();
+    let aquarius_clmm_boot = aquarius_clmm.clone();
     let pool_state_boot = pool_state_store.clone();
     let network_passphrase = config.network_passphrase.clone();
     let destination = snapshot_destination(&config);
-    let Arc venue_boot = Arc venue.clone();
-    let Arc venue_boot = Arc venue.clone();
+    let aquarius_boot = aquarius.clone();
+    let comet_boot = comet.clone();
     let clmm_metrics_boot = clmm_metrics.clone();
     tokio::spawn(async move {
         info!("Background bootstrap: parallel adapter discovery");
         let sources = collect_sources_from_discovery(&adapters_boot).await;
         let clmm_pools =
-            collect_clmm_snapshots(&sushi_boot, &Arc venue_clmm_boot, Some(clmm_metrics_boot.as_ref())).await;
+            collect_clmm_snapshots(&sushi_boot, &aquarius_clmm_boot, Some(clmm_metrics_boot.as_ref())).await;
         {
             let mut guard = shared_boot.write().await;
             guard.sources = sources.clone();
@@ -758,8 +758,8 @@ pub async fn run(config: WorkerConfig) -> Result<()> {
             snapshot_store_boot.as_ref(),
             pool_state_boot.as_ref(),
             &adapters_boot,
-            Arc venue_boot.as_ref(),
-            Arc venue_boot.as_ref(),
+            aquarius_boot.as_ref(),
+            comet_boot.as_ref(),
             &snapshot,
             &clmm_pools,
         )
@@ -786,12 +786,12 @@ pub async fn run(config: WorkerConfig) -> Result<()> {
                 pool_store.clone(),
                 rpc.clone(),
                 shared.clone(),
-                Arc venue.clone(),
-                Arc venue.clone(),
-                Arc venue.clone(),
-                Arc venue.clone(),
+                soroswap.clone(),
+                aquarius.clone(),
+                phoenix.clone(),
+                comet.clone(),
                 sushi.clone(),
-                Arc venue_clmm.clone(),
+                aquarius_clmm.clone(),
                 Some(clmm_metrics.clone()),
             )
         })
@@ -805,12 +805,12 @@ pub async fn run(config: WorkerConfig) -> Result<()> {
         let rpc_url = config.rpc_url.clone();
         let network_passphrase = config.network_passphrase.clone();
         let pool_store = pool_state_store.clone();
-        let Arc venue_ledger = Arc venue.clone();
-        let Arc venue_ledger = Arc venue.clone();
-        let Arc venue_ledger = Arc venue.clone();
-        let Arc venue_ledger = Arc venue.clone();
+        let soroswap_ledger = soroswap.clone();
+        let aquarius_ledger = aquarius.clone();
+        let phoenix_ledger = phoenix.clone();
+        let comet_ledger = comet.clone();
         let sushi_ledger = sushi.clone();
-        let Arc venue_clmm_ledger = Arc venue_clmm.clone();
+        let aquarius_clmm_ledger = aquarius_clmm.clone();
         let clmm_metrics_ledger = clmm_metrics.clone();
         tokio::spawn(async move {
             let mut ledger_interval = tokio::time::interval(ledger_poll);
@@ -832,7 +832,7 @@ pub async fn run(config: WorkerConfig) -> Result<()> {
                         let Some(ref pool_store) = pool_store else {
                             continue;
                         };
-                        let rpc = ArcRpc::new(&rpc_url, &network_passphrase);
+                        let rpc = SorobanRpc::new(&rpc_url, &network_passphrase);
                         let mut sources = {
                             let guard = shared_ledger.read().await;
                             guard.sources.clone()
@@ -845,12 +845,12 @@ pub async fn run(config: WorkerConfig) -> Result<()> {
                             crate::touched_refresh::TouchedRefreshContext {
                                 rpc: &rpc,
                                 pool_store: pool_store.as_ref(),
-                                _Arc venue: &Arc venue_ledger,
-                                Arc venue: &Arc venue_ledger,
-                                Arc venue: &Arc venue_ledger,
-                                Arc venue: &Arc venue_ledger,
+                                _soroswap: &soroswap_ledger,
+                                aquarius: &aquarius_ledger,
+                                phoenix: &phoenix_ledger,
+                                comet: &comet_ledger,
                                 sushi: &sushi_ledger,
-                                Arc venue_clmm: &Arc venue_clmm_ledger,
+                                aquarius_clmm: &aquarius_clmm_ledger,
                                 sources: &mut sources,
                                 clmm_pools: &mut clmm_pools,
                                 clmm_metrics: Some(clmm_metrics_ledger.as_ref()),
@@ -877,7 +877,7 @@ pub async fn run(config: WorkerConfig) -> Result<()> {
 
     let pool_refresh_in_flight = Arc::new(PoolRefreshInFlight::new());
     let monitor_metrics = Arc::new(crate::monitor::WorkerMonitorMetrics::new());
-    let telegram = Chakra_alerts::TelegramAlerter::from_env().map(Arc::new);
+    let telegram = lumagg_alerts::TelegramAlerter::from_env().map(Arc::new);
     if let Some(ref alerter) = telegram {
         let api_health_url = std::env::var("MONITOR_API_HEALTH_URL")
             .unwrap_or_else(|_| "http://127.0.0.1:3100/api/v1/health".to_string());
@@ -892,7 +892,7 @@ pub async fn run(config: WorkerConfig) -> Result<()> {
         );
         info!("Telegram monitoring enabled (heartbeat + alerts)");
         let _ = alerter
-            .send("🚀 Chakra worker started (pool refresh + Telegram monitoring)")
+            .send("🚀 LumAgg worker started (pool refresh + Telegram monitoring)")
             .await;
     }
     let use_legacy_pool_publish = fetch_pipeline.is_none();
@@ -923,8 +923,8 @@ pub async fn run(config: WorkerConfig) -> Result<()> {
                 spawn_fast_pool_publish(
                     shared.clone(),
                     adapters.clone(),
-                    Arc venue.clone(),
-                    Arc venue.clone(),
+                    aquarius.clone(),
+                    comet.clone(),
                     pool_state_store.clone(),
                     Some(monitor_metrics.clone()),
                     telegram.clone(),
@@ -934,11 +934,11 @@ pub async fn run(config: WorkerConfig) -> Result<()> {
                     shared.clone(),
                     adapters.clone(),
                     sushi.clone(),
-                    Arc venue_clmm.clone(),
-                    Arc venue.clone(),
-                    Arc venue.clone(),
-                    Arc venue.clone(),
-                    Arc venue.clone(),
+                    aquarius_clmm.clone(),
+                    aquarius.clone(),
+                    comet.clone(),
+                    phoenix.clone(),
+                    soroswap.clone(),
                     pool_state_store.clone(),
                     false,
                     true,
@@ -952,11 +952,11 @@ pub async fn run(config: WorkerConfig) -> Result<()> {
                     shared.clone(),
                     adapters.clone(),
                     sushi.clone(),
-                    Arc venue_clmm.clone(),
-                    Arc venue.clone(),
-                    Arc venue.clone(),
-                    Arc venue.clone(),
-                    Arc venue.clone(),
+                    aquarius_clmm.clone(),
+                    aquarius.clone(),
+                    comet.clone(),
+                    phoenix.clone(),
+                    soroswap.clone(),
                     pool_state_store.clone(),
                     true,
                     true,
@@ -968,19 +968,19 @@ pub async fn run(config: WorkerConfig) -> Result<()> {
                 let shared_disc = shared.clone();
                 let adapters_disc = adapters.clone();
                 let sushi_disc = sushi.clone();
-                let Arc venue_clmm_disc = Arc venue_clmm.clone();
+                let aquarius_clmm_disc = aquarius_clmm.clone();
                 let snapshot_store_disc = snapshot_store.clone();
                 let token_metadata_disc = token_metadata.clone();
                 let pool_state_disc = pool_state_store.clone();
-                let Arc venue_disc = Arc venue.clone();
-                let Arc venue_disc = Arc venue.clone();
+                let aquarius_disc = aquarius.clone();
+                let comet_disc = comet.clone();
                 let network_passphrase_disc = config.network_passphrase.clone();
                 let destination_disc = snapshot_destination(&config);
                 let clmm_metrics_disc = clmm_metrics.clone();
                 tokio::spawn(async move {
                     let sources = collect_sources_from_discovery(&adapters_disc).await;
                     let clmm_pools =
-                        collect_clmm_snapshots(&sushi_disc, &Arc venue_clmm_disc, Some(clmm_metrics_disc.as_ref()))
+                        collect_clmm_snapshots(&sushi_disc, &aquarius_clmm_disc, Some(clmm_metrics_disc.as_ref()))
                             .await;
                     {
                         let mut guard = shared_disc.write().await;
@@ -1011,8 +1011,8 @@ pub async fn run(config: WorkerConfig) -> Result<()> {
                         snapshot_store_disc.as_ref(),
                         pool_state_disc.as_ref(),
                         &adapters_disc,
-                        Arc venue_disc.as_ref(),
-                        Arc venue_disc.as_ref(),
+                        aquarius_disc.as_ref(),
+                        comet_disc.as_ref(),
                         &snapshot,
                         &clmm_pools,
                     )
@@ -1074,9 +1074,9 @@ mod tests {
     }
 
     #[test]
-    fn sanitizes_Arc venue_multi_edge_pools() {
+    fn sanitizes_aquarius_multi_edge_pools() {
         let filtered = sanitize_source_pairs(
-            "Arc venue",
+            "aquarius",
             vec![
                 TradingPairSnapshot {
                     token_a: "A".to_string(),
@@ -1107,7 +1107,7 @@ mod tests {
     fn upserts_source_snapshot_without_dropping_others() {
         let current = vec![
             SourceSnapshot {
-                source: "Arc venue".to_string(),
+                source: "soroswap".to_string(),
                 pairs: vec![TradingPairSnapshot {
                     token_a: "A".to_string(),
                     token_b: "B".to_string(),
@@ -1116,7 +1116,7 @@ mod tests {
                 }],
             },
             SourceSnapshot {
-                source: "Arc venue".to_string(),
+                source: "phoenix".to_string(),
                 pairs: vec![TradingPairSnapshot {
                     token_a: "C".to_string(),
                     token_b: "D".to_string(),
@@ -1129,7 +1129,7 @@ mod tests {
         let updated = upsert_source_snapshot(
             current,
             SourceSnapshot {
-                source: "Arc venue".to_string(),
+                source: "soroswap".to_string(),
                 pairs: vec![TradingPairSnapshot {
                     token_a: "A".to_string(),
                     token_b: "B".to_string(),
@@ -1140,9 +1140,9 @@ mod tests {
         );
 
         assert_eq!(updated.len(), 2);
-        assert!(updated.iter().any(|source| source.source == "Arc venue"));
+        assert!(updated.iter().any(|source| source.source == "phoenix"));
         assert_eq!(
-            updated.iter().find(|source| source.source == "Arc venue").unwrap().pairs[0].pool_address,
+            updated.iter().find(|source| source.source == "soroswap").unwrap().pairs[0].pool_address,
             "new"
         );
     }
@@ -1181,9 +1181,9 @@ mod tests {
 
     #[tokio::test]
     async fn snapshot_from_sources_preserves_clmm_pool_refs() {
-        let rpc = Arc::new(ArcRpc::new(
-            "https://Arc-rpc.mainnet.Arc.gateway.fm",
-            "Public Global Arc Network ; September 2015",
+        let rpc = Arc::new(SorobanRpc::new(
+            "https://soroban-rpc.mainnet.stellar.gateway.fm",
+            "Public Global Stellar Network ; September 2015",
         ));
         let token_metadata = TokenMetadataStore::new(rpc);
         token_metadata

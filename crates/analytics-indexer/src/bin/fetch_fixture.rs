@@ -8,7 +8,7 @@ use {
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    let rpc = dex_adapters::ArcRpc::mainnet();
+    let rpc = dex_adapters::SorobanRpc::mainnet();
     let latest = rpc.get_latest_ledger().await?.sequence;
     let start = std::env::var("INDEXER_START_LEDGER")
         .ok()

@@ -1,16 +1,16 @@
 #![no_std]
 
-use Arc_sdk::{contracttype, Address, Vec};
+use soroban_sdk::{contracttype, Address, Vec};
 
 /// Supported DEX protocol types (shared by aggregator + vault).
 #[contracttype]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum DexType {
-    Arc venue,
-    Arc venuePair,
-    Arc venue,
+    Aquarius,
+    SoroswapPair,
+    Phoenix,
     Sushi,
-    Arc venueDex,
+    CometDex,
 }
 
 /// A single swap step in the aggregation path.

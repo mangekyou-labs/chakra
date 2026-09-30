@@ -1,6 +1,6 @@
 # Smart Contract Deployment
 
-Chakra uses two main contracts:
+LumAgg uses two main contracts:
 
 | Contract | Required by | Purpose |
 | --- | --- | --- |
@@ -14,34 +14,34 @@ product.
 ## Prerequisites
 
 - Rust with the `wasm32v1-none` target.
-- Arc CLI and a configured network.
+- Stellar CLI and a configured network.
 - A funded deployer identity.
 - A separate admin identity whose key is protected for initialization and
   upgrades.
 
-The repository currently uses Arc SDK 22. Check the tested toolchain before
+The repository currently uses Soroban SDK 22. Check the tested toolchain before
 deploying and do not upgrade contract dependencies as part of a production
 deployment without rerunning all contract tests.
 
 Official references:
 
-- [Arc smart contract setup](https://developers.Arc.org/docs/build/smart-contracts/getting-started/setup)
-- [Arc CLI manual](https://developers.Arc.org/docs/tools/cli/Arc-cli)
-- [Contract TTL maintenance](https://developers.Arc.org/docs/build/guides/conventions/extending-wasm-ttl)
+- [Stellar smart contract setup](https://developers.stellar.org/docs/build/smart-contracts/getting-started/setup)
+- [Stellar CLI manual](https://developers.stellar.org/docs/tools/cli/stellar-cli)
+- [Contract TTL maintenance](https://developers.stellar.org/docs/build/guides/conventions/extending-wasm-ttl)
 
 ## Configure Testnet
 
 Use a named CLI network so every command targets the same RPC and passphrase:
 
 ```bash
-Arc network add Chakra-testnet \
-  --rpc-url https://Arc-testnet.Arc.org \
+stellar network add lumagg-testnet \
+  --rpc-url https://soroban-testnet.stellar.org \
   --network-passphrase 'Test SDF Network ; September 2015'
 
-Arc network health --network Chakra-testnet
-Arc keys generate Chakra-admin --network Chakra-testnet
-Arc keys fund Chakra-admin --network Chakra-testnet
-export ADMIN_G=$(Arc keys address Chakra-admin)
+stellar network health --network lumagg-testnet
+stellar keys generate lumagg-admin --network lumagg-testnet
+stellar keys fund lumagg-admin --network lumagg-testnet
+export ADMIN_G=$(stellar keys address lumagg-admin)
 ```
 
 For mainnet, create a separate network profile and use an existing funded
@@ -60,12 +60,12 @@ Build optimized release WASM from the locked workspace:
 
 ```bash
 mkdir -p build/contracts
-Arc contract build --locked \
+stellar contract build --locked \
   --package aggregator-contract \
   --profile contract-release \
   --optimize \
   --out-dir build/contracts
-Arc contract build --locked \
+stellar contract build --locked \
   --package vault-contract \
   --profile contract-release \
   --optimize \
@@ -74,8 +74,8 @@ Arc contract build --locked \
 openssl dgst -sha256 build/contracts/*.wasm
 ```
 
-These commands were verified with Arc CLI 25.2. Newer CLI versions also
-optimize during `Arc contract build`; check `Arc contract build --help`
+These commands were verified with Stellar CLI 25.2. Newer CLI versions also
+optimize during `stellar contract build`; check `stellar contract build --help`
 if the flag syntax changes. Always verify the resulting hash rather than
 assuming two toolchains produce identical bytes.
 
@@ -87,15 +87,15 @@ ID, deployment transaction, and admin address in the release record.
 Deploy and capture the returned contract ID:
 
 ```bash
-export AGGREGATOR=$(Arc contract deploy \
+export AGGREGATOR=$(stellar contract deploy \
   --wasm build/contracts/aggregator_contract.wasm \
-  --source Chakra-admin \
-  --network Chakra-testnet)
+  --source lumagg-admin \
+  --network lumagg-testnet)
 
-Arc contract invoke \
+stellar contract invoke \
   --id "$AGGREGATOR" \
-  --source Chakra-admin \
-  --network Chakra-testnet \
+  --source lumagg-admin \
+  --network lumagg-testnet \
   -- initialize --admin "$ADMIN_G"
 ```
 
@@ -103,10 +103,10 @@ Arc contract invoke \
 simulation:
 
 ```bash
-Arc contract invoke \
+stellar contract invoke \
   --id "$AGGREGATOR" \
-  --source Chakra-admin \
-  --network Chakra-testnet \
+  --source lumagg-admin \
+  --network lumagg-testnet \
   --send=no \
   -- admin
 ```
@@ -116,7 +116,7 @@ without it, but `/build_tx` requires it. For Arbitrage, set the same ID as
 `ARB_AGGREGATOR_CONTRACT`.
 
 The repository also includes `contracts/aggregator/deploy-testnet.sh`. It
-refuses mainnet and is convenient for Chakra development, but the explicit
+refuses mainnet and is convenient for LumAgg development, but the explicit
 commands above are easier for an external operator to audit.
 
 ## Deploy the Vault
@@ -124,15 +124,15 @@ commands above are easier for an external operator to audit.
 The Vault is optional and should be deployed only by an Arbitrage operator:
 
 ```bash
-export VAULT=$(Arc contract deploy \
+export VAULT=$(stellar contract deploy \
   --wasm build/contracts/vault_contract.wasm \
-  --source Chakra-admin \
-  --network Chakra-testnet)
+  --source lumagg-admin \
+  --network lumagg-testnet)
 
-Arc contract invoke \
+stellar contract invoke \
   --id "$VAULT" \
-  --source Chakra-admin \
-  --network Chakra-testnet \
+  --source lumagg-admin \
+  --network lumagg-testnet \
   -- initialize --admin "$ADMIN_G"
 ```
 
@@ -141,32 +141,32 @@ Allowlist a bot caller and verify it:
 ```bash
 export CALLER_G=G...
 
-Arc contract invoke \
+stellar contract invoke \
   --id "$VAULT" \
-  --source Chakra-admin \
-  --network Chakra-testnet \
+  --source lumagg-admin \
+  --network lumagg-testnet \
   -- add_caller --caller "$CALLER_G"
 
-Arc contract invoke \
+stellar contract invoke \
   --id "$VAULT" \
-  --source Chakra-admin \
-  --network Chakra-testnet \
+  --source lumagg-admin \
+  --network lumagg-testnet \
   --send=no \
   -- is_caller --caller "$CALLER_G"
 ```
 
 Fund the Vault from a separate funded identity. `amount` uses the token's
-integer units; XLM and most Arc assets use seven decimals:
+integer units; XLM and most Stellar assets use seven decimals:
 
 ```bash
-export FUNDER=Chakra-funder
+export FUNDER=lumagg-funder
 export BASE_TOKEN=C...
 
-Arc contract invoke \
+stellar contract invoke \
   --id "$VAULT" \
   --source "$FUNDER" \
-  --network Chakra-testnet \
-  -- deposit --from "$(Arc keys address "$FUNDER")" \
+  --network lumagg-testnet \
+  -- deposit --from "$(stellar keys address "$FUNDER")" \
   --token "$BASE_TOKEN" --amount 1000000000
 ```
 
@@ -185,15 +185,15 @@ artifact, record its hash, then invoke the admin-only `upgrade` function:
 export NEW_WASM=build/contracts/aggregator_contract.wasm
 export NEW_WASM_HASH=$(openssl dgst -sha256 "$NEW_WASM" | awk '{print $NF}')
 
-Arc contract upload \
+stellar contract upload \
   --wasm "$NEW_WASM" \
-  --source Chakra-admin \
-  --network Chakra-testnet
+  --source lumagg-admin \
+  --network lumagg-testnet
 
-Arc contract invoke \
+stellar contract invoke \
   --id "$AGGREGATOR" \
-  --source Chakra-admin \
-  --network Chakra-testnet \
+  --source lumagg-admin \
+  --network lumagg-testnet \
   -- upgrade --new_wasm_hash "$NEW_WASM_HASH"
 ```
 
@@ -203,7 +203,7 @@ state transition and cannot be undone with Git alone.
 
 ## TTL Maintenance
 
-Chakra intentionally keeps TTL extension outside the contracts. Arc stores
+LumAgg intentionally keeps TTL extension outside the contracts. Stellar stores
 the contract instance and WASM as separate ledger entries, and both can become
 archived if they are not extended.
 
@@ -212,8 +212,8 @@ Use the exact deployed WASM or its recorded hash:
 ```bash
 CONTRACT_ID="$AGGREGATOR" \
 WASM=build/contracts/aggregator_contract.wasm \
-SOURCE=Chakra-admin \
-NETWORK=Chakra-testnet \
+SOURCE=lumagg-admin \
+NETWORK=lumagg-testnet \
 LEDGERS_TO_EXTEND=2073600 \
   ./scripts/extend-contract-ttl.sh
 ```
@@ -221,7 +221,7 @@ LEDGERS_TO_EXTEND=2073600 \
 At an average five-second ledger close, `2073600` ledgers is approximately 120
 days. Run the operation well before the remaining TTL reaches 30 days and
 monitor the resulting transactions. Network limits can change, so confirm the
-accepted range with the current Arc CLI and RPC before scheduling it.
+accepted range with the current Stellar CLI and RPC before scheduling it.
 
 The helper extends the contract instance and WASM by default. Vault allowlist
 entries use persistent storage and have their own TTL; reading or rewriting an
@@ -231,15 +231,15 @@ entry does not automatically extend it. Generate the base64 XDR for each
 ```bash
 CONTRACT_ID="$VAULT" \
 WASM=build/contracts/vault_contract.wasm \
-SOURCE=Chakra-admin \
-NETWORK=Chakra-testnet \
+SOURCE=lumagg-admin \
+NETWORK=lumagg-testnet \
 PERSISTENT_KEY_XDRS='<caller-1-key-xdr>,<caller-2-key-xdr>' \
   ./scripts/extend-contract-ttl.sh
 ```
 
-The Arc CLI requires `--key-xdr` for enum keys containing an address. See
+The Stellar CLI requires `--key-xdr` for enum keys containing an address. See
 the official
-[persistent-entry CLI guide](https://developers.Arc.org/docs/tools/cli/cookbook/extend-contract-storage)
+[persistent-entry CLI guide](https://developers.stellar.org/docs/tools/cli/cookbook/extend-contract-storage)
 for the key format. Continue to verify `is_caller` before enabling live
 submissions; an archived caller entry must be restored before contract code can
 read or recreate it.

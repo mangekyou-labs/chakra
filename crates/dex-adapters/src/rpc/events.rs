@@ -1,8 +1,8 @@
-//! Arc RPC `getLatestLedger` / `getEvents` helpers for ledger-driven
+//! Soroban RPC `getLatestLedger` / `getEvents` helpers for ledger-driven
 //! indexing.
 
 use {
-    super::ArcRpc,
+    super::SorobanRpc,
     anyhow::{anyhow, Result},
     serde::Deserialize,
     serde_json::json,
@@ -61,7 +61,7 @@ pub struct EventFilterSpec {
     pub topics: Option<Vec<Vec<String>>>,
 }
 
-impl ArcRpc {
+impl SorobanRpc {
     pub async fn get_latest_ledger(&self) -> Result<LatestLedger> {
         let body = json!({
             "jsonrpc": "2.0",

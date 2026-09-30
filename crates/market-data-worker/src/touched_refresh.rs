@@ -3,17 +3,17 @@
 use {
     crate::{
         clmm_metrics::ClmmCoverageMetrics, ledger_watcher::ledger_max_touched_refresh_from_env,
-        pool_state_publish::Arc venue_state_to_value,
+        pool_state_publish::comet_state_to_value,
     },
     anyhow::Result,
     dex_adapters::{
-        Arc venue::Arc venueAdapter, Arc venue_clmm::Arc venueClmmAdapter, batch_refresh::batch_refresh_Arc venue_reserves,
-        Arc venue::Arc venueAdapter, Arc venue::Arc venueAdapter, pool_index::PoolRef, rpc::ArcRpc, Arc venue::Arc venueAdapter,
+        aquarius::AquariusAdapter, aquarius_clmm::AquariusClmmAdapter, batch_refresh::batch_refresh_soroswap_reserves,
+        comet::CometAdapter, phoenix::PhoenixAdapter, pool_index::PoolRef, rpc::SorobanRpc, soroswap::SoroswapAdapter,
         sushi::SushiAdapter, DexAdapter,
     },
     market_snapshot::{
         pool_state_store::{
-            should_publish_clmm_to_redis, Arc venuePoolStateValue, Arc venuePoolStateValue, PoolStateStore,
+            should_publish_clmm_to_redis, AquariusPoolStateValue, CometPoolStateValue, PoolStateStore,
             XykPoolStateValue,
         },
         ClmmPoolSnapshot, SourceSnapshot,
@@ -22,21 +22,21 @@ use {
     tracing::{debug, warn},
 };
 
-const BATCH_XYK_SOURCES: &[&str] = &["Arc venue"];
-const Arc venue_SOURCE: &str = "Arc venue";
-const CLMM_SOURCES: &[&str] = &["sushi", "Arc venue_clmm"];
-const Arc venue_SOURCE: &str = "Arc venue";
-const Arc venue_SOURCE: &str = "Arc venue";
+const BATCH_XYK_SOURCES: &[&str] = &["soroswap"];
+const AQUARIUS_SOURCE: &str = "aquarius";
+const CLMM_SOURCES: &[&str] = &["sushi", "aquarius_clmm"];
+const PHOENIX_SOURCE: &str = "phoenix";
+const COMET_SOURCE: &str = "comet";
 
 pub struct TouchedRefreshContext<'a> {
-    pub rpc: &'a ArcRpc,
+    pub rpc: &'a SorobanRpc,
     pub pool_store: &'a dyn PoolStateStore,
-    pub _Arc venue: &'a Arc venueAdapter,
-    pub Arc venue: &'a Arc venueAdapter,
-    pub Arc venue: &'a Arc venueAdapter,
-    pub Arc venue: &'a Arc venueAdapter,
+    pub _soroswap: &'a SoroswapAdapter,
+    pub aquarius: &'a AquariusAdapter,
+    pub phoenix: &'a PhoenixAdapter,
+    pub comet: &'a CometAdapter,
     pub sushi: &'a SushiAdapter,
-    pub Arc venue_clmm: &'a Arc venueClmmAdapter,
+    pub aquarius_clmm: &'a AquariusClmmAdapter,
     pub sources: &'a mut Vec<SourceSnapshot>,
     pub clmm_pools: &'a mut Vec<ClmmPoolSnapshot>,
     pub clmm_metrics: Option<&'a ClmmCoverageMetrics>,
@@ -66,8 +66,8 @@ pub async fn refresh_touched_pools(ctx: TouchedRefreshContext<'_>, touched: Hash
 
     let mut updated = 0usize;
     let mut xyk_writeback: Vec<XykPoolStateValue> = Vec::new();
-    let mut Arc venue_writeback: Vec<Arc venuePoolStateValue> = Vec::new();
-    let mut Arc venue_writeback: Vec<Arc venuePoolStateValue> = Vec::new();
+    let mut aquarius_writeback: Vec<AquariusPoolStateValue> = Vec::new();
+    let mut comet_writeback: Vec<CometPoolStateValue> = Vec::new();
     let mut clmm_writeback: Vec<ClmmPoolSnapshot> = Vec::new();
 
     for (source, addresses) in &by_source {
@@ -76,32 +76,32 @@ pub async fn refresh_touched_pools(ctx: TouchedRefreshContext<'_>, touched: Hash
                 updated += n;
                 xyk_writeback.extend(values);
             }
-        } else if source == Arc venue_SOURCE {
-            let n = ctx.Arc venue.refresh_pool_addresses(addresses).await?;
+        } else if source == AQUARIUS_SOURCE {
+            let n = ctx.aquarius.refresh_pool_addresses(addresses).await?;
             if n > 0 {
                 updated += n;
-                Arc venue_writeback.extend(collect_Arc venue_writeback(ctx.Arc venue, addresses).await);
+                aquarius_writeback.extend(collect_aquarius_writeback(ctx.aquarius, addresses).await);
             }
-        } else if source == Arc venue_SOURCE {
-            let n = ctx.Arc venue.refresh_touched_pools(addresses).await?;
+        } else if source == PHOENIX_SOURCE {
+            let n = ctx.phoenix.refresh_touched_pools(addresses).await?;
             if n > 0 {
-                merge_xyk_topology_from_adapter(ctx.sources, Arc venue_SOURCE, ctx.Arc venue as &dyn DexAdapter).await;
+                merge_xyk_topology_from_adapter(ctx.sources, PHOENIX_SOURCE, ctx.phoenix as &dyn DexAdapter).await;
                 updated += n;
                 xyk_writeback.extend(
-                    collect_xyk_from_adapter(ctx.sources, Arc venue_SOURCE, addresses, ctx.Arc venue as &dyn DexAdapter)
+                    collect_xyk_from_adapter(ctx.sources, PHOENIX_SOURCE, addresses, ctx.phoenix as &dyn DexAdapter)
                         .await,
                 );
             }
-        } else if source == Arc venue_SOURCE {
-            let n = refresh_Arc venue_touched(ctx.Arc venue, ctx.sources, addresses).await?;
+        } else if source == COMET_SOURCE {
+            let n = refresh_comet_touched(ctx.comet, ctx.sources, addresses).await?;
             updated += n;
-            Arc venue_writeback.extend(collect_Arc venue_writeback(ctx.Arc venue, addresses).await);
+            comet_writeback.extend(collect_comet_writeback(ctx.comet, addresses).await);
         } else if CLMM_SOURCES.contains(&source.as_str()) {
             let (n, snaps) = refresh_clmm_pools(
                 source,
                 addresses,
                 ctx.sushi,
-                ctx.Arc venue_clmm,
+                ctx.aquarius_clmm,
                 ctx.clmm_pools,
                 ctx.clmm_metrics,
             )
@@ -120,11 +120,11 @@ pub async fn refresh_touched_pools(ctx: TouchedRefreshContext<'_>, touched: Hash
     if !xyk_writeback.is_empty() {
         ctx.pool_store.set_xyk_batch(&xyk_writeback).await?;
     }
-    if !Arc venue_writeback.is_empty() {
-        ctx.pool_store.set_Arc venue_batch(&Arc venue_writeback).await?;
+    if !aquarius_writeback.is_empty() {
+        ctx.pool_store.set_aquarius_batch(&aquarius_writeback).await?;
     }
-    if !Arc venue_writeback.is_empty() {
-        ctx.pool_store.set_Arc venue_batch(&Arc venue_writeback).await?;
+    if !comet_writeback.is_empty() {
+        ctx.pool_store.set_comet_batch(&comet_writeback).await?;
     }
     if !clmm_writeback.is_empty() {
         ctx.pool_store.set_clmm_batch(&clmm_writeback).await?;
@@ -134,7 +134,7 @@ pub async fn refresh_touched_pools(ctx: TouchedRefreshContext<'_>, touched: Hash
 }
 
 async fn refresh_xyk_batch(
-    rpc: &ArcRpc,
+    rpc: &SorobanRpc,
     sources: &[SourceSnapshot],
     source: &str,
     pool_addresses: &[String],
@@ -142,7 +142,7 @@ async fn refresh_xyk_batch(
     if pool_addresses.is_empty() {
         return Ok(None);
     }
-    let results = batch_refresh_Arc venue_reserves(rpc, pool_addresses).await?;
+    let results = batch_refresh_soroswap_reserves(rpc, pool_addresses).await?;
     let source_snapshot = sources.iter().find(|s| s.source == source);
     let Some(source_snapshot) = source_snapshot else {
         return Ok(None);
@@ -171,15 +171,15 @@ async fn refresh_xyk_batch(
     Ok(Some((updated, values)))
 }
 
-async fn collect_Arc venue_writeback(
-    Arc venue: &Arc venueAdapter,
+async fn collect_aquarius_writeback(
+    aquarius: &AquariusAdapter,
     pool_addresses: &[String],
-) -> Vec<Arc venuePoolStateValue> {
-    Arc venue
+) -> Vec<AquariusPoolStateValue> {
+    aquarius
         .export_pool_quote_states_for(pool_addresses)
         .await
         .into_iter()
-        .map(|state| Arc venuePoolStateValue {
+        .map(|state| AquariusPoolStateValue {
             pool_address: state.pool_address,
             tokens: state.tokens,
             reserves: state.reserves,
@@ -242,24 +242,24 @@ async fn collect_xyk_from_adapter(
     out
 }
 
-async fn refresh_Arc venue_touched(
-    Arc venue: &Arc venueAdapter,
+async fn refresh_comet_touched(
+    comet: &CometAdapter,
     sources: &mut [SourceSnapshot],
     pool_addresses: &[String],
 ) -> Result<usize> {
     let mut updated = 0usize;
     for addr in pool_addresses {
-        if !Arc venue.refresh_pool(addr).await? {
+        if !comet.refresh_pool(addr).await? {
             continue;
         }
         updated += 1;
-        let refreshed: Vec<_> = Arc venue
+        let refreshed: Vec<_> = comet
             .get_cached_pairs()
             .await
             .into_iter()
             .filter(|p| p.pool_address == *addr)
             .collect();
-        if let Some(existing) = sources.iter_mut().find(|s| s.source == Arc venue_SOURCE) {
+        if let Some(existing) = sources.iter_mut().find(|s| s.source == COMET_SOURCE) {
             for pair in refreshed {
                 if let Some(snap) = existing.pairs.iter_mut().find(|p| {
                     p.pool_address == pair.pool_address &&
@@ -274,13 +274,13 @@ async fn refresh_Arc venue_touched(
     Ok(updated)
 }
 
-async fn collect_Arc venue_writeback(Arc venue: &Arc venueAdapter, pool_addresses: &[String]) -> Vec<Arc venuePoolStateValue> {
-    Arc venue
+async fn collect_comet_writeback(comet: &CometAdapter, pool_addresses: &[String]) -> Vec<CometPoolStateValue> {
+    comet
         .export_pool_quote_states_for(pool_addresses)
         .await
         .into_iter()
         .filter(|(_, state)| state.records.len() >= 2)
-        .map(|(addr, state)| Arc venue_state_to_value(&addr, &state))
+        .map(|(addr, state)| comet_state_to_value(&addr, &state))
         .collect()
 }
 
@@ -288,7 +288,7 @@ async fn refresh_clmm_pools(
     source: &str,
     pool_addresses: &[String],
     sushi: &SushiAdapter,
-    Arc venue_clmm: &Arc venueClmmAdapter,
+    aquarius_clmm: &AquariusClmmAdapter,
     clmm_pools: &mut Vec<ClmmPoolSnapshot>,
     clmm_metrics: Option<&ClmmCoverageMetrics>,
 ) -> Result<(usize, Vec<ClmmPoolSnapshot>)> {
@@ -298,7 +298,7 @@ async fn refresh_clmm_pools(
     for addr in pool_addresses {
         let result = match source {
             "sushi" => sushi.ensure_pool_loaded(addr).await,
-            "Arc venue_clmm" => Arc venue_clmm.ensure_pool_loaded(addr).await,
+            "aquarius_clmm" => aquarius_clmm.ensure_pool_loaded(addr).await,
             _ => continue,
         };
         if let Err(error) = result {
@@ -310,7 +310,7 @@ async fn refresh_clmm_pools(
 
     let exported = match source {
         "sushi" => sushi.export_clmm_snapshots().await,
-        "Arc venue_clmm" => Arc venue_clmm.export_clmm_snapshots().await,
+        "aquarius_clmm" => aquarius_clmm.export_clmm_snapshots().await,
         _ => Vec::new(),
     };
 

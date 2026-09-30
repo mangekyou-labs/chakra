@@ -3,7 +3,7 @@
 
 use {
     crate::{
-        rpc::{scval_to_string, ArcRpc},
+        rpc::{scval_to_string, SorobanRpc},
         token_logo::TokenLogoCache,
         token_logo_lists::TokenLogoListIndex,
     },
@@ -65,7 +65,7 @@ pub struct TokenMetadataStore {
 }
 
 impl TokenMetadataStore {
-    pub fn new(_rpc: Arc<ArcRpc>) -> Self {
+    pub fn new(_rpc: Arc<SorobanRpc>) -> Self {
         Self::with_logo_cache(TokenLogoCache::from_env(), TokenLogoListIndex::from_env())
     }
 
@@ -230,9 +230,9 @@ impl TokenMetadataStore {
     /// Fetch symbol and name from chain via simulate_call.
     async fn fetch_token_metadata(&self, contract: &str) -> Option<TokenMetadata> {
         // Use public RPC for metadata (more reliable than local for some contracts)
-        let public_rpc = ArcRpc::new(
-            "https://Arc-rpc.mainnet.Arc.gateway.fm",
-            "Public Global Arc Network ; September 2015",
+        let public_rpc = SorobanRpc::new(
+            "https://soroban-rpc.mainnet.stellar.gateway.fm",
+            "Public Global Stellar Network ; September 2015",
         );
 
         // Call symbol()
@@ -255,7 +255,7 @@ impl TokenMetadataStore {
         let display_name = if name.contains(':') {
             name.split(':').next().unwrap_or(&name).to_string()
         } else if name == "native" {
-            "Arc Lumens".to_string()
+            "Stellar Lumens".to_string()
         } else {
             name.clone()
         };
@@ -457,7 +457,7 @@ mod tests {
                 contract: "token-sep".to_string(),
                 symbol: "SEP".to_string(),
                 name: "Sep".to_string(),
-                logo: Some("https://Arc.expert/explorer/public/asset/native/icon".into()),
+                logo: Some("https://stellar.expert/explorer/public/asset/native/icon".into()),
                 logo_kind: None,
             },
         );

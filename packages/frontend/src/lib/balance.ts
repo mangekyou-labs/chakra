@@ -1,12 +1,12 @@
-/** Token balance lookup (atomic unitss) for swap UI and pre-swap checks. */
+/** Token balance lookup (stroops) for swap UI and pre-swap checks. */
 
 import { NATIVE_CONTRACT } from '@/lib/tokenDisplay';
 
 const NATIVE_SAC = NATIVE_CONTRACT;
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://api.Chakra.xyz';
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://api.lumagg.xyz';
 
 /** Reserve native XLM for fees when using Max / 100%. */
-export const NATIVE_FEE_RESERVE_atomic unitsS = BigInt(5_000_000); // 0.5 XLM
+export const NATIVE_FEE_RESERVE_STROOPS = BigInt(5_000_000); // 0.5 XLM
 
 export type BalanceMap = Record<string, bigint>;
 export type TrustlineMap = Record<string, boolean>;
@@ -80,7 +80,7 @@ export async function fetchTokenBalance(
   }
 }
 
-export async function fetchTokenBalanceatomic unitss(
+export async function fetchTokenBalanceStroops(
   accountId: string,
   tokenContractId: string,
 ): Promise<bigint | null> {
@@ -88,7 +88,7 @@ export async function fetchTokenBalanceatomic unitss(
   return result?.balance ?? null;
 }
 
-/** Batch SAC balances via Arc RPC. `common` ≈15 hubs (fast); `catalog` = full set. */
+/** Batch SAC balances via Soroban RPC. `common` ≈15 hubs (fast); `catalog` = full set. */
 export async function fetchAccountBalances(
   accountId: string,
   scope: 'common' | 'catalog' = 'catalog',
@@ -126,7 +126,7 @@ export async function fetchAccountBalances(
   };
 }
 
-export async function fetchSpendableBalanceatomic unitss(
+export async function fetchSpendableBalanceStroops(
   accountId: string,
   tokenContractId: string,
   _decimals: number,
@@ -136,20 +136,20 @@ export async function fetchSpendableBalanceatomic unitss(
     return cached[tokenContractId];
   }
 
-  return fetchTokenBalanceatomic unitss(accountId, tokenContractId);
+  return fetchTokenBalanceStroops(accountId, tokenContractId);
 }
 
-export function atomic unitssToDecimalString(atomic unitss: bigint, decimals: number): string {
+export function stroopsToDecimalString(stroops: bigint, decimals: number): string {
   const base = BigInt(10) ** BigInt(decimals);
-  const whole = atomic unitss / base;
-  const frac = atomic unitss % base;
+  const whole = stroops / base;
+  const frac = stroops % base;
   if (frac === BigInt(0)) return whole.toString();
   const fracStr = frac.toString().padStart(decimals, '0').replace(/0+$/, '');
   return `${whole}.${fracStr}`;
 }
 
-export function formatBalanceDisplay(atomic unitss: bigint, decimals: number): string {
-  const val = Number(atomic unitss) / 10 ** decimals;
+export function formatBalanceDisplay(stroops: bigint, decimals: number): string {
+  const val = Number(stroops) / 10 ** decimals;
   if (val >= 1_000_000) return val.toLocaleString(undefined, { maximumFractionDigits: 2 });
   if (val >= 1) return val.toLocaleString(undefined, { maximumFractionDigits: 4 });
   if (val >= 0.0001) return val.toLocaleString(undefined, { maximumFractionDigits: 6 });
@@ -158,31 +158,31 @@ export function formatBalanceDisplay(atomic unitss: bigint, decimals: number): s
 }
 
 export function spendableForPercent(
-  balanceatomic unitss: bigint,
+  balanceStroops: bigint,
   percent: number,
   tokenContractId: string,
 ): bigint {
-  let available = balanceatomic unitss;
+  let available = balanceStroops;
   if (tokenContractId === NATIVE_SAC && percent >= 100) {
     available =
-      balanceatomic unitss > NATIVE_FEE_RESERVE_atomic unitsS
-        ? balanceatomic unitss - NATIVE_FEE_RESERVE_atomic unitsS
+      balanceStroops > NATIVE_FEE_RESERVE_STROOPS
+        ? balanceStroops - NATIVE_FEE_RESERVE_STROOPS
         : BigInt(0);
   } else if (percent >= 100) {
-    available = balanceatomic unitss;
+    available = balanceStroops;
   } else {
-    available = (balanceatomic unitss * BigInt(percent)) / BigInt(100);
+    available = (balanceStroops * BigInt(percent)) / BigInt(100);
   }
   return available > BigInt(0) ? available : BigInt(0);
 }
 
 export function percentToAmountInput(
-  balanceatomic unitss: bigint,
+  balanceStroops: bigint,
   percent: number,
   decimals: number,
   tokenContractId: string,
 ): string {
-  const atomic unitss = spendableForPercent(balanceatomic unitss, percent, tokenContractId);
-  if (atomic unitss === BigInt(0)) return '';
-  return atomic unitssToDecimalString(atomic unitss, decimals);
+  const stroops = spendableForPercent(balanceStroops, percent, tokenContractId);
+  if (stroops === BigInt(0)) return '';
+  return stroopsToDecimalString(stroops, decimals);
 }

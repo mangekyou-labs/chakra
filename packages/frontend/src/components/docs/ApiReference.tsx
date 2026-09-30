@@ -4,7 +4,7 @@ import { useState, type ReactNode } from 'react';
 import { BuildTxCodeSample } from '@/components/BuildTxCodeSample';
 import { GITHUB_REPO_URL } from '@/lib/site';
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://api.Chakra.xyz';
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://api.lumagg.xyz';
 const AGGREGATOR = 'CC6QAV7JEG5MYRSPO5Z65E5G2M4ZB64BEG2ZXIZXL55TQT35JDI2LC6K';
 
 const TOKENS: Record<string, string> = {
@@ -64,11 +64,11 @@ export function ApiReference() {
       <header className="docs-intro">
         <h1 className="docs-title">API Documentation</h1>
         <p className="docs-lead">
-          Liquidity aggregator across Arc venue, Arc venue, Arc venue, Sushi V3, Arc venue and Classic DEX.
+          Liquidity aggregator across Soroswap, Aquarius, Phoenix, Sushi V3, Comet and Classic DEX.
         </p>
         <p className="docs-meta">
           <a href={GITHUB_REPO_URL} target="_blank" rel="noopener noreferrer">
-            github.com/Chakra/Arc-dex-agg
+            github.com/Lum-Agg/stellar-dex-agg
           </a>
           {' · '}
           <a
@@ -144,7 +144,7 @@ export function ApiReference() {
         <Endpoint
           method="GET"
           path="/api/v1/account"
-          description="Account sequence via Arc RPC."
+          description="Account sequence via Soroban RPC."
           params={[{ name: 'account', type: 'string', required: true, desc: 'G... address' }]}
           tryIt={<PingTryIt path={`/api/v1/account?account=${DEMO_USER}`} />}
         />
@@ -242,13 +242,13 @@ export function ApiReference() {
               required: true,
               desc: 'Output token (contract id)',
             },
-            { name: 'amount_in', type: 'string', required: true, desc: 'atomic unitss, 7 decimals' },
+            { name: 'amount_in', type: 'string', required: true, desc: 'Stroops, 7 decimals' },
             { name: 'slippage', type: 'number', required: false, desc: 'Percent, e.g. 0.5' },
             {
-              name: 'prefer_Arc',
+              name: 'prefer_soroban',
               type: '0 | 1',
               required: false,
-              desc: '1 = Arc AMMs only (no Classic / no Horizon). Default may return pure classic or pure Arc; never mixed hops',
+              desc: '1 = Soroban AMMs only (no Classic / no Horizon). Default may return pure classic or pure Soroban; never mixed hops',
             },
           ]}
           tryIt={<QuoteTryIt />}
@@ -262,16 +262,16 @@ export function ApiReference() {
             { name: 'user_public_key', type: 'string', required: true, desc: 'G... address' },
             { name: 'token_in', type: 'string', required: true, desc: 'Input token' },
             { name: 'token_out', type: 'string', required: true, desc: 'Output token' },
-            { name: 'amount_in', type: 'string', required: true, desc: 'Total atomic unitss in' },
-            { name: 'min_amount_out', type: 'string', required: true, desc: 'Min atomic unitss out' },
+            { name: 'amount_in', type: 'string', required: true, desc: 'Total stroops in' },
+            { name: 'min_amount_out', type: 'string', required: true, desc: 'Min stroops out' },
             { name: 'sub_routes', type: 'array', required: true, desc: 'From GET /quote response' },
           ]}
           extra={
             <BuildTxCodeSample
               apiUrl={API_URL}
               rpcUrl={
-                process.env.NEXT_PUBLIC_Arc_RPC_URL ||
-                'https://Arc-rpc.mainnet.Arc.gateway.fm'
+                process.env.NEXT_PUBLIC_SOROBAN_RPC_URL ||
+                'https://soroban-rpc.mainnet.stellar.gateway.fm'
               }
             />
           }
@@ -283,12 +283,12 @@ export function ApiReference() {
         <h2 className="docs-section-label">Supported DEXes</h2>
         <ul className="docs-dex-list">
           {[
-            ['Arc venue', 'AMM'],
-            ['Arc venue', 'AMM · Stable · CLMM'],
-            ['Arc venue', 'AMM'],
+            ['Soroswap', 'AMM'],
+            ['Aquarius', 'AMM · Stable · CLMM'],
+            ['Phoenix', 'AMM'],
             ['Sushi V3', 'CLMM'],
-            ['Arc venue', 'Weighted'],
-            ['Classic', 'Arc'],
+            ['Comet', 'Weighted'],
+            ['Classic', 'SDEX'],
           ].map(([name, type]) => (
             <li key={name}>
               <strong>{name}</strong>
@@ -529,11 +529,11 @@ function QuoteTryIt() {
   const run = async () => {
     setLoading(true);
     setResult(null);
-    const atomic unitss = (parseFloat(amount) * 10_000_000).toFixed(0);
+    const stroops = (parseFloat(amount) * 10_000_000).toFixed(0);
     const q = new URLSearchParams({
       token_in: TOKENS[tokenIn],
       token_out: TOKENS[tokenOut],
-      amount_in: atomic unitss,
+      amount_in: stroops,
       slippage,
     });
     try {
@@ -613,13 +613,13 @@ function BuildTxTryIt() {
     setRequestBody(null);
     const tokenInId = TOKENS[tokenIn];
     const tokenOutId = TOKENS[tokenOut];
-    const atomic unitss = (parseFloat(amount) * 10_000_000).toFixed(0);
+    const stroops = (parseFloat(amount) * 10_000_000).toFixed(0);
     try {
       const quoteResp = await fetch(
         `${API_URL}/api/v1/quote?${new URLSearchParams({
           token_in: tokenInId,
           token_out: tokenOutId,
-          amount_in: atomic unitss,
+          amount_in: stroops,
           slippage,
         })}`,
       );

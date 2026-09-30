@@ -1,4 +1,4 @@
-//! Yield base×bridge pairs continuously (Arc-arb RandomArbCollector
+//! Yield base×bridge pairs continuously (stellar-arb RandomArbCollector
 //! pattern).
 
 use {

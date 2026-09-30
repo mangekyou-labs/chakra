@@ -1,4 +1,4 @@
-//! Integration tests that hit real Arc mainnet RPC.
+//! Integration tests that hit real Stellar mainnet RPC.
 //! Run with: cargo test --test integration_test -- --nocapture
 //!
 //! These tests are ignored by default (require network access).
@@ -7,43 +7,43 @@
 
 use {
     dex_adapters::{
-        rpc::{scval_to_address, scval_to_u32, ArcRpc},
-        Arc venue::Arc venue_FACTORY,
-        DexAdapter, ArcRpc as _,
+        rpc::{scval_to_address, scval_to_u32, SorobanRpc},
+        soroswap::SOROSWAP_FACTORY,
+        DexAdapter, SorobanRpc as _,
     },
     std::sync::Arc,
-    Arc_xdr::curr as xdr,
+    stellar_xdr::curr as xdr,
 };
 
-fn mainnet_rpc() -> Arc<ArcRpc> {
-    Arc::new(ArcRpc::mainnet())
+fn mainnet_rpc() -> Arc<SorobanRpc> {
+    Arc::new(SorobanRpc::mainnet())
 }
 
 #[tokio::test]
 #[ignore] // requires network
-async fn test_Arc venue_factory_pair_count() {
+async fn test_soroswap_factory_pair_count() {
     let rpc = mainnet_rpc();
 
     let result = rpc
-        .call_no_args(Arc venue_FACTORY, "all_pairs_length")
+        .call_no_args(SOROSWAP_FACTORY, "all_pairs_length")
         .await
         .expect("Failed to call all_pairs_length");
 
     let count = scval_to_u32(&result).expect("Failed to parse u32");
-    println!("Arc venue total pairs: {}", count);
+    println!("Soroswap total pairs: {}", count);
     assert!(count > 0, "Should have at least 1 pair");
     assert!(count < 10_000, "Sanity check: shouldn't have > 10k pairs");
 }
 
 #[tokio::test]
 #[ignore] // requires network
-async fn test_Arc venue_fetch_first_pair() {
+async fn test_soroswap_fetch_first_pair() {
     let rpc = mainnet_rpc();
 
     // Get first pair address
     let index_val = xdr::ScVal::U32(0);
     let pair_val = rpc
-        .simulate_call(Arc venue_FACTORY, "all_pairs", vec![index_val])
+        .simulate_call(SOROSWAP_FACTORY, "all_pairs", vec![index_val])
         .await
         .expect("Failed to call all_pairs(0)");
 
@@ -77,12 +77,12 @@ async fn test_Arc venue_fetch_first_pair() {
 
 #[tokio::test]
 #[ignore] // requires network
-async fn test_Arc venue_adapter_fetch_pairs() {
+async fn test_soroswap_adapter_fetch_pairs() {
     let rpc = mainnet_rpc();
-    let adapter = dex_adapters::Arc venue::Arc venueAdapter::new(rpc);
+    let adapter = dex_adapters::soroswap::SoroswapAdapter::new(rpc);
 
     let pairs = adapter.get_trading_pairs().await.expect("Failed to fetch pairs");
-    println!("Fetched {} Arc venue pairs", pairs.len());
+    println!("Fetched {} Soroswap pairs", pairs.len());
 
     for (i, pair) in pairs.iter().take(5).enumerate() {
         println!(
@@ -101,9 +101,9 @@ async fn test_Arc venue_adapter_fetch_pairs() {
 
 #[tokio::test]
 #[ignore] // requires network
-async fn test_Arc venue_quote_accuracy() {
+async fn test_soroswap_quote_accuracy() {
     let rpc = mainnet_rpc();
-    let adapter = dex_adapters::Arc venue::Arc venueAdapter::new(rpc);
+    let adapter = dex_adapters::soroswap::SoroswapAdapter::new(rpc);
 
     let pairs = adapter.get_trading_pairs().await.expect("Failed to fetch pairs");
 
@@ -121,7 +121,7 @@ async fn test_Arc venue_quote_accuracy() {
             pair.reserve_b.unwrap(),
         );
 
-        // Quote 1 unit (10^7 atomic unitss)
+        // Quote 1 unit (10^7 stroops)
         let amount_in = 10_000_000u128; // 1 token in 7-decimal
         let quote = adapter
             .get_quote(&pair.token_a, &pair.token_b, amount_in, &pair.pool_address)
@@ -134,7 +134,7 @@ async fn test_Arc venue_quote_accuracy() {
                 amount_in, q.amount_out, q.price_impact_bps, q.fee_bps
             );
             assert!(q.amount_out > 0, "Output should be positive");
-            assert_eq!(q.fee_bps, 30, "Arc venue fee should be 30 bps");
+            assert_eq!(q.fee_bps, 30, "Soroswap fee should be 30 bps");
         } else {
             println!("  No quote available (pool may be empty)");
         }
@@ -145,17 +145,17 @@ async fn test_Arc venue_quote_accuracy() {
 
 #[tokio::test]
 #[ignore] // requires network
-async fn test_Arc venue_router_pool_count() {
-    use dex_adapters::{Arc venue::Arc venue_ROUTER, rpc::scval_to_u128};
+async fn test_aquarius_router_pool_count() {
+    use dex_adapters::{aquarius::AQUARIUS_ROUTER, rpc::scval_to_u128};
 
     let rpc = mainnet_rpc();
 
     let result = rpc
-        .call_no_args(Arc venue_ROUTER, "get_tokens_sets_count")
+        .call_no_args(AQUARIUS_ROUTER, "get_tokens_sets_count")
         .await
         .expect("Failed to call get_tokens_sets_count");
 
     let count = scval_to_u128(&result).expect("Failed to parse u128");
-    println!("Arc venue token sets: {}", count);
+    println!("Aquarius token sets: {}", count);
     assert!(count > 0, "Should have at least 1 token set");
 }

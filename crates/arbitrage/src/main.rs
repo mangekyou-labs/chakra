@@ -1,15 +1,15 @@
-//! Chakra round-trip arbitrage bot (quote-api + aggregator.round_trip_swap).
+//! LumAgg round-trip arbitrage bot (quote-api + aggregator.round_trip_swap).
 //!
 //! Burberry pipeline: BridgeCollector → parallel workers → async TxExecutor.
 //!
 //!   ARB_BRIDGE_TOKENS=... ARB_AGGREGATOR_CONTRACT=C... ARB_QUOTE_API_URL=http://127.0.0.1:8080 \
 //!   ARB_BUILD_TX=1 ARB_SUBMIT_TX=1 cargo run -p arbitrage --bin
-//! Chakra-arbitrage-bot
+//! lumagg-arbitrage-bot
 
 use {
     anyhow::{bail, Context, Result},
     arbitrage::{pipeline::engine, telegram, ArbConfig, ArbRuntime},
-    Chakra_config::arbitrage::ArbitrageConfig,
+    lumagg_config::arbitrage::ArbitrageConfig,
     std::{path::PathBuf, sync::Arc},
     tracing::info,
     tracing_subscriber::EnvFilter,
@@ -17,9 +17,9 @@ use {
 
 fn print_help() {
     println!(
-        "Chakra-arbitrage-bot {}\n\n\
-         Usage: Chakra-arbitrage-bot --config <FILE> [--check-config]\n\n\
-         Options:\n  --config <FILE>  Chakra Arbitrage TOML configuration\n  \
+        "lumagg-arbitrage-bot {}\n\n\
+         Usage: lumagg-arbitrage-bot --config <FILE> [--check-config]\n\n\
+         Options:\n  --config <FILE>  LumAgg Arbitrage TOML configuration\n  \
          --check-config  Validate configuration and exit\n  -h, --help      Show this help\n  \
          -V, --version   Show version",
         env!("CARGO_PKG_VERSION")
@@ -39,7 +39,7 @@ fn parse_args() -> Result<Option<(Option<PathBuf>, bool)>> {
                 return Ok(None);
             }
             "-V" | "--version" => {
-                println!("Chakra-arbitrage-bot {}", env!("CARGO_PKG_VERSION"));
+                println!("lumagg-arbitrage-bot {}", env!("CARGO_PKG_VERSION"));
                 return Ok(None);
             }
             _ => bail!("unknown argument: {arg}"),
@@ -54,7 +54,7 @@ async fn main() -> Result<()> {
         return Ok(());
     };
     if let Some(path) = path {
-        let config: ArbitrageConfig = Chakra_config::load(&path)?;
+        let config: ArbitrageConfig = lumagg_config::load(&path)?;
         config.validate()?;
         config.apply();
     } else if check {
@@ -73,9 +73,9 @@ async fn main() -> Result<()> {
     let runtime = Arc::new(ArbRuntime::from_config(config)?);
     runtime.log_startup();
 
-    if let Some(alerter) = Chakra_alerts::TelegramAlerter::from_env().map(Arc::new) {
+    if let Some(alerter) = lumagg_alerts::TelegramAlerter::from_env().map(Arc::new) {
         info!("Telegram profit reports + quiet-window alerts enabled");
-        let _ = alerter.send("Chakra arbitrage bot started (burberry pipeline)").await;
+        let _ = alerter.send("LumAgg arbitrage bot started (burberry pipeline)").await;
         telegram::spawn_hourly_profit_report(runtime.clone(), alerter.clone());
         telegram::spawn_quiet_window_monitor(runtime.clone(), alerter);
     } else {

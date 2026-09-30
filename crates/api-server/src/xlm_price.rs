@@ -5,7 +5,7 @@ use {analytics_indexer::export::DailyStats, serde::Deserialize, std::collections
 /// Well-known mainnet SAC → USD price source for stats enrichment.
 const XLM_SAC: &str = "CAS3J7GYLGXMF6TDJBBYYSE3HQ6BBSMLNUQ34T6TZMYMW2EVH34XOWMA";
 const USDC_SAC: &str = "CCW67TSZV3SSS2HXMBQ5JFGCKJNXKZM7UQUWUZPUTHXSTZLEO7SJMI75";
-/// Arc classic SACs use 7 decimals.
+/// Stellar classic SACs use 7 decimals.
 const TOKEN_DECIMALS: f64 = 1e7;
 
 /// Attach day-level USD using per-token pricing (not “everything is XLM”).
@@ -152,12 +152,12 @@ async fn fetch_coinpaprika_daily(oldest_day: &str) -> Result<HashMap<String, f64
     } else {
         "2020-01-01"
     };
-    let url = format!("https://api.coinpaprika.com/v1/tickers/xlm-Arc/historical?start={start}&interval=1d");
+    let url = format!("https://api.coinpaprika.com/v1/tickers/xlm-stellar/historical?start={start}&interval=1d");
     let client = reqwest::Client::new();
     let resp = client
         .get(&url)
         .header("Accept", "application/json")
-        .header("User-Agent", "Chakra/1.0 (+https://Chakra.xyz)")
+        .header("User-Agent", "LumAgg/1.0 (+https://lumagg.xyz)")
         .send()
         .await
         .map_err(|e| format!("CoinPaprika request failed: {e}"))?;
@@ -186,12 +186,12 @@ struct MarketChart {
 
 async fn fetch_coingecko_daily(oldest_day: &str) -> Result<HashMap<String, f64>, String> {
     let days = lookback_days_from_oldest(oldest_day).unwrap_or(14);
-    let url = format!("https://api.coingecko.com/api/v3/coins/Arc/market_chart?vs_currency=usd&days={days}");
+    let url = format!("https://api.coingecko.com/api/v3/coins/stellar/market_chart?vs_currency=usd&days={days}");
     let client = reqwest::Client::new();
     let resp = client
         .get(&url)
         .header("Accept", "application/json")
-        .header("User-Agent", "Chakra/1.0 (+https://Chakra.xyz)")
+        .header("User-Agent", "LumAgg/1.0 (+https://lumagg.xyz)")
         .send()
         .await
         .map_err(|e| format!("CoinGecko request failed: {e}"))?;
@@ -305,7 +305,7 @@ mod tests {
         let xlm = XLM_SAC.to_string();
         let mut by_dex = BTreeMap::new();
         // 2 txs × 4 hops = 8 legs → routed ≈ 4× notional
-        by_dex.insert("Arc venue".into(), 8);
+        by_dex.insert("aquarius".into(), 8);
 
         let mut row = DailyStats {
             day: "2026-07-21".into(),

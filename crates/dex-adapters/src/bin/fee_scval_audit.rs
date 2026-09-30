@@ -1,13 +1,13 @@
 //! Audit on-chain fee ScVal shapes across DEX adapters.
 //!
 //!   RPC_URL=http://127.0.0.1:8003 \
-//!   AQUA_CLMM_POOLS=addr1,addr2 SUSHI_POOLS=addr1 Arc venue_POOLS=addr1 \
+//!   AQUA_CLMM_POOLS=addr1,addr2 SUSHI_POOLS=addr1 COMET_POOLS=addr1 \
 //!   cargo run -p dex-adapters --bin fee-scval-audit --release
 
 use {
-    dex_adapters::rpc::{get_map_field, scval_to_address, scval_to_i128, scval_to_u32, ArcRpc},
+    dex_adapters::rpc::{get_map_field, scval_to_address, scval_to_i128, scval_to_u32, SorobanRpc},
     std::env,
-    Arc_xdr::curr as xdr,
+    stellar_xdr::curr as xdr,
 };
 
 fn describe(val: &xdr::ScVal) -> String {
@@ -39,7 +39,7 @@ fn parse_u32_only(val: &xdr::ScVal) -> Option<u32> {
     }
 }
 
-fn parse_Arc venue(val: &xdr::ScVal) -> Option<i128> {
+fn parse_comet(val: &xdr::ScVal) -> Option<i128> {
     match val {
         xdr::ScVal::I128(parts) => Some(((parts.hi as i128) << 64) | (parts.lo as u64 as i128)),
         xdr::ScVal::U128(parts) => Some(((parts.hi as u128) << 64 | parts.lo as u128) as i128),
@@ -63,15 +63,15 @@ fn env_pools(key: &str) -> Vec<String> {
         .unwrap_or_default()
 }
 
-async fn dump(rpc: &ArcRpc, label: &str, contract: &str, method: &str) {
+async fn dump(rpc: &SorobanRpc, label: &str, contract: &str, method: &str) {
     match rpc.call_no_args(contract, method).await {
         Ok(val) => {
             println!(
-                "[{label}] {contract} {method} => {} | multi={:?} u32_only={:?} Arc venue={:?} raw_u32={:?} raw_i128={:?}",
+                "[{label}] {contract} {method} => {} | multi={:?} u32_only={:?} comet={:?} raw_u32={:?} raw_i128={:?}",
                 describe(&val),
                 parse_multi(&val),
                 parse_u32_only(&val),
-                parse_Arc venue(&val),
+                parse_comet(&val),
                 scval_to_u32(&val).ok(),
                 scval_to_i128(&val).ok()
             );
@@ -83,9 +83,9 @@ async fn dump(rpc: &ArcRpc, label: &str, contract: &str, method: &str) {
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     let rpc_url = env::var("RPC_URL").unwrap_or_else(|_| "http://127.0.0.1:8003".into());
-    let rpc = ArcRpc::new(&rpc_url, "Public Global Arc Network ; September 2015");
+    let rpc = SorobanRpc::new(&rpc_url, "Public Global Stellar Network ; September 2015");
 
-    println!("=== Arc venue factory total_fee_bps ===");
+    println!("=== Phoenix factory total_fee_bps ===");
     let factory = "CB4SVAWJA6TSRNOJZ7W2AWFW46D5VR4ZMFZKDIKXEINZCZEGZCJZCKMI";
     match rpc.call_no_args(factory, "query_all_pools_details").await {
         Ok(xdr::ScVal::Vec(Some(entries))) => {
@@ -100,7 +100,7 @@ async fn main() -> anyhow::Result<()> {
                 };
                 if let Some(fee) = get_map_field(map, "total_fee_bps") {
                     println!(
-                        "[Arc venue] {addr} total_fee_bps={} | multi={:?} u32_only={:?}  << u32_only fails on I64 = old bug",
+                        "[phoenix] {addr} total_fee_bps={} | multi={:?} u32_only={:?}  << u32_only fails on I64 = old bug",
                         describe(fee),
                         parse_multi(fee),
                         parse_u32_only(fee)
@@ -116,7 +116,7 @@ async fn main() -> anyhow::Result<()> {
         Err(e) => println!("error: {e}"),
     }
 
-    println!("\n=== Arc venue classic get_fee_fraction ===");
+    println!("\n=== Aquarius classic get_fee_fraction ===");
     for pool in [
         "CCMHVBZGY65EIFQZLZFRWMPMM23MWK4P5RFKDFWEPA5NQHENBNWMZETZ",
         "CBRXOYKXPQI4EEA6KA35TUIYN5OJLNWMTIVDOMNOIL2BG5Y5LEDHUU7V",
@@ -125,7 +125,7 @@ async fn main() -> anyhow::Result<()> {
         dump(&rpc, "aqua", pool, "get_fee_fraction").await;
     }
 
-    println!("\n=== Arc venue CLMM get_fee_fraction ===");
+    println!("\n=== Aquarius CLMM get_fee_fraction ===");
     let clmm = env_pools("AQUA_CLMM_POOLS");
     if clmm.is_empty() {
         println!("(pass AQUA_CLMM_POOLS=...)");
@@ -143,17 +143,17 @@ async fn main() -> anyhow::Result<()> {
         dump(&rpc, "sushi", pool, "fee").await;
     }
 
-    println!("\n=== Arc venue get_swap_fee ===");
-    let mut Arc venue = env_pools("Arc venue_POOLS");
-    if Arc venue.is_empty() {
-        Arc venue.push("CAS3FL6TLZKDGGSISDBWGGPXT3NRR4DYTZD7YOD3HMYO6LTJUVGRVEAM".into());
+    println!("\n=== Comet get_swap_fee ===");
+    let mut comet = env_pools("COMET_POOLS");
+    if comet.is_empty() {
+        comet.push("CAS3FL6TLZKDGGSISDBWGGPXT3NRR4DYTZD7YOD3HMYO6LTJUVGRVEAM".into());
     }
-    for pool in &Arc venue {
-        dump(&rpc, "Arc venue", pool, "get_swap_fee").await;
+    for pool in &comet {
+        dump(&rpc, "comet", pool, "get_swap_fee").await;
     }
 
-    println!("\n=== Arc venue ===");
-    println!("[Arc venue] no on-chain fee getter — adapter hardcodes fee_bps=30 (Uniswap V2 style)");
+    println!("\n=== Soroswap ===");
+    println!("[soroswap] no on-chain fee getter — adapter hardcodes fee_bps=30 (Uniswap V2 style)");
 
     Ok(())
 }

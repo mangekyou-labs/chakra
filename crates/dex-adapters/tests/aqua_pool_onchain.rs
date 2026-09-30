@@ -1,8 +1,8 @@
-//! On-chain inspection of specific Arc venue pools (run with --ignored
+//! On-chain inspection of specific Aquarius pools (run with --ignored
 //! --nocapture).
 
 use {
-    dex_adapters::rpc::{scval_to_address, scval_to_u128, ArcRpc},
+    dex_adapters::rpc::{scval_to_address, scval_to_u128, SorobanRpc},
     std::sync::Arc,
 };
 
@@ -13,17 +13,17 @@ const POOLS: &[&str] = &[
 
 #[tokio::test]
 #[ignore]
-async fn inspect_Arc venue_pools_onchain() {
-    let rpc = Arc::new(ArcRpc::new(
-        "https://Arc-rpc.mainnet.Arc.gateway.fm",
-        "Public Global Arc Network ; September 2015",
+async fn inspect_aquarius_pools_onchain() {
+    let rpc = Arc::new(SorobanRpc::new(
+        "https://soroban-rpc.mainnet.stellar.gateway.fm",
+        "Public Global Stellar Network ; September 2015",
     ));
     for p in POOLS {
         println!("\n=== {p} ===");
         let pt = rpc.call_no_args(p, "pool_type").await.unwrap();
         println!("  pool_type: {pt:?}");
         let tokens = rpc.call_no_args(p, "get_tokens").await.unwrap();
-        if let Arc_xdr::curr::ScVal::Vec(Some(vec)) = &tokens {
+        if let stellar_xdr::curr::ScVal::Vec(Some(vec)) = &tokens {
             for (i, item) in vec.0.iter().enumerate() {
                 if let Ok(a) = scval_to_address(item) {
                     println!("  token[{i}] = {a}");
@@ -33,7 +33,7 @@ async fn inspect_Arc venue_pools_onchain() {
             println!("  get_tokens: {tokens:?}");
         }
         let reserves = rpc.call_no_args(p, "get_reserves").await.unwrap();
-        if let Arc_xdr::curr::ScVal::Vec(Some(vec)) = &reserves {
+        if let stellar_xdr::curr::ScVal::Vec(Some(vec)) = &reserves {
             for (i, item) in vec.0.iter().enumerate() {
                 if let Ok(r) = scval_to_u128(item) {
                     println!("  reserve[{i}] = {r}");
@@ -50,17 +50,17 @@ const THREE_TOKEN_POOL: &str = "CBBMQBNHB2FYVZYV7VNHOJHUMTFJLR4PUMRVQYNW6RHIKZO2
 
 #[tokio::test]
 #[ignore]
-async fn inspect_3token_Arc venue_pool() {
-    let rpc = Arc::new(ArcRpc::new(
-        "https://Arc-rpc.mainnet.Arc.gateway.fm",
-        "Public Global Arc Network ; September 2015",
+async fn inspect_3token_aquarius_pool() {
+    let rpc = Arc::new(SorobanRpc::new(
+        "https://soroban-rpc.mainnet.stellar.gateway.fm",
+        "Public Global Stellar Network ; September 2015",
     ));
     let p = THREE_TOKEN_POOL;
     println!("\n=== 3-token pool {p} ===");
     let pt = rpc.call_no_args(p, "pool_type").await.unwrap();
     println!("  pool_type: {pt:?}");
     let tokens = rpc.call_no_args(p, "get_tokens").await.unwrap();
-    if let Arc_xdr::curr::ScVal::Vec(Some(vec)) = &tokens {
+    if let stellar_xdr::curr::ScVal::Vec(Some(vec)) = &tokens {
         for (i, item) in vec.0.iter().enumerate() {
             if let Ok(a) = scval_to_address(item) {
                 println!("  token[{i}] = {a}");

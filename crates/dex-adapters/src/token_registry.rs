@@ -1,17 +1,17 @@
 //! Token registry: maps between human-readable asset identifiers and contract
 //! addresses.
 //!
-//! Arc has three token formats:
+//! Stellar has three token formats:
 //! - "native" → XLM (SAC:
 //!   CAS3J7GYLGXMF6TDJBBYYSE3HQ6BBSMLNUQ34T6TZMYMW2EVH34XOWMA)
 //! - "CODE:ISSUER" → Classic asset (has a deterministic SAC address)
-//! - "C..." → Arc contract address (may be a SAC or a pure Arc token)
+//! - "C..." → Soroban contract address (may be a SAC or a pure Soroban token)
 //!
 //! The registry resolves contract addresses to human-readable names by calling
 //! the token's name() function, and caches the results.
 
 use {
-    crate::rpc::{scval_to_string, ArcRpc},
+    crate::rpc::{scval_to_string, SorobanRpc},
     anyhow::Result,
     serde::{Deserialize, Serialize},
     std::{collections::HashMap, sync::Arc},
@@ -19,7 +19,7 @@ use {
     tracing::debug,
 };
 
-/// Well-known tokens on Arc mainnet (contract address → metadata).
+/// Well-known tokens on Stellar mainnet (contract address → metadata).
 /// These are pre-populated to avoid RPC calls for common tokens.
 const WELL_KNOWN_TOKENS: &[(&str, &str, &str, u32)] = &[
     // (contract_address, symbol, name/asset_id, decimals)
@@ -56,13 +56,13 @@ pub struct TokenMeta {
 }
 
 pub struct TokenRegistry {
-    rpc: Arc<ArcRpc>,
+    rpc: Arc<SorobanRpc>,
     /// contract_address -> TokenMeta
     cache: RwLock<HashMap<String, TokenMeta>>,
 }
 
 impl TokenRegistry {
-    pub fn new(rpc: Arc<ArcRpc>) -> Self {
+    pub fn new(rpc: Arc<SorobanRpc>) -> Self {
         let mut cache = HashMap::new();
 
         // Pre-populate well-known tokens
@@ -177,7 +177,7 @@ impl TokenRegistry {
             contract: contract_address.to_string(),
             symbol,
             asset_id,
-            decimals: 7, // Default for Arc
+            decimals: 7, // Default for Stellar
         })
     }
 }

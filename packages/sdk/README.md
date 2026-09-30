@@ -1,11 +1,11 @@
-# @Chakra/sdk
+# @lumagg/sdk
 
-TypeScript client for the [Chakra](https://Chakra.xyz) REST API — quote, build unsigned XDR, wallet helpers, submit + poll.
+TypeScript client for the [LumAgg](https://lumagg.xyz) REST API — quote, build unsigned XDR, wallet helpers, submit + poll.
 
 ## Install
 
 ```bash
-npm install @Chakra/sdk
+npm install @lumagg/sdk
 # or link locally during development:
 cd packages/sdk && npm run build
 ```
@@ -13,14 +13,14 @@ cd packages/sdk && npm run build
 ## Quick start (&lt; 30 min)
 
 ```typescript
-import { ChakraClient } from '@Chakra/sdk';
+import { LumAggClient } from '@lumagg/sdk';
 
-const client = new ChakraClient({ apiUrl: 'https://api.Chakra.xyz' });
+const client = new LumAggClient({ apiUrl: 'https://api.lumagg.xyz' });
 
 const quote = await client.quote({
   tokenIn: 'CAS3J7GYLGXMF6TDJBBYYSE3HQ6BBSMLNUQ34T6TZMYMW2EVH34XOWMA', // XLM
   tokenOut: 'CCW67TSZV3SSS2HXMBQ5JFGCKJNXKZM7UQUWUZPUTHXSTZLEO7SJMI75', // USDC
-  amountIn: '1000000000', // 100 XLM atomic unitss
+  amountIn: '1000000000', // 100 XLM stroops
   slippage: 0.5,
   maxHops: 3,
   maxSplits: 2,
@@ -35,7 +35,7 @@ const { unsignedTxXdr } = await client.buildTx({
   subRoutes: quote.subRoutes,
 });
 
-// Sign with wallet / wallet, then:
+// Sign with Freighter / wallet, then:
 // const { hash } = await client.submitTx({ signedTxXdr });
 // await client.waitForTx(hash);
 ```
@@ -46,7 +46,7 @@ const { unsignedTxXdr } = await client.buildTx({
 |--------|------|-------------|
 | `isHealthy()` | `GET /health` | Liveness |
 | `listTokens()` | `GET /tokens` | Routable tokens + logos |
-| `quote()` | `GET /quote` | Best route; optional `preferArc` |
+| `quote()` | `GET /quote` | Best route; optional `preferSoroban` |
 | `buildTx()` | `POST /build_tx` | Unsigned envelope XDR |
 | `quoteAndBuild()` | quote + build_tx | One-call integrator flow |
 | `getBalance()` | `GET /balance` | SAC balance + `hasTrustline` |
@@ -72,8 +72,8 @@ execution). All token amounts and rate fields are integer strings.
 
 Partner rate limit: pass `apiKey` in constructor → `X-API-Key` header (60 req/s).
 
-`quote()` also accepts `preferArc`, `maxHops`, and `maxSplits`. These map
-to the REST parameters `prefer_Arc`, `max_hops`, and `max_splits`. Omit
+`quote()` also accepts `preferSoroban`, `maxHops`, and `maxSplits`. These map
+to the REST parameters `prefer_soroban`, `max_hops`, and `max_splits`. Omit
 them to use the API defaults. Amounts remain integer strings in the token's
 smallest unit; `slippage` is expressed as a percentage.
 
@@ -84,7 +84,7 @@ npx tsx packages/sdk/examples/basic-usage.ts
 USER_G=G... npx tsx packages/sdk/examples/quote-build.ts
 npx tsx packages/sdk/examples/stats.ts
 
-# wallet browser demo (sign + optional submit):
+# Freighter browser demo (sign + optional submit):
 cd packages/sdk/examples/browser-swap && npm install && npm run dev
 ```
 

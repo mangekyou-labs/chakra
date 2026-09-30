@@ -1,4 +1,4 @@
-//! Arc round-trip arbitrage via Chakra aggregator `round_trip_swap`.
+//! Soroban round-trip arbitrage via LumAgg aggregator `round_trip_swap`.
 
 pub mod bridge;
 pub mod callers;

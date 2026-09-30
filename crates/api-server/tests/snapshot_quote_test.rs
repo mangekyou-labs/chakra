@@ -209,7 +209,7 @@ async fn snapshot_quote_succeeds_for_sushi_clmm_pool() {
             slippage_bps: Some(50),
             max_hops: Some(1),
             max_splits: Some(1),
-            prefer_Arc: None,
+            prefer_soroban: None,
         })
         .await;
 
@@ -218,9 +218,9 @@ async fn snapshot_quote_succeeds_for_sushi_clmm_pool() {
 }
 
 #[tokio::test]
-async fn snapshot_quote_succeeds_for_Arc venue_clmm_pool() {
+async fn snapshot_quote_succeeds_for_aquarius_clmm_pool() {
     let config = AppConfig::default();
-    let (snapshot, pool) = sample_clmm_topology_snapshot("Arc venue_clmm");
+    let (snapshot, pool) = sample_clmm_topology_snapshot("aquarius_clmm");
     let engine = build_engine_from_snapshot(&config, &snapshot).await.unwrap();
     seed_clmm_quote_states(&engine, std::slice::from_ref(&pool)).await;
 
@@ -232,7 +232,7 @@ async fn snapshot_quote_succeeds_for_Arc venue_clmm_pool() {
             slippage_bps: Some(50),
             max_hops: Some(1),
             max_splits: Some(1),
-            prefer_Arc: None,
+            prefer_soroban: None,
         })
         .await;
 
@@ -256,7 +256,7 @@ async fn snapshot_quote_succeeds_for_classic_when_live_adapter_is_attached() {
             slippage_bps: Some(50),
             max_hops: Some(1),
             max_splits: Some(1),
-            prefer_Arc: None,
+            prefer_soroban: None,
         })
         .await;
 

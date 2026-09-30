@@ -1,4 +1,4 @@
-//! Sushi V3 adapter: Concentrated Liquidity AMM on Arc.
+//! Sushi V3 adapter: Concentrated Liquidity AMM on Soroban.
 //!
 //! TVL: ~$1.95M (per DeFiLlama).
 //! Contracts:
@@ -6,7 +6,7 @@
 //!   Factory: CD3KRKGDRVWPXVB3VXLUMQKMX6XZ6Q2H334IVZD4XXNAMKSRVQL5GLYF
 //!   Pool Lens: CDFGDFKEN7EVMI3DKIEQ6BKDAKEPHTEPWC6G2ZTDY7ATVCLD24AAU2IN
 //!
-//! Quote approach: local CLMM tick math (shared with Arc venue concentrated).
+//! Quote approach: local CLMM tick math (shared with Aquarius concentrated).
 //! Reads pool state via simulate_call on pool contract (slot0, liquidity,
 //! tick_spacing). Reads tick data via pool-lens get_populated_ticks_in_word.
 //!
@@ -24,22 +24,22 @@ use {
             self, bitmap, clmm_pool_to_snapshot, clmm_swap_allowed, loaded_tick_range, tick_outside_word_scan,
             ClmmCoverageInput, ClmmPoolState, TickDataStore, TickState, TICKS_PER_CHUNK, U256 as ClmmU256,
         },
-        rpc::{parse_fee_bps_u32, scval_to_address, scval_to_i128, scval_to_u128, ArcRpc},
+        rpc::{parse_fee_bps_u32, scval_to_address, scval_to_i128, scval_to_u128, SorobanRpc},
         traits::*,
     },
     anyhow::{anyhow, Result},
     async_trait::async_trait,
     market_snapshot::{ClmmCoverageSnapshot, ClmmPoolSnapshot},
     std::{collections::HashMap, sync::Arc},
-    Arc_xdr::curr as xdr,
+    stellar_xdr::curr as xdr,
     tokio::sync::RwLock,
     tracing::{debug, info, warn},
 };
 
-/// Sushi V3 Router contract address on Arc Mainnet
+/// Sushi V3 Router contract address on Stellar Mainnet
 pub const SUSHI_ROUTER: &str = "CDMIM23WOUL5CZBKX3GOA3V5R5AMVIMTCP52KCDQORWELAPLJ27WZCHL";
 
-/// Sushi V3 Factory contract address on Arc Mainnet
+/// Sushi V3 Factory contract address on Stellar Mainnet
 pub const SUSHI_FACTORY: &str = "CD3KRKGDRVWPXVB3VXLUMQKMX6XZ6Q2H334IVZD4XXNAMKSRVQL5GLYF";
 
 /// Sushi V3 Pool Lens contract (for batch tick reading)
@@ -80,13 +80,13 @@ struct SushiPoolCache {
 }
 
 pub struct SushiAdapter {
-    rpc: Arc<ArcRpc>,
+    rpc: Arc<SorobanRpc>,
     pairs: RwLock<Vec<AdapterTradingPair>>,
     pool_cache: RwLock<HashMap<String, SushiPoolCache>>,
 }
 
 impl SushiAdapter {
-    pub fn new(rpc: Arc<ArcRpc>) -> Self {
+    pub fn new(rpc: Arc<SorobanRpc>) -> Self {
         Self {
             rpc,
             pairs: RwLock::new(Vec::new()),
@@ -224,7 +224,7 @@ impl SushiAdapter {
         let compressed_tick = floor_div(pool.tick, pool.tick_spacing);
         let current_word = floor_div(compressed_tick, 256);
 
-        let pool_hash = Arc_strkey::Contract::from_string(&pool.pool_address)
+        let pool_hash = stellar_strkey::Contract::from_string(&pool.pool_address)
             .map_err(|e| anyhow!("Invalid pool address: {:?}", e))?
             .0;
         let pool_addr_val = xdr::ScVal::Address(xdr::ScAddress::Contract(xdr::ContractId(xdr::Hash(pool_hash))));
@@ -247,7 +247,7 @@ impl SushiAdapter {
                         for tick_val in ticks_vec.0.iter() {
                             if let Some((tick_idx, lg, ln)) = parse_populated_tick(tick_val) {
                                 if lg > 0 {
-                                    // Store in our TickDataStore using Arc venue-style chunked format
+                                    // Store in our TickDataStore using Aquarius-style chunked format
                                     let compressed = bitmap::compress_tick(tick_idx, pool.tick_spacing);
                                     let (chunk_pos, slot) = bitmap::chunk_address(compressed);
 
@@ -350,10 +350,10 @@ impl SushiAdapter {
         result.map(|(amount_out, _, _)| amount_out)
     }
 
-    fn discovery_rpc(&self) -> ArcRpc {
+    fn discovery_rpc(&self) -> SorobanRpc {
         let url = std::env::var("SUSHI_DISCOVERY_RPC")
-            .unwrap_or_else(|_| "https://Arc-rpc.mainnet.Arc.gateway.fm".to_string());
-        ArcRpc::new(&url, self.rpc.network_passphrase())
+            .unwrap_or_else(|_| "https://soroban-rpc.mainnet.stellar.gateway.fm".to_string());
+        SorobanRpc::new(&url, self.rpc.network_passphrase())
     }
 
     /// Discover all pools (known list + brute-force fallback).
@@ -375,7 +375,7 @@ impl SushiAdapter {
         Ok(pools)
     }
 
-    async fn load_sushi_pool_pairs(rpc: &ArcRpc, pool_addrs: &[String]) -> Vec<AdapterTradingPair> {
+    async fn load_sushi_pool_pairs(rpc: &SorobanRpc, pool_addrs: &[String]) -> Vec<AdapterTradingPair> {
         let mut pools = Vec::new();
         for chunk in pool_addrs.chunks(10) {
             let futures: Vec<_> = chunk
@@ -471,7 +471,7 @@ impl SushiAdapter {
     /// This is the fastest discovery method — just verify each pool has
     /// liquidity.
     async fn check_known_pools(&self) -> Vec<AdapterTradingPair> {
-        // Pool addresses with known liquidity (from sushi.com/Arc/explore/pools)
+        // Pool addresses with known liquidity (from sushi.com/stellar/explore/pools)
         // Only include pools that had TVL > $40 on the website
         const KNOWN_POOL_ADDRS: &[&str] = &[
             "CCR2CH4GQVCZHG7CHFVMNANCK45CU5DVKXZIIITDZQAU3CEJZ7RQH2MQ", // XLM/USDC 0.3% - $660k TVL
@@ -499,10 +499,10 @@ impl SushiAdapter {
 
     /// Query factory for a pool address given token pair and fee.
     async fn get_pool_address(&self, token_a: &str, token_b: &str, fee: u32) -> Result<Option<String>> {
-        let token_a_hash = Arc_strkey::Contract::from_string(token_a)
+        let token_a_hash = stellar_strkey::Contract::from_string(token_a)
             .map_err(|e| anyhow!("Invalid token: {:?}", e))?
             .0;
-        let token_b_hash = Arc_strkey::Contract::from_string(token_b)
+        let token_b_hash = stellar_strkey::Contract::from_string(token_b)
             .map_err(|e| anyhow!("Invalid token: {:?}", e))?
             .0;
 
@@ -529,10 +529,10 @@ impl SushiAdapter {
         amount_in: u128,
         fee_bps: u32,
     ) -> Result<Option<u128>> {
-        let token_in_hash = Arc_strkey::Contract::from_string(token_in)
+        let token_in_hash = stellar_strkey::Contract::from_string(token_in)
             .map_err(|e| anyhow!("Invalid token_in: {:?}", e))?
             .0;
-        let token_out_hash = Arc_strkey::Contract::from_string(token_out)
+        let token_out_hash = stellar_strkey::Contract::from_string(token_out)
             .map_err(|e| anyhow!("Invalid token_out: {:?}", e))?
             .0;
 
@@ -733,7 +733,7 @@ impl DexAdapter for SushiAdapter {
     }
 
     fn protocol_type(&self) -> ProtocolType {
-        ProtocolType::ArcAmm
+        ProtocolType::SorobanAmm
     }
 
     async fn get_trading_pairs(&self) -> Result<Vec<AdapterTradingPair>> {
@@ -829,7 +829,7 @@ impl DexAdapter for SushiAdapter {
         _min_amount_out: u128,
         _pool_address: &str,
     ) -> Result<SwapOperation> {
-        Ok(SwapOperation::ArcInvoke {
+        Ok(SwapOperation::SorobanInvoke {
             contract_id: SUSHI_ROUTER.to_string(),
             function_name: "swap_exact_input_hints".to_string(),
             args_xdr: vec![],

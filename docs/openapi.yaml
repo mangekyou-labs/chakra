@@ -1,9 +1,9 @@
 openapi: 3.0.3
 info:
-  title: Chakra API
+  title: LumAgg API
   description: |
-    Arc DEX aggregator — quotes and unsigned swap transactions across Arc AMMs
-    (Arc venue, Arc venue, Arc venue, Sushi V3, Arc venue) and optionally Classic Arc.
+    Stellar DEX aggregator — quotes and unsigned swap transactions across Soroban AMMs
+    (Soroswap, Aquarius, Phoenix, Sushi V3, Comet) and optionally Classic SDEX.
 
     **Rate limits:** 10 req/s per IP; 60 req/s with valid `X-API-Key` (partner keys).
     See [integrator-guide.md](./integrator-guide.md).
@@ -12,7 +12,7 @@ info:
     name: Apache-2.0
     url: https://www.apache.org/licenses/LICENSE-2.0
 servers:
-  - url: https://api.Chakra.xyz
+  - url: https://api.lumagg.xyz
     description: Production
   - url: http://127.0.0.1:3100
     description: Local dev
@@ -81,8 +81,8 @@ paths:
       tags: [routing]
       summary: Best swap route
       description: |
-        Returns optimal route(s) and expected output. Set `prefer_Arc=1` to exclude
-        Classic Arc paths (apples-to-apples vs Arc-only aggregators).
+        Returns optimal route(s) and expected output. Set `prefer_soroban=1` to exclude
+        Classic SDEX paths (apples-to-apples vs Soroban-only aggregators).
       parameters:
         - $ref: '#/components/parameters/token_in'
         - $ref: '#/components/parameters/token_out'
@@ -111,14 +111,14 @@ paths:
             minimum: 1
             example: 3
           description: Max parallel sub-routes in a split quote. Omit = server default
-        - name: prefer_Arc
+        - name: prefer_soroban
           in: query
           required: false
           schema:
             type: integer
             enum: [0, 1]
             default: 0
-          description: When `1`, exclude Classic Arc — Arc AMMs only
+          description: When `1`, exclude Classic SDEX — Soroban AMMs only
         - name: debug
           in: query
           required: false
@@ -143,7 +143,7 @@ paths:
       summary: Build unsigned swap transaction
       description: |
         Builds wallet-ready XDR from quote `sub_routes`. Classic routes return PathPayment XDR;
-        Arc routes return invoke host function XDR (simulated).
+        Soroban routes return invoke host function XDR (simulated).
       requestBody:
         required: true
         content:
@@ -202,7 +202,7 @@ paths:
       summary: Successful round-trip (arbitrage) history
       description: |
         Recent successful on-chain `round_trip_swap` invocations from the analytics indexer.
-        Gross surplus is `amount_out - amount_in` in base-token atomic unitss; transaction fees are not deducted.
+        Gross surplus is `amount_out - amount_in` in base-token stroops; transaction fees are not deducted.
         Requires `INDEXER_DB_PATH` on the API server.
       parameters:
         - name: limit
@@ -239,7 +239,7 @@ paths:
       tags: [health]
       summary: Wallet swap history (indexer DB)
       description: |
-        Recent Chakra aggregator invocations for a Arc account. Requires `INDEXER_DB_PATH`
+        Recent LumAgg aggregator invocations for a Stellar account. Requires `INDEXER_DB_PATH`
         on the API server (same SQLite as `/stats`). Ordered by `created_at` descending.
       parameters:
         - name: user
@@ -248,7 +248,7 @@ paths:
           schema:
             type: string
             example: "GABCDEFGHIJKLMNOPQRSTUVWXYZ234567ABCDEFGHIJKLMNOPQRSTUVW"
-          description: Arc account public key (`G…`, 56 chars)
+          description: Stellar account public key (`G…`, 56 chars)
         - name: limit
           in: query
           required: false
@@ -283,7 +283,7 @@ paths:
       tags: [orders]
       summary: Wallet limit orders (indexer DB)
       description: |
-        Open and historical limit orders for a Arc account from escrow lifecycle events.
+        Open and historical limit orders for a Stellar account from escrow lifecycle events.
         Requires `INDEXER_DB_PATH` on the API server (same SQLite as `/stats` and `/swaps`).
         Default `status=open` returns only open orders; `status=all` includes filled, cancelled, and expired.
       parameters:
@@ -293,7 +293,7 @@ paths:
           schema:
             type: string
             example: "GABCDEFGHIJKLMNOPQRSTUVWXYZ234567ABCDEFGHIJKLMNOPQRSTUVW"
-          description: Arc account public key (`G…`, 56 chars)
+          description: Stellar account public key (`G…`, 56 chars)
         - name: status
           in: query
           required: false
@@ -319,7 +319,7 @@ paths:
       summary: Build unsigned create-limit transaction
       description: |
         Simulates and prepares wallet-ready XDR invoking `order-escrow.create_limit`.
-        Requires `ESCROW_CONTRACT` on the API server. Wallet signs and submits via Arc RPC.
+        Requires `ESCROW_CONTRACT` on the API server. Wallet signs and submits via Soroban RPC.
       requestBody:
         required: true
         content:
@@ -370,7 +370,7 @@ paths:
       tags: [orders]
       summary: Wallet DCA orders (indexer DB)
       description: |
-        Open and historical DCA orders for a Arc account from escrow lifecycle events.
+        Open and historical DCA orders for a Stellar account from escrow lifecycle events.
         Requires `INDEXER_DB_PATH` on the API server. Default `status=open` returns only
         open orders; `status=all` also includes filled, cancelled, and expired orders.
       parameters:
@@ -380,7 +380,7 @@ paths:
           schema:
             type: string
             example: "GABCDEFGHIJKLMNOPQRSTUVWXYZ234567ABCDEFGHIJKLMNOPQRSTUVW"
-          description: Arc account public key (`G...`, 56 chars)
+          description: Stellar account public key (`G...`, 56 chars)
         - name: status
           in: query
           required: false
@@ -543,7 +543,7 @@ paths:
       tags: [wallet]
       summary: Token balances for account
       description: >
-        Batch SAC balances via Arc RPC (no Horizon).
+        Batch SAC balances via Soroban RPC (no Horizon).
         `scope=common` — curated hubs (~15, fast).
         `scope=catalog` — full quote-engine token set.
       parameters:
@@ -570,7 +570,7 @@ paths:
   /api/v1/account:
     get:
       tags: [wallet]
-      summary: Account sequence via Arc RPC
+      summary: Account sequence via Soroban RPC
       parameters:
         - name: account
           in: query
@@ -618,7 +618,7 @@ paths:
       tags: [tx]
       summary: Submit signed XDR (fast enqueue)
       description: |
-        Proxies signed envelope to the server Arc RPC and returns quickly
+        Proxies signed envelope to the server Soroban RPC and returns quickly
         (`PENDING` / hash). Poll `GET /api/v1/tx_status` for inclusion.
       requestBody:
         required: true
@@ -645,13 +645,13 @@ paths:
               schema:
                 $ref: '#/components/schemas/SubmitTxResponse'
         '502':
-          description: Upstream Arc RPC request failed
+          description: Upstream Soroban RPC request failed
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/SubmitTxResponse'
         '503':
-          description: Arc transaction queue temporarily unavailable; retry shortly
+          description: Soroban transaction queue temporarily unavailable; retry shortly
           content:
             application/json:
               schema:
@@ -695,7 +695,7 @@ components:
       required: true
       schema:
         type: string
-      description: Input amount in atomic unitss (7 decimals for most SAC tokens)
+      description: Input amount in stroops (7 decimals for most SAC tokens)
   schemas:
     ReadinessResponse:
       type: object
@@ -794,7 +794,7 @@ components:
       properties:
         user_public_key:
           type: string
-          description: Arc G-address (signer)
+          description: Stellar G-address (signer)
         token_in:
           type: string
         token_out:
@@ -839,7 +839,7 @@ components:
               type: string
             execution:
               type: string
-              enum: [Arc, classic]
+              enum: [soroban, classic]
             hash:
               type: string
         error:
@@ -1008,7 +1008,7 @@ components:
         gross_surplus:
           type: string
           nullable: true
-          description: amount_out − amount_in in base-token atomic unitss
+          description: amount_out − amount_in in base-token stroops
         is_split:
           type: boolean
     SwapsResponse:
@@ -1124,7 +1124,7 @@ components:
       properties:
         user:
           type: string
-          description: Arc G-address (order owner / signer)
+          description: Stellar G-address (order owner / signer)
         token_in:
           type: string
           description: Input token contract id (C…)
@@ -1133,7 +1133,7 @@ components:
           description: Output token contract id (C…)
         amount_in:
           type: string
-          description: Input amount in atomic unitss
+          description: Input amount in stroops
         limit_out_per_in_e7:
           type: string
           description: Minimum output per 1e7 units of input
@@ -1149,7 +1149,7 @@ components:
       properties:
         user:
           type: string
-          description: Arc G-address (order owner / signer)
+          description: Stellar G-address (order owner / signer)
         order_id:
           type: integer
           format: int64
@@ -1222,7 +1222,7 @@ components:
       properties:
         user:
           type: string
-          description: Arc G-address (DCA owner / signer)
+          description: Stellar G-address (DCA owner / signer)
         token_in:
           type: string
           description: Input token contract id (C...)
@@ -1265,10 +1265,10 @@ components:
               description: Unsigned transaction envelope XDR (base64)
             fee:
               type: string
-              description: Estimated fee in atomic unitss
+              description: Estimated fee in stroops
             execution:
               type: string
-              enum: [Arc]
+              enum: [soroban]
             num_operations:
               type: integer
             contract:
@@ -1342,7 +1342,7 @@ components:
           type: boolean
         balance:
           type: string
-          description: Raw token units (atomic unitss-style)
+          description: Raw token units (stroops-style)
         has_trustline:
           type: boolean
           description: Classic trustline presence when known

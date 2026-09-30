@@ -9,7 +9,7 @@ pub mod price_store;
 pub mod prices;
 pub mod rate_limit;
 pub mod snapshot_loader;
-pub mod Arc_prepare;
+pub mod soroban_prepare;
 pub mod state;
 pub mod stats;
 pub mod swaps;
@@ -69,7 +69,7 @@ fn build_router(app_state: AppState, rate_limit: RateLimitState, logo_dir: PathB
     Router::new()
         .merge(api)
         .nest_service("/logos", ServeDir::new(logo_dir))
-        // Signed Arc transactions are small; reject oversized JSON before
+        // Signed Stellar transactions are small; reject oversized JSON before
         // deserialization or forwarding it to the upstream RPC.
         .layer(RequestBodyLimitLayer::new(128 * 1024))
         .layer(CorsLayer::permissive())
@@ -79,7 +79,7 @@ pub async fn run_server() -> anyhow::Result<()> {
     let config = AppConfig::from_env();
     info!(
         "Config: mode={:?}, rpc_url={}, listen={}, discovery={}s, refresh={}s",
-        config.Chakra_mode,
+        config.lumagg_mode,
         config.rpc_url,
         config.listen_addr,
         config.discovery_interval_secs,
@@ -93,7 +93,7 @@ pub async fn run_server() -> anyhow::Result<()> {
     std::fs::create_dir_all(&logo_dir)?;
     let app = build_router(app_state, rate_limit, logo_dir);
 
-    info!("Arc DEX Aggregator API listening on {}", listen_addr);
+    info!("Stellar DEX Aggregator API listening on {}", listen_addr);
 
     let listener = tokio::net::TcpListener::bind(listen_addr).await?;
     axum::serve(listener, app.into_make_service_with_connect_info::<SocketAddr>()).await?;
@@ -111,7 +111,7 @@ mod tests {
     #[tokio::test]
     async fn serves_logo_files_from_configured_directory() {
         let dir = std::env::temp_dir().join(format!(
-            "Chakra-logo-serve-{}-{}",
+            "lumagg-logo-serve-{}-{}",
             std::process::id(),
             std::time::SystemTime::now()
                 .duration_since(std::time::UNIX_EPOCH)
@@ -136,7 +136,7 @@ mod tests {
 
         assert_eq!(response.status(), StatusCode::OK);
         let content_type = response.headers().get(CONTENT_TYPE).unwrap().to_str().unwrap();
-        assert!(content_type.starts_with("image/svg+document"), "got {content_type}");
+        assert!(content_type.starts_with("image/svg+xml"), "got {content_type}");
 
         let _ = std::fs::remove_dir_all(&dir);
     }

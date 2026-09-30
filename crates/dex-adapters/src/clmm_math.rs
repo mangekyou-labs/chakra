@@ -1,7 +1,7 @@
 //! CLMM (Concentrated Liquidity Market Maker) math — pure Rust port of Uniswap
 //! V3 math.
 //!
-//! Shared between Arc venue Concentrated pools and Sushi V3 on Arc.
+//! Shared between Aquarius Concentrated pools and Sushi V3 on Stellar.
 //! All calculations use U256 (represented as [u64; 4] little-endian) with
 //! Q64.96 fixed point. This matches the on-chain contract exactly for
 //! precision.

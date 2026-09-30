@@ -1,13 +1,13 @@
 use crate::math;
-use Chakra_contract_types::{DexType, SwapStep};
-use Arc_sdk::{
+use lumagg_contract_types::{DexType, SwapStep};
+use soroban_sdk::{
     auth::{ContractContext, InvokerContractAuthEntry, SubContractInvocation},
     token, Address, Env, IntoVal, Symbol, Val, Vec,
 };
 
-/// Arc venue rounds the approval ledger to avoid simulation vs execution
+/// Comet rounds the approval ledger to avoid simulation vs execution
 /// sequence mismatch.
-pub(crate) fn Arc venue_approval_ledger(env: &Env) -> u32 {
+pub(crate) fn comet_approval_ledger(env: &Env) -> u32 {
     let seq = env.ledger().sequence();
     (seq / 100_000 + 1) * 100_000
 }
@@ -44,11 +44,11 @@ pub(crate) fn execute_path(
 
 pub(crate) fn dex_tag(dex_type: &DexType) -> u32 {
     match dex_type {
-        DexType::Arc venue => 0,
-        DexType::Arc venuePair => 1,
-        DexType::Arc venue => 2,
+        DexType::Aquarius => 0,
+        DexType::SoroswapPair => 1,
+        DexType::Phoenix => 2,
         DexType::Sushi => 3,
-        DexType::Arc venueDex => 4,
+        DexType::CometDex => 4,
     }
 }
 
@@ -72,34 +72,34 @@ pub(crate) fn execute_step(env: &Env, step: &SwapStep, amount_in: i128, my_addre
 
 pub(crate) fn execute_step_inner(env: &Env, step: &SwapStep, amount_in: i128, my_address: &Address) -> i128 {
     match step.dex_type {
-        DexType::Arc venue => {
-            // Arc venue pool: swap(user, in_idx, out_idx, in_amount, out_min) -> u128
+        DexType::Aquarius => {
+            // Aquarius pool: swap(user, in_idx, out_idx, in_amount, out_min) -> u128
             // The pool pulls token_in via transfer(user, pool, amount); authorize only that
-            // transfer (same pattern as Arc-arb arb-contract).
+            // transfer (same pattern as stellar-arb arb-contract).
             let (in_idx, out_idx) = (step.in_idx, step.out_idx);
             let aq_in_amount: u128 = amount_in as u128;
 
-            env.authorize_as_current_contract(Arc_sdk::vec![
+            env.authorize_as_current_contract(soroban_sdk::vec![
                 env,
                 InvokerContractAuthEntry::Contract(SubContractInvocation {
                     context: ContractContext {
                         contract: step.token_in.clone(),
                         fn_name: Symbol::new(env, "transfer"),
-                        args: Arc_sdk::vec![
+                        args: soroban_sdk::vec![
                             env,
                             my_address.into_val(env),
                             step.dex_id.into_val(env),
                             amount_in.into_val(env),
                         ],
                     },
-                    sub_invocations: Arc_sdk::vec![env],
+                    sub_invocations: soroban_sdk::vec![env],
                 }),
             ]);
 
             let received: u128 = env.invoke_contract(
                 &step.dex_id,
                 &Symbol::new(env, "swap"),
-                Arc_sdk::vec![
+                soroban_sdk::vec![
                     env,
                     my_address.into_val(env),
                     in_idx.into_val(env),
@@ -111,12 +111,12 @@ pub(crate) fn execute_step_inner(env: &Env, step: &SwapStep, amount_in: i128, my
             received as i128
         }
 
-        DexType::Arc venuePair => {
-            // Arc venue flash-swap: transfer in, then pair.swap(out0, out1, to).
-            // Same flow as Arc-arb (transfer then pair.swap; pair sends output to
+        DexType::SoroswapPair => {
+            // Soroswap flash-swap: transfer in, then pair.swap(out0, out1, to).
+            // Same flow as stellar-arb (transfer then pair.swap; pair sends output to
             // aggregator).
             let reserves: (i128, i128) =
-                env.invoke_contract(&step.dex_id, &Symbol::new(env, "get_reserves"), Arc_sdk::vec![env]);
+                env.invoke_contract(&step.dex_id, &Symbol::new(env, "get_reserves"), soroban_sdk::vec![env]);
 
             let a2b = step.in_idx == 0 && step.out_idx == 1;
             let (reserve_in, reserve_out) = if a2b {
@@ -125,7 +125,7 @@ pub(crate) fn execute_step_inner(env: &Env, step: &SwapStep, amount_in: i128, my
                 (reserves.1, reserves.0)
             };
 
-            let expected_out = math::Arc venue_get_amount_out(amount_in, reserve_in, reserve_out);
+            let expected_out = math::soroswap_get_amount_out(amount_in, reserve_in, reserve_out);
             if expected_out <= 0 {
                 return 0;
             }
@@ -138,7 +138,7 @@ pub(crate) fn execute_step_inner(env: &Env, step: &SwapStep, amount_in: i128, my
 
             let (amount0_out, amount1_out): (i128, i128) = if a2b { (0, expected_out) } else { (expected_out, 0) };
 
-            let swap_args = Arc_sdk::vec![
+            let swap_args = soroban_sdk::vec![
                 env,
                 amount0_out.into_val(env),
                 amount1_out.into_val(env),
@@ -150,14 +150,14 @@ pub(crate) fn execute_step_inner(env: &Env, step: &SwapStep, amount_in: i128, my
             balance_after - balance_before
         }
 
-        DexType::Arc venue => {
-            // Arc venue: swap(sender, offer_asset, offer_amount, ...)
+        DexType::Phoenix => {
+            // Phoenix: swap(sender, offer_asset, offer_amount, ...)
             // Fee on output, need balance diff to determine actual output
             let token_out_client = token::Client::new(env, &step.token_out);
             let balance_before = token_out_client.balance(my_address);
 
             let none_val: Val = ().into_val(env);
-            let swap_args = Arc_sdk::vec![
+            let swap_args = soroban_sdk::vec![
                 env,
                 my_address.into_val(env),
                 step.token_in.into_val(env),
@@ -168,20 +168,20 @@ pub(crate) fn execute_step_inner(env: &Env, step: &SwapStep, amount_in: i128, my
                 none_val,
             ];
 
-            env.authorize_as_current_contract(Arc_sdk::vec![
+            env.authorize_as_current_contract(soroban_sdk::vec![
                 env,
                 InvokerContractAuthEntry::Contract(SubContractInvocation {
                     context: ContractContext {
                         contract: step.token_in.clone(),
                         fn_name: Symbol::new(env, "transfer"),
-                        args: Arc_sdk::vec![
+                        args: soroban_sdk::vec![
                             env,
                             my_address.into_val(env),
                             step.dex_id.into_val(env),
                             amount_in.into_val(env),
                         ],
                     },
-                    sub_invocations: Arc_sdk::vec![env],
+                    sub_invocations: soroban_sdk::vec![env],
                 }),
             ]);
 
@@ -200,12 +200,12 @@ pub(crate) fn execute_step_inner(env: &Env, step: &SwapStep, amount_in: i128, my
 
             // sqrt_price_limit: MIN_SQRT_RATIO+1 for zero_for_one, MAX_SQRT_RATIO-1
             // otherwise
-            let price_limit: Arc_sdk::U256 = if zero_for_one {
-                Arc_sdk::U256::from_u128(env, 4_295_128_740u128)
+            let price_limit: soroban_sdk::U256 = if zero_for_one {
+                soroban_sdk::U256::from_u128(env, 4_295_128_740u128)
             } else {
-                Arc_sdk::U256::from_be_bytes(
+                soroban_sdk::U256::from_be_bytes(
                     env,
-                    &Arc_sdk::Bytes::from_array(
+                    &soroban_sdk::Bytes::from_array(
                         env,
                         &[
                             0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xff, 0xfd,
@@ -219,13 +219,13 @@ pub(crate) fn execute_step_inner(env: &Env, step: &SwapStep, amount_in: i128, my
             let hints: Val = env.invoke_contract(
                 &step.dex_id,
                 &Symbol::new(env, "get_oracle_hints"),
-                Arc_sdk::vec![env],
+                soroban_sdk::vec![env],
             );
 
             let token_out_client = token::Client::new(env, &step.token_out);
             let balance_before = token_out_client.balance(my_address);
 
-            let swap_args = Arc_sdk::vec![
+            let swap_args = soroban_sdk::vec![
                 env,
                 my_address.into_val(env),
                 my_address.into_val(env),
@@ -235,20 +235,20 @@ pub(crate) fn execute_step_inner(env: &Env, step: &SwapStep, amount_in: i128, my
                 hints,
             ];
 
-            env.authorize_as_current_contract(Arc_sdk::vec![
+            env.authorize_as_current_contract(soroban_sdk::vec![
                 env,
                 InvokerContractAuthEntry::Contract(SubContractInvocation {
                     context: ContractContext {
                         contract: step.token_in.clone(),
                         fn_name: Symbol::new(env, "transfer"),
-                        args: Arc_sdk::vec![
+                        args: soroban_sdk::vec![
                             env,
                             my_address.into_val(env),
                             step.dex_id.into_val(env),
                             amount_in.into_val(env),
                         ],
                     },
-                    sub_invocations: Arc_sdk::vec![env],
+                    sub_invocations: soroban_sdk::vec![env],
                 }),
             ]);
 
@@ -258,27 +258,27 @@ pub(crate) fn execute_step_inner(env: &Env, step: &SwapStep, amount_in: i128, my
             balance_after - balance_before
         }
 
-        DexType::Arc venueDex => {
-            // Arc venue: swap_exact_amount_in(token_in, amount_in, token_out, min_out,
+        DexType::CometDex => {
+            // Comet: swap_exact_amount_in(token_in, amount_in, token_out, min_out,
             // max_price, user). user = aggregator (funds already here).
             //
-            // pull_underlying (Arc venue token_utility) does:
+            // pull_underlying (Comet token_utility) does:
             //   token.approve(from=user, spender=pool, amount, ledger)
             //   token.transfer_from(spender=pool, from=user, to=pool, amount)
             //
             // SAC approve requires auth from `from` (aggregator). transfer_from requires
             // auth from `spender` (the pool), not the aggregator — same pattern as
-            // Arc venue/Arc venue flat token.transfer pre-auth before pool.swap.
+            // Aquarius/Phoenix flat token.transfer pre-auth before pool.swap.
             let max_price = i128::MAX;
-            let approval_ledger = Arc venue_approval_ledger(env);
+            let approval_ledger = comet_approval_ledger(env);
 
-            env.authorize_as_current_contract(Arc_sdk::vec![
+            env.authorize_as_current_contract(soroban_sdk::vec![
                 env,
                 InvokerContractAuthEntry::Contract(SubContractInvocation {
                     context: ContractContext {
                         contract: step.token_in.clone(),
                         fn_name: Symbol::new(env, "approve"),
-                        args: Arc_sdk::vec![
+                        args: soroban_sdk::vec![
                             env,
                             my_address.into_val(env),
                             step.dex_id.into_val(env),
@@ -286,14 +286,14 @@ pub(crate) fn execute_step_inner(env: &Env, step: &SwapStep, amount_in: i128, my
                             approval_ledger.into_val(env),
                         ],
                     },
-                    sub_invocations: Arc_sdk::vec![env],
+                    sub_invocations: soroban_sdk::vec![env],
                 }),
             ]);
 
             let (amount_out, _): (i128, i128) = env.invoke_contract(
                 &step.dex_id,
                 &Symbol::new(env, "swap_exact_amount_in"),
-                Arc_sdk::vec![
+                soroban_sdk::vec![
                     env,
                     step.token_in.into_val(env),
                     amount_in.into_val(env),

@@ -1,12 +1,12 @@
-# Chakra Phase 3b: Limit Keeper (Lean MVP)
+# LumAgg Phase 3b: Limit Keeper (Lean MVP)
 
 **Date:** 2026-07-19  
 **Status:** Approved for planning  
-**Depends on:** `contracts/order-escrow` (3a), Chakra `GET /quote`
+**Depends on:** `contracts/order-escrow` (3a), LumAgg `GET /quote`
 
 ## Goal
 
-Run a self-hosted **limit-keeper** that discovers open Limit orders via Arc **getEvents**, quotes via Chakra API, and permissionlessly calls `escrow.fill` when the limit is met. No DCA, no retail API/UI, no fill incentives.
+Run a self-hosted **limit-keeper** that discovers open Limit orders via Soroban **getEvents**, quotes via LumAgg API, and permissionlessly calls `escrow.fill` when the limit is met. No DCA, no retail API/UI, no fill incentives.
 
 ## Decisions
 
@@ -75,16 +75,16 @@ Use quote `expected_output` (and submit `min_amount_out = required_min_out`, not
 
 | Var | Purpose |
 |-----|---------|
-| `KEEPER_RPC_URL` | Arc RPC |
+| `KEEPER_RPC_URL` | Soroban RPC |
 | `KEEPER_SECRET` | Filler key seed/secret |
 | `KEEPER_NETWORK` | public/testnet passphrase |
 | `ESCROW_CONTRACT` | C… |
 | `AGGREGATOR_CONTRACT` | C… (needed if building routes / validation) |
-| `QUOTE_API_URL` | e.g. `https://api.Chakra.xyz` |
+| `QUOTE_API_URL` | e.g. `https://api.lumagg.xyz` |
 | `KEEPER_POLL_SECS` | default 10 |
 | `KEEPER_CURSOR_PATH` | file for last processed ledger |
 | `KEEPER_DRY_RUN` | `1` = quote+log only, no submit |
-| `KEEPER_MAX_FILL` | optional cap per fill (atomic unitss) |
+| `KEEPER_MAX_FILL` | optional cap per fill (stroops) |
 | `KEEPER_RECLAIM` | `1` = auto reclaim expired |
 
 ## Non-goals

@@ -6,14 +6,14 @@
  *   FORMAT=csv npx tsx packages/sdk/examples/stats.ts
  */
 
-import { ChakraClient } from '../src/index';
+import { LumAggClient } from '../src/index';
 
-const API_URL = process.env.API_URL || 'https://api.Chakra.xyz';
+const API_URL = process.env.API_URL || 'https://api.lumagg.xyz';
 const DAY = process.env.DAY;
 const FORMAT = process.env.FORMAT === 'csv' ? 'csv' : 'json';
 
 async function main() {
-  const client = new ChakraClient({ apiUrl: API_URL });
+  const client = new LumAggClient({ apiUrl: API_URL });
 
   if (FORMAT === 'csv') {
     const csv = await client.getStats({ day: DAY, format: 'csv' });

@@ -6,7 +6,7 @@
 
 | Component | Role |
 |-----------|------|
-| `aggregator.round_trip_swap` | base → bridge → base in one Arc invocation |
+| `aggregator.round_trip_swap` | base → bridge → base in one Soroban invocation |
 | `vault.execute_round_trip` | vault → caller → aggregator → vault (pooled capital; callers only need XLM for fees) |
 | `crates/arbitrage` | Scanner + tx build/submit against live snapshot and pool state |
 
@@ -47,7 +47,7 @@ Bot builds `vault.execute_round_trip`; vault internally calls aggregator.
 ## Scanner
 
 ```bash
-cargo run -p arbitrage --bin Chakra-arbitrage-bot
+cargo run -p arbitrage --bin lumagg-arbitrage-bot
 ```
 
 Key env: `SNAPSHOT_REDIS_URL`, `ARB_BRIDGE_TOKENS`, `ARB_MIN_PROFIT`, `ARB_MAX_AMOUNT_IN`, `ARB_OPTIMIZE_AMOUNT`, `ARB_SUBMIT_DEDUP_SECS`.

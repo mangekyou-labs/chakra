@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { NATIVE_CONTRACT } from '@/lib/tokenDisplay';
 import { useTokenList } from '@/components/TokenSelector';
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://api.Chakra.xyz';
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://api.lumagg.xyz';
 
 const XLM_SAC = NATIVE_CONTRACT;
 const USDC_SAC = 'CCW67TSZV3SSS2HXMBQ5JFGCKJNXKZM7UQUWUZPUTHXSTZLEO7SJMI75';
@@ -315,7 +315,7 @@ export default function ArbitragePage() {
             Arbitrage
           </h1>
           <p className="text-[13px] text-[var(--text-muted)] mt-2 leading-relaxed max-w-2xl">
-            Successful on-chain round trips executed through Chakra. A vault holds principal;
+            Successful on-chain round trips executed through LumAgg. A vault holds principal;
             callers pay gas. Gross surplus is base token returned minus base supplied — fees are not
             deducted, so this is not net P&amp;L.
           </p>
@@ -558,7 +558,7 @@ export default function ArbitragePage() {
       <section className="rounded-xl border border-teal-400/20 bg-[linear-gradient(115deg,rgba(45,212,191,0.08),rgba(15,23,42,0.18))] px-4 sm:px-5 py-4">
         <h2 className="text-[15px] font-medium text-[var(--text-primary)]">How it works</h2>
         <p className="text-[12px] text-[var(--text-muted)] mt-1.5 leading-relaxed max-w-3xl">
-          When venue prices diverge, Chakra callers run a two-leg round trip against the vault
+          When venue prices diverge, LumAgg callers run a two-leg round trip against the vault
           balance (typically XLM → bridge → XLM). Only confirmed successful transactions are shown
           here — not quotes, simulations, or rejected opportunities.
         </p>
@@ -619,7 +619,7 @@ export default function ArbitragePage() {
                         </td>
                         <td className="px-3 sm:px-4 py-2.5 whitespace-nowrap font-[family-name:var(--font-mono)]">
                           <a
-                            href={`https://Arc.expert/explorer/public/tx/${t.tx_hash}`}
+                            href={`https://stellar.expert/explorer/public/tx/${t.tx_hash}`}
                             target="_blank"
                             rel="noreferrer"
                             className="text-teal-300/90 hover:text-teal-200 underline underline-offset-2"

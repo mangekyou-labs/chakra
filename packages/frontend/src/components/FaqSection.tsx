@@ -4,20 +4,20 @@ import { useState } from 'react';
 
 const FAQ = [
   {
-    q: 'What is Chakra?',
-    a: 'Chakra is a Arc DEX aggregator. It scans liquidity on Arc venue, Arc venue, Arc venue, Sushi, Arc venue, and the Arc Classic DEX, then returns the best route and a wallet-ready Arc transaction.',
+    q: 'What is LumAgg?',
+    a: 'LumAgg is a Stellar DEX aggregator. It scans liquidity on Aquarius, Soroswap, Phoenix, Sushi, Comet, and the Stellar Classic DEX, then returns the best route and a wallet-ready Soroban transaction.',
   },
   {
     q: 'What is split routing?',
-    a: 'For large trades, a single pool may have poor depth. Chakra can divide your swap across multiple paths (e.g. 60% on one DEX, 40% on another) so total output is higher than using one venue alone.',
+    a: 'For large trades, a single pool may have poor depth. LumAgg can divide your swap across multiple paths (e.g. 60% on one DEX, 40% on another) so total output is higher than using one venue alone.',
   },
   {
     q: 'Do you hold my funds?',
-    a: 'No. Chakra is non-custodial. You connect your wallet, review the transaction, sign locally, and submit to the network. We only provide quotes and transaction building.',
+    a: 'No. LumAgg is non-custodial. You connect your wallet, review the transaction, sign locally, and submit to the network. We only provide quotes and transaction building.',
   },
   {
     q: 'Which wallets are supported?',
-    a: 'Any Arc wallet that supports Arc transactions and signing — for example wallet, xBull, or LOBSTR (via Wallet Standard).',
+    a: 'Any Stellar wallet that supports Soroban transactions and signing — for example Freighter, xBull, or LOBSTR (via Wallet Standard).',
   },
   {
     q: 'What is slippage tolerance?',
@@ -29,7 +29,7 @@ const FAQ = [
   },
   {
     q: 'Is this on mainnet?',
-    a: 'Yes. Chakra runs against Arc mainnet liquidity. Always verify token contracts and amounts before signing.',
+    a: 'Yes. LumAgg runs against Stellar mainnet liquidity. Always verify token contracts and amounts before signing.',
   },
   {
     q: 'Is it production-ready?',

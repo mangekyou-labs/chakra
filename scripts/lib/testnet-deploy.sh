@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
-# Shared helpers for testnet-only Arc deploys.
+# Shared helpers for testnet-only Soroban deploys.
 # Source from deploy scripts:  source "$ROOT/scripts/lib/testnet-deploy.sh"
 
 refuse_if_mainnet() {
   case "${NETWORK_PASSPHRASE:-}" in
-    *"Public Global Arc Network"*)
+    *"Public Global Stellar Network"*)
       echo "ERROR: This script is testnet-only. Refusing mainnet passphrase." >&2
       echo "  NETWORK_PASSPHRASE=${NETWORK_PASSPHRASE}" >&2
       exit 1
@@ -14,7 +14,7 @@ refuse_if_mainnet() {
 
 set_testnet_defaults() {
   NETWORK_PASSPHRASE="${NETWORK_PASSPHRASE:-Test SDF Network ; September 2015}"
-  RPC_URL="${RPC_URL:-https://Arc-testnet.Arc.org}"
+  RPC_URL="${RPC_URL:-https://soroban-testnet.stellar.org}"
   TX_POLL_SECS="${TX_POLL_SECS:-180}"
   RESOURCE_FEE="${RESOURCE_FEE:-200000000}"
   INCLUSION_FEE="${INCLUSION_FEE:-5000000}"
@@ -25,7 +25,7 @@ set_testnet_defaults() {
 resolve_admin_g() {
   local admin="${ADMIN:-admin}"
   if [[ -z "${ADMIN_G:-}" ]]; then
-    ADMIN_G=$(Arc keys address "$admin" 2>/dev/null || true)
+    ADMIN_G=$(stellar keys address "$admin" 2>/dev/null || true)
   fi
   if [[ -z "${ADMIN_G:-}" ]]; then
     echo "ERROR: Set ADMIN_G to the admin public key (G-address)." >&2
@@ -38,7 +38,7 @@ poll_tx() {
   local tx_hash="$1"
   local deadline=$((SECONDS + TX_POLL_SECS))
   echo "Polling getTransaction (up to ${TX_POLL_SECS}s): $tx_hash"
-  echo "  https://Arc.expert/explorer/testnet/tx/$tx_hash"
+  echo "  https://stellar.expert/explorer/testnet/tx/$tx_hash"
   while (( SECONDS < deadline )); do
     local resp status
     resp=$(curl -sS -X POST "$RPC_URL" \
@@ -62,7 +62,7 @@ poll_tx() {
   return 2
 }
 
-run_Arc_tx() {
+run_stellar_tx() {
   local label="$1"
   shift
   local log
@@ -122,15 +122,15 @@ build_contract_wasm() {
   echo "=== Building $package WASM (release) ===" >&2
   (
     cd "$crate_dir"
-    if ! Arc contract build --optimize 2>/dev/null; then
-      echo "Arc contract build --optimize failed, trying cargo + Arc optimize..." >&2
+    if ! stellar contract build --optimize 2>/dev/null; then
+      echo "stellar contract build --optimize failed, trying cargo + stellar optimize..." >&2
       cargo build -p "$package" --target wasm32v1-none --profile contract-release
       local wasm
       wasm=$(find_wasm "$wasm_stem" "$root") || {
         echo "ERROR: Could not find built WASM for $wasm_stem after cargo build." >&2
         exit 1
       }
-      Arc contract optimize --wasm "$wasm" --wasm-out "$wasm"
+      stellar contract optimize --wasm "$wasm" --wasm-out "$wasm"
     fi
   )
 
@@ -150,7 +150,7 @@ deploy_wasm() {
   deploy_log=$(mktemp)
   echo "=== Deploying via RPC ($RPC_URL) ===" >&2
   set +e
-  Arc contract deploy \
+  stellar contract deploy \
     --rpc-url "$RPC_URL" \
     --network-passphrase "$NETWORK_PASSPHRASE" \
     --source-account "$admin" \

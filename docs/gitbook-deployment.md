@@ -1,7 +1,7 @@
 # GitBook Deployment
 
 This is the maintainer runbook for publishing the repository documentation with
-GitBook. GitBook hosts the site and synchronizes Markdown from GitHub; Chakra
+GitBook. GitBook hosts the site and synchronizes Markdown from GitHub; LumAgg
 does not need a documentation server or a GitHub Actions deployment workflow.
 
 ## Repository Layout
@@ -37,19 +37,19 @@ and push `.gitbook.yaml`, the public Markdown files, and referenced assets to
 the `main` branch of:
 
 ```text
-Chakra/Arc-dex-agg
+Lum-Agg/stellar-dex-agg
 ```
 
 Confirm the files are visible on GitHub before starting the initial sync.
 
 ## 2. Create the GitBook Content Space
 
-1. Sign in to GitBook and create or open the Chakra organization.
-2. Create a docs site named `Chakra Documentation`.
+1. Sign in to GitBook and create or open the LumAgg organization.
+2. Create a docs site named `LumAgg Documentation`.
 3. Choose the option to sync content from GitHub, or create an empty space and
    select `Set up Git Sync` from that space.
-4. Install the GitBook GitHub App for the `Chakra` organization.
-5. Grant the app access only to `Arc-dex-agg` unless other repositories are
+4. Install the GitBook GitHub App for the `Lum-Agg` organization.
+5. Grant the app access only to `stellar-dex-agg` unless other repositories are
    intentionally going to use GitBook.
 
 Only a GitBook organization administrator or creator can configure Git Sync.
@@ -61,7 +61,7 @@ Use these exact values:
 | Setting | Value |
 | --- | --- |
 | Provider | GitHub |
-| Repository | `Chakra/Arc-dex-agg` |
+| Repository | `Lum-Agg/stellar-dex-agg` |
 | Branch | `main` |
 | Project directory | Empty or `/` |
 | Initial sync direction | GitHub to GitBook |
@@ -76,7 +76,7 @@ repository documentation.
 
 After import, verify:
 
-- The first page is `Chakra Documentation` from `docs/README.md`.
+- The first page is `LumAgg Documentation` from `docs/README.md`.
 - The sidebar order matches `docs/SUMMARY.md`.
 - Production Aggregator, Swap API, Arbitrage, contracts, and API pages open.
 - Internal SCF drafts are not in the main navigation.
@@ -85,13 +85,13 @@ After import, verify:
 ## 4. Publish the Site
 
 GitBook separates editable content spaces from published docs sites. Open the
-`Chakra Documentation` docs site, link the synchronized space if it is not
+`LumAgg Documentation` docs site, link the synchronized space if it is not
 already linked, set the audience to `Public`, and click `Publish`.
 
 The current public GitBook URL is:
 
 ```text
-https://Chakra.gitbook.io/
+https://lumagg.gitbook.io/
 ```
 
 GitBook may also provide a site URL similar to:
@@ -102,16 +102,16 @@ https://<organization>.gitbook.io/<site-slug>
 
 Use this URL for the initial review before configuring DNS.
 
-## 5. Configure `docs.Chakra.xyz`
+## 5. Configure `docs.lumagg.xyz`
 
 Custom domains are currently available on GitBook Premium and Ultimate site
 plans. If the site uses one of those plans:
 
 1. Open the docs site dashboard.
 2. Go to `Settings` -> `Domain and URL`.
-3. Select custom domain and enter `docs.Chakra.xyz`.
+3. Select custom domain and enter `docs.lumagg.xyz`.
 4. Copy the exact DNS record type, name, and target shown by GitBook.
-5. Add that record at the DNS provider for `Chakra.xyz`.
+5. Add that record at the DNS provider for `lumagg.xyz`.
 6. Wait for DNS propagation, return to GitBook, and complete verification.
 
 Do not hardcode a CNAME target from another GitBook site; use the value GitBook
@@ -125,8 +125,8 @@ GitBook from validating the hostname.
 Useful checks:
 
 ```bash
-dig CNAME docs.Chakra.xyz
-curl -I https://docs.Chakra.xyz
+dig CNAME docs.lumagg.xyz
+curl -I https://docs.lumagg.xyz
 ```
 
 If a paid GitBook plan is not desired yet, publish with the provided
@@ -160,13 +160,13 @@ Before merging a documentation change:
 
 ## Recommended Site Settings
 
-- Site title: `Chakra Documentation`
-- Description: `Arc liquidity aggregation, Swap API, and arbitrage operator documentation.`
+- Site title: `LumAgg Documentation`
+- Description: `Stellar liquidity aggregation, Swap API, and arbitrage operator documentation.`
 - Audience: Public and indexed by search engines
-- Default content: Chakra Documentation space
-- Logo and favicon: Chakra production brand assets
-- Header links: `Chakra`, `GitHub`, and `API Status`
-- Primary URL after verification: `https://docs.Chakra.xyz`
+- Default content: LumAgg Documentation space
+- Logo and favicon: LumAgg production brand assets
+- Header links: `LumAgg`, `GitHub`, and `API Status`
+- Primary URL after verification: `https://docs.lumagg.xyz`
 
 The initial release should use one space. Separate API-reference, version, or
 language spaces can be added later only when the content is large enough to

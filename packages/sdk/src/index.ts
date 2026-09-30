@@ -1,5 +1,5 @@
 /**
- * Chakra TypeScript SDK — quote, build_tx, wallet helpers, submit/poll.
+ * LumAgg TypeScript SDK — quote, build_tx, wallet helpers, submit/poll.
  */
 
 export interface ClientOptions {
@@ -13,8 +13,8 @@ export interface QuoteParams {
   tokenOut: string;
   amountIn: string;
   slippage?: number;
-  /** When true, exclude Classic Arc paths. */
-  preferArc?: boolean;
+  /** When true, exclude Classic SDEX paths. */
+  preferSoroban?: boolean;
   /** Maximum number of DEX hops in a route. */
   maxHops?: number;
   /** Maximum number of split route portions. */
@@ -250,7 +250,7 @@ export interface TokenInfo {
   logoKind?: "official" | "fallback";
 }
 
-export class ChakraClient {
+export class LumAggClient {
   private baseUrl: string;
   private apiKey?: string;
 
@@ -309,7 +309,7 @@ export class ChakraClient {
     });
     if (params.slippage !== undefined)
       search.set("slippage", String(params.slippage));
-    if (params.preferArc) search.set("prefer_Arc", "1");
+    if (params.preferSoroban) search.set("prefer_soroban", "1");
     if (params.maxHops !== undefined) search.set("max_hops", String(params.maxHops));
     if (params.maxSplits !== undefined) search.set("max_splits", String(params.maxSplits));
 
@@ -348,7 +348,7 @@ export class ChakraClient {
       sub_routes: params.subRoutes.map((sr) => ({
         amount_in: sr.amountIn,
         steps: sr.poolAddresses.map((pool, i) => ({
-          dex_type: sr.dexTypes[i] ?? "Arc venue",
+          dex_type: sr.dexTypes[i] ?? "aquarius",
           pool_address: pool,
           token_in: sr.path[i] ?? params.tokenIn,
           token_out: sr.path[i + 1] ?? params.tokenOut,
@@ -807,7 +807,7 @@ function mapSubRoute(raw: Record<string, unknown>): QuoteSubRoute {
     source: String(raw.source ?? ""),
     path: (raw.path as string[]) ?? [],
     poolAddresses,
-    dexTypes: pad(raw.dex_types as string[] | undefined, "Arc venue"),
+    dexTypes: pad(raw.dex_types as string[] | undefined, "aquarius"),
     inIndices: pad(raw.in_indices as number[] | undefined, 0),
     outIndices: pad(raw.out_indices as number[] | undefined, 1),
     amountIn: String(raw.amount_in ?? "0"),
@@ -816,8 +816,8 @@ function mapSubRoute(raw: Record<string, unknown>): QuoteSubRoute {
   };
 }
 
-/** @deprecated Use ChakraClient */
-export class ArcAggregator extends ChakraClient {
+/** @deprecated Use LumAggClient */
+export class StellarAggregator extends LumAggClient {
   constructor(options: { apiUrl: string }) {
     super({ apiUrl: options.apiUrl });
   }

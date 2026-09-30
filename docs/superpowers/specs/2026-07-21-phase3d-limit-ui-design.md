@@ -1,4 +1,4 @@
-# Chakra Phase 3d: Limit Orders UI (Testnet)
+# LumAgg Phase 3d: Limit Orders UI (Testnet)
 
 **Date:** 2026-07-21  
 **Status:** Approved for planning  
@@ -52,7 +52,7 @@ Does not close the product loop.
 ```
 
 - Switching rail only swaps the center column; layout shell unchanged.
-- Limit mode shows a clear **Testnet** notice (network passphrase / wallet must be Testnet).
+- Limit mode shows a clear **Testnet** notice (network passphrase / Freighter must be Testnet).
 - Below the form: open orders for the connected wallet (not Instant Activity).
 
 ## Create form → API
@@ -61,12 +61,12 @@ Does not close the product loop.
 |----------|-----------|
 | Sell token | `token_in` |
 | Buy token | `token_out` |
-| Sell amount | `amount_in` (atomic unitss string) |
+| Sell amount | `amount_in` (stroops string) |
 | Limit price (OUT per 1 IN, human) | `limit_out_per_in_e7` |
 | Expiry preset | `expires_ledger` = current_ledger + Δ |
 
 **Price conversion:**  
-`limit_out_per_in_e7 = round(price_human * 10^7)` where `price_human` is units of `token_out` per 1 whole `token_in` (adjust if decimals differ — both SAC default 7 on Arc; use token decimals from token list).
+`limit_out_per_in_e7 = round(price_human * 10^7)` where `price_human` is units of `token_out` per 1 whole `token_in` (adjust if decimals differ — both SAC default 7 on Stellar; use token decimals from token list).
 
 **Expiry:** Fetch latest ledger (Horizon testnet or helper on limit API). Presets:
 
@@ -92,8 +92,8 @@ Empty / disconnected / API missing: quiet empty states (match Instant tone).
 |-----|------|
 | `NEXT_PUBLIC_API_URL` | Instant / mainnet (unchanged) |
 | `NEXT_PUBLIC_LIMIT_API_URL` | Testnet api-server base (orders + optional health) |
-| `NEXT_PUBLIC_LIMIT_HORIZON_URL` | Optional; default `https://horizon-testnet.Arc.org` for ledger height |
-| `NEXT_PUBLIC_LIMIT_RPC_URL` | Optional; default testnet Arc RPC for submit |
+| `NEXT_PUBLIC_LIMIT_HORIZON_URL` | Optional; default `https://horizon-testnet.stellar.org` for ledger height |
+| `NEXT_PUBLIC_LIMIT_RPC_URL` | Optional; default testnet Soroban RPC for submit |
 | `NEXT_PUBLIC_LIMIT_NETWORK` | `testnet` (documentation / banner) |
 
 If `NEXT_PUBLIC_LIMIT_API_URL` unset: Limit rail enabled but panel shows “Testnet Limit API not configured”.
@@ -103,7 +103,7 @@ Wallet: reuse `WalletProvider`; Limit submit must use **testnet** network passph
 1. Temporarily set kit network to TESTNET while in Limit mode, or  
 2. Pass `networkPassphrase` on `signTransaction` for Limit txs only.
 
-**Decision:** Prefer (2) if kit supports per-sign passphrase; else (1) with restore to PUBLIC when leaving Limit mode. Document wallet Testnet requirement in banner.
+**Decision:** Prefer (2) if kit supports per-sign passphrase; else (1) with restore to PUBLIC when leaving Limit mode. Document Freighter Testnet requirement in banner.
 
 ## Components / files
 
@@ -130,14 +130,14 @@ Reuse: `TokenSelector`, connect CTA patterns, surface tokens from Titan restyle.
 ## Acceptance
 
 1. On `/`, Limit is selectable; Instant still works against mainnet API.  
-2. With testnet API configured + wallet Testnet: create → open order appears → cancel removes/updates.  
+2. With testnet API configured + Freighter Testnet: create → open order appears → cancel removes/updates.  
 3. Without Limit API env: clear unavailable message, no mainnet escrow calls.  
 4. DCA remains Soon.  
 5. Mobile: rail horizontal + Limit form usable.
 
 ## Risks
 
-- Wallet network mismatch (mainnet wallet vs testnet XDR) — banner + passphrase on sign.  
+- Wallet network mismatch (mainnet Freighter vs testnet XDR) — banner + passphrase on sign.  
 - Testnet liquidity thin — fill not required for acceptance (create/cancel/list is enough).  
 - `expires_ledger` clock skew — use Horizon latest + buffer.
 

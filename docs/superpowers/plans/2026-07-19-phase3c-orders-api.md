@@ -4,9 +4,9 @@
 
 **Goal:** Persist escrow order events in SQLite and serve `GET /orders` plus `build_create` / `build_cancel` unsigned XDR endpoints.
 
-**Architecture:** Extend `analytics-indexer` to ingest escrow events into `limit_orders`; `api-server` reads DB and builds Arc invoke XDRs via existing prepare/sim utilities.
+**Architecture:** Extend `analytics-indexer` to ingest escrow events into `limit_orders`; `api-server` reads DB and builds Soroban invoke XDRs via existing prepare/sim utilities.
 
-**Tech Stack:** Rust, rusqlite, dex_adapters RPC events, api-server axum + Arc prepare (mirror `build_tx` / swaps handlers).
+**Tech Stack:** Rust, rusqlite, dex_adapters RPC events, api-server axum + soroban prepare (mirror `build_tx` / swaps handlers).
 
 **Spec:** `docs/superpowers/specs/2026-07-19-phase3c-orders-api-design.md`
 

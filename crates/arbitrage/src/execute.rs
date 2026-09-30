@@ -19,7 +19,7 @@ use {
     },
     anyhow::{Context, Result},
     std::sync::Arc,
-    Arc_xdr::curr as sxdr,
+    stellar_xdr::curr as sxdr,
     tracing::{info, warn},
 };
 
@@ -32,9 +32,9 @@ pub struct PreparedArbTx {
     pub quoted_amount_out: u128,
     /// On-chain simulated output (`base_total` from contract return).
     pub simulated_amount_out: u128,
-    /// Fee used for profit gates / accounting (atomic unitss): simulated
+    /// Fee used for profit gates / accounting (stroops): simulated
     /// `min_resource_fee` only (declared inclusion bid is ignored here).
-    pub estimated_fee_atomic unitss: u128,
+    pub estimated_fee_stroops: u128,
     pub profit_bps: i64,
     pub unsigned_tx_xdr: String,
     pub simulated: bool,
@@ -144,12 +144,12 @@ pub async fn prepare_opportunity_tx(
         0
     };
     // Declared inclusion bid (priority under surge). Not what we charge in the
-    // profit gate — actual inclusion is ~100 atomic unitss and dominated by resource fee.
+    // profit gate — actual inclusion is ~100 stroops and dominated by resource fee.
     let fee = 100_000u32;
     let mut unsigned_tx_xdr = String::new();
     let mut simulated = false;
     let mut simulated_amount_out = 0u128;
-    let mut estimated_fee_atomic unitss = 0u128;
+    let mut estimated_fee_stroops = 0u128;
     let mut tried_probe_fallback = false;
 
     // Up to 2 sims: sized quote → optional probe-size fallback on phantom profit.
@@ -177,8 +177,8 @@ pub async fn prepare_opportunity_tx(
                 unsigned_tx_xdr = prepared.unsigned_tx_xdr;
                 simulated = true;
                 simulated_amount_out = prepared.amount_out;
-                // Profit gate: resource fee only (ignore ~100 atomic units inclusion).
-                estimated_fee_atomic unitss = prepared.resource_fee_atomic unitss;
+                // Profit gate: resource fee only (ignore ~100 stroop inclusion).
+                estimated_fee_stroops = prepared.resource_fee_stroops;
                 break;
             }
             Err(err) => {
@@ -279,7 +279,7 @@ pub async fn prepare_opportunity_tx(
                     error = %err,
                     route = %opp.route_label,
                     caller = %caller_public_key,
-                    "Arc prepare failed"
+                    "Soroban prepare failed"
                 );
                 unsigned_tx_xdr = build_raw_envelope_xdr(caller_public_key, seq as u64, op)?;
                 break;
@@ -290,7 +290,7 @@ pub async fn prepare_opportunity_tx(
     if simulated {
         let sim_profit = simulated_amount_out.saturating_sub(quote.amount_in);
         let base = quote.base.canonical();
-        let fee_base = ctx.fee_in_base(estimated_fee_atomic unitss, &base);
+        let fee_base = ctx.fee_in_base(estimated_fee_stroops, &base);
         let min_profit = ctx.config.min_profit_for(&base);
         // Gas covered by fee_base (XLM fee converted when base is USDC);
         // ARB_MIN_PROFIT_* is a post-fee race/slippage buffer in base units.
@@ -303,7 +303,7 @@ pub async fn prepare_opportunity_tx(
                 quoted_amount_out = quote.amount_out,
                 simulated_amount_out,
                 simulated_profit = sim_profit,
-                estimated_fee_atomic unitss,
+                estimated_fee_stroops,
                 fee_in_base = fee_base,
                 net_profit,
                 min_profit,
@@ -322,7 +322,7 @@ pub async fn prepare_opportunity_tx(
     let profit_bps = crate::scanner::compute_profit_bps(quote.amount_in, simulated_amount_out);
     let simulated_profit = simulated_amount_out.saturating_sub(quote.amount_in);
     let base = quote.base.canonical();
-    let fee_base = ctx.fee_in_base(estimated_fee_atomic unitss, &base);
+    let fee_base = ctx.fee_in_base(estimated_fee_stroops, &base);
     let min_profit = ctx.config.min_profit_for(&base);
     let net_profit = simulated_profit.saturating_sub(fee_base);
     let min_amount_out = min_amount_out_break_even(quote.amount_in);
@@ -340,7 +340,7 @@ pub async fn prepare_opportunity_tx(
         quoted_minimum_out = quote.minimum_out,
         simulated_amount_out,
         simulated_profit,
-        estimated_fee_atomic unitss,
+        estimated_fee_stroops,
         fee_in_base = fee_base,
         net_profit,
         profit_bps,
@@ -359,7 +359,7 @@ pub async fn prepare_opportunity_tx(
         amount_in: quote.amount_in,
         quoted_amount_out: quote.amount_out,
         simulated_amount_out,
-        estimated_fee_atomic unitss,
+        estimated_fee_stroops,
         profit_bps,
         unsigned_tx_xdr,
         simulated,
@@ -401,8 +401,8 @@ pub async fn try_execute_opportunity(
             caller = %prepared.caller_public_key,
             simulated_amount_out = prepared.simulated_amount_out,
             simulated_profit,
-            estimated_fee_atomic unitss = prepared.estimated_fee_atomic unitss,
-            net_profit = simulated_profit.saturating_sub(prepared.estimated_fee_atomic unitss),
+            estimated_fee_stroops = prepared.estimated_fee_stroops,
+            net_profit = simulated_profit.saturating_sub(prepared.estimated_fee_stroops),
             profit_bps = prepared.profit_bps,
             "DRY_RUN: would submit round_trip_swap"
         );

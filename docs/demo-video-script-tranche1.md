@@ -2,7 +2,7 @@
 
 Upload as **unlisted** YouTube / Loom / Drive. Paste the URL into **Deliverable Verification - Video**.
 
-**Voice-over recommended.** Read [tranche-1-voiceover-script.md](./tranche-1-voiceover-script.md) while recording the browser. The caption-card deck remains an optional silent fallback: [evidence/Chakra-Tranche1-Demo-Captions.pptx](./evidence/Chakra-Tranche1-Demo-Captions.pptx).
+**Voice-over recommended.** Read [tranche-1-voiceover-script.md](./tranche-1-voiceover-script.md) while recording the browser. The caption-card deck remains an optional silent fallback: [evidence/LumAgg-Tranche1-Demo-Captions.pptx](./evidence/LumAgg-Tranche1-Demo-Captions.pptx).
 
 For a simple spoken version, read [tranche-1-voiceover-script.md](./tranche-1-voiceover-script.md). It uses short sentences and follows the same screen order.
 
@@ -28,7 +28,7 @@ Audience: SCF reviewers verifying D1–D4. Do **not** spend time on arb vault / 
 建议只录一条连续视频；操作失误时停两秒再继续即可，不必追求专业剪辑。目标是让审阅者
 确认 D1–D4 的证据，不是制作宣传片。
 
-录完后上传到 YouTube Studio，标题可用 `Chakra — SCF #44 Tranche 1 Demo`，将
+录完后上传到 YouTube Studio，标题可用 `LumAgg — SCF #44 Tranche 1 Demo`，将
 Visibility 设为 **Unlisted**。等待处理完成后，用无痕窗口打开分享链接，确认不登录也能
 播放，再把链接填入 completion form 的 `Deliverable Verification - Video`。
 
@@ -38,10 +38,10 @@ Visibility 设为 **Unlisted**。等待处理完成后，用无痕窗口打开�
 
 1. Browser: clean window, 1920×1080, hide bookmarks bar; English UI if possible.
 2. Tabs ready (left → right):
-   - https://Chakra.xyz
-   - https://Chakra.xyz/docs
-   - https://Chakra.xyz/stats
-   - https://github.com/Chakra/Arc-dex-agg (or your public repo)
+   - https://lumagg.xyz
+   - https://lumagg.xyz/docs
+   - https://lumagg.xyz/stats
+   - https://github.com/Lum-Agg/stellar-dex-agg (or your public repo)
    - Terminal in repo root
 3. Terminal pre-run (so live take is fast):
    ```bash
@@ -55,7 +55,7 @@ Visibility 设为 **Unlisted**。等待处理完成后，用无痕窗口打开�
    jq '{success, xdr_prefix: .data.unsigned_tx_xdr[:60]}' \
      docs/evidence/d2-integrator-smoke/build_resp.json
    ```
-4. wallet: connected on mainnet (optional for UI segment). If you skip signing, still show logos / balance / % chips.
+4. Freighter: connected on mainnet (optional for UI segment). If you skip signing, still show logos / balance / % chips.
 5. Pre-warm one quote on the swap page (XLM → USDC) so the live take is snappy.
 
 ---
@@ -64,24 +64,24 @@ Visibility 设为 **Unlisted**。等待处理完成后，用无痕窗口打开�
 
 Text on screen:
 
-> Chakra — SCF #44 Tranche 1  
+> LumAgg — SCF #44 Tranche 1  
 > Integrator API · Swap UX · Analytics indexer · Differentiation evidence  
-> https://Chakra.xyz · https://api.Chakra.xyz
+> https://lumagg.xyz · https://api.lumagg.xyz
 
 ---
 
 ## 0:00–0:25 — Intro
 
-**Show:** Chakra.xyz homepage / swap.
+**Show:** lumagg.xyz homepage / swap.
 
 **Optional narration (skip this when using caption cards):**
-> This is Chakra, a Arc DEX aggregator. Tranche 1 delivers four things: live differentiation benchmarks, an integrator-ready public API, completed swap UX, and an on-chain analytics indexer. I’ll walk through each with live evidence.
+> This is LumAgg, a Stellar DEX aggregator. Tranche 1 delivers four things: live differentiation benchmarks, an integrator-ready public API, completed swap UX, and an on-chain analytics indexer. I’ll walk through each with live evidence.
 
 ---
 
 ## 0:25–1:25 — D3 Swap UI (~60s)
 
-**Show:** https://Chakra.xyz — select **XLM → USDC**.
+**Show:** https://lumagg.xyz — select **XLM → USDC**.
 
 **Do / point:**
 1. Token logos visible in the picker / pair row.
@@ -101,8 +101,8 @@ Text on screen:
 
 ## 1:25–2:55 — D2 Integrator API (~90s)
 
-**Show A — Docs (20s):** https://Chakra.xyz/docs  
-Point to OpenAPI / integrator guide, mention `prefer_Arc=1` and API keys.
+**Show A — Docs (20s):** https://lumagg.xyz/docs  
+Point to OpenAPI / integrator guide, mention `prefer_soroban=1` and API keys.
 
 **Show B — Terminal smoke (70s):**
 
@@ -124,25 +124,25 @@ jq '.success, .data.unsigned_tx_xdr[:60]' docs/evidence/d2-integrator-smoke/buil
 - README: external / non-founder `USER_G`
 
 **Optional narration (skip this when using caption cards):**
-> Deliverable 2: partners can quote and get an unsigned XDR from docs alone. Here is an external G-address smoke — quote plus build_tx — no founder key. OpenAPI and the integrator guide are linked from the docs site; prefer_Arc excludes Classic when integrators need Arc-only comparison.
+> Deliverable 2: partners can quote and get an unsigned XDR from docs alone. Here is an external G-address smoke — quote plus build_tx — no founder key. OpenAPI and the integrator guide are linked from the docs site; prefer_soroban excludes Classic when integrators need Soroban-only comparison.
 
 ---
 
 ## 2:55–3:50 — D1 Differentiation (~55s)
 
 **Show:**
-1. `docs/scf-venue-comparison.md` (GitHub or local) — Broker adapter gap / Chakra venue list.
+1. `docs/scf-venue-comparison.md` (GitHub or local) — Broker adapter gap / LumAgg venue list.
 2. `docs/scf-benchmark-results.md` — show only the top **Tranche 1 reviewer summary** table; do not scroll through the full result matrix.
 3. Optional one-liner: `./scripts/scf-benchmark.sh` exists for reviewers to re-run.
 
 **Optional narration (skip this when using caption cards):**
-> Deliverable 1 is verifiable differentiation, not marketing slides. We maintain a live Arc venue quote benchmark and a public Broker router-contract comparison — including CLMM coverage Broker’s open router lacks. Reviewers can re-run the benchmark script; results are dated in the repo.
+> Deliverable 1 is verifiable differentiation, not marketing slides. We maintain a live Soroswap quote benchmark and a public Broker router-contract comparison — including CLMM coverage Broker’s open router lacks. Reviewers can re-run the benchmark script; results are dated in the repo.
 
 ---
 
 ## 3:50–4:45 — D4 Analytics indexer (~55s)
 
-**Show:** https://Chakra.xyz/stats
+**Show:** https://lumagg.xyz/stats
 
 **Point:**
 - Daily / recent tx count and volume
@@ -151,7 +151,7 @@ jq '.success, .data.unsigned_tx_xdr[:60]' docs/evidence/d2-integrator-smoke/buil
 
 **Then terminal (optional 10s):**
 ```bash
-curl -sS 'https://api.Chakra.xyz/api/v1/stats?format=csv' | head -5
+curl -sS 'https://api.lumagg.xyz/api/v1/stats?format=csv' | head -5
 ```
 
 **Optional narration (skip this when using caption cards):**
@@ -164,12 +164,12 @@ curl -sS 'https://api.Chakra.xyz/api/v1/stats?format=csv' | head -5
 **Show:** GitHub repo root or end card.
 
 **Say:**
-> That’s Tranche 1: benchmarks, integrator API with external smoke evidence, completed swap UX, and live analytics. Links are in the completion form — Chakra.xyz, api.Chakra.xyz, and the repo evidence folder. Thanks for reviewing.
+> That’s Tranche 1: benchmarks, integrator API with external smoke evidence, completed swap UX, and live analytics. Links are in the completion form — lumagg.xyz, api.lumagg.xyz, and the repo evidence folder. Thanks for reviewing.
 
 **End card text:**
-> https://Chakra.xyz  
-> https://api.Chakra.xyz  
-> https://github.com/Chakra/Arc-dex-agg  
+> https://lumagg.xyz  
+> https://api.lumagg.xyz  
+> https://github.com/Lum-Agg/stellar-dex-agg  
 > Evidence: docs/evidence/d2-integrator-smoke/
 
 ---
@@ -185,7 +185,7 @@ curl -sS 'https://api.Chakra.xyz/api/v1/stats?format=csv' | head -5
 | 3:50 | /stats + CSV | D4 |
 | 4:45 | Close | — |
 
-If you run long: cut wallet signing first, then cut live `scf-benchmark.sh`.
+If you run long: cut Freighter signing first, then cut live `scf-benchmark.sh`.
 
 ---
 

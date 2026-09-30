@@ -22,10 +22,10 @@ agent/
 deploy/
 !deploy/
 deploy/*
-!deploy/Chakra-api-testnet.service
-!deploy/Chakra-indexer-testnet.service
-!deploy/Chakra-limit-keeper-testnet.service
-!deploy/Chakra-worker-testnet.service
+!deploy/lumagg-api-testnet.service
+!deploy/lumagg-indexer-testnet.service
+!deploy/lumagg-limit-keeper-testnet.service
+!deploy/lumagg-worker-testnet.service
 !scripts/scf-quote-regression.sh
 .DS_Store
 todo.org
@@ -34,3 +34,15 @@ configs
 # Optional upstream clones (see thirdparty/README.md)
 thirdparty/*
 !thirdparty/README.md
+
+# Local PlantUML jar used by docs/diagrams/render.sh (~24MB)
+docs/diagrams/plantuml.jar
+
+# Wayfinder maps and grant research (may name LumAgg internally)
+.scratch/
+
+# Environment files are backed up separately.
+.env.*
+!.env.example
+!.env.sample
+!.env.template

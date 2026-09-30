@@ -1,11 +1,11 @@
 # Arbitrage Configuration Reference
 
-`Chakra-arbitrage-bot` reads a TOML file and applies it to the scanner runtime.
-The release archive includes a complete `Chakra-arbitrage.toml` template.
+`lumagg-arbitrage-bot` reads a TOML file and applies it to the scanner runtime.
+The release archive includes a complete `lumagg-arbitrage.toml` template.
 Unknown sections and unknown keys are rejected to catch spelling mistakes.
 
 ```bash
-./Chakra-arbitrage-bot --config ./arbitrage.toml --check-config
+./lumagg-arbitrage-bot --config ./arbitrage.toml --check-config
 ```
 
 The config can reference caller secrets, mnemonic files, private RPC URLs, and
@@ -21,21 +21,21 @@ chmod 600 arbitrage-callers
 
 | TOML key | Required/default | Description |
 | --- | --- | --- |
-| `network.rpc_url` | required | Arc RPC used for simulation, transaction preparation, submission, and account sequence reads. Use a low-latency endpoint with enough capacity. |
-| `network.quote_api_urls` | required | One or more Chakra quote API base URLs. The bot can distribute quote work across multiple API replicas. |
+| `network.rpc_url` | required | Soroban RPC used for simulation, transaction preparation, submission, and account sequence reads. Use a low-latency endpoint with enough capacity. |
+| `network.quote_api_urls` | required | One or more LumAgg quote API base URLs. The bot can distribute quote work across multiple API replicas. |
 
 ## Contracts
 
 | TOML key | Required/default | Description |
 | --- | --- | --- |
-| `contracts.aggregator` | required | Chakra Aggregator contract used by built round-trip transactions. Must match the quote API's contract version. |
-| `contracts.vault` | unset | Optional Chakra Vault. When set, callers execute through the vault and principal stays in the vault. When unset, callers must hold the trading principal directly. |
+| `contracts.aggregator` | required | LumAgg Aggregator contract used by built round-trip transactions. Must match the quote API's contract version. |
+| `contracts.vault` | unset | Optional LumAgg Vault. When set, callers execute through the vault and principal stays in the vault. When unset, callers must hold the trading principal directly. |
 
 ## Accounts
 
 | TOML key | Required/default | Description |
 | --- | --- | --- |
-| `accounts.caller_secrets_file` | unset | Path to a file containing one Arc `S...` secret seed per line. |
+| `accounts.caller_secrets_file` | unset | Path to a file containing one Stellar `S...` secret seed per line. |
 | `accounts.mnemonic_path` | unset | Path to a mnemonic file used with `caller_indices`. |
 | `accounts.caller_indices` | `[0]` | Derivation indices used when `mnemonic_path` is configured. |
 
@@ -58,7 +58,7 @@ simulation success rate, and API backlog.
 
 | TOML key | Program default | Description |
 | --- | --- | --- |
-| `scanner.probe_amount_in` | runtime default | Initial amount, in raw token units, used to probe opportunities. XLM and most Arc SAC assets use 7 decimals. |
+| `scanner.probe_amount_in` | runtime default | Initial amount, in raw token units, used to probe opportunities. XLM and most Stellar SAC assets use 7 decimals. |
 | `scanner.min_profit` | runtime default | Global minimum simulated post-fee profit in raw base-token units. |
 | `scanner.min_profit_xlm` | unset | XLM-specific minimum profit override. |
 | `scanner.min_profit_usdc` | unset | USDC-specific minimum profit override. |

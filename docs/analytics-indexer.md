@@ -1,14 +1,14 @@
 # Analytics Indexer (v0)
 
-On-chain analytics for the Chakra **aggregator contract** — Tranche 1 Deliverable 4.
+On-chain analytics for the LumAgg **aggregator contract** — Tranche 1 Deliverable 4.
 
 ## Scope
 
-The indexer polls Arc RPC **`getEvents`** for the aggregator contract, groups `swap` / `rt` / `leg` topics per `tx_hash`, and stores invocations in SQLite. Daily rollups export as JSON for Tranche 3 dashboard wiring.
+The indexer polls Soroban RPC **`getEvents`** for the aggregator contract, groups `swap` / `rt` / `leg` topics per `tx_hash`, and stores invocations in SQLite. Daily rollups export as JSON for Tranche 3 dashboard wiring.
 
 **Vault path:** When arb uses `vault.execute_round_trip`, the aggregator still emits events via CPI — same indexer path as direct `round_trip_swap`.
 
-**Legacy fallback:** `indexer.envelope_fallback = true` also ingests pre-upgrade txs and supplies token/path metadata for historical 4-field `leg` events. New compact `leg` events are self-contained. For old ledgers, the fallback can use `dex.horizon_url` when the configured Arc RPC no longer returns the transaction envelope.
+**Legacy fallback:** `indexer.envelope_fallback = true` also ingests pre-upgrade txs and supplies token/path metadata for historical 4-field `leg` events. New compact `leg` events are self-contained. For old ledgers, the fallback can use `dex.horizon_url` when the configured Soroban RPC no longer returns the transaction envelope.
 
 ## Aggregator events (requires WASM upgrade)
 
@@ -20,7 +20,7 @@ After upgrading mainnet aggregator WASM, each successful invoke emits:
 | `rt` | `round_trip_swap()` completes | user, base, bridge, amount_in, amount_out, serial_depth, is_split |
 | `leg` | each DEX hop | leg_index, dex_tag, pool, token_in, actual amount_in |
 
-`dex_tag`: 0=Arc venue, 1=Arc venue, 2=Arc venue, 3=sushi, 4=Arc venue
+`dex_tag`: 0=aquarius, 1=soroswap, 2=phoenix, 3=sushi, 4=comet
 
 Upgrade: `./contracts/aggregator/upgrade.sh` (see repo README).
 
@@ -28,7 +28,7 @@ Upgrade: `./contracts/aggregator/upgrade.sh` (see repo README).
 
 ```mermaid
 flowchart LR
-  RPC[Arc RPC getEvents] --> IDX[Chakra-analytics-indexer]
+  RPC[Soroban RPC getEvents] --> IDX[lumagg-analytics-indexer]
   ENV[optional envelope fallback] --> IDX
   IDX --> DB[(SQLite)]
   IDX --> EXP[export-daily JSON]
@@ -70,12 +70,12 @@ Failed transactions and bot simulation estimates are excluded.
 
 ## Configuration
 
-The indexer reads the same `Chakra-aggregator.toml` as the API and worker.
+The indexer reads the same `lumagg-aggregator.toml` as the API and worker.
 
 | TOML key | Default | Description |
 |----------|---------|-------------|
-| `network.rpc_url` | required | Arc RPC endpoint |
-| `network.passphrase` | mainnet | Arc network passphrase |
+| `network.rpc_url` | required | Soroban RPC endpoint |
+| `network.passphrase` | mainnet | Stellar network passphrase |
 | `api.aggregator_contract` | required | Event source contract |
 | `features.escrow_contract` | unset | Optional Order Escrow event source |
 | `indexer.mode` | `events` | `events` \| `envelope` \| `both` |
@@ -89,20 +89,20 @@ The indexer reads the same `Chakra-aggregator.toml` as the API and worker.
 ## Commands
 
 ```bash
-CONFIG=./Chakra-aggregator.toml
+CONFIG=./lumagg-aggregator.toml
 
 # Continuous ingest
-./Chakra-analytics-indexer --config "$CONFIG" run
+./lumagg-analytics-indexer --config "$CONFIG" run
 
 # One-shot backfill from ledger
-./Chakra-analytics-indexer --config "$CONFIG" backfill --start-ledger 63200000
+./lumagg-analytics-indexer --config "$CONFIG" backfill --start-ledger 63200000
 
 # Status
-./Chakra-analytics-indexer --config "$CONFIG" status
+./lumagg-analytics-indexer --config "$CONFIG" status
 
 # Daily JSON export
-./Chakra-analytics-indexer --config "$CONFIG" export-daily
-./Chakra-analytics-indexer --config "$CONFIG" export-daily 2026-06-01
+./lumagg-analytics-indexer --config "$CONFIG" export-daily
+./lumagg-analytics-indexer --config "$CONFIG" export-daily 2026-06-01
 ```
 
 ## Tranche 3 handoff
@@ -114,11 +114,11 @@ The daily JSON export also includes `round_trip_by_bridge`, an additive
 breakdown of successful round trips by intermediary bridge token. Existing
 `daily[].by_token[].amount_in` semantics are unchanged for external consumers
 such as DefiLlama.
-- Public UI: https://Chakra.xyz/stats
+- Public UI: https://lumagg.xyz/stats
 - Sample export: [sample-indexer-export.json](./sample-indexer-export.json)
 
 ```bash
-curl -s https://api.Chakra.xyz/api/v1/stats | jq .
+curl -s https://api.lumagg.xyz/api/v1/stats | jq .
 ```
 
 ## Development

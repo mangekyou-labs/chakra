@@ -1,7 +1,7 @@
-//! Arc RPC `getTransactions` helpers for contract-scoped tx indexing.
+//! Soroban RPC `getTransactions` helpers for contract-scoped tx indexing.
 
 use {
-    super::ArcRpc,
+    super::SorobanRpc,
     anyhow::{anyhow, Result},
     serde::Deserialize,
     serde_json::json,
@@ -36,7 +36,7 @@ pub struct TransactionFilterSpec {
     pub contract_ids: Option<Vec<String>>,
 }
 
-impl ArcRpc {
+impl SorobanRpc {
     /// Fetch transactions touching filtered contracts in `[start_ledger,
     /// end_ledger)`.
     pub async fn get_contract_transactions(

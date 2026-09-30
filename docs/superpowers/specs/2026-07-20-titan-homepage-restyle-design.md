@@ -1,4 +1,4 @@
-# Chakra Frontend: Titan-leaning Homepage Restyle
+# LumAgg Frontend: Titan-leaning Homepage Restyle
 
 **Date:** 2026-07-20  
 **Status:** Approved for planning  

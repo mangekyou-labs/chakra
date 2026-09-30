@@ -1,4 +1,4 @@
-//! Two-leg round-trip quotes via Chakra quote-api.
+//! Two-leg round-trip quotes via LumAgg quote-api.
 
 use {
     crate::{context::ArbContext, quote_client::LegQuote},

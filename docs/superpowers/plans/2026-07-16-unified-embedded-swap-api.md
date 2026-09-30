@@ -4,7 +4,7 @@
 
 **Goal:** One quote/refresh codebase with pluggable stores so self-hosters run a single binary (`embedded` = in-process worker + memory) while production keeps Redis cluster mode—without forking business logic.
 
-**Architecture:** Extract `PoolStateStore` (and reuse existing `SnapshotStore`) behind traits. Redis and Memory backends implement the same APIs. Worker publish + API hydrate only talk to `Arc<dyn …>`. `Chakra_MODE=embedded|cluster` selects wiring, not alternate quote paths.
+**Architecture:** Extract `PoolStateStore` (and reuse existing `SnapshotStore`) behind traits. Redis and Memory backends implement the same APIs. Worker publish + API hydrate only talk to `Arc<dyn …>`. `LUMAGG_MODE=embedded|cluster` selects wiring, not alternate quote paths.
 
 **Tech Stack:** Rust workspace (`market-snapshot`, `market-data-worker` as lib, `api-server`), `async-trait`, Tokio, existing Redis clients.
 
@@ -20,7 +20,7 @@
 | `crates/market-data-worker/src/worker.rs` | Inject `Arc<dyn SnapshotStore>` + `Arc<dyn PoolStateStore>` |
 | `crates/api-server/src/pool_hydrate.rs` | Hydrate via trait object |
 | `crates/api-server/src/state.rs` / `config.rs` | Mode wiring; spawn worker in embedded |
-| Docs: short `README` / deploy note for `Chakra_MODE` | Self-host one-binary instructions |
+| Docs: short `README` / deploy note for `LUMAGG_MODE` | Self-host one-binary instructions |
 
 ---
 
@@ -30,7 +30,7 @@
 - Modify: `crates/market-snapshot/src/pool_state_store.rs`
 - Test: unit tests in same file
 
-- [ ] **Step 1:** Define `#[async_trait] trait PoolStateStore` with: `publish_pool_state`, `set_xyk_batch`, `set_clmm_batch`, `set_Arc venue_batch`, `set_Arc venue_batch`, `fetch_xyk`, `fetch_clmm`, `fetch_Arc venue`, `fetch_Arc venue` (mirror current Redis methods used by worker/API).
+- [ ] **Step 1:** Define `#[async_trait] trait PoolStateStore` with: `publish_pool_state`, `set_xyk_batch`, `set_clmm_batch`, `set_aquarius_batch`, `set_comet_batch`, `fetch_xyk`, `fetch_clmm`, `fetch_aquarius`, `fetch_comet` (mirror current Redis methods used by worker/API).
 - [ ] **Step 2:** `impl PoolStateStore for RedisPoolStateStore` (thin wrappers calling existing methods).
 - [ ] **Step 3:** Implement `MemoryPoolStateStore` with `tokio::sync::RwLock<HashMap<…>>` (or four maps); no TTL required for v1 (or optional ignore).
 - [ ] **Step 4:** Unit test: set_xyk_batch → fetch_xyk round-trip on Memory.
@@ -75,12 +75,12 @@
 
 ---
 
-### Task 5: `Chakra_MODE=embedded` in api-server
+### Task 5: `LUMAGG_MODE=embedded` in api-server
 
 **Files:**
 - Modify: `crates/api-server/src/config.rs`, `lib.rs` / server startup, `Cargo.toml` (depend on `market-data-worker`)
 
-- [ ] **Step 1:** Parse `Chakra_MODE` (`embedded` | `cluster`, default `cluster` for prod safety—or `embedded` if no Redis URL).
+- [ ] **Step 1:** Parse `LUMAGG_MODE` (`embedded` | `cluster`, default `cluster` for prod safety—or `embedded` if no Redis URL).
 - [ ] **Step 2:** Embedded: create shared Memory stores, `tokio::spawn(worker::run(...))`, load/reload snapshot via memory watch, skip Redis requirement.
 - [ ] **Step 3:** Cluster: unchanged Redis worker + API split.
 - [ ] **Step 4:** Smoke: `cargo build -p api-server`; document env in README snippet.
@@ -89,7 +89,7 @@
 
 ### Task 6: Docs + sanity
 
-- [ ] Short self-host section: one binary, `RPC_URL`, `Chakra_MODE=embedded`, listen port.
+- [ ] Short self-host section: one binary, `RPC_URL`, `LUMAGG_MODE=embedded`, listen port.
 - [ ] Note production remains Redis + separate `market-data-worker`.
 
 ---

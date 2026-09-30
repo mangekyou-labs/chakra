@@ -2,11 +2,11 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Split Arc contracts from single-file `lib.rs` into focused modules without changing external behavior, storage, events, or auth semantics.
+**Goal:** Split Soroban contracts from single-file `lib.rs` into focused modules without changing external behavior, storage, events, or auth semantics.
 
 **Architecture:** Behavior-preserving refactor. `lib.rs` becomes a thin `#[contractimpl]` facade; logic moves into `storage` / `auth` / domain modules. Validate after each contract with existing unit tests. Start with `vault`, then `aggregator`, leave `order-escrow` for a follow-up once the pattern is proven.
 
-**Tech Stack:** Rust, Arc SDK 22, `cargo test -p vault-contract` / `cargo test -p aggregator-contract`
+**Tech Stack:** Rust, Soroban SDK 22, `cargo test -p vault-contract` / `cargo test -p aggregator-contract`
 
 **Spec:** `docs/superpowers/specs/2026-08-06-contract-module-split-design.md`
 
@@ -86,8 +86,8 @@ Move this from `lib.rs` unchanged:
 
 ```rust
 use {
-    Chakra_contract_types::SubRoute,
-    Arc_sdk::{contractclient, Address, Env, Vec},
+    lumagg_contract_types::SubRoute,
+    soroban_sdk::{contractclient, Address, Env, Vec},
 };
 
 #[contractclient(name = "AggregatorContractClient")]
@@ -108,7 +108,7 @@ pub trait AggregatorContract {
 - [ ] **Step 2: Create `storage.rs`**
 
 ```rust
-use Arc_sdk::{contracttype, Address, Env};
+use soroban_sdk::{contracttype, Address, Env};
 
 #[contracttype]
 #[derive(Clone)]
@@ -154,7 +154,7 @@ At top of `lib.rs`:
 
 ```rust
 #![no_std]
-//! Chakra arb vault: ...
+//! LumAgg arb vault: ...
 //! (keep the existing crate-level auth-pitfall docs)
 
 mod admin;
@@ -166,8 +166,8 @@ mod types;
 #[cfg(test)]
 mod tests;
 
-use Arc_sdk::{contract, contractimpl, Address, BytesN, Env, Vec};
-use Chakra_contract_types::SubRoute;
+use soroban_sdk::{contract, contractimpl, Address, BytesN, Env, Vec};
+use lumagg_contract_types::SubRoute;
 
 pub use types::AggregatorContract;
 
@@ -217,7 +217,7 @@ EOF
 
 ```rust
 use crate::storage;
-use Arc_sdk::{Address, Env};
+use soroban_sdk::{Address, Env};
 
 pub fn require_admin(env: &Env) -> Address {
     let admin = storage::get_admin(env);
@@ -239,7 +239,7 @@ Example shapes:
 
 ```rust
 use crate::{auth, storage};
-use Arc_sdk::{token, Address, BytesN, Env};
+use soroban_sdk::{token, Address, BytesN, Env};
 
 pub fn initialize(env: Env, admin: Address) {
     if storage::has_admin(&env) {
@@ -351,8 +351,8 @@ Preserve:
 
 ```rust
 use crate::{auth, types::AggregatorContractClient};
-use Chakra_contract_types::SubRoute;
-use Arc_sdk::{token, Address, Env, Vec};
+use lumagg_contract_types::SubRoute;
+use soroban_sdk::{token, Address, Env, Vec};
 
 pub fn deposit(env: Env, from: Address, token: Address, amount: i128) {
     from.require_auth();
@@ -447,8 +447,8 @@ Keep the crate-level doc comments on `lib.rs` (auth pitfall). Optionally keep a 
 use {
     super::*,
     aggregator_contract::AggregatorContract,
-    Chakra_contract_types::{DexType, SubRoute, SwapStep},
-    Arc_sdk::{testutils::Address as _, token, vec, Address, Env},
+    lumagg_contract_types::{DexType, SubRoute, SwapStep},
+    soroban_sdk::{testutils::Address as _, token, vec, Address, Env},
 };
 ```
 
@@ -560,8 +560,8 @@ Same pattern as vault: `DataKey::Admin`, `has_admin` / `get_admin` / `set_admin`
 
 Move unchanged:
 
-- `Arc venue_fee`
-- `Arc venue_get_amount_out`
+- `soroswap_fee`
+- `soroswap_get_amount_out`
 - `scale_sub_routes_to_total`
 
 Make them `pub(crate)`.
@@ -620,7 +620,7 @@ EOF
 
 Move:
 
-- `Arc venue_approval_ledger`
+- `comet_approval_ledger`
 - `dex_tag`
 - `execute_step`
 - `execute_step_inner`
@@ -717,4 +717,4 @@ Otherwise stop.
 - Prefer **move code, then fix imports** over rewriting logic.
 - Panic / assert string literals are part of test surface for some contracts — keep them identical.
 - Aggregator has `test_snapshots/`; treat snapshot diffs as regressions unless you intentionally changed XDR/event encoding (you must not).
-- Do not run `Arc contract build` / mainnet upgrade as part of this refactor unless the user explicitly asks.
+- Do not run `stellar contract build` / mainnet upgrade as part of this refactor unless the user explicitly asks.

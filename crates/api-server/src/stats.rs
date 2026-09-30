@@ -46,7 +46,7 @@ fn indexer_db_path() -> Option<String> {
     std::env::var("INDEXER_DB_PATH")
         .ok()
         .filter(|s| !s.is_empty())
-        .or_else(|| std::env::var("Chakra_INDEXER_DB_PATH").ok().filter(|s| !s.is_empty()))
+        .or_else(|| std::env::var("LUMAGG_INDEXER_DB_PATH").ok().filter(|s| !s.is_empty()))
 }
 
 pub async fn get_stats(Query(params): Query<StatsQuery>) -> Response {
@@ -121,7 +121,7 @@ pub async fn get_stats(Query(params): Query<StatsQuery>) -> Response {
 
     if params.format.as_deref() == Some("csv") {
         let mut lines = vec![
-            "day,tx_count,unique_users,notional_in_atomic unitss,notional_in_usd,routed_dex_volume_atomic unitss,routed_dex_volume_usd,routed_leg_count,routed_priced_leg_count,routed_pricing_coverage,round_trip_count,round_trip_gross_surplus_usd,xlm_usd,split_swap_count,success_count,failed_count"
+            "day,tx_count,unique_users,notional_in_stroops,notional_in_usd,routed_dex_volume_stroops,routed_dex_volume_usd,routed_leg_count,routed_priced_leg_count,routed_pricing_coverage,round_trip_count,round_trip_gross_surplus_usd,xlm_usd,split_swap_count,success_count,failed_count"
                 .into(),
         ];
         for d in &daily {
@@ -154,7 +154,7 @@ pub async fn get_stats(Query(params): Query<StatsQuery>) -> Response {
             StatusCode::OK,
             [
                 (header::CONTENT_TYPE, "text/csv; charset=utf-8"),
-                (header::CONTENT_DISPOSITION, "attachment; filename=\"Chakra-stats.csv\""),
+                (header::CONTENT_DISPOSITION, "attachment; filename=\"lumagg-stats.csv\""),
             ],
             body,
         )

@@ -1,0 +1,68 @@
+' Shared look for LumAgg architecture diagrams. Included, not rendered alone.
+' Smetana: built-in layout so Graphviz is not required.
+!pragma layout smetana
+skinparam backgroundColor #FFFFFF
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+skinparam defaultFontSize 13
+skinparam ArrowColor #1F2933
+skinparam ArrowFontColor #1F2933
+skinparam ArrowThickness 1.2
+skinparam RoundCorner 8
+skinparam Padding 6
+skinparam wrapWidth 180
+skinparam maxMessageSize 180
+
+skinparam ActorBackgroundColor #FFFFFF
+skinparam ActorBorderColor #1F2933
+skinparam ActorFontColor #1F2933
+
+skinparam ParticipantBackgroundColor #F4F1EA
+skinparam ParticipantBorderColor #1F2933
+skinparam ParticipantFontColor #1F2933
+skinparam ParticipantPadding 12
+skinparam SequenceLifeLineBorderColor #9AA3AD
+skinparam SequenceLifeLineBackgroundColor #FFFFFF
+skinparam SequenceGroupBackgroundColor #FAFAF8
+skinparam SequenceGroupBorderColor #1F2933
+skinparam SequenceGroupHeaderFontColor #1F2933
+skinparam SequenceDividerBackgroundColor #EEF1F4
+skinparam SequenceDividerFontColor #1F2933
+skinparam SequenceBoxBackgroundColor #FAFAF8
+skinparam SequenceBoxBorderColor #6B7280
+skinparam SequenceBoxFontColor #1F2933
+
+skinparam ComponentBackgroundColor #F4F1EA
+skinparam ComponentBorderColor #1F2933
+skinparam ComponentFontColor #1F2933
+skinparam ComponentStyle uml2
+
+skinparam DatabaseBackgroundColor #E8EEF4
+skinparam DatabaseBorderColor #1F2933
+skinparam DatabaseFontColor #1F2933
+
+skinparam CloudBackgroundColor #EEF1F4
+skinparam CloudBorderColor #1F2933
+skinparam CloudFontColor #1F2933
+
+skinparam PackageBackgroundColor #FAFAF8
+skinparam PackageBorderColor #6B7280
+skinparam PackageFontColor #1F2933
+skinparam PackageTitleFontColor #1F2933
+skinparam PackageStyle rectangle
+
+skinparam RectangleBackgroundColor #FAFAF8
+skinparam RectangleBorderColor #6B7280
+skinparam RectangleFontColor #1F2933
+
+skinparam NoteBackgroundColor #FFF8E7
+skinparam NoteBorderColor #C4A35A
+skinparam NoteFontColor #1F2933
+
+skinparam TitleFontSize 16
+skinparam TitleFontColor #1F2933
+skinparam FooterFontColor #6B7280
+skinparam FooterFontSize 11
+
+hide stereotype
+skinparam linetype ortho

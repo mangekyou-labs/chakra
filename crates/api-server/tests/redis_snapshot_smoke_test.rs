@@ -85,7 +85,7 @@ fn clmm_pool_snapshot(source: &str, token0: &str, token1: &str, pool_address: &s
 fn smoke_clmm_pools() -> Vec<ClmmPoolSnapshot> {
     vec![
         clmm_pool_snapshot("sushi", "token-a", "token-b", "pool-sushi"),
-        clmm_pool_snapshot("Arc venue_clmm", "token-c", "token-d", "pool-aqua"),
+        clmm_pool_snapshot("aquarius_clmm", "token-c", "token-d", "pool-aqua"),
     ]
 }
 
@@ -107,7 +107,7 @@ fn smoke_snapshot() -> MarketSnapshot {
                 }],
             },
             SourceSnapshot {
-                source: "Arc venue_clmm".to_string(),
+                source: "aquarius_clmm".to_string(),
                 pairs: vec![TradingPairSnapshot {
                     token_a: "token-c".to_string(),
                     token_b: "token-d".to_string(),
@@ -219,7 +219,7 @@ struct RedisServerGuard {
 impl RedisServerGuard {
     fn start(port: u16) -> Option<Self> {
         let dir = std::env::temp_dir().join(format!(
-            "Chakra-redis-smoke-{}",
+            "lumagg-redis-smoke-{}",
             SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_nanos()
         ));
         std::fs::create_dir_all(&dir).unwrap();
@@ -257,7 +257,7 @@ impl Drop for RedisServerGuard {
 }
 
 #[tokio::test]
-async fn redis_snapshot_store_smoke_quotes_sushi_Arc venue_clmm_and_classic() {
+async fn redis_snapshot_store_smoke_quotes_sushi_aquarius_clmm_and_classic() {
     let port = 6395;
     let Some(_redis) = RedisServerGuard::start(port) else {
         eprintln!("redis-server unavailable; skipping Redis snapshot smoke test");
@@ -268,7 +268,7 @@ async fn redis_snapshot_store_smoke_quotes_sushi_Arc venue_clmm_and_classic() {
         SnapshotStoreBackend::Redis,
         None,
         Some(&redis_url),
-        Some("Chakra:test:snapshot:events"),
+        Some("lumagg:test:snapshot:events"),
         Some(3),
     )
     .unwrap();
@@ -292,7 +292,7 @@ async fn redis_snapshot_store_smoke_quotes_sushi_Arc venue_clmm_and_classic() {
             slippage_bps: Some(50),
             max_hops: Some(1),
             max_splits: Some(1),
-            prefer_Arc: None,
+            prefer_soroban: None,
         })
         .await;
     assert!(sushi_route.total_expected_out > 0);
@@ -305,7 +305,7 @@ async fn redis_snapshot_store_smoke_quotes_sushi_Arc venue_clmm_and_classic() {
             slippage_bps: Some(50),
             max_hops: Some(1),
             max_splits: Some(1),
-            prefer_Arc: None,
+            prefer_soroban: None,
         })
         .await;
     assert!(aqua_route.total_expected_out > 0);
@@ -318,7 +318,7 @@ async fn redis_snapshot_store_smoke_quotes_sushi_Arc venue_clmm_and_classic() {
             slippage_bps: Some(50),
             max_hops: Some(1),
             max_splits: Some(1),
-            prefer_Arc: None,
+            prefer_soroban: None,
         })
         .await;
     assert_eq!(classic_route.total_expected_out, 1_077);

@@ -1,6 +1,6 @@
 /** Persisted Instant-swap routing / slippage settings (Jupiter-style). */
 
-export const SWAP_SETTINGS_STORAGE_KEY = 'Chakra.swapSettings';
+export const SWAP_SETTINGS_STORAGE_KEY = 'lumagg.swapSettings';
 
 export const SLIPPAGE_PRESETS = [0.5, 1.0] as const;
 export const SLIPPAGE_MIN = 0.01;

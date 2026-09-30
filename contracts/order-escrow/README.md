@@ -9,7 +9,7 @@ unfilled input; it is not an order book or a price oracle.
 ### `initialize(admin, aggregator)`
 
 Initializes the contract once. `admin` must authorize initialization.
-`aggregator` is the deployed Chakra aggregator contract used by fills.
+`aggregator` is the deployed LumAgg aggregator contract used by fills.
 
 ### `create_limit(owner, token_in, token_out, amount_in, limit_out_per_in_e7, expires_ledger) -> order_id`
 
@@ -45,22 +45,22 @@ again.
 
 ## Limit-rate math
 
-`limit_out_per_in_e7` represents the minimum output atomic unitss per input atomic units,
+`limit_out_per_in_e7` represents the minimum output stroops per input stroop,
 scaled by `10_000_000`. For each fill:
 
 ```text
 required_min_out = floor(amount_in * limit_out_per_in_e7 / 10_000_000)
 ```
 
-For example, a rate of `20_000_000` means at least two output atomic unitss for each
-input atomic units. A partial fill of `2_500_000` input atomic unitss requires a
+For example, a rate of `20_000_000` means at least two output stroops for each
+input stroop. A partial fill of `2_500_000` input stroops requires a
 `min_amount_out` of at least `5_000_000`. Computing this per fill preserves
 the user's rate across partial fills.
 
 ## Aggregator authorization decision
 
 The escrow contract is passed as `user` to `aggregator.swap`. A direct contract
-call made by the current contract is already authorized by Arc, so
+call made by the current contract is already authorized by Soroban, so
 `env.authorize_as_current_contract` must authorize only the deeper call made by
 the aggregator:
 

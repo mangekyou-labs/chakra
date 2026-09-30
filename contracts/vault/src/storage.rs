@@ -1,4 +1,4 @@
-use Arc_sdk::{contracttype, Address, Env};
+use soroban_sdk::{contracttype, Address, Env};
 
 #[contracttype]
 #[derive(Clone)]

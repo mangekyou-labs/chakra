@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
-# Build optimized WASM and deploy Chakra order-escrow on Arc **testnet**.
+# Build optimized WASM and deploy LumAgg order-escrow on Stellar **testnet**.
 #
 # Hard rule: refuses mainnet / Public Global passphrase.
 #
 # Prerequisites:
-#   - Arc CLI + funded testnet admin key
+#   - stellar CLI + funded testnet admin key
 #   - Testnet aggregator already deployed (AGGREGATOR=C… or .testnet-aggregator-id)
 #
 # Usage:
@@ -43,12 +43,12 @@ CONTRACT_ID=$(deploy_wasm "$WASM")
 echo ""
 echo "=== Order escrow deployed ==="
 echo "ESCROW=$CONTRACT_ID"
-echo "  https://Arc.expert/explorer/testnet/contract/$CONTRACT_ID"
+echo "  https://stellar.expert/explorer/testnet/contract/$CONTRACT_ID"
 echo "$CONTRACT_ID" > "$ID_FILE"
 echo "(saved to $ID_FILE)"
 
 echo "=== initialize(admin=$ADMIN_G, aggregator=$AGGREGATOR) ==="
-run_Arc_tx "initialize" Arc contract invoke \
+run_stellar_tx "initialize" stellar contract invoke \
   --id "$CONTRACT_ID" \
   --source-account "$ADMIN" \
   --rpc-url "$RPC_URL" \

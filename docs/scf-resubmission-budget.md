@@ -16,7 +16,7 @@
 
 ### Shipped MVP — $0 from this grant (pre-award)
 
-Live today: [Chakra.xyz](https://Chakra.xyz), [api.Chakra.xyz](https://api.Chakra.xyz), `market-data-worker` + Redis (6 Arc venue types), `router-engine` + Brent split, mainnet aggregator (`split_swap`), swap UI shell, Telegram alerts, Arc venue/CLMM hydration.
+Live today: [lumagg.xyz](https://lumagg.xyz), [api.lumagg.xyz](https://api.lumagg.xyz), `market-data-worker` + Redis (6 Soroban venue types), `router-engine` + Brent split, mainnet aggregator (`split_swap`), swap UI shell, Telegram alerts, Comet/CLMM hydration.
 
 ### Post-submission & resubmission scope — not in original $100k application
 
@@ -33,8 +33,8 @@ Evidence: [scf-venue-comparison.md](scf-venue-comparison.md) · [scf-benchmark-r
 | Event-driven pool state pipeline | Analytics indexer + dashboard |
 | Router engine + quote API rebuild | Atomic arb + vault operator stack (post-submission code) |
 | Aggregator mainnet production | External audit (**aggregator + vault**) |
-| Swap frontend MVP | OpenAPI, API keys, `prefer_Arc` |
-| Arc venue / extended DEX hydration | Token metadata, logos, balance UX |
+| Swap frontend MVP | OpenAPI, API keys, `prefer_soroban` |
+| Comet / extended DEX hydration | Token metadata, logos, balance UX |
 | Internal “hardening” of worker/API | npm SDK publish + ≥2 integration validation paths |
 
 We reduced **$10k** (not 25–40%) because the **original line items for shipped MVP are now $0 pre-award**, while **new deliverables** (analytics, post-submission arb+vault, dual-contract audit, integrator SDK/pilots) were added. No large “removed vs added” dollar reallocation — only a clearer scope split and a modest total trim.
@@ -56,13 +56,13 @@ We reduced **$10k** (not 25–40%) because the **original line items for shipped
 
 **Budget:** $1,500 (Grant-period expansion only — initial comparison docs exist pre-award as $0 evidence; this funds matrix growth + refresh through Jul 2026)
 
-**Brief description:** Expand and maintain verifiable differentiation vs Arc venue (live quote benchmark), Arc Broker (public router-contract adapter matrix — no Arc venue CLMM / Sushi CLMM), and wallets (xBull). **Net-new in Tranche 1:** grow benchmark coverage, refresh results as APIs change, and link the pack from the integrator guide (Deliverable 2). Repo entry points: `scripts/scf-benchmark.sh`, `docs/scf-venue-comparison.md`, `docs/scf-benchmark-results.md`.
+**Brief description:** Expand and maintain verifiable differentiation vs Soroswap (live quote benchmark), Stellar Broker (public router-contract adapter matrix — no Aquarius CLMM / Sushi CLMM), and wallets (xBull). **Net-new in Tranche 1:** grow benchmark coverage, refresh results as APIs change, and link the pack from the integrator guide (Deliverable 2). Repo entry points: `scripts/scf-benchmark.sh`, `docs/scf-venue-comparison.md`, `docs/scf-benchmark-results.md`.
 
 **How to measure completion:**
-- Benchmark matrix expanded to **≥3 pairs × ≥3 sizes** with dated rows in `docs/scf-benchmark-results.md` (fair rows documented: e.g. XLM→USDC 100–1,000 XLM; 10 XLM multi-leg split; XLM→AQUA via Arc venue CLMM)
-- Arc Broker CLMM gap cited from public GitHub (`Arc-broker/router-contract` `src/types/protocol.rs`)
+- Benchmark matrix expanded to **≥3 pairs × ≥3 sizes** with dated rows in `docs/scf-benchmark-results.md` (fair rows documented: e.g. XLM→USDC 100–1,000 XLM; 10 XLM multi-leg split; XLM→AQUA via Aquarius CLMM)
+- Stellar Broker CLMM gap cited from public GitHub (`stellar-broker/router-contract` `src/types/protocol.rs`)
 - Reviewer can re-run `./scripts/scf-benchmark.sh` locally; README one-command instructions in repo
-- **≥1 new** documented split case (`is_split=true`) vs Arc venue single-route output (not in resubmission snapshot)
+- **≥1 new** documented split case (`is_split=true`) vs Soroswap single-route output (not in resubmission snapshot)
 
 **Estimated date of completion:** July 20, 2026
 
@@ -72,12 +72,12 @@ We reduced **$10k** (not 25–40%) because the **original line items for shipped
 
 **Budget:** $9,000 (Engineering: partner API keys, OpenAPI spec, routing query params — **not** a router rewrite; includes link to Deliverable 1 benchmark pack)
 
-**Brief description:** Make the **existing** public API adoptable by wallets and dApps: partner API key flow, documented rate limits, **OpenAPI** spec for `/quote`, `/build_tx`, `/tokens`, `/health`, integrator quickstart, and optional quote param **`prefer_Arc`** (exclude Classic DEX when integrators need Arc-only comparison).
+**Brief description:** Make the **existing** public API adoptable by wallets and dApps: partner API key flow, documented rate limits, **OpenAPI** spec for `/quote`, `/build_tx`, `/tokens`, `/health`, integrator quickstart, and optional quote param **`prefer_soroban`** (exclude Classic DEX when integrators need Soroban-only comparison).
 
 **How to measure completion:**
 - Published integrator guide + OpenAPI (Swagger) in repo, linked from docs site
 - Documented API key issuance process
-- `prefer_Arc` (or equivalent) live on `/quote` with documented behavior
+- `prefer_soroban` (or equivalent) live on `/quote` with documented behavior
 - ≥1 external developer completes quote + unsigned XDR build using docs only (feedback or PR)
 
 **Estimated date of completion:** July 31, 2026
@@ -88,7 +88,7 @@ We reduced **$10k** (not 25–40%) because the **original line items for shipped
 
 **Budget:** $6,500 (Engineering: server-side token metadata enrichment + frontend UX)
 
-**Brief description:** Complete retail swap UX gaps on [Chakra.xyz](https://Chakra.xyz): enrich `/api/v1/tokens` with **logo URLs** (metadata pipeline + fallbacks), show wallet **spendable balance** for input token, quick amount chips **25% / 50% / 75% / 100%** (respect XLM reserve), tx **explorer link** on success, and basic slippage control.
+**Brief description:** Complete retail swap UX gaps on [lumagg.xyz](https://lumagg.xyz): enrich `/api/v1/tokens` with **logo URLs** (metadata pipeline + fallbacks), show wallet **spendable balance** for input token, quick amount chips **25% / 50% / 75% / 100%** (respect XLM reserve), tx **explorer link** on success, and basic slippage control.
 
 **How to measure completion:**
 - ≥50 routed tokens return logo or deterministic fallback via API
@@ -105,7 +105,7 @@ We reduced **$10k** (not 25–40%) because the **original line items for shipped
 
 **Budget:** $9,000 (Engineering: tx/event ingestion — dashboard UI in Tranche 3)
 
-**Brief description:** Start production analytics (**not implemented today**). Indexer ingests Chakra **aggregator contract** invocations from Horizon/Arc RPC: swap volume, tx count, function breakdown (**`split_swap` vs `round_trip_swap`**), unique wallet addresses, per-leg **DEX attribution** (Arc venue, Arc venue, Arc venue, Sushi, Arc venue). Store time-series for ≥30 days by Tranche 3.
+**Brief description:** Start production analytics (**not implemented today**). Indexer ingests LumAgg **aggregator contract** invocations from Horizon/Soroban RPC: swap volume, tx count, function breakdown (**`split_swap` vs `round_trip_swap`**), unique wallet addresses, per-leg **DEX attribution** (Soroswap, Aquarius, Phoenix, Sushi, Comet). Store time-series for ≥30 days by Tranche 3.
 
 **How to measure completion:**
 - Indexer running against mainnet aggregator contract ID(s)
@@ -132,7 +132,7 @@ We reduced **$10k** (not 25–40%) because the **original line items for shipped
 
 **Budget:** $11,000 (Engineering: npm publish, types, CI, examples)
 
-**Brief description:** Publish `packages/sdk` to npm (semver, typed `quote()` / `buildTx()`, sub-route leg parsing). Ship CLI example + minimal wallet dApp snippet. Optional thin Rust client stub in `crates/sdk` for parity.
+**Brief description:** Publish `packages/sdk` to npm (semver, typed `quote()` / `buildTx()`, sub-route leg parsing). Ship CLI example + minimal Freighter dApp snippet. Optional thin Rust client stub in `crates/sdk` for parity.
 
 **How to measure completion:**
 - Public npm package (Apache-2.0)
@@ -171,7 +171,7 @@ We reduced **$10k** (not 25–40%) because the **original line items for shipped
 
 **Brief description:** Validate **≥2 integrator adoption paths** for the open-source stack. Integrators may use the self-hosted API or the public API with the npm SDK; hosted API use is not required.
 
-- **Path A:** In-repo reference client (Chakra swap UI or SDK demo app) completes `quote → build_tx` end to end.
+- **Path A:** In-repo reference client (LumAgg swap UI or SDK demo app) completes `quote → build_tx` end to end.
 - **Path B:** External developer, reviewer, or community integrator completes the same flow using the published docs; feedback or anonymized confirmation is documented.
 
 The output is reproducible integration evidence, not guaranteed SaaS onboarding.
@@ -221,7 +221,7 @@ The output is reproducible integration evidence, not guaranteed SaaS onboarding.
 
 **[DELIVERABLE 9: THIRD-PARTY SMART CONTRACT AUDIT — AGGREGATOR + VAULT]**
 
-**Budget:** $16,000 (External audit firm or Arc audit bank; remediation engineering)
+**Budget:** $16,000 (External audit firm or Stellar audit bank; remediation engineering)
 
 **Brief description:** Professional security audit of mainnet **aggregator** (`split_swap`, `round_trip_swap`, DEX CPI auth) and **arb vault** (`execute_round_trip`, caller allowlist, fund flow). Remediate critical/high findings; upgrade WASM if required.
 
@@ -264,42 +264,42 @@ The output is reproducible integration evidence, not guaranteed SaaS onboarding.
 ## Resubmission feedback — paste into dashboard
 
 ```markdown
-## Resubmission changelog (SCF #44 — Chakra)
+## Resubmission changelog (SCF #44 — LumAgg)
 
 Thank you for the panel feedback. Below is our change log mapped to your **three** requested edits.
 
 ---
 
-### 1. Differentiation (vs Arc venue, xBull, Arc Broker)
+### 1. Differentiation (vs Soroswap, xBull, Stellar Broker)
 
-**Positioning:** Open-source, self-hostable integrator/operator infra — not Arc Broker (hosted session router) and not xBull (wallet).
+**Positioning:** Open-source, self-hostable integrator/operator infra — not Stellar Broker (hosted session router) and not xBull (wallet).
 
-**Arc Broker — no live API benchmark (deadline constraint):**
-We did **not** run live Arc Broker API quotes before resubmission. Hosted Broker access requires an **application/approval**; we did not receive credentials in time for SCF #44 revision. Broker comparison below is from the **public open-source router contract** only (`broker/router-contract`, same as github.com/Arc-broker/router-contract) — adapter coverage and on-chain fee model — **not** a head-to-head execution benchmark vs Broker’s hosted service.
+**Stellar Broker — no live API benchmark (deadline constraint):**
+We did **not** run live Stellar Broker API quotes before resubmission. Hosted Broker access requires an **application/approval**; we did not receive credentials in time for SCF #44 revision. Broker comparison below is from the **public open-source router contract** only (`broker/router-contract`, same as github.com/stellar-broker/router-contract) — adapter coverage and on-chain fee model — **not** a head-to-head execution benchmark vs Broker’s hosted service.
 
 **Venue coverage (public router-contract, Jun 2026):**
-- Chakra routes **6 Arc families** (Arc venue, Arc venue xy=k + stable + **CLMM**, Arc venue, **Sushi V3 CLMM**, Arc venue weighted) **plus Classic Arc** when it wins on price.
-- Broker **public router-contract** adapters: AquaConstant, AquaStable, Arc venue, Arc venue, Arc venue only — **no Arc venue CLMM, no Sushi V3 CLMM** in `src/adapters/`.
+- LumAgg routes **6 Soroban families** (Soroswap, Aquarius xy=k + stable + **CLMM**, Phoenix, **Sushi V3 CLMM**, Comet weighted) **plus Classic SDEX** when it wins on price.
+- Broker **public router-contract** adapters: AquaConstant, AquaStable, Soroswap, Comet, Phoenix only — **no Aquarius CLMM, no Sushi V3 CLMM** in `src/adapters/`.
 - xBull: wallet product; not a multi-venue aggregator.
 
 **Broker on-chain fee model (router contract `swap()`):**
 The Broker router contract **charges swap fees on-chain** — not a zero-fee pass-through router. Each `swap()` call takes `vfee` and `ffee` (rates in **‰**, per thousand):
 - **vfee:** variable fee on “profit” (actual output above estimated/minimum)
 - **ffee:** fixed fee on total bought amount
-Fees are deducted from the trader’s output, accumulated in a configured `fee_token` on the contract, and **admin `withdraw()`** pulls them. Example from contract tests: vfee=150‰ + ffee=10‰ on a swap charges measurable USDC fees to the contract balance. **Chakra’s open aggregator contract does not implement this Broker-style vfee/ffee skim** — integrators/wallets keep full quoted output subject to slippage only.
+Fees are deducted from the trader’s output, accumulated in a configured `fee_token` on the contract, and **admin `withdraw()`** pulls them. Example from contract tests: vfee=150‰ + ffee=10‰ on a swap charges measurable USDC fees to the contract balance. **LumAgg’s open aggregator contract does not implement this Broker-style vfee/ffee skim** — integrators/wallets keep full quoted output subject to slippage only.
 
-**Live quote benchmark vs Arc venue only** (Chakra `api.Chakra.xyz` vs Arc venue API, run **2026-06-25 10:33 UTC**; reproducible via `./scripts/scf-benchmark.sh`):
+**Live quote benchmark vs Soroswap only** (LumAgg `api.lumagg.xyz` vs Soroswap API, run **2026-06-25 10:33 UTC**; reproducible via `./scripts/scf-benchmark.sh`):
 
-| Pair | Size | Chakra | Split? | Primary route | vs Arc venue |
+| Pair | Size | LumAgg | Split? | Primary route | vs Soroswap |
 |------|------|--------|--------|---------------|-------------|
 | XLM → USDC | 1,000 XLM | 184.15 USDC | no | Classic DEX | **+0.02%** (parity at size) |
-| XLM → USDC | 1 XLM | 0.19 USDC | **yes (2 legs)** | Arc venue + Arc venue split | Arc venue single-route; Chakra splits across venues |
-| XLM → USDC | 100 XLM | 18.42 USDC | no | **Arc venue CLMM** | -2.92% (fair Arc row; CLMM route) |
-| XLM → AQUA | 100 XLM | 51,364 AQUA | no | **Arc venue CLMM only** | n/a (>3× unit gap — CLMM venue Arc venue/Broker open router lacks) |
+| XLM → USDC | 1 XLM | 0.19 USDC | **yes (2 legs)** | Aquarius + Soroswap split | Soroswap single-route; LumAgg splits across venues |
+| XLM → USDC | 100 XLM | 18.42 USDC | no | **Aquarius CLMM** | -2.92% (fair Soroban row; CLMM route) |
+| XLM → AQUA | 100 XLM | 51,364 AQUA | no | **Aquarius CLMM only** | n/a (>3× unit gap — CLMM venue Soroswap/Broker open router lacks) |
 
-**Execution model vs Arc venue:** Arc venue API returns a single best route; Chakra runs Brent **multi-path split** (`is_split=true`) and atomic on-chain `split_swap` / `round_trip_swap`.
+**Execution model vs Soroswap:** Soroswap API returns a single best route; LumAgg runs Brent **multi-path split** (`is_split=true`) and atomic on-chain `split_swap` / `round_trip_swap`.
 
-**Post-submission operator stack (Jun 2026):** `round_trip_swap` + arb vault (`execute_round_trip`) + `crates/arbitrage` — self-deploy atomic arb; not offered as open-source operator infra by Broker or Arc venue public repos.
+**Post-submission operator stack (Jun 2026):** `round_trip_swap` + arb vault (`execute_round_trip`) + `crates/arbitrage` — self-deploy atomic arb; not offered as open-source operator infra by Broker or Soroswap public repos.
 
 ---
 
@@ -319,7 +319,7 @@ Grant-funded deliverables complete by **Oct 15, 2026**; remaining time is buffer
 
 ### 3. Net-new scope vs already-shipped MVP
 
-**Already live at resubmission ($0 from grant — not re-funded):** pool-state worker, public quote API (api.Chakra.xyz), router-engine + Brent split, mainnet aggregator (`split_swap`), swap UI shell (Chakra.xyz), monitoring/alerts, Arc venue/CLMM hydration. These were the bulk of our **original $100k line items** and are linked live in this submission.
+**Already live at resubmission ($0 from grant — not re-funded):** pool-state worker, public quote API (api.lumagg.xyz), router-engine + Brent split, mainnet aggregator (`split_swap`), swap UI shell (lumagg.xyz), monitoring/alerts, Comet/CLMM hydration. These were the bulk of our **original $100k line items** and are linked live in this submission.
 
 **Added after initial application (Jun 2026) — not in original $100k scope:**
 - Atomic arb operator stack: `aggregator.round_trip_swap`, `contracts/vault` (`execute_round_trip`), `crates/arbitrage`
@@ -332,5 +332,5 @@ Grant-funded deliverables complete by **Oct 15, 2026**; remaining time is buffer
 
 **Tranche alignment:** T1 = integrator API + UI gaps + indexer v0; T2 = npm SDK + arb/vault mainnet + pilots; T3 = analytics dashboard + audit + close-out.
 
-**Links:** https://Chakra.xyz · https://api.Chakra.xyz · https://github.com/Chakra/Arc-dex-agg
+**Links:** https://lumagg.xyz · https://api.lumagg.xyz · https://github.com/Lum-Agg/stellar-dex-agg
 ```

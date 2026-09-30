@@ -1,4 +1,4 @@
-# Round-trip arbitrage via Chakra aggregator
+# Round-trip arbitrage via LumAgg aggregator
 
 Atomic two-leg arbitrage through the **deployed aggregator contract** (`round_trip_swap`).
 All volume appears on the same contract address as user swaps.
@@ -16,7 +16,7 @@ round_trip_swap(user, base_token, bridge_token, amount_in, leg_out, leg_back, mi
 
 Same `SubRoute` type for both legs — no extra fields. Semantics of `amount_in` differ by leg.
 
-One `InvokeHostFunction` per transaction (Arc protocol limit).
+One `InvokeHostFunction` per transaction (Stellar protocol limit).
 
 ## Bot env
 
@@ -44,7 +44,7 @@ ARB_BUILD_TX=1
 ARB_SUBMIT_TX=1
 ARB_DRY_RUN=1
 
-cargo run -p arbitrage --bin Chakra-arbitrage-bot
+cargo run -p arbitrage --bin lumagg-arbitrage-bot
 ```
 
 Operator runbook (env, monitoring, checklist): [arb-operator.md](./arb-operator.md).

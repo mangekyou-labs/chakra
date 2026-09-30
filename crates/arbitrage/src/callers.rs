@@ -1,9 +1,9 @@
-//! Pool of authorized bot accounts (Arc-arb `caller_indices` pattern).
+//! Pool of authorized bot accounts (stellar-arb `caller_indices` pattern).
 
 use {
     crate::keypair::ExecutorKeypair,
     anyhow::{anyhow, Context, Result},
-    Arc_client::keypair::{Keypair, KeypairBehavior},
+    soroban_client::keypair::{Keypair, KeypairBehavior},
     std::{
         collections::HashSet,
         sync::{
@@ -16,7 +16,7 @@ use {
     tracing::info,
 };
 
-/// After send, block caller reuse for ~one ledger (Arc ~5s).
+/// After send, block caller reuse for ~one ledger (Stellar ~5s).
 pub const DEFAULT_CALLER_COOLDOWN_MS: u64 = 5_000;
 
 fn now_ms() -> u64 {

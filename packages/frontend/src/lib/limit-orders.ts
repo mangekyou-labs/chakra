@@ -3,7 +3,7 @@
  * Instant swap continues to use aggregator.ts → NEXT_PUBLIC_API_URL.
  */
 
-import { Networks } from '@creit.tech/Arc-wallets-kit/types';
+import { Networks } from '@creit.tech/stellar-wallets-kit/types';
 import { decimalToAtomicUnits } from '@/lib/balance';
 import { fetchLatestLedger as fetchLatestLedgerRpc, submitSignedTransaction } from '@/lib/rpc';
 
@@ -25,7 +25,7 @@ export const TESTNET_TOKENS: LimitToken[] = [
   {
     id: 'CDTKPWPLOURQA2SGTKTUQOWRCBZEORB4BWBOMJ3D3ZTQQSGE5F6JBQLV',
     symbol: 'XLM',
-    name: 'Arc Lumens (testnet)',
+    name: 'Stellar Lumens (testnet)',
     decimals: 7,
     color: '#14B8A6',
   },
@@ -87,8 +87,8 @@ export function priceHumanToE7(
   const n = Number(cleaned);
   if (!Number.isFinite(n) || n <= 0) throw new Error('Price must be positive');
   // price_human = out_units / in_units (whole tokens).
-  // e7 stores out_atomic unitss * 1e7 / in_atomic unitss for equal-decimal SACs (both 7).
-  // General: out_atomic unitss/in_atomic unitss * 1e7 = price * 10^(decOut-decIn) * 1e7
+  // e7 stores out_stroops * 1e7 / in_stroops for equal-decimal SACs (both 7).
+  // General: out_stroops/in_stroops * 1e7 = price * 10^(decOut-decIn) * 1e7
   const scale = 10 ** (decimalsOut - decimalsIn);
   const e7 = Math.round(n * scale * 1e7);
   if (!Number.isFinite(e7) || e7 <= 0) throw new Error('Price out of range');
@@ -103,7 +103,7 @@ export function e7ToPriceHuman(e7: string, decimalsIn: number, decimalsOut: numb
   return human.toLocaleString(undefined, { maximumFractionDigits: 8 });
 }
 
-export function amountToatomic unitss(amount: string, decimals: number): string {
+export function amountToStroops(amount: string, decimals: number): string {
   return decimalToAtomicUnits(amount, decimals);
 }
 
@@ -113,16 +113,16 @@ export function ceilDiv(a: bigint, b: bigint): bigint {
   return (a + b - BigInt(1)) / b;
 }
 
-export function formatatomic unitss(atomic unitss: string, decimals: number): string {
+export function formatStroops(stroops: string, decimals: number): string {
   try {
-    const n = BigInt(atomic unitss);
+    const n = BigInt(stroops);
     const base = BigInt(10) ** BigInt(decimals);
     const whole = n / base;
     const frac = n % base;
     const fracStr = frac.toString().padStart(decimals, '0').replace(/0+$/, '');
     return fracStr ? `${whole}.${fracStr}` : whole.toString();
   } catch {
-    return atomic unitss;
+    return stroops;
   }
 }
 

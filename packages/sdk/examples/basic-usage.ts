@@ -1,5 +1,5 @@
 /**
- * Arc DEX Aggregator SDK — Basic Usage Example
+ * Stellar DEX Aggregator SDK — Basic Usage Example
  *
  * Demonstrates the full SDK surface:
  *   1. Client setup
@@ -12,7 +12,7 @@
  *   npx tsx packages/sdk/examples/basic-usage.ts
  *
  * Options (env vars):
- *   API_URL  — aggregator deployment (default: https://api.Chakra.xyz)
+ *   API_URL  — aggregator deployment (default: https://api.lumagg.xyz)
  *   AMOUNT   — input amount in whole tokens (default: 100)
  *   TOKEN_IN — input token contract id  (default: XLM native)
  *   TOKEN_OUT— output token contract id (default: USDC)
@@ -22,15 +22,15 @@
  *   API_URL=http://localhost:3000 TOKEN_IN=<contract> TOKEN_OUT=<contract> npx tsx packages/sdk/examples/basic-usage.ts
  */
 
-import { ChakraClient, type QuoteResult, type TokenInfo } from '../src/index';
+import { LumAggClient, type QuoteResult, type TokenInfo } from '../src/index';
 
 // ---------------------------------------------------------------------------
 // Config
 // ---------------------------------------------------------------------------
 
-const API_URL = process.env.API_URL || 'https://api.Chakra.xyz';
+const API_URL = process.env.API_URL || 'https://api.lumagg.xyz';
 
-// Well-known Arc mainnet contract ids.
+// Well-known Stellar mainnet contract ids.
 const XLM_CONTRACT = 'CAS3J7GYLGXMF6TDJBBYYSE3HQ6BBSMLNUQ34T6TZMYMW2EVH34XOWMA';
 const USDC_CONTRACT = 'CCW67TSZV3SSS2HXMBQ5JFGCKJNXKZM7UQUWUZPUTHXSTZLEO7SJMIHG';
 
@@ -42,8 +42,8 @@ const TOKEN_OUT = process.env.TOKEN_OUT || USDC_CONTRACT;
 // Helpers
 // ---------------------------------------------------------------------------
 
-function atomic unitssToUnits(atomic unitss: string, decimals = 7): string {
-  const val = Number(atomic unitss) / 10 ** decimals;
+function stroopsToUnits(stroops: string, decimals = 7): string {
+  const val = Number(stroops) / 10 ** decimals;
   if (val >= 1_000) return val.toFixed(2);
   if (val >= 1) return val.toFixed(4);
   return val.toFixed(Math.min(decimals, 7));
@@ -99,7 +99,7 @@ function buildTokenMap(
 // ---------------------------------------------------------------------------
 
 async function main() {
-  const sdk = new ChakraClient({ apiUrl: API_URL });
+  const sdk = new LumAggClient({ apiUrl: API_URL });
 
   // ---- 1. Health check --------------------------------------------------
   printDivider('1. Health check');
@@ -143,14 +143,14 @@ async function main() {
   // ---- 3. Quote ---------------------------------------------------------
   printDivider(`3. Quote: ${AMOUNT} ${inSymbol} → ${outSymbol}`);
 
-  const amountatomic unitss = String(BigInt(AMOUNT) * BigInt(10) ** BigInt(inDecimals));
+  const amountStroops = String(BigInt(AMOUNT) * BigInt(10) ** BigInt(inDecimals));
 
   let quote: QuoteResult;
   try {
     quote = await sdk.quote({
       tokenIn: TOKEN_IN,
       tokenOut: TOKEN_OUT,
-      amountIn: amountatomic unitss,
+      amountIn: amountStroops,
       slippage: 0.5,
     });
   } catch (err: any) {
@@ -159,8 +159,8 @@ async function main() {
   }
 
   console.log(`Input:        ${AMOUNT} ${inSymbol}`);
-  console.log(`Expected out: ${atomic unitssToUnits(quote.expectedOutput, outDecimals)} ${outSymbol}`);
-  console.log(`Minimum out:  ${atomic unitssToUnits(quote.minimumOutput, outDecimals)} ${outSymbol}`);
+  console.log(`Expected out: ${stroopsToUnits(quote.expectedOutput, outDecimals)} ${outSymbol}`);
+  console.log(`Minimum out:  ${stroopsToUnits(quote.minimumOutput, outDecimals)} ${outSymbol}`);
   console.log(`Price impact: ${quote.priceImpact > 0 ? `~${quote.priceImpact.toFixed(2)}%` : '<0.01%'}`);
   console.log(`Split route:  ${quote.isSplit ? 'yes' : 'no'}`);
   console.log(`Compute time: ${quote.computeTimeMs}ms`);
@@ -188,8 +188,8 @@ async function main() {
       console.log(`\n  Leg ${i + 1}  ——  ${formatPercent(legPct)} of input`);
       console.log(`    DEX:        ${dexLabels}`);
       console.log(`    Path:       ${pathTokens}`);
-      console.log(`    Amount in:  ${atomic unitssToUnits(leg.amountIn, inDecimals)} ${inSymbol}`);
-      console.log(`    Amount out: ${atomic unitssToUnits(leg.amountOut, outDecimals)} ${outSymbol}`);
+      console.log(`    Amount in:  ${stroopsToUnits(leg.amountIn, inDecimals)} ${inSymbol}`);
+      console.log(`    Amount out: ${stroopsToUnits(leg.amountOut, outDecimals)} ${outSymbol}`);
       if (rate !== null) {
         console.log(`    Rate:       ${formatRate(rate)} ${outSymbol} per ${inSymbol}`);
       }
@@ -211,9 +211,9 @@ async function main() {
     });
 
     console.log(`Execution:    ${tx.execution}`);
-    console.log(`Fee atomic unitss:  ${tx.fee}`);
+    console.log(`Fee stroops:  ${tx.fee}`);
     console.log(`\nUnsigned XDR (first 80 chars):  ${tx.unsignedTxXdr.slice(0, 80)}…`);
-    console.log('👉  Sign with wallet, then submit via Arc RPC or Horizon');
+    console.log('👉  Sign with wallet, then submit via Soroban RPC or Horizon');
   } catch (err: any) {
     console.warn(`⚠️  buildTx failed: ${err.message}`);
   }

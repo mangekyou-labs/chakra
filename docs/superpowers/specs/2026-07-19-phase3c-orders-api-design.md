@@ -1,4 +1,4 @@
-# Chakra Phase 3c: Limit Orders API + Event Index (Lean)
+# LumAgg Phase 3c: Limit Orders API + Event Index (Lean)
 
 **Date:** 2026-07-19  
 **Status:** Approved for planning  

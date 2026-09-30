@@ -6,10 +6,10 @@ license.workspace = true
 
 [dependencies]
 market-snapshot = { path = "../market-snapshot" }
-Arc-xdr.workspace = true
-Arc-strkey.workspace = true
-Arc-client.workspace = true
-Arc-rpc-client.workspace = true
+stellar-xdr.workspace = true
+stellar-strkey.workspace = true
+soroban-client.workspace = true
+stellar-rpc-client.workspace = true
 
 tokio.workspace = true
 async-trait.workspace = true
@@ -54,12 +54,12 @@ name = "list-sushi-pools"
 path = "src/bin/list_sushi_pools.rs"
 
 [[bin]]
-name = "Arc venue-fee-dump"
-path = "src/bin/Arc venue_fee_dump.rs"
+name = "phoenix-fee-dump"
+path = "src/bin/phoenix_fee_dump.rs"
 
 [[bin]]
-name = "Arc venue-fee-dump"
-path = "src/bin/Arc venue_fee_dump.rs"
+name = "aquarius-fee-dump"
+path = "src/bin/aquarius_fee_dump.rs"
 
 [[bin]]
 name = "fee-scval-audit"

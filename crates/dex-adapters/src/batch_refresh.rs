@@ -4,47 +4,47 @@
 //! pool), we read the contract instance data for all pools in a single
 //! getLedgerEntries call.
 //!
-//! Arc venue pairs store reserves in instance storage:
+//! Soroswap pairs store reserves in instance storage:
 //!   DataKey::Reserve0 = U32(2) → I128
 //!   DataKey::Reserve1 = U32(3) → I128
 //!
-//! Arc venue volatile pools (liquidity_pool):
+//! Aquarius volatile pools (liquidity_pool):
 //!   DataKey::ReserveA = U32(2), DataKey::ReserveB = U32(3)
 //!
-//! Arc venue stableswap pools (liquidity_pool_stableswap):
+//! Aquarius stableswap pools (liquidity_pool_stableswap):
 //!   DataKey::Reserves = U32(2) → Vec<u128>
 
 use {
-    crate::rpc::ArcRpc,
+    crate::rpc::SorobanRpc,
     anyhow::{anyhow, Result},
     serde_json::json,
-    Arc_xdr::curr::{self as xdr, Limits, ReadXdr, WriteXdr},
+    stellar_xdr::curr::{self as xdr, Limits, ReadXdr, WriteXdr},
     tracing::debug,
 };
 
-/// Maximum keys per getLedgerEntries call (Arc RPC limit)
+/// Maximum keys per getLedgerEntries call (Stellar RPC limit)
 const MAX_KEYS_PER_CALL: usize = 200;
 
-/// Batch-read contract instance data for multiple Arc venue pairs.
+/// Batch-read contract instance data for multiple Soroswap pairs.
 /// Returns a map of pool_address -> (reserve0, reserve1).
-pub async fn batch_refresh_Arc venue_reserves(
-    rpc: &ArcRpc,
+pub async fn batch_refresh_soroswap_reserves(
+    rpc: &SorobanRpc,
     pool_addresses: &[String],
 ) -> Result<Vec<(String, Option<(u128, u128)>)>> {
     let mut all_results = Vec::new();
 
     for chunk in pool_addresses.chunks(MAX_KEYS_PER_CALL) {
-        let results = fetch_Arc venue_reserves_batch(rpc, chunk).await?;
+        let results = fetch_soroswap_reserves_batch(rpc, chunk).await?;
         all_results.extend(results);
     }
 
     Ok(all_results)
 }
 
-/// Same as [`batch_refresh_Arc venue_reserves`] but runs up to `max_in_flight`
+/// Same as [`batch_refresh_soroswap_reserves`] but runs up to `max_in_flight`
 /// ledger batches concurrently.
-pub async fn batch_refresh_Arc venue_reserves_parallel(
-    rpc: &ArcRpc,
+pub async fn batch_refresh_soroswap_reserves_parallel(
+    rpc: &SorobanRpc,
     pool_addresses: &[String],
     max_in_flight: usize,
 ) -> Result<Vec<(String, Option<(u128, u128)>)>> {
@@ -61,8 +61,8 @@ pub async fn batch_refresh_Arc venue_reserves_parallel(
         let passphrase = rpc.network_passphrase().to_string();
         tasks.push(tokio::spawn(async move {
             let _permit = sem.acquire().await.expect("semaphore");
-            let rpc = ArcRpc::new(&rpc_url, &passphrase);
-            fetch_Arc venue_reserves_batch(&rpc, &chunk).await
+            let rpc = SorobanRpc::new(&rpc_url, &passphrase);
+            fetch_soroswap_reserves_batch(&rpc, &chunk).await
         }));
     }
     let mut all_results = Vec::with_capacity(pool_addresses.len());
@@ -72,10 +72,10 @@ pub async fn batch_refresh_Arc venue_reserves_parallel(
     Ok(all_results)
 }
 
-/// Batch-read Arc venue pool reserves (volatile + stableswap) from contract
+/// Batch-read Aquarius pool reserves (volatile + stableswap) from contract
 /// instance storage.
-pub async fn batch_refresh_Arc venue_reserves_parallel(
-    rpc: &ArcRpc,
+pub async fn batch_refresh_aquarius_reserves_parallel(
+    rpc: &SorobanRpc,
     pool_addresses: &[String],
     max_in_flight: usize,
 ) -> Result<Vec<(String, Option<Vec<u128>>)>> {
@@ -92,8 +92,8 @@ pub async fn batch_refresh_Arc venue_reserves_parallel(
         let passphrase = rpc.network_passphrase().to_string();
         tasks.push(tokio::spawn(async move {
             let _permit = sem.acquire().await.expect("semaphore");
-            let rpc = ArcRpc::new(&rpc_url, &passphrase);
-            fetch_Arc venue_reserves_batch(&rpc, &chunk).await
+            let rpc = SorobanRpc::new(&rpc_url, &passphrase);
+            fetch_aquarius_reserves_batch(&rpc, &chunk).await
         }));
     }
     let mut all_results = Vec::with_capacity(pool_addresses.len());
@@ -103,9 +103,9 @@ pub async fn batch_refresh_Arc venue_reserves_parallel(
     Ok(all_results)
 }
 
-/// Fetch contract instance data for a batch of Arc venue contracts.
-async fn fetch_Arc venue_reserves_batch(
-    rpc: &ArcRpc,
+/// Fetch contract instance data for a batch of Soroswap contracts.
+async fn fetch_soroswap_reserves_batch(
+    rpc: &SorobanRpc,
     pool_addresses: &[String],
 ) -> Result<Vec<(String, Option<(u128, u128)>)>> {
     let entries = fetch_instance_ledger_xdrs(rpc, pool_addresses).await?;
@@ -116,13 +116,13 @@ async fn fetch_Arc venue_reserves_batch(
         let Some(xdr_b64) = xdr_b64 else {
             continue;
         };
-        match parse_Arc venue_instance_reserves(&xdr_b64) {
+        match parse_soroswap_instance_reserves(&xdr_b64) {
             Ok(Some((r0, r1))) => {
                 results[i].1 = Some((r0, r1));
             }
             Ok(None) => {}
             Err(e) => {
-                debug!("Failed to parse Arc venue reserves for {}: {}", pool_addresses[i], e);
+                debug!("Failed to parse Soroswap reserves for {}: {}", pool_addresses[i], e);
             }
         }
     }
@@ -130,9 +130,9 @@ async fn fetch_Arc venue_reserves_batch(
     Ok(results)
 }
 
-/// Fetch contract instance data for a batch of Arc venue pool contracts.
-async fn fetch_Arc venue_reserves_batch(
-    rpc: &ArcRpc,
+/// Fetch contract instance data for a batch of Aquarius pool contracts.
+async fn fetch_aquarius_reserves_batch(
+    rpc: &SorobanRpc,
     pool_addresses: &[String],
 ) -> Result<Vec<(String, Option<Vec<u128>>)>> {
     let entries = fetch_instance_ledger_xdrs(rpc, pool_addresses).await?;
@@ -143,13 +143,13 @@ async fn fetch_Arc venue_reserves_batch(
         let Some(xdr_b64) = xdr_b64 else {
             continue;
         };
-        match parse_Arc venue_instance_reserves(&xdr_b64) {
+        match parse_aquarius_instance_reserves(&xdr_b64) {
             Ok(Some(reserves)) => {
                 results[i].1 = Some(reserves);
             }
             Ok(None) => {}
             Err(e) => {
-                debug!("Failed to parse Arc venue reserves for {}: {}", pool_addresses[i], e);
+                debug!("Failed to parse Aquarius reserves for {}: {}", pool_addresses[i], e);
             }
         }
     }
@@ -157,7 +157,7 @@ async fn fetch_Arc venue_reserves_batch(
     Ok(results)
 }
 
-async fn fetch_instance_ledger_xdrs(rpc: &ArcRpc, pool_addresses: &[String]) -> Result<Vec<Option<String>>> {
+async fn fetch_instance_ledger_xdrs(rpc: &SorobanRpc, pool_addresses: &[String]) -> Result<Vec<Option<String>>> {
     let key_xdrs = build_instance_ledger_key_xdrs(pool_addresses)?;
 
     let body = json!({
@@ -217,7 +217,7 @@ async fn fetch_instance_ledger_xdrs(rpc: &ArcRpc, pool_addresses: &[String]) -> 
 fn build_instance_ledger_key_xdrs(pool_addresses: &[String]) -> Result<Vec<String>> {
     let mut key_xdrs = Vec::with_capacity(pool_addresses.len());
     for addr in pool_addresses {
-        let contract_hash = Arc_strkey::Contract::from_string(addr)
+        let contract_hash = stellar_strkey::Contract::from_string(addr)
             .map_err(|e| anyhow!("Invalid contract address {}: {:?}", addr, e))?
             .0;
 
@@ -260,8 +260,8 @@ fn contract_instance_storage(xdr_b64: &str) -> Result<Option<xdr::ScMap>> {
     Ok(instance.storage.clone())
 }
 
-/// Parse Arc venue instance storage: U32(2)=Reserve0, U32(3)=Reserve1.
-fn parse_Arc venue_instance_reserves(xdr_b64: &str) -> Result<Option<(u128, u128)>> {
+/// Parse Soroswap instance storage: U32(2)=Reserve0, U32(3)=Reserve1.
+fn parse_soroswap_instance_reserves(xdr_b64: &str) -> Result<Option<(u128, u128)>> {
     let Some(storage) = contract_instance_storage(xdr_b64)? else {
         return Ok(None);
     };
@@ -287,11 +287,11 @@ fn parse_Arc venue_instance_reserves(xdr_b64: &str) -> Result<Option<(u128, u128
     }
 }
 
-/// Parse Arc venue instance storage.
+/// Parse Aquarius instance storage.
 ///
 /// Volatile: U32(2)=ReserveA, U32(3)=ReserveB.
 /// Stableswap: U32(2)=Reserves (Vec<u128>).
-fn parse_Arc venue_instance_reserves(xdr_b64: &str) -> Result<Option<Vec<u128>>> {
+fn parse_aquarius_instance_reserves(xdr_b64: &str) -> Result<Option<Vec<u128>>> {
     let Some(storage) = contract_instance_storage(xdr_b64)? else {
         return Ok(None);
     };
@@ -357,15 +357,15 @@ mod tests {
 
     #[tokio::test]
     #[ignore] // requires network
-    async fn test_batch_refresh_Arc venue() {
-        let rpc = ArcRpc::new(
+    async fn test_batch_refresh_soroswap() {
+        let rpc = SorobanRpc::new(
             "http://88.198.16.144:8003",
-            "Public Global Arc Network ; September 2015",
+            "Public Global Stellar Network ; September 2015",
         );
 
         let pools = vec!["CB46LMGJC7SYSH4C7SBNLV635OX5BSNQDGRR32NRXAV7N2AVNZMQUJ3A".to_string()];
 
-        let results = batch_refresh_Arc venue_reserves(&rpc, &pools).await.unwrap();
+        let results = batch_refresh_soroswap_reserves(&rpc, &pools).await.unwrap();
 
         assert_eq!(results.len(), 1);
         assert!(results[0].1.is_some(), "Should have reserves");
@@ -376,10 +376,10 @@ mod tests {
 
     #[tokio::test]
     #[ignore] // requires network
-    async fn test_batch_refresh_Arc venue() {
-        let rpc = ArcRpc::new(
+    async fn test_batch_refresh_aquarius() {
+        let rpc = SorobanRpc::new(
             "http://88.198.16.144:8003",
-            "Public Global Arc Network ; September 2015",
+            "Public Global Stellar Network ; September 2015",
         );
 
         // USDC/CBVDRT stable pool + XLM/CBVDRT volatile pool from production debugging.
@@ -388,7 +388,7 @@ mod tests {
             "CDYLKM3YI3LFD2AFUXILLBO2ABDHYKDD3RXTLOUVW2C7BXEQPZ65IMFX".to_string(),
         ];
 
-        let results = batch_refresh_Arc venue_reserves_parallel(&rpc, &pools, 2).await.unwrap();
+        let results = batch_refresh_aquarius_reserves_parallel(&rpc, &pools, 2).await.unwrap();
 
         assert_eq!(results.len(), 2);
         for (addr, reserves) in &results {

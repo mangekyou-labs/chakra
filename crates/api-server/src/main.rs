@@ -1,7 +1,7 @@
 use {
     anyhow::{bail, Context, Result},
     api_server::run_server,
-    Chakra_config::aggregator::AggregatorConfig,
+    lumagg_config::aggregator::AggregatorConfig,
     std::path::PathBuf,
 };
 
@@ -13,9 +13,9 @@ struct Args {
 
 fn print_help() {
     println!(
-        "Chakra-api-server {}\n\n\
-         Usage: Chakra-api-server --config <FILE> [--listen-addr <ADDR>] [--check-config]\n\n\
-         Options:\n  --config <FILE>       Chakra Aggregator TOML configuration\n  \
+        "lumagg-api-server {}\n\n\
+         Usage: lumagg-api-server --config <FILE> [--listen-addr <ADDR>] [--check-config]\n\n\
+         Options:\n  --config <FILE>       LumAgg Aggregator TOML configuration\n  \
          --listen-addr <ADDR> Override api.listen_addr for this replica\n  \
          --check-config       Validate configuration and exit\n  -h, --help           Show this help\n  -V, --version        Show version",
         env!("CARGO_PKG_VERSION")
@@ -39,7 +39,7 @@ fn parse_args() -> Result<Option<Args>> {
                 return Ok(None);
             }
             "-V" | "--version" => {
-                println!("Chakra-api-server {}", env!("CARGO_PKG_VERSION"));
+                println!("lumagg-api-server {}", env!("CARGO_PKG_VERSION"));
                 return Ok(None);
             }
             _ => bail!("unknown argument: {arg}"),
@@ -54,7 +54,7 @@ async fn main() -> Result<()> {
         return Ok(());
     };
     if let Some(path) = args.config {
-        let config: AggregatorConfig = Chakra_config::load(&path)?;
+        let config: AggregatorConfig = lumagg_config::load(&path)?;
         config.validate_cluster()?;
         config.apply();
     } else if args.check_config {

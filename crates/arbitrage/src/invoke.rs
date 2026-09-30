@@ -1,12 +1,12 @@
-//! Build `aggregator::round_trip_swap` Arc invoke operations.
+//! Build `aggregator::round_trip_swap` Soroban invoke operations.
 
 use {
     crate::quote_client::LegQuote,
     anyhow::{anyhow, Context, Result},
     market_snapshot::MarketSnapshot,
     router_engine::{OptimalRoute, Path, QuoteHydration, TokenId},
-    Arc_strkey::ed25519::PublicKey,
-    Arc_xdr::curr::{self as xdr, Limits, WriteXdr},
+    stellar_strkey::ed25519::PublicKey,
+    stellar_xdr::curr::{self as xdr, Limits, WriteXdr},
 };
 
 /// One hop encoded for the on-chain `SwapStep` struct.
@@ -22,12 +22,12 @@ pub struct ArbSwapStep {
 
 pub fn source_to_dex_type(source: &str) -> Result<&'static str> {
     match source {
-        // Arc venue xy=k, stableswap, and CLMM pools share swap(user, in_idx, out_idx, ...).
-        "Arc venue" | "Arc venue_clmm" => Ok("Arc venue"),
-        "Arc venue" => Ok("Arc venue"),
-        "Arc venue" => Ok("Arc venue"),
+        // Aquarius xy=k, stableswap, and CLMM pools share swap(user, in_idx, out_idx, ...).
+        "aquarius" | "aquarius_clmm" => Ok("aquarius"),
+        "soroswap" => Ok("soroswap"),
+        "phoenix" => Ok("phoenix"),
         "sushi" => Ok("sushi"),
-        "Arc venue" => Ok("Arc venue"),
+        "comet" => Ok("comet"),
         other => Err(anyhow!("unsupported dex source: {}", other)),
     }
 }
@@ -44,18 +44,18 @@ pub fn resolve_hop_indices(
     let in_key = token_in.canonical();
     let out_key = token_out.canonical();
 
-    if source == "Arc venue" {
-        if let Some(state) = hydration.Arc venue_pools.get(pool_address) {
+    if source == "aquarius" {
+        if let Some(state) = hydration.aquarius_pools.get(pool_address) {
             let in_idx = state
                 .tokens
                 .iter()
                 .position(|t| t == &in_key)
-                .context("token_in not in Arc venue pool")? as u32;
+                .context("token_in not in aquarius pool")? as u32;
             let out_idx = state
                 .tokens
                 .iter()
                 .position(|t| t == &out_key)
-                .context("token_out not in Arc venue pool")? as u32;
+                .context("token_out not in aquarius pool")? as u32;
             return Ok((in_idx, out_idx));
         }
     }
@@ -117,11 +117,11 @@ pub fn path_to_steps(path: &Path, snapshot: &MarketSnapshot, hydration: &QuoteHy
 
 fn dex_type_scval(dex_type: &str) -> Result<xdr::ScVal> {
     let name = match dex_type {
-        "Arc venue" => "Arc venue",
-        "Arc venue" => "Arc venuePair",
-        "Arc venue" => "Arc venue",
+        "aquarius" => "Aquarius",
+        "soroswap" => "SoroswapPair",
+        "phoenix" => "Phoenix",
         "sushi" => "Sushi",
-        "Arc venue" => "Arc venueDex",
+        "comet" => "CometDex",
         other => return Err(anyhow!("unknown dex_type {}", other)),
     };
     Ok(xdr::ScVal::Vec(Some(xdr::ScVec(
@@ -134,7 +134,7 @@ fn dex_type_scval(dex_type: &str) -> Result<xdr::ScVal> {
 }
 
 fn contract_hash(contract: &str) -> Result<[u8; 32]> {
-    Ok(Arc_strkey::Contract::from_string(contract)
+    Ok(stellar_strkey::Contract::from_string(contract)
         .with_context(|| format!("invalid contract id {}", contract))?
         .0)
 }
@@ -460,7 +460,7 @@ mod tests {
         let path = router_engine::Path {
             hops: 1,
             tokens: vec![TokenId::from_str_auto("A"), TokenId::from_str_auto("B")],
-            sources: vec!["Arc venue".into()],
+            sources: vec!["soroswap".into()],
             pool_addresses: vec!["p1".into()],
         };
         let mut leg_back = OptimalRoute {
@@ -509,7 +509,7 @@ mod tests {
             0,
             "test",
             vec![SourceSnapshot {
-                source: "Arc venue".to_string(),
+                source: "soroswap".to_string(),
                 pairs: vec![TradingPairSnapshot {
                     token_a: "A".into(),
                     token_b: "B".into(),
@@ -521,7 +521,7 @@ mod tests {
         let path = router_engine::Path {
             hops: 1,
             tokens: vec![TokenId::from_str_auto("A"), TokenId::from_str_auto("B")],
-            sources: vec!["Arc venue".into()],
+            sources: vec!["soroswap".into()],
             pool_addresses: vec!["p1".into()],
         };
         let hydration = QuoteHydration::default();

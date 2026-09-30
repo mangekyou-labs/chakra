@@ -2,7 +2,7 @@
  * Aggregator API client for the frontend.
  */
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://api.Chakra.xyz';
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://api.lumagg.xyz';
 
 export interface SubRoute {
   source: string;
@@ -65,7 +65,7 @@ function normalizeSubRoute(raw: Record<string, unknown>): SubRoute {
   dex_types = [...dex_types];
   while (in_indices.length < n) in_indices.push(0);
   while (out_indices.length < n) out_indices.push(1);
-  while (dex_types.length < n) dex_types.push('Arc venue');
+  while (dex_types.length < n) dex_types.push('aquarius');
 
   return {
     source: String(raw.source ?? ''),
@@ -93,7 +93,7 @@ function buildTxSubRoutesFromQuote(subRoutes: SubRoute[]): BuildTxSubRoute[] {
   return subRoutes.map((subRoute) => ({
     amount_in: subRoute.amount_in,
     steps: subRoute.pool_addresses.map((poolAddress, index) => ({
-      dex_type: subRoute.dex_types[index] ?? 'Arc venue',
+      dex_type: subRoute.dex_types[index] ?? 'aquarius',
       pool_address: poolAddress,
       token_in: subRoute.path[index] ?? '',
       token_out: subRoute.path[index + 1] ?? '',

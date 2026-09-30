@@ -20,7 +20,7 @@ pub struct MarketSnapshot {
     #[serde(default)]
     pub token_metadata: Vec<TokenMetadataSnapshot>,
     /// CLMM pool topology only (no slot0 / ticks / liquidity). Live state is in
-    /// Redis `Chakra:pool:clmm:*`.
+    /// Redis `lumagg:pool:clmm:*`.
     #[serde(default, skip_serializing_if = "Vec::is_empty", alias = "clmm_pools")]
     pub clmm_pool_refs: Vec<ClmmPoolRefSnapshot>,
 }
@@ -45,7 +45,7 @@ pub struct SourceSnapshot {
 }
 
 /// Routing-graph edge (topology only). Reserves live in Redis
-/// `Chakra:pool:xyk:*`.
+/// `lumagg:pool:xyk:*`.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct TradingPairSnapshot {
     pub token_a: String,
@@ -90,7 +90,7 @@ impl ClmmPoolRefSnapshot {
     }
 }
 
-/// Full CLMM pool state (Redis `Chakra:pool:clmm:*` only — not stored in
+/// Full CLMM pool state (Redis `lumagg:pool:clmm:*` only — not stored in
 /// topology snapshot).
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct ClmmPoolSnapshot {
@@ -281,7 +281,7 @@ mod tests {
                 token_count: 2,
             },
             sources: vec![SourceSnapshot {
-                source: "Arc venue".to_string(),
+                source: "soroswap".to_string(),
                 pairs: vec![TradingPairSnapshot {
                     token_a: "A".to_string(),
                     token_b: "B".to_string(),
@@ -359,7 +359,7 @@ mod tests {
             789,
             "mainnet",
             vec![SourceSnapshot {
-                source: "Arc venue".to_string(),
+                source: "phoenix".to_string(),
                 pairs: vec![TradingPairSnapshot {
                     token_a: "A".to_string(),
                     token_b: "B".to_string(),
@@ -397,13 +397,13 @@ mod tests {
         .with_token_metadata(vec![TokenMetadataSnapshot {
             contract: "native".to_string(),
             symbol: "XLM".to_string(),
-            name: "Arc Lumens".to_string(),
+            name: "Stellar Lumens".to_string(),
             logo: Some("logo".to_string()),
             logo_kind: Some("official".to_string()),
         }]);
 
         assert_eq!(snapshot.token_metadata.len(), 1);
-        assert_eq!(snapshot.token_metadata[0].name, "Arc Lumens");
+        assert_eq!(snapshot.token_metadata[0].name, "Stellar Lumens");
     }
 
     #[test]
@@ -415,7 +415,7 @@ mod tests {
             "meta":{"source_count":1,"pair_count":1,"token_count":2},
             "sources":[
                 {
-                    "source":"Arc venue",
+                    "source":"soroswap",
                     "pairs":[
                         {
                             "token_a":"A",

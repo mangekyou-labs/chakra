@@ -12,7 +12,7 @@ fn normalize_snapshot_poll_interval_ms(interval_ms: u64) -> u64 {
 /// Deployment topology for quote + market data.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "lowercase")]
-pub enum ChakraMode {
+pub enum LumaggMode {
     /// Separate `market-data-worker` + Redis + API (production default).
     #[default]
     Cluster,
@@ -21,7 +21,7 @@ pub enum ChakraMode {
     Embedded,
 }
 
-impl ChakraMode {
+impl LumaggMode {
     pub fn parse(value: &str) -> Option<Self> {
         match value.trim().to_ascii_lowercase().as_str() {
             "cluster" | "redis" => Some(Self::Cluster),
@@ -31,7 +31,7 @@ impl ChakraMode {
     }
 
     pub fn from_env() -> Self {
-        std::env::var("Chakra_MODE")
+        std::env::var("LUMAGG_MODE")
             .ok()
             .and_then(|v| Self::parse(&v))
             .unwrap_or_default()
@@ -40,7 +40,7 @@ impl ChakraMode {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AppConfig {
-    /// Arc RPC endpoint URL
+    /// Soroban RPC endpoint URL
     pub rpc_url: String,
     /// Network passphrase
     pub network_passphrase: String,
@@ -79,7 +79,7 @@ pub struct AppConfig {
     /// is true.
     pub quote_hydrate_max_pools: usize,
     /// `cluster` (Redis worker) or `embedded` (in-process worker + memory).
-    pub Chakra_mode: ChakraMode,
+    pub lumagg_mode: LumaggMode,
     /// Optional snapshot backend selector (`file`, `redis`, or `memory`).
     pub snapshot_backend: Option<String>,
     /// Optional directory containing file-backed market snapshots.
@@ -97,8 +97,8 @@ pub struct AppConfig {
 impl Default for AppConfig {
     fn default() -> Self {
         Self {
-            rpc_url: "https://Arc-rpc.mainnet.Arc.gateway.fm".to_string(),
-            network_passphrase: "Public Global Arc Network ; September 2015".to_string(),
+            rpc_url: "https://soroban-rpc.mainnet.stellar.gateway.fm".to_string(),
+            network_passphrase: "Public Global Stellar Network ; September 2015".to_string(),
             listen_addr: "0.0.0.0:3100".to_string(),
             aggregator_contract: None,
             refresh_interval_secs: 5,
@@ -112,7 +112,7 @@ impl Default for AppConfig {
             path_finder_max_direct_paths: 0,
             quote_rpc_hydrate_enabled: false,
             quote_hydrate_max_pools: 12,
-            Chakra_mode: ChakraMode::Cluster,
+            lumagg_mode: LumaggMode::Cluster,
             snapshot_backend: None,
             snapshot_dir: None,
             snapshot_redis_url: None,
@@ -177,7 +177,7 @@ impl AppConfig {
                 .ok()
                 .and_then(|s| s.parse().ok())
                 .unwrap_or(Self::default().quote_hydrate_max_pools),
-            Chakra_mode: ChakraMode::from_env(),
+            lumagg_mode: LumaggMode::from_env(),
             snapshot_backend: std::env::var("SNAPSHOT_BACKEND").ok(),
             snapshot_dir: std::env::var("SNAPSHOT_DIR").ok(),
             snapshot_redis_url: std::env::var("SNAPSHOT_REDIS_URL").ok(),
@@ -213,16 +213,16 @@ mod tests {
     fn default_config_uses_default_snapshot_redis_settings() {
         let config = AppConfig::default();
 
-        assert_eq!(config.snapshot_redis_channel, "Chakra:snapshot:events");
+        assert_eq!(config.snapshot_redis_channel, "lumagg:snapshot:events");
         assert_eq!(config.snapshot_redis_keep_latest, 10);
-        assert_eq!(config.Chakra_mode, ChakraMode::Cluster);
+        assert_eq!(config.lumagg_mode, LumaggMode::Cluster);
     }
 
     #[test]
-    fn Chakra_mode_parses_embedded_aliases() {
-        assert_eq!(ChakraMode::parse("embedded"), Some(ChakraMode::Embedded));
-        assert_eq!(ChakraMode::parse("all-in-one"), Some(ChakraMode::Embedded));
-        assert_eq!(ChakraMode::parse("cluster"), Some(ChakraMode::Cluster));
+    fn lumagg_mode_parses_embedded_aliases() {
+        assert_eq!(LumaggMode::parse("embedded"), Some(LumaggMode::Embedded));
+        assert_eq!(LumaggMode::parse("all-in-one"), Some(LumaggMode::Embedded));
+        assert_eq!(LumaggMode::parse("cluster"), Some(LumaggMode::Cluster));
     }
 
     #[test]

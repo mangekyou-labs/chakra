@@ -6,7 +6,7 @@
 
 **Architecture:** Small contract event patch + standalone keeper binary. Reuse `dex_adapters` RPC events + arb-style quote HTTP and simulate/sign/submit patterns without coupling to vault round-trip.
 
-**Tech Stack:** Rust workspace, Arc RPC (`dex_adapters::rpc`), `reqwest` quote API, `Arc-client` / `Arc-baselib` sign+submit (mirror `crates/arbitrage`).
+**Tech Stack:** Rust workspace, soroban RPC (`dex_adapters::rpc`), `reqwest` quote API, `soroban-client` / `stellar-baselib` sign+submit (mirror `crates/arbitrage`).
 
 **Spec:** `docs/superpowers/specs/2026-07-19-phase3b-limit-keeper-design.md`
 
@@ -27,7 +27,7 @@
 
 **Files:** `contracts/order-escrow/src/lib.rs`
 
-- [ ] **Step 1: Tests** assert create/cancel/reclaim publish expected topic symbols (use `env.events().all()` pattern from Arc testutils if available in this SDK version; else assert via successful call + documented event payload shape and a unit helper).
+- [ ] **Step 1: Tests** assert create/cancel/reclaim publish expected topic symbols (use `env.events().all()` pattern from soroban testutils if available in this SDK version; else assert via successful call + documented event payload shape and a unit helper).
 
 Minimal approach matching existing style: after `create_limit`, inspect `env.events().all()` for topic containing `order_created`.
 
@@ -116,8 +116,8 @@ fn required_min_out_scales() {
 
 **Files:** `execute.rs`, `main.rs`, cursor file IO
 
-- [ ] Build Arc invoke for `fill(order_id, amount_in, sub_routes, min_amount_out)`  
-  Map quote `sub_routes` to `Chakra`/XDR `SubRoute` the same way arb maps quotes to swap steps — **read escrow fill ABI and shared-types**. Prefer importing types from a small helper; if XDR build is heavy, adapt arb `invoke`/`prepare` modules by copying only what's needed (avoid vault).
+- [ ] Build Soroban invoke for `fill(order_id, amount_in, sub_routes, min_amount_out)`  
+  Map quote `sub_routes` to `lumagg`/XDR `SubRoute` the same way arb maps quotes to swap steps — **read escrow fill ABI and shared-types**. Prefer importing types from a small helper; if XDR build is heavy, adapt arb `invoke`/`prepare` modules by copying only what's needed (avoid vault).
 - [ ] Simulate; on success and `!dry_run`, sign with `KEEPER_SECRET` and submit.
 - [ ] Main loop: load cursor → getEvents → update book → try fills → save cursor.
 - [ ] `KEEPER_DRY_RUN=1` skips submit.

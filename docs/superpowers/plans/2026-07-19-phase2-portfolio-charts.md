@@ -6,7 +6,7 @@
 
 **Architecture:** api-server owns SQLite `price_ticks` + background sampler that marks whitelist tokens via existing `quote_route`. Frontend composes `/balances` + `/prices` + `/prices/history`.
 
-**Tech Stack:** Rust (api-server, rusqlite, QuoteEngine), Next.js frontend, `@Chakra/sdk`.
+**Tech Stack:** Rust (api-server, rusqlite, QuoteEngine), Next.js frontend, `@lumagg/sdk`.
 
 **Spec:** `docs/superpowers/specs/2026-07-19-phase2-portfolio-charts-design.md`
 
@@ -159,7 +159,7 @@ pub async fn mark_token_usdc(state: &AppState, token: &str) -> Option<(f64, &'st
 }
 
 async fn quote_one(state: &AppState, token_in: &str, token_out: &str) -> Option<f64> {
-    // Build RouteRequest amount_in=TOKEN_UNITS, prefer_Arc=true optional
+    // Build RouteRequest amount_in=TOKEN_UNITS, prefer_soroban=true optional
     // state.quote_route(&req).await
     // if empty sub_orders → None
     // else price = total_expected_out as f64 / TOKEN_UNITS as f64

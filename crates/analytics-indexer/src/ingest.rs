@@ -1,4 +1,4 @@
-//! Poll Arc RPC `getEvents` and persist aggregator analytics events.
+//! Poll Soroban RPC `getEvents` and persist aggregator analytics events.
 
 use {
     crate::{
@@ -80,7 +80,7 @@ pub async fn run(config: IndexerConfig) -> Result<()> {
 async fn resolve_start_ledger(
     store: &IndexStore,
     config: &IndexerConfig,
-    rpc: &dex_adapters::ArcRpc,
+    rpc: &dex_adapters::SorobanRpc,
 ) -> Result<u32> {
     let (oldest_available, latest) = rpc
         .get_events_ledger_bounds(&config.aggregator_contract)
@@ -110,7 +110,7 @@ async fn resolve_start_ledger(
 async fn ingest_range(
     config: &IndexerConfig,
     store: &IndexStore,
-    rpc: &dex_adapters::ArcRpc,
+    rpc: &dex_adapters::SorobanRpc,
     start_ledger: u32,
     end_ledger: u32,
 ) -> Result<u64> {

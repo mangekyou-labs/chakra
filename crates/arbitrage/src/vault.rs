@@ -3,17 +3,17 @@
 use {
     crate::context::ArbContext,
     anyhow::Result,
-    dex_adapters::rpc::{scval_to_i128, ArcRpc},
+    dex_adapters::rpc::{scval_to_i128, SorobanRpc},
     std::{
         collections::HashMap,
         sync::Mutex,
         time::{Duration, Instant},
     },
-    Arc_strkey::Contract,
-    Arc_xdr::curr as xdr,
+    stellar_strkey::Contract,
+    stellar_xdr::curr as xdr,
 };
 
-const MAINNET_PASSPHRASE: &str = "Public Global Arc Network ; September 2015";
+const MAINNET_PASSPHRASE: &str = "Public Global Stellar Network ; September 2015";
 const VAULT_BALANCE_CACHE_TTL: Duration = Duration::from_secs(30);
 
 fn contract_holder_scval(contract_id: &str) -> Result<xdr::ScVal> {
@@ -26,8 +26,8 @@ fn contract_holder_scval(contract_id: &str) -> Result<xdr::ScVal> {
 }
 
 /// SAC `balance` for `holder` (vault contract address).
-pub async fn fetch_token_balance_atomic unitss(rpc_url: &str, token: &str, holder_contract: &str) -> Result<u128> {
-    let rpc = ArcRpc::new(rpc_url, MAINNET_PASSPHRASE);
+pub async fn fetch_token_balance_stroops(rpc_url: &str, token: &str, holder_contract: &str) -> Result<u128> {
+    let rpc = SorobanRpc::new(rpc_url, MAINNET_PASSPHRASE);
     let holder = contract_holder_scval(holder_contract)?;
     let val = rpc.simulate_call(token, "balance", vec![holder]).await?;
     let balance = scval_to_i128(&val).map_err(|e| anyhow::anyhow!("parse balance: {}", e))?;
@@ -50,7 +50,7 @@ impl VaultBalanceCache {
         if let Some(bal) = self.cached(&key) {
             return Ok(bal);
         }
-        let bal = fetch_token_balance_atomic unitss(rpc_url, token, vault).await?;
+        let bal = fetch_token_balance_stroops(rpc_url, token, vault).await?;
         if let Ok(mut g) = self.inner.lock() {
             g.insert(key, (bal, Instant::now()));
         }

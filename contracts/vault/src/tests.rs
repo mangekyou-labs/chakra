@@ -1,18 +1,18 @@
 use {
     super::*,
     aggregator_contract::AggregatorContract,
-    Chakra_contract_types::{DexType, SubRoute, SwapStep},
-    Arc_sdk::{testutils::Address as _, token, vec, Address, Env},
+    lumagg_contract_types::{DexType, SubRoute, SwapStep},
+    soroban_sdk::{testutils::Address as _, token, vec, Address, Env},
 };
 
 fn gen_addr(env: &Env) -> Address {
     Address::generate(env)
 }
 
-fn create_token(env: &Env) -> (Address, Arc_sdk::token::ArcAssetClient<'static>) {
+fn create_token(env: &Env) -> (Address, soroban_sdk::token::StellarAssetClient<'static>) {
     let admin = gen_addr(env);
-    let addr = env.register_Arc_asset_contract_v2(admin).address();
-    let sac = Arc_sdk::token::ArcAssetClient::new(env, &addr);
+    let addr = env.register_stellar_asset_contract_v2(admin).address();
+    let sac = soroban_sdk::token::StellarAssetClient::new(env, &addr);
     (addr, sac)
 }
 
@@ -30,9 +30,9 @@ fn setup_vault<'a>(env: &'a Env, admin: &Address) -> (Address, VaultContractClie
     (id, vault)
 }
 
-// ── Mock Arc venue Pool (1:1 swap) ──
+// ── Mock Aquarius Pool (1:1 swap) ──
 mod aq_mock {
-    use Arc_sdk::{contract, contractimpl, contracttype, token, Address, Env};
+    use soroban_sdk::{contract, contractimpl, contracttype, token, Address, Env};
 
     #[contract]
     pub struct AqPool;
@@ -98,7 +98,7 @@ fn execute_round_trip_returns_funds_to_vault() {
                 &env,
                 SwapStep {
                     dex_id: out_pool,
-                    dex_type: DexType::Arc venue,
+                    dex_type: DexType::Aquarius,
                     token_in: base.clone(),
                     token_out: bridge.clone(),
                     in_idx: 0,
@@ -115,7 +115,7 @@ fn execute_round_trip_returns_funds_to_vault() {
                 &env,
                 SwapStep {
                     dex_id: back_pool,
-                    dex_type: DexType::Arc venue,
+                    dex_type: DexType::Aquarius,
                     token_in: bridge.clone(),
                     token_out: base.clone(),
                     in_idx: 0,

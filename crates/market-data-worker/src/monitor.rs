@@ -2,7 +2,7 @@
 
 use {
     crate::{clmm_metrics::ClmmCoverageMetrics, worker::WorkerShared},
-    Chakra_alerts::TelegramAlerter,
+    lumagg_alerts::TelegramAlerter,
     market_snapshot::pool_state_store::PoolStateStore,
     std::sync::{
         atomic::{AtomicU64, Ordering},
@@ -91,7 +91,7 @@ pub async fn alert_failure(alerter: Option<&Arc<TelegramAlerter>>, key: &str, de
     let Some(alerter) = alerter else {
         return;
     };
-    let text = format!("⚠️ Chakra worker\n{detail}");
+    let text = format!("⚠️ LumAgg worker\n{detail}");
     if let Err(error) = alerter.alert(key, &text).await {
         warn!("telegram alert failed: {}", error);
     }
@@ -137,7 +137,7 @@ async fn build_heartbeat_message(
     let rpc_line = format_rpc_block_height(rpc_url).await;
 
     Ok(format!(
-        "✅ Chakra heartbeat\n\
+        "✅ LumAgg heartbeat\n\
          API health ({api_health_url}): {}\n\
          Redis snapshot: {}\n\
          {rpc_line}\
@@ -161,7 +161,7 @@ async fn build_heartbeat_message(
 
 async fn format_rpc_block_height(rpc_url: &str) -> String {
     let mainnet_ref = std::env::var("MAINNET_RPC_REF_URL")
-        .unwrap_or_else(|_| "https://Arc-rpc.mainnet.Arc.gateway.fm".to_string());
+        .unwrap_or_else(|_| "https://soroban-rpc.mainnet.stellar.gateway.fm".to_string());
 
     let local = fetch_latest_ledger(rpc_url).await;
     let mainnet = if rpc_url == mainnet_ref {

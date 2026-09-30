@@ -1,6 +1,6 @@
 # Deployment Overview
 
-Chakra releases native Linux binaries from the monorepo. Docker can still be
+LumAgg releases native Linux binaries from the monorepo. Docker can still be
 used for local testing, but the production path is to run the binaries directly
 under your preferred process manager.
 
@@ -8,20 +8,20 @@ under your preferred process manager.
 
 | Goal | Binary or binaries | Notes |
 | --- | --- | --- |
-| Private quote API or integration testing | `Chakra-swap-api` | One process runs the API and market-data worker with in-memory state. Redis is not required. |
-| Public or horizontally scaled aggregator | `Chakra-market-data-worker` + `Chakra-api-server` | The worker publishes market state to Redis; one or more API processes read from Redis. |
-| Public analytics, swap history, and arbitrage history | `Chakra-analytics-indexer` | Reads chain events into SQLite; API serves `/stats`, `/swaps`, and `/arbitrage` from that DB. |
-| Atomic round-trip arbitrage | `Chakra-arbitrage-bot` | Runs separately from the quote stack and should use low-latency quote API and RPC endpoints. |
+| Private quote API or integration testing | `lumagg-swap-api` | One process runs the API and market-data worker with in-memory state. Redis is not required. |
+| Public or horizontally scaled aggregator | `lumagg-market-data-worker` + `lumagg-api-server` | The worker publishes market state to Redis; one or more API processes read from Redis. |
+| Public analytics, swap history, and arbitrage history | `lumagg-analytics-indexer` | Reads chain events into SQLite; API serves `/stats`, `/swaps`, and `/arbitrage` from that DB. |
+| Atomic round-trip arbitrage | `lumagg-arbitrage-bot` | Runs separately from the quote stack and should use low-latency quote API and RPC endpoints. |
 
 ## Release archives
 
-Download the Linux x86_64 archives from the [GitHub Releases](https://github.com/Chakra/Arc-dex-agg/releases) page. The analytics indexer is included in the aggregator archive because it shares the aggregator TOML configuration and is normally deployed alongside the API:
+Download the Linux x86_64 archives from the [GitHub Releases](https://github.com/Lum-Agg/stellar-dex-agg/releases) page. The analytics indexer is included in the aggregator archive because it shares the aggregator TOML configuration and is normally deployed alongside the API:
 
 | Archive | Included executables | Use |
 | --- | --- | --- |
-| `Chakra-swap-api-linux-x86_64.tar.gz` | `Chakra-swap-api` | Single-process quote API for testing or private self-hosting |
-| `Chakra-aggregator-linux-x86_64.tar.gz` | `Chakra-market-data-worker`, `Chakra-api-server`, `Chakra-analytics-indexer` | Shared production quote stack and on-chain analytics |
-| `Chakra-arbitrage-bot-linux-x86_64.tar.gz` | `Chakra-arbitrage-bot` | Standalone arbitrage service |
+| `lumagg-swap-api-linux-x86_64.tar.gz` | `lumagg-swap-api` | Single-process quote API for testing or private self-hosting |
+| `lumagg-aggregator-linux-x86_64.tar.gz` | `lumagg-market-data-worker`, `lumagg-api-server`, `lumagg-analytics-indexer` | Shared production quote stack and on-chain analytics |
+| `lumagg-arbitrage-bot-linux-x86_64.tar.gz` | `lumagg-arbitrage-bot` | Standalone arbitrage service |
 
 Verify every downloaded archive with the matching `SHA256SUMS` file before
 extracting it.
@@ -31,22 +31,22 @@ extracting it.
 ### Self-hosted quote API
 
 ```text
-Chakra-swap-api
-  -> Arc RPC
+lumagg-swap-api
+  -> Soroban RPC
   -> Aggregator contract for /build_tx
 ```
 
 Use this when you want the smallest deployable quote service. It is the easiest
-way for wallets, bots, and integrators to test Chakra routing without operating
+way for wallets, bots, and integrators to test LumAgg routing without operating
 Redis.
 
-Guide: [Chakra Swap API](Chakra-swap-api.md)
+Guide: [LumAgg Swap API](lumagg-swap-api.md)
 
 ### Production aggregator
 
 ```text
-Chakra-market-data-worker -> Redis -> Chakra-api-server x N
-Chakra-analytics-indexer -> SQLite -> Chakra-api-server x N
+lumagg-market-data-worker -> Redis -> lumagg-api-server x N
+lumagg-analytics-indexer -> SQLite -> lumagg-api-server x N
 ```
 
 Use this when API replicas need shared market state, when a public endpoint must
@@ -59,7 +59,7 @@ Full guide: [Production Aggregator Deployment](aggregator-deployment.md)
 ### Arbitrage operator
 
 ```text
-Chakra quote API -> Chakra-arbitrage-bot -> Arc RPC -> Vault / Aggregator
+LumAgg quote API -> lumagg-arbitrage-bot -> Soroban RPC -> Vault / Aggregator
 ```
 
 Run the arbitrage bot as its own process. It scans, simulates, and optionally
@@ -72,13 +72,13 @@ Configuration: [Arbitrage Configuration](arbitrage-configuration.md)
 
 ## Configuration files
 
-Chakra uses TOML files rather than requiring environment variables:
+LumAgg uses TOML files rather than requiring environment variables:
 
 | Config | Used by |
 | --- | --- |
-| `Chakra-swap-api.toml` | `Chakra-swap-api` |
-| `Chakra-aggregator.toml` | `Chakra-market-data-worker`, `Chakra-api-server`, `Chakra-analytics-indexer` |
-| `Chakra-arbitrage.toml` | `Chakra-arbitrage-bot` |
+| `lumagg-swap-api.toml` | `lumagg-swap-api` |
+| `lumagg-aggregator.toml` | `lumagg-market-data-worker`, `lumagg-api-server`, `lumagg-analytics-indexer` |
+| `lumagg-arbitrage.toml` | `lumagg-arbitrage-bot` |
 
 Release archives include complete templates. Store edited configs outside the
 repository, restrict file permissions, and keep private RPC URLs, Redis
@@ -93,16 +93,16 @@ After downloading all three release archives and `SHA256SUMS`, you can verify
 the package structure and config templates without connecting to RPC or Redis:
 
 ```bash
-git clone https://github.com/Chakra/Arc-dex-agg.git
-cd Arc-dex-agg
+git clone https://github.com/Lum-Agg/stellar-dex-agg.git
+cd stellar-dex-agg
 ./scripts/smoke-release-archives.sh
 ```
 
 Run it from the directory containing:
 
-- `Chakra-swap-api-linux-x86_64.tar.gz`
-- `Chakra-aggregator-linux-x86_64.tar.gz`
-- `Chakra-arbitrage-bot-linux-x86_64.tar.gz`
+- `lumagg-swap-api-linux-x86_64.tar.gz`
+- `lumagg-aggregator-linux-x86_64.tar.gz`
+- `lumagg-arbitrage-bot-linux-x86_64.tar.gz`
 
 Use `DIST_DIR=/path/to/downloads ./scripts/smoke-release-archives.sh` when the
 archives are in another directory. The script always checks required files. On
@@ -111,7 +111,7 @@ patched dummy contract IDs. On macOS or other non-Linux hosts it skips binary
 execution because the release archives contain Linux x86_64 binaries.
 
 The archive check also verifies that all three optional aggregator systemd
-units read `/etc/Chakra/Chakra-aggregator.toml`, matching the configuration
+units read `/etc/lumagg/lumagg-aggregator.toml`, matching the configuration
 install command in the deployment guide.
 
 ## Validation checklist
@@ -119,10 +119,10 @@ install command in the deployment guide.
 After deployment:
 
 ```bash
-./Chakra-market-data-worker --config ./aggregator.toml --check-config
-./Chakra-api-server --config ./aggregator.toml --check-config
-./Chakra-analytics-indexer --config ./aggregator.toml --check-config
-./Chakra-arbitrage-bot --config ./arbitrage.toml --check-config
+./lumagg-market-data-worker --config ./aggregator.toml --check-config
+./lumagg-api-server --config ./aggregator.toml --check-config
+./lumagg-analytics-indexer --config ./aggregator.toml --check-config
+./lumagg-arbitrage-bot --config ./arbitrage.toml --check-config
 ```
 
 Then verify the public API surface:

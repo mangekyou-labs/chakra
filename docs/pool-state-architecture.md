@@ -1,15 +1,19 @@
-# Pool state architecture
+# Pool state
 
-Chakra separates **routing graph** from **per-pool live state**. Pool freshness follows an **event-driven** model (similar to Jupiter on Solana): update Redis when chain state changes or on discovery/bootstrap — not via periodic full-market sweeps.
+This is the operator deep-dive: Redis keys, env vars, and the fetch
+pipeline. System architecture (components, quote, swap, arb, limits) is
+in [Architecture](architecture.md).
+
+LumAgg separates **routing graph** from **per-pool live state**. Pool freshness follows an **event-driven** model (similar to Jupiter on Solana): update Redis when chain state changes or on discovery/bootstrap — not via periodic full-market sweeps.
 
 ## Data layers
 
 | Layer | What | Storage | Update cadence |
 |-------|------|---------|----------------|
-| Graph | Token pairs, pool addresses, fees; CLMM `clmm_pool_refs` (topology only) | `MarketSnapshot` (`Chakra:snapshot:*`) | Discovery ~600s; API hot-reload via Pub/Sub |
-| xy=k reserves | `reserve_a` / `reserve_b` per pool | `Chakra:pool:xyk:{source}:{pool_address}` | Bootstrap + discovery publish; **ledger touched** |
-| Arc venue N-token | tokens, reserves, stable params | `Chakra:pool:Arc venue:{pool_address}` | Same as xy=k |
-| CLMM | slot0, liquidity, ticks, coverage | `Chakra:pool:clmm:{source}:{pool_address}` | Same; CLMM only if `coverage.is_complete` |
+| Graph | Token pairs, pool addresses, fees; CLMM `clmm_pool_refs` (topology only) | `MarketSnapshot` (`lumagg:snapshot:*`) | Discovery ~600s; API hot-reload via Pub/Sub |
+| xy=k reserves | `reserve_a` / `reserve_b` per pool | `lumagg:pool:xyk:{source}:{pool_address}` | Bootstrap + discovery publish; **ledger touched** |
+| Aquarius N-token | tokens, reserves, stable params | `lumagg:pool:aquarius:{pool_address}` | Same as xy=k |
+| CLMM | slot0, liquidity, ticks, coverage | `lumagg:pool:clmm:{source}:{pool_address}` | Same; CLMM only if `coverage.is_complete` |
 
 Redis pool keys use **`EX=86400`** (24h) by default. TTL is cache eviction, not a freshness scheduler — untouched pools keep the last known-good state until the next write.
 
@@ -40,7 +44,7 @@ No periodic full-market pool refresh loop. Pools with **no on-chain activity** a
 ```text
 1. find_paths          — graph only (all candidate paths; no liquidity prune)
 2. collect pool keys   — unique (source, pool_address) across candidate paths
-3. Redis MGET          — one round trip for xy=k + Arc venue + CLMM keys
+3. Redis MGET          — one round trip for xy=k + Aquarius + CLMM keys
 4. quote paths         — local math only (QUOTE_RPC_HYDRATE_ENABLED=false by default)
 ```
 
@@ -52,20 +56,20 @@ When `FETCH_PIPELINE_ENABLED=true` (default):
 Ledger watcher enqueue_touched
   → high-priority FetchTask queue
   → RPC workers (FETCH_WORKER_COUNT, default 8)
-  → Redis sink (set_xyk_batch / set_Arc venue_batch / set_clmm_batch)
+  → Redis sink (set_xyk_batch / set_aquarius_batch / set_clmm_batch)
 ```
 
 Legacy `POOL_PUBLISH_INTERVAL_SECS` loop is disabled while the fetch pipeline is on.
 
 ## Ledger watcher
 
-There is no Arc WebSocket / Geyser equivalent; the worker **polls** RPC:
+There is no Soroban WebSocket / Geyser equivalent; the worker **polls** RPC:
 
 1. `getLatestLedger` — detect new `sequence`
 2. `getEvents` on `[last+1, latest]` with contract filter
 3. `contractId` intersected with known pool index (graph + CLMM)
 4. Touched pools → fetch pipeline (or legacy `touched_refresh` if pipeline off)
-5. Redis writeback — xy=k / Arc venue always; CLMM only if `is_complete`
+5. Redis writeback — xy=k / Aquarius always; CLMM only if `is_complete`
 
 Ledger ticks do **not** publish a new `MarketSnapshot`.
 
@@ -85,10 +89,10 @@ Code: `crates/market-data-worker/src/fetch_pipeline.rs`, `ledger_watcher.rs`, `t
 
 Incomplete tick windows must not be shared across API instances.
 
-- **`coverage.is_complete == true`** → worker may `SET Chakra:pool:clmm:...`
+- **`coverage.is_complete == true`** → worker may `SET lumagg:pool:clmm:...`
 - **`is_complete == false`** → do **not** write Redis; quote engine skips those hops
 
-CLMM tick data lives in **pool contract storage** (not separate accounts). Arc venue: `TickChunk` / bitmap keys; Sushi: pool storage read via pool-lens.
+CLMM tick data lives in **pool contract storage** (not separate accounts). Aquarius: `TickChunk` / bitmap keys; Sushi: pool storage read via pool-lens.
 
 Implemented in `market_snapshot::pool_state_store::should_publish_clmm_to_redis`.
 

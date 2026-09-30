@@ -5,7 +5,7 @@ import { useWallet } from '@/lib/wallet-context';
 import {
   TESTNET_TOKENS,
   e7ToPriceHuman,
-  formatatomic unitss,
+  formatStroops,
   buildCancelOrder,
   isLimitApiConfigured,
   listOpenOrders,
@@ -122,7 +122,7 @@ export function OpenOrders({
           {orders.map((o) => {
             const inSym = tokenSymbol(o.tokenIn, TESTNET_TOKENS);
             const outSym = tokenSymbol(o.tokenOut, TESTNET_TOKENS);
-            const remaining = formatatomic unitss(o.amountInRemaining, 7);
+            const remaining = formatStroops(o.amountInRemaining, 7);
             const price = e7ToPriceHuman(o.limitOutPerInE7, 7, 7);
             const busy = cancellingId === o.orderId;
             return (

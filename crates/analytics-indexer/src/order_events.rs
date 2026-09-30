@@ -6,8 +6,8 @@ use {
     base64::{engine::general_purpose::STANDARD as BASE64, Engine as _},
     chrono::DateTime,
     dex_adapters::rpc::events::ContractEvent,
-    Arc_strkey::{ed25519::PublicKey, Contract},
-    Arc_xdr::curr::{self as xdr, Limits, ReadXdr},
+    stellar_strkey::{ed25519::PublicKey, Contract},
+    stellar_xdr::curr::{self as xdr, Limits, ReadXdr},
 };
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -422,7 +422,7 @@ mod tests {
     use {
         super::*,
         base64::{engine::general_purpose::STANDARD as BASE64, Engine},
-        Arc_xdr::curr::{self as xdr, Limits, WriteXdr},
+        stellar_xdr::curr::{self as xdr, Limits, WriteXdr},
         tempfile::tempdir,
     };
 

@@ -1,5 +1,5 @@
 use crate::{auth, storage};
-use Arc_sdk::{token, Address, BytesN, Env};
+use soroban_sdk::{token, Address, BytesN, Env};
 
 pub fn initialize(env: Env, admin: Address) {
     if storage::has_admin(&env) {

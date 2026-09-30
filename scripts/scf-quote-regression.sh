@@ -2,7 +2,7 @@
 # Regression checks for quote sanity (large size, no fantasy legs).
 set -euo pipefail
 
-API="${API:-https://api.Chakra.xyz}"
+API="${API:-https://api.lumagg.xyz}"
 XLM="CAS3J7GYLGXMF6TDJBBYYSE3HQ6BBSMLNUQ34T6TZMYMW2EVH34XOWMA"
 USDC="CCW67TSZV3SSS2HXMBQ5JFGCKJNXKZM7UQUWUZPUTHXSTZLEO7SJMI75"
 
@@ -74,9 +74,9 @@ PY
   echo
 }
 
-echo "Chakra quote regression — API=$API"
+echo "LumAgg quote regression — API=$API"
 echo
-echo "Note: XLM→USDC often wins on classic_dex (Horizon path). USDC→XLM exercises Arc routing."
+echo "Note: XLM→USDC often wins on classic_dex (Horizon path). USDC→XLM exercises Soroban routing."
 echo
 
 echo "--- XLM → USDC ---"

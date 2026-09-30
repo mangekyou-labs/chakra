@@ -1,16 +1,16 @@
 # Arbitrage Deployment
 
-Chakra Arbitrage is an operator-run scanner and executor. It is not part of
-`Chakra-swap-api` and it should run as its own native process.
+LumAgg Arbitrage is an operator-run scanner and executor. It is not part of
+`lumagg-swap-api` and it should run as its own native process.
 
 For high-throughput mainnet operation, connect it to the
 [production Aggregator topology](aggregator-deployment.md). A
-`Chakra-swap-api` instance can be used for evaluation or a small private setup.
+`lumagg-swap-api` instance can be used for evaluation or a small private setup.
 
 ## Architecture
 
 ```text
-quote API -> Chakra-arbitrage-bot -> simulateTransaction -> optional transaction submit
+quote API -> lumagg-arbitrage-bot -> simulateTransaction -> optional transaction submit
                          -> vault -> Aggregator -> DEXes
 ```
 
@@ -20,12 +20,12 @@ the final rollout stage signs and broadcasts transactions.
 
 ## Prerequisites
 
-- One or more ready Chakra quote API endpoints.
-- A low-latency Arc RPC with sufficient simulation and submission capacity.
-- A deployed Chakra Aggregator contract compatible with the quote API.
+- One or more ready LumAgg quote API endpoints.
+- A low-latency Soroban RPC with sufficient simulation and submission capacity.
+- A deployed LumAgg Aggregator contract compatible with the quote API.
 - Base and bridge token contract IDs selected for the scanner.
 - One or more funded caller accounts for fees and transaction submission.
-- Optionally, a deployed and funded Chakra Vault with every caller allowlisted.
+- Optionally, a deployed and funded LumAgg Vault with every caller allowlisted.
 
 See [Smart Contract Deployment](contracts-deployment.md) for Aggregator and
 Vault deployment, upgrades, and external TTL maintenance.
@@ -38,35 +38,35 @@ hold only enough native XLM for fees.
 
 Linux x86_64 releases include a standalone arbitrage archive:
 
-<https://github.com/Chakra/Arc-dex-agg/releases>
+<https://github.com/Lum-Agg/stellar-dex-agg/releases>
 
 ```bash
-grep 'Chakra-arbitrage-bot-linux-x86_64.tar.gz$' SHA256SUMS | sha256sum --check
-tar -xzf Chakra-arbitrage-bot-linux-x86_64.tar.gz
-cd Chakra-arbitrage-bot-linux-x86_64
+grep 'lumagg-arbitrage-bot-linux-x86_64.tar.gz$' SHA256SUMS | sha256sum --check
+tar -xzf lumagg-arbitrage-bot-linux-x86_64.tar.gz
+cd lumagg-arbitrage-bot-linux-x86_64
 ```
 
 Create a private config and caller-secret file from the archive contents:
 
 ```bash
-cp Chakra-arbitrage.toml arbitrage.toml
+cp lumagg-arbitrage.toml arbitrage.toml
 chmod 600 arbitrage.toml
 touch arbitrage-callers
 chmod 600 arbitrage-callers
 ```
 
 Set `accounts.caller_secrets_file` in `arbitrage.toml` to the absolute path of
-`arbitrage-callers`, then put one Arc `S...` secret per line in that file.
+`arbitrage-callers`, then put one Stellar `S...` secret per line in that file.
 Never commit either private file. Mnemonic-based callers are also supported
 through `accounts.mnemonic_path` and `accounts.caller_indices`.
 
 To build the same executable from a tagged source revision instead:
 
 ```bash
-git clone https://github.com/Chakra/Arc-dex-agg.git
-cd Arc-dex-agg
+git clone https://github.com/Lum-Agg/stellar-dex-agg.git
+cd stellar-dex-agg
 git checkout <release-tag-or-commit>
-cargo build --locked --release -p arbitrage --bin Chakra-arbitrage-bot
+cargo build --locked --release -p arbitrage --bin lumagg-arbitrage-bot
 ```
 
 ## Configure and run
@@ -82,8 +82,8 @@ The binary is not tied to systemd. Load the config and run it under any process
 manager:
 
 ```bash
-./Chakra-arbitrage-bot --config ./arbitrage.toml --check-config
-./Chakra-arbitrage-bot --config ./arbitrage.toml
+./lumagg-arbitrage-bot --config ./arbitrage.toml --check-config
+./lumagg-arbitrage-bot --config ./arbitrage.toml
 ```
 
 The remaining rollout stages apply regardless of the process manager.
@@ -94,19 +94,19 @@ The release archive also includes a systemd unit. Install it only if systemd is
 your chosen process manager:
 
 ```bash
-sudo useradd --system --home /var/lib/Chakra --shell /usr/sbin/nologin Chakra
-sudo install -d -o Chakra -g Chakra -m 0750 /var/lib/Chakra
-sudo install -d -o root -g Chakra -m 0750 /etc/Chakra
-sudo install -m 0755 Chakra-arbitrage-bot /usr/local/bin/
-sudo install -m 0600 -o Chakra -g Chakra /dev/null \
-  /etc/Chakra/arbitrage-callers
-sudo install -m 0640 -o root -g Chakra arbitrage.toml /etc/Chakra/arbitrage.toml
-sudo install -m 0644 Chakra-arbitrage.service \
+sudo useradd --system --home /var/lib/lumagg --shell /usr/sbin/nologin lumagg
+sudo install -d -o lumagg -g lumagg -m 0750 /var/lib/lumagg
+sudo install -d -o root -g lumagg -m 0750 /etc/lumagg
+sudo install -m 0755 lumagg-arbitrage-bot /usr/local/bin/
+sudo install -m 0600 -o lumagg -g lumagg /dev/null \
+  /etc/lumagg/arbitrage-callers
+sudo install -m 0640 -o root -g lumagg arbitrage.toml /etc/lumagg/arbitrage.toml
+sudo install -m 0644 lumagg-arbitrage.service \
   /etc/systemd/system/
 ```
 
 Skip `useradd` when the service account already exists. Set
-`accounts.caller_secrets_file = "/etc/Chakra/arbitrage-callers"` in the installed config.
+`accounts.caller_secrets_file = "/etc/lumagg/arbitrage-callers"` in the installed config.
 
 ## Safe Rollout
 
@@ -151,8 +151,8 @@ Restart the service after each configuration change:
 
 ```bash
 sudo systemctl daemon-reload
-sudo systemctl enable --now Chakra-arbitrage
-journalctl -u Chakra-arbitrage -f
+sudo systemctl enable --now lumagg-arbitrage
+journalctl -u lumagg-arbitrage -f
 ```
 
 ## Profit and Failure Policy
@@ -175,13 +175,13 @@ vault exposure, token selection, and submission settings.
 - Keep the quote API and RPC close to the scanner; latency directly affects
   opportunity validity.
 - Keep `scanner.max_splits = 1` initially. More splits increase route complexity and
-  Arc resource use.
+  Soroban resource use.
 - Use several callers only after confirming sequence management and fee
   funding for one caller.
 - Monitor simulation failure rate, estimated fees, successful transactions,
   realized token deltas, RPC errors, and vault balance independently.
 - To stop new submissions immediately, set `execution.submit_tx = false` and restart, or
-  stop `Chakra-arbitrage.service`.
+  stop `lumagg-arbitrage.service`.
 
 The deeper contract and fund-flow description remains in
 [Round-trip Arbitrage](round-trip-arb.md).

@@ -1,16 +1,16 @@
 import './style.css';
-import { ChakraClient } from '@Chakra/sdk';
+import { LumAggClient } from '@lumagg/sdk';
 import {
   isConnected,
   requestAccess,
   signTransaction,
-} from '@Arc/wallet-api';
+} from '@stellar/freighter-api';
 
-const API_URL = import.meta.env.VITE_API_URL || 'https://api.Chakra.xyz';
+const API_URL = import.meta.env.VITE_API_URL || 'https://api.lumagg.xyz';
 const XLM = 'CAS3J7GYLGXMF6TDJBBYYSE3HQ6BBSMLNUQ34T6TZMYMW2EVH34XOWMA';
 const USDC = 'CCW67TSZV3SSS2HXMBQ5JFGCKJNXKZM7UQUWUZPUTHXSTZLEO7SJMI75';
 
-const client = new ChakraClient({ apiUrl: API_URL });
+const client = new LumAggClient({ apiUrl: API_URL });
 
 const logEl = document.getElementById('log') as HTMLPreElement;
 const addressEl = document.getElementById('address') as HTMLSpanElement;
@@ -31,12 +31,12 @@ connectBtn.addEventListener('click', async () => {
   try {
     const connected = await isConnected();
     if (!connected.isConnected) {
-      throw new Error('wallet not detected — install the extension and reload');
+      throw new Error('Freighter not detected — install the extension and reload');
     }
     const access = await requestAccess();
     if (access.error) throw new Error(String(access.error));
     address = String(access.address || '');
-    if (!address.startsWith('G')) throw new Error('No wallet address returned');
+    if (!address.startsWith('G')) throw new Error('No Freighter address returned');
     addressEl.textContent = address;
     swapBtn.disabled = false;
     log(`Connected ${address}`);
@@ -57,17 +57,17 @@ swapBtn.addEventListener('click', async () => {
 
     const usdcBal = await client.getBalance({ account: address, token: USDC });
     if (usdcBal.hasTrustline === false) {
-      throw new Error('USDC trustline missing — add USDC in wallet first (~0.5 XLM reserve)');
+      throw new Error('USDC trustline missing — add USDC in Freighter first (~0.5 XLM reserve)');
     }
     log(`USDC has_trustline=${usdcBal.hasTrustline} balance=${usdcBal.balance ?? '0'}`);
 
-    log(`Quoting ${amountIn} atomic unitss XLM → USDC (preferArc)…`);
+    log(`Quoting ${amountIn} stroops XLM → USDC (preferSoroban)…`);
     const { quote, tx } = await client.quoteAndBuild({
       tokenIn: XLM,
       tokenOut: USDC,
       amountIn,
       slippage: 0.5,
-      preferArc: true,
+      preferSoroban: true,
       userPublicKey: address,
     });
     log(
@@ -75,14 +75,14 @@ swapBtn.addEventListener('click', async () => {
     );
     log(`build_tx execution=${tx.execution} fee=${tx.fee}`);
 
-    log('Requesting wallet signature…');
+    log('Requesting Freighter signature…');
     const signed = await signTransaction(tx.unsignedTxXdr, {
-      networkPassphrase: 'Public Global Arc Network ; September 2015',
+      networkPassphrase: 'Public Global Stellar Network ; September 2015',
       address,
     });
     if (signed.error) throw new Error(String(signed.error));
     const signedXdr = String(signed.signedTxXdr || '');
-    if (!signedXdr) throw new Error('wallet returned empty signedTxXdr');
+    if (!signedXdr) throw new Error('Freighter returned empty signedTxXdr');
     log(`Signed XDR length=${signedXdr.length}`);
 
     if (dryRunEl.checked) {
@@ -90,7 +90,7 @@ swapBtn.addEventListener('click', async () => {
       return;
     }
 
-    log('Submitting via Chakra /submit_tx…');
+    log('Submitting via LumAgg /submit_tx…');
     const submitted = await client.submitTx({ signedTxXdr: signedXdr });
     log(`Submitted hash=${submitted.hash} status=${submitted.status ?? ''}`);
 

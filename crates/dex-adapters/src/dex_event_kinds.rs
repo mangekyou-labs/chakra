@@ -2,7 +2,7 @@
 
 use {
     base64::Engine,
-    Arc_xdr::curr::{Limits, ReadXdr, ScVal},
+    stellar_xdr::curr::{Limits, ReadXdr, ScVal},
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -35,8 +35,8 @@ pub fn primary_topic_op(topics: Option<&[String]>) -> Option<String> {
     let topics = topics?;
     for raw in topics {
         if let Some(sym) = decode_topic_symbol(raw) {
-            // Arc venue pair/router prefix topic.
-            if sym == "Arc venuePair" || sym == "Arc venueRouter" {
+            // Soroswap pair/router prefix topic.
+            if sym == "SoroswapPair" || sym == "SoroswapRouter" {
                 continue;
             }
             return Some(sym);
@@ -74,24 +74,24 @@ fn decode_topic_symbol(raw: &str) -> Option<String> {
 
 #[cfg(test)]
 mod tests {
-    use {super::*, Arc_xdr::curr::WriteXdr};
+    use {super::*, stellar_xdr::curr::WriteXdr};
 
     fn sym(s: &str) -> String {
         base64::engine::general_purpose::STANDARD.encode(
-            ScVal::Symbol(Arc_xdr::curr::ScSymbol::try_from(s).unwrap())
+            ScVal::Symbol(stellar_xdr::curr::ScSymbol::try_from(s).unwrap())
                 .to_xdr(Limits::none())
                 .unwrap(),
         )
     }
 
     #[test]
-    fn classifies_Arc venue_trade_as_swap() {
+    fn classifies_aquarius_trade_as_swap() {
         assert_eq!(classify_topic_op("trade"), DexEventKind::Swap);
     }
 
     #[test]
-    fn skips_Arc venue_prefix_topic() {
-        let topics = [sym("Arc venuePair"), sym("swap")];
+    fn skips_soroswap_prefix_topic() {
+        let topics = [sym("SoroswapPair"), sym("swap")];
         assert_eq!(primary_topic_op(Some(&topics)).as_deref(), Some("swap"));
     }
 }

@@ -54,7 +54,7 @@ fn indexer_db_path() -> Option<String> {
     std::env::var("INDEXER_DB_PATH")
         .ok()
         .filter(|s| !s.is_empty())
-        .or_else(|| std::env::var("Chakra_INDEXER_DB_PATH").ok().filter(|s| !s.is_empty()))
+        .or_else(|| std::env::var("LUMAGG_INDEXER_DB_PATH").ok().filter(|s| !s.is_empty()))
 }
 
 fn encode_cursor(created_at: i64, tx_hash: &str) -> String {

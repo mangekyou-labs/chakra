@@ -1,8 +1,8 @@
 #![no_std]
 
 use {
-    Chakra_contract_types::SubRoute,
-    Arc_sdk::{
+    lumagg_contract_types::SubRoute,
+    soroban_sdk::{
         auth::{ContractContext, InvokerContractAuthEntry, SubContractInvocation},
         contract, contractclient, contractimpl, contracttype, token, Address, Env, IntoVal, Symbol, Vec,
     },
@@ -92,20 +92,20 @@ fn authorize_swap_as_current_contract(
     token_in: &Address,
     amount_in: i128,
 ) {
-    env.authorize_as_current_contract(Arc_sdk::vec![
+    env.authorize_as_current_contract(soroban_sdk::vec![
         env,
         InvokerContractAuthEntry::Contract(SubContractInvocation {
             context: ContractContext {
                 contract: token_in.clone(),
                 fn_name: Symbol::new(env, "transfer"),
-                args: Arc_sdk::vec![
+                args: soroban_sdk::vec![
                     env,
                     escrow.clone().into_val(env),
                     aggregator.clone().into_val(env),
                     amount_in.into_val(env),
                 ],
             },
-            sub_invocations: Arc_sdk::vec![env],
+            sub_invocations: soroban_sdk::vec![env],
         }),
     ]);
 }
@@ -452,8 +452,8 @@ mod tests {
             OrderStatus, MAX_ORDER_LIFETIME,
         },
         aggregator_contract::AggregatorContract,
-        Chakra_contract_types::{DexType, SubRoute, SwapStep},
-        Arc_sdk::{
+        lumagg_contract_types::{DexType, SubRoute, SwapStep},
+        soroban_sdk::{
             contract, contractimpl,
             testutils::{Address as _, EnvTestConfig, Events as _, Ledger, LedgerInfo},
             token, vec, Address, Env, Symbol, TryFromVal, Vec,
@@ -464,10 +464,10 @@ mod tests {
         Address::generate(env)
     }
 
-    fn create_token(env: &Env) -> (Address, token::ArcAssetClient<'static>) {
+    fn create_token(env: &Env) -> (Address, token::StellarAssetClient<'static>) {
         let admin = gen_addr(env);
-        let address = env.register_Arc_asset_contract_v2(admin).address();
-        let sac = token::ArcAssetClient::new(env, &address);
+        let address = env.register_stellar_asset_contract_v2(admin).address();
+        let sac = token::StellarAssetClient::new(env, &address);
         (address, sac)
     }
 
@@ -478,7 +478,7 @@ mod tests {
     }
 
     mod aq_mock {
-        use Arc_sdk::{contract, contractimpl, contracttype, token, Address, Env};
+        use soroban_sdk::{contract, contractimpl, contracttype, token, Address, Env};
 
         #[contract]
         pub struct AqPool;
@@ -529,7 +529,7 @@ mod tests {
 
     #[test]
     fn min_out_scales_with_fill_size() {
-        // A limit of 2e7 means two output atomic unitss per input atomic units.
+        // A limit of 2e7 means two output stroops per input stroop.
         assert_eq!(required_min_out(5_000_000, 20_000_000), 10_000_000);
     }
 
@@ -552,7 +552,7 @@ mod tests {
         OrderEscrowContractClient<'a>,
         Address,
         Address,
-        token::ArcAssetClient<'a>,
+        token::StellarAssetClient<'a>,
         Address,
     ) {
         let owner = gen_addr(env);
@@ -583,7 +583,7 @@ mod tests {
                     env,
                     SwapStep {
                         dex_id: pool_id.clone(),
-                        dex_type: DexType::Arc venue,
+                        dex_type: DexType::Aquarius,
                         token_in: token_in.clone(),
                         token_out: token_out.clone(),
                         in_idx: 0,

@@ -1,11 +1,11 @@
 //! Token logo index: contract address → official icon URL.
 //!
 //! Sources (merged in priority order):
-//! 1. Chakra overrides verified against exact mainnet contract IDs
-//! 2. Arc venue token list
+//! 1. LumAgg overrides verified against exact mainnet contract IDs
+//! 2. Soroswap token list
 //! 3. LOBSTR curated list (hex contract IDs normalized to StrKey)
-//! 4. ArcExpert Top50
-//! 5. MetaMask Arc token list
+//! 4. StellarExpert Top50
+//! 5. MetaMask Stellar token list
 
 use {
     serde::Deserialize,
@@ -15,17 +15,17 @@ use {
 };
 
 const DEFAULT_LIST_URLS: &[&str] = &[
-    "https://raw.githubusercontent.com/Arc venue/token-list/main/tokenList.json",
+    "https://raw.githubusercontent.com/soroswap/token-list/main/tokenList.json",
     "https://lobstr.co/api/v1/sep/assets/curated.json",
-    "https://api.Arc.expert/explorer/public/asset-list/top50",
-    "https://raw.githubusercontent.com/MetaMask/snap-Arc-wallet/main/tokenlists/unified-pubnet.json",
+    "https://api.stellar.expert/explorer/public/asset-list/top50",
+    "https://raw.githubusercontent.com/MetaMask/snap-stellar-wallet/main/tokenlists/unified-pubnet.json",
 ];
 
 // Keep this list deliberately small. A symbol alone is not enough to identify
-// a Arc asset; every entry must be verified against the exact contract ID.
+// a Stellar asset; every entry must be verified against the exact contract ID.
 const VERIFIED_LOGO_OVERRIDES: &[(&str, &str)] = &[
     (
-        // Native XLM SAC; icon is served by the Arc Development Foundation.
+        // Native XLM SAC; icon is served by the Stellar Development Foundation.
         "CAS3J7GYLGXMF6TDJBBYYSE3HQ6BBSMLNUQ34T6TZMYMW2EVH34XOWMA",
         "https://cdn.sanity.io/images/e2r40yh6/production-i18n/d4809d7123ca78f57b05601982932f5cfa62c3ac-32x32.png?w=192&h=192&fm=png",
     ),
@@ -40,12 +40,12 @@ const VERIFIED_LOGO_OVERRIDES: &[(&str, &str)] = &[
         "https://xau.cl/wp-content/uploads/2024/01/logo_xau_low.png",
     ),
     (
-        // Balanced's Arc configuration maps this contract to bnUSD.
+        // Balanced's Stellar configuration maps this contract to bnUSD.
         "CCT4ZYIYZ3TUO2AWQFEOFGBZ6HQP3GW5TA37CK7CRZVFRDXYTHTYX7KP",
         "https://raw.githubusercontent.com/balancednetwork/icons/main/tokens/bnusd.png",
     ),
     (
-        // LIBRE and DAWG contracts are published by LibreQuidity and Arc venue's list.
+        // LIBRE and DAWG contracts are published by LibreQuidity and Soroswap's list.
         "CBEM2CAIYLM3HBOPU5HLQL7V5BUAKM3N77DYQKX4FNHTQLQUUD2ZFBOX",
         "https://librequidity.org/LIBRE.png",
     ),
@@ -98,7 +98,7 @@ impl TokenLogoListIndex {
     pub fn new(list_urls: Vec<String>) -> Self {
         let client = reqwest::Client::builder()
             .timeout(Duration::from_secs(20))
-            .user_agent("Chakra-token-logo-lists/0.1")
+            .user_agent("lumagg-token-logo-lists/0.1")
             .build()
             .expect("reqwest client");
         Self {
@@ -188,14 +188,14 @@ pub(crate) fn parse_sep42_assets(assets: &[Sep42Asset]) -> Vec<(String, String)>
 pub fn normalize_contract_id(raw: &str) -> Option<String> {
     let s = raw.trim();
     if s.starts_with('C') && s.len() == 56 {
-        return Arc_strkey::Contract::from_string(s).ok().map(|c| format!("{c}"));
+        return stellar_strkey::Contract::from_string(s).ok().map(|c| format!("{c}"));
     }
     if s.len() == 64 && s.chars().all(|c| c.is_ascii_hexdigit()) {
         let mut bytes = [0u8; 32];
         for i in 0..32 {
             bytes[i] = u8::from_str_radix(&s[i * 2..i * 2 + 2], 16).ok()?;
         }
-        return Some(format!("{}", Arc_strkey::Contract(bytes)));
+        return Some(format!("{}", stellar_strkey::Contract(bytes)));
     }
     None
 }

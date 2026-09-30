@@ -1,5 +1,5 @@
 /**
- * Wallet utilities for signing and submitting Arc transactions.
+ * Wallet utilities for signing and submitting Stellar transactions.
  */
 
 import { submitSignedTransaction, type SubmitTxOptions } from '@/lib/rpc';
@@ -7,11 +7,11 @@ import { submitSignedTransaction, type SubmitTxOptions } from '@/lib/rpc';
 const NETWORK = 'PUBLIC';
 
 /**
- * Sign a transaction XDR using wallet.
+ * Sign a transaction XDR using Freighter.
  */
 export async function signTransaction(xdr: string): Promise<string> {
-  const walletApi = await import('@Arc/wallet-api');
-  const result = await walletApi.signTransaction(xdr, { network: NETWORK });
+  const freighterApi = await import('@stellar/freighter-api');
+  const result = await freighterApi.signTransaction(xdr, { network: NETWORK });
 
   if (typeof result === 'string') {
     return result;

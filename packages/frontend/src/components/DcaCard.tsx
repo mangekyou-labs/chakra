@@ -6,12 +6,12 @@ import { useWallet } from '@/lib/wallet-context';
 import {
   TESTNET_TOKENS,
   LIMIT_NETWORK_PASSPHRASE,
-  amountToatomic unitss,
+  amountToStroops,
   buildCancelDca,
   buildCreateDca,
   ceilDiv,
   fetchLatestLedger,
-  formatatomic unitss,
+  formatStroops,
   isLimitApiConfigured,
   listDcaOrders,
   priceHumanToE7,
@@ -60,8 +60,8 @@ export function DcaCard() {
     setBusy(true);
     setError(null);
     try {
-      const amountIn = amountToatomic unitss(total, tokenIn.decimals);
-      const chunkAmount = amountToatomic unitss(chunk, tokenIn.decimals);
+      const amountIn = amountToStroops(total, tokenIn.decimals);
+      const chunkAmount = amountToStroops(chunk, tokenIn.decimals);
       const amountInUnits = BigInt(amountIn);
       const chunkUnits = BigInt(chunkAmount);
       if (amountInUnits <= BigInt(0) || chunkUnits <= BigInt(0)) {
@@ -137,7 +137,7 @@ export function DcaCard() {
           </span>
         </div>
         <p className="mb-4 text-[13px] leading-relaxed text-[var(--text-muted)]">
-          Lock a total amount and swap one chunk on each schedule. Keep your wallet on Arc
+          Lock a total amount and swap one chunk on each schedule. Keep your wallet on Stellar
           Testnet.
         </p>
 
@@ -256,8 +256,8 @@ export function DcaCard() {
                   {tokenSymbol(order.tokenOut, TESTNET_TOKENS)}
                 </strong>
                 <p className="break-words text-[var(--text-muted)]">
-                  {formatatomic unitss(order.amountInRemaining, 7)} remaining ·{' '}
-                  {formatatomic unitss(order.chunkAmount, 7)} per chunk · next ledger{' '}
+                  {formatStroops(order.amountInRemaining, 7)} remaining ·{' '}
+                  {formatStroops(order.chunkAmount, 7)} per chunk · next ledger{' '}
                   {order.nextExecutableLedger.toLocaleString()}
                 </p>
               </div>

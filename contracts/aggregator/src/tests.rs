@@ -2,9 +2,9 @@ extern crate std;
 
 use {
     super::*,
-    Arc_sdk::{
+    soroban_sdk::{
         testutils,
-        token::{ArcAssetClient, TokenClient},
+        token::{StellarAssetClient, TokenClient},
         vec, Address, Env,
     },
 };
@@ -13,10 +13,10 @@ fn gen_addr(env: &Env) -> Address {
     <Address as testutils::Address>::generate(env)
 }
 
-fn create_token(env: &Env) -> (Address, ArcAssetClient<'static>, TokenClient<'static>) {
+fn create_token(env: &Env) -> (Address, StellarAssetClient<'static>, TokenClient<'static>) {
     let admin = gen_addr(env);
-    let addr = env.register_Arc_asset_contract_v2(admin).address();
-    let sac = ArcAssetClient::new(env, &addr);
+    let addr = env.register_stellar_asset_contract_v2(admin).address();
+    let sac = StellarAssetClient::new(env, &addr);
     let tok = TokenClient::new(env, &addr);
     (addr, sac, tok)
 }
@@ -36,16 +36,16 @@ fn single_swap(
     token_in: &Address,
     token_out: &Address,
     amount_in: i128,
-    steps: Arc_sdk::Vec<SwapStep>,
+    steps: soroban_sdk::Vec<SwapStep>,
     min: i128,
 ) -> i128 {
     let sub = SubRoute { amount_in, steps };
     agg.swap(user, token_in, token_out, &vec![env, sub], &min)
 }
 
-// ── Mock Arc venue Pool ──
+// ── Mock Aquarius Pool ──
 mod aq_mock {
-    use Arc_sdk::{contract, contractimpl, contracttype, token, Address, Env};
+    use soroban_sdk::{contract, contractimpl, contracttype, token, Address, Env};
 
     #[contract]
     pub struct AqPool;
@@ -76,9 +76,9 @@ mod aq_mock {
     }
 }
 
-// ── Mock Arc venue Pair ──
+// ── Mock Soroswap Pair ──
 mod ss_mock {
-    use Arc_sdk::{contract, contractimpl, contracttype, token, Address, Env};
+    use soroban_sdk::{contract, contractimpl, contracttype, token, Address, Env};
 
     #[contract]
     pub struct SsPair;
@@ -120,7 +120,7 @@ mod ss_mock {
 
 // ── Mock Sushi V3 Pool ──
 mod sushi_mock {
-    use Arc_sdk::{contract, contractimpl, contracttype, token, Address, Env, U256};
+    use soroban_sdk::{contract, contractimpl, contracttype, token, Address, Env, U256};
 
     #[contracttype]
     #[derive(Clone)]
@@ -171,24 +171,24 @@ mod sushi_mock {
     }
 }
 
-// ── Mock Arc venue Pool ──
-mod Arc venue_mock {
-    use Arc_sdk::{contract, contractimpl, contracttype, token, Address, Env};
+// ── Mock Comet Pool ──
+mod comet_mock {
+    use soroban_sdk::{contract, contractimpl, contracttype, token, Address, Env};
 
     #[contract]
-    pub struct Arc venuePool;
+    pub struct CometPool;
 
     #[contracttype]
-    enum Arc venueKey {
+    enum CometKey {
         TokenA,
         TokenB,
     }
 
     #[contractimpl]
-    impl Arc venuePool {
+    impl CometPool {
         pub fn init(env: Env, a: Address, b: Address) {
-            env.storage().instance().set(&Arc venueKey::TokenA, &a);
-            env.storage().instance().set(&Arc venueKey::TokenB, &b);
+            env.storage().instance().set(&CometKey::TokenA, &a);
+            env.storage().instance().set(&CometKey::TokenB, &b);
         }
 
         pub fn swap_exact_amount_in(
@@ -202,7 +202,7 @@ mod Arc venue_mock {
         ) -> (i128, i128) {
             assert!(token_amount_in > 0);
             let me = env.current_contract_address();
-            // Mainnet Arc venue pull_underlying: approve(user, pool) then transfer_from.
+            // Mainnet Comet pull_underlying: approve(user, pool) then transfer_from.
             let seq = env.ledger().sequence();
             let approval_ledger = (seq / 100_000 + 1) * 100_000;
             let token_in_client = token::Client::new(&env, &token_in);
@@ -215,14 +215,14 @@ mod Arc venue_mock {
     }
 }
 
-use {aq_mock::AqPoolClient, Arc venue_mock::Arc venuePoolClient, ss_mock::SsPairClient, sushi_mock::SushiPoolClient};
+use {aq_mock::AqPoolClient, comet_mock::CometPoolClient, ss_mock::SsPairClient, sushi_mock::SushiPoolClient};
 
 // ═══════════════════════════════════════════════════════════════════════
-//  Arc venue tests
+//  Aquarius tests
 // ═══════════════════════════════════════════════════════════════════════
 
 #[test]
-fn test_Arc venue_a2b_true() {
+fn test_aquarius_a2b_true() {
     let env = Env::default();
     env.mock_all_auths();
     let user = gen_addr(&env);
@@ -239,7 +239,7 @@ fn test_Arc venue_a2b_true() {
 
     let step = SwapStep {
         dex_id: p,
-        dex_type: DexType::Arc venue,
+        dex_type: DexType::Aquarius,
         token_in: a.clone(),
         token_out: b.clone(),
         in_idx: 0,
@@ -252,7 +252,7 @@ fn test_Arc venue_a2b_true() {
 }
 
 #[test]
-fn test_Arc venue_a2b_false() {
+fn test_aquarius_a2b_false() {
     let env = Env::default();
     env.mock_all_auths();
     let user = gen_addr(&env);
@@ -269,7 +269,7 @@ fn test_Arc venue_a2b_false() {
 
     let step = SwapStep {
         dex_id: p,
-        dex_type: DexType::Arc venue,
+        dex_type: DexType::Aquarius,
         token_in: b.clone(),
         token_out: a.clone(),
         in_idx: 1,
@@ -282,7 +282,7 @@ fn test_Arc venue_a2b_false() {
 }
 
 #[test]
-fn test_Arc venue_rejects_low_output() {
+fn test_aquarius_rejects_low_output() {
     let env = Env::default();
     env.mock_all_auths();
     let user = gen_addr(&env);
@@ -299,7 +299,7 @@ fn test_Arc venue_rejects_low_output() {
 
     let step = SwapStep {
         dex_id: p,
-        dex_type: DexType::Arc venue,
+        dex_type: DexType::Aquarius,
         token_in: a.clone(),
         token_out: b.clone(),
         in_idx: 0,
@@ -312,11 +312,11 @@ fn test_Arc venue_rejects_low_output() {
 }
 
 // ═══════════════════════════════════════════════════════════════════════
-//  Arc venue tests
+//  Soroswap tests
 // ═══════════════════════════════════════════════════════════════════════
 
 #[test]
-fn test_Arc venue_a2b_true() {
+fn test_soroswap_a2b_true() {
     let env = Env::default();
     env.mock_all_auths();
     let user = gen_addr(&env);
@@ -334,7 +334,7 @@ fn test_Arc venue_a2b_true() {
 
     let step = SwapStep {
         dex_id: p,
-        dex_type: DexType::Arc venuePair,
+        dex_type: DexType::SoroswapPair,
         token_in: a.clone(),
         token_out: b.clone(),
         in_idx: 0,
@@ -347,7 +347,7 @@ fn test_Arc venue_a2b_true() {
 }
 
 #[test]
-fn test_Arc venue_a2b_false() {
+fn test_soroswap_a2b_false() {
     let env = Env::default();
     env.mock_all_auths();
     let user = gen_addr(&env);
@@ -365,7 +365,7 @@ fn test_Arc venue_a2b_false() {
 
     let step = SwapStep {
         dex_id: p,
-        dex_type: DexType::Arc venuePair,
+        dex_type: DexType::SoroswapPair,
         token_in: b.clone(),
         token_out: a.clone(),
         in_idx: 1,
@@ -412,11 +412,11 @@ fn test_sushi_swap_with_hints() {
 }
 
 // ═══════════════════════════════════════════════════════════════════════
-//  Arc venue tests
+//  Comet tests
 // ═══════════════════════════════════════════════════════════════════════
 
 #[test]
-fn test_Arc venue_swap_exact_amount_in() {
+fn test_comet_swap_exact_amount_in() {
     let env = Env::default();
     env.mock_all_auths_allowing_non_root_auth();
     let user = gen_addr(&env);
@@ -426,14 +426,14 @@ fn test_Arc venue_swap_exact_amount_in() {
     let (b, sac_b, tok_b) = create_token(&env);
     sac_a.mint(&user, &1_000_000);
 
-    let pid = env.register(Arc venue_mock::Arc venuePool, ());
+    let pid = env.register(comet_mock::CometPool, ());
     let p = pid.clone();
-    Arc venuePoolClient::new(&env, &pid).init(&a, &b);
+    CometPoolClient::new(&env, &pid).init(&a, &b);
     sac_b.mint(&p, &10_000_000);
 
     let step = SwapStep {
         dex_id: p,
-        dex_type: DexType::Arc venueDex,
+        dex_type: DexType::CometDex,
         token_in: a.clone(),
         token_out: b.clone(),
         in_idx: 0,
@@ -476,7 +476,7 @@ fn test_multi_hop() {
         &env,
         SwapStep {
             dex_id: aq,
-            dex_type: DexType::Arc venue,
+            dex_type: DexType::Aquarius,
             token_in: a.clone(),
             token_out: b.clone(),
             in_idx: 0,
@@ -484,7 +484,7 @@ fn test_multi_hop() {
         },
         SwapStep {
             dex_id: ss,
-            dex_type: DexType::Arc venuePair,
+            dex_type: DexType::SoroswapPair,
             token_in: b,
             token_out: c.clone(),
             in_idx: 0,
@@ -533,7 +533,7 @@ fn test_swap_split_two_routes() {
                 &env,
                 SwapStep {
                     dex_id: aq,
-                    dex_type: DexType::Arc venue,
+                    dex_type: DexType::Aquarius,
                     token_in: a.clone(),
                     token_out: b.clone(),
                     in_idx: 0,
@@ -547,7 +547,7 @@ fn test_swap_split_two_routes() {
                 &env,
                 SwapStep {
                     dex_id: ss,
-                    dex_type: DexType::Arc venuePair,
+                    dex_type: DexType::SoroswapPair,
                     token_in: a.clone(),
                     token_out: b.clone(),
                     in_idx: 0,
@@ -595,7 +595,7 @@ fn test_round_trip_swap_two_legs() {
                 &env,
                 SwapStep {
                     dex_id: out_pool,
-                    dex_type: DexType::Arc venue,
+                    dex_type: DexType::Aquarius,
                     token_in: base.clone(),
                     token_out: bridge.clone(),
                     in_idx: 0,
@@ -612,7 +612,7 @@ fn test_round_trip_swap_two_legs() {
                 &env,
                 SwapStep {
                     dex_id: back_pool,
-                    dex_type: DexType::Arc venue,
+                    dex_type: DexType::Aquarius,
                     token_in: bridge.clone(),
                     token_out: base.clone(),
                     in_idx: 0,
@@ -662,7 +662,7 @@ fn test_round_trip_swap_split_out_leg() {
                 &env,
                 SwapStep {
                     dex_id: aq1,
-                    dex_type: DexType::Arc venue,
+                    dex_type: DexType::Aquarius,
                     token_in: base.clone(),
                     token_out: bridge.clone(),
                     in_idx: 0,
@@ -676,7 +676,7 @@ fn test_round_trip_swap_split_out_leg() {
                 &env,
                 SwapStep {
                     dex_id: aq2,
-                    dex_type: DexType::Arc venue,
+                    dex_type: DexType::Aquarius,
                     token_in: base.clone(),
                     token_out: bridge.clone(),
                     in_idx: 0,
@@ -694,7 +694,7 @@ fn test_round_trip_swap_split_out_leg() {
                 &env,
                 SwapStep {
                     dex_id: back_pool,
-                    dex_type: DexType::Arc venue,
+                    dex_type: DexType::Aquarius,
                     token_in: bridge.clone(),
                     token_out: base.clone(),
                     in_idx: 0,
@@ -741,7 +741,7 @@ fn test_round_trip_leg_back_weight_mismatch_single() {
                 &env,
                 SwapStep {
                     dex_id: out_pool,
-                    dex_type: DexType::Arc venue,
+                    dex_type: DexType::Aquarius,
                     token_in: base.clone(),
                     token_out: bridge.clone(),
                     in_idx: 0,
@@ -759,7 +759,7 @@ fn test_round_trip_leg_back_weight_mismatch_single() {
                 &env,
                 SwapStep {
                     dex_id: back_pool,
-                    dex_type: DexType::Arc venue,
+                    dex_type: DexType::Aquarius,
                     token_in: bridge.clone(),
                     token_out: base.clone(),
                     in_idx: 0,
@@ -810,7 +810,7 @@ fn test_round_trip_leg_back_split_rescale() {
                 &env,
                 SwapStep {
                     dex_id: out_pool,
-                    dex_type: DexType::Arc venue,
+                    dex_type: DexType::Aquarius,
                     token_in: base.clone(),
                     token_out: bridge.clone(),
                     in_idx: 0,
@@ -827,7 +827,7 @@ fn test_round_trip_leg_back_split_rescale() {
                 &env,
                 SwapStep {
                     dex_id: back1,
-                    dex_type: DexType::Arc venue,
+                    dex_type: DexType::Aquarius,
                     token_in: bridge.clone(),
                     token_out: base.clone(),
                     in_idx: 0,
@@ -841,7 +841,7 @@ fn test_round_trip_leg_back_split_rescale() {
                 &env,
                 SwapStep {
                     dex_id: back2,
-                    dex_type: DexType::Arc venue,
+                    dex_type: DexType::Aquarius,
                     token_in: bridge.clone(),
                     token_out: base.clone(),
                     in_idx: 0,
@@ -863,7 +863,7 @@ fn test_scale_sub_routes_remainder() {
     let dummy = gen_addr(&env);
     let step = SwapStep {
         dex_id: dummy.clone(),
-        dex_type: DexType::Arc venue,
+        dex_type: DexType::Aquarius,
         token_in: dummy.clone(),
         token_out: dummy.clone(),
         in_idx: 0,
@@ -895,7 +895,7 @@ fn test_scale_sub_routes_remainder() {
 // ═══════════════════════════════════════════════════════════════════════
 
 #[test]
-fn test_Arc venue_exact_match() {
+fn test_aquarius_exact_match() {
     let env = Env::default();
     env.mock_all_auths();
     let user = gen_addr(&env);
@@ -912,7 +912,7 @@ fn test_Arc venue_exact_match() {
 
     let step = SwapStep {
         dex_id: p,
-        dex_type: DexType::Arc venue,
+        dex_type: DexType::Aquarius,
         token_in: a.clone(),
         token_out: b.clone(),
         in_idx: 0,
@@ -964,7 +964,7 @@ fn test_disconnected_sub_route_panics() {
             &env,
             SwapStep {
                 dex_id: gen_addr(&env),
-                dex_type: DexType::Arc venue,
+                dex_type: DexType::Aquarius,
                 token_in: a.clone(),
                 token_out: b,
                 in_idx: 0,
@@ -972,7 +972,7 @@ fn test_disconnected_sub_route_panics() {
             },
             SwapStep {
                 dex_id: gen_addr(&env),
-                dex_type: DexType::Arc venue,
+                dex_type: DexType::Aquarius,
                 token_in: c,
                 token_out: d.clone(),
                 in_idx: 0,
@@ -1001,7 +1001,7 @@ fn test_insufficient_balance_panics() {
 
     let step = SwapStep {
         dex_id: p,
-        dex_type: DexType::Arc venue,
+        dex_type: DexType::Aquarius,
         token_in: a.clone(),
         token_out: b.clone(),
         in_idx: 0,

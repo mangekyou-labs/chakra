@@ -3,14 +3,14 @@
 #
 # Usage:
 #   ./scripts/verify_aggregator_events.sh
-#   RPC_URL=https://mainnet.Arcrpc.com START_LEDGER=63200000 ./scripts/verify_aggregator_events.sh
+#   RPC_URL=https://mainnet.sorobanrpc.com START_LEDGER=63200000 ./scripts/verify_aggregator_events.sh
 #
 # Checks getEvents for swap/rt/leg topics on the mainnet aggregator contract.
 
 set -euo pipefail
 
 AGGREGATOR="${AGGREGATOR:-CC6QAV7JEG5MYRSPO5Z65E5G2M4ZB64BEG2ZXIZXL55TQT35JDI2LC6K}"
-RPC_URL="${RPC_URL:-https://mainnet.Arcrpc.com}"
+RPC_URL="${RPC_URL:-https://mainnet.sorobanrpc.com}"
 START_LEDGER="${START_LEDGER:-}"
 LIMIT="${LIMIT:-200}"
 
@@ -74,7 +74,7 @@ else:
     for k, v in sorted(topics.items()):
         print(f"  {k}: {v}")
     if any(k in topics for k in ("swap", "rt", "leg")):
-        print("\n✓ Chakra aggregator events detected")
+        print("\n✓ LumAgg aggregator events detected")
     else:
         print("\n⚠ contract events exist but no swap/rt/leg topics yet")
 PY

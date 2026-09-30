@@ -1,5 +1,5 @@
 use crate::{auth, storage};
-use Arc_sdk::{Address, BytesN, Env};
+use soroban_sdk::{Address, BytesN, Env};
 
 /// Initialize the contract with an admin address.
 /// Must be called once after deployment.

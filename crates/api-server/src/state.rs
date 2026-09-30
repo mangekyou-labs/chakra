@@ -1,6 +1,6 @@
 use {
     crate::{
-        config::{AppConfig, ChakraMode},
+        config::{AppConfig, LumaggMode},
         pool_hydrate::{self, PoolHydrateConfig},
         price_sampler::spawn_price_sampler,
         price_store::PriceStore,
@@ -8,14 +8,14 @@ use {
     },
     anyhow::Result,
     dex_adapters::{
-        Arc venue::Arc venueAdapter,
-        Arc venue_clmm::Arc venueClmmAdapter,
+        aquarius::AquariusAdapter,
+        aquarius_clmm::AquariusClmmAdapter,
         cache::{default_cache_path, PoolCache},
         classic_dex::ClassicDexAdapter,
-        Arc venue::Arc venueAdapter,
-        Arc venue::Arc venueAdapter,
-        rpc::ArcRpc,
-        Arc venue::Arc venueAdapter,
+        comet::CometAdapter,
+        phoenix::PhoenixAdapter,
+        rpc::SorobanRpc,
+        soroswap::SoroswapAdapter,
         sushi::SushiAdapter,
         token_metadata::{LogoKind, TokenMetadata, TokenMetadataStore},
         traits::AdapterTradingPair,
@@ -41,9 +41,9 @@ pub struct AppState {
     pub engine: Arc<RwLock<Arc<QuoteEngine>>>,
     pub config: AppConfig,
     pub token_metadata: Arc<TokenMetadataStore>,
-    pub rpc: Arc<ArcRpc>,
+    pub rpc: Arc<SorobanRpc>,
     pub pool_state_store: Option<Arc<dyn PoolStateStore>>,
-    pub telegram: Option<Arc<Chakra_alerts::TelegramAlerter>>,
+    pub telegram: Option<Arc<lumagg_alerts::TelegramAlerter>>,
     pub price_store: Option<Arc<PriceStore>>,
 }
 
@@ -51,7 +51,7 @@ pub(crate) fn sanitize_cached_pairs(
     source: &str,
     pairs: Vec<router_engine::TradingPair>,
 ) -> Vec<router_engine::TradingPair> {
-    if source != "Arc venue" {
+    if source != "aquarius" {
         return pairs;
     }
 
@@ -60,7 +60,7 @@ pub(crate) fn sanitize_cached_pairs(
         *by_pool.entry(pair.pool_address.clone()).or_insert(0) += 1;
     }
 
-    // Arc venue multi-token pools are represented as multiple edges sharing one pool
+    // Aquarius multi-token pools are represented as multiple edges sharing one pool
     // address. Those routes are not executable by the current on-chain
     // aggregator, so never hydrate them from disk cache during startup.
     pairs
@@ -201,7 +201,7 @@ fn subscribe_memory_snapshot_versions(
 }
 
 async fn new_embedded(config: AppConfig) -> Result<AppState> {
-    info!("Chakra_MODE=embedded: in-process market-data-worker + memory stores (no Redis required)");
+    info!("LUMAGG_MODE=embedded: in-process market-data-worker + memory stores (no Redis required)");
 
     let memory_snapshot = MemorySnapshotStore::shared();
     let memory_pool = MemoryPoolStateStore::shared();
@@ -232,7 +232,7 @@ async fn new_embedded(config: AppConfig) -> Result<AppState> {
         }
     });
 
-    let rpc = Arc::new(ArcRpc::new(&config.rpc_url, &config.network_passphrase));
+    let rpc = Arc::new(SorobanRpc::new(&config.rpc_url, &config.network_passphrase));
     let token_metadata = Arc::new(TokenMetadataStore::new(rpc.clone()));
     let snapshot_events = Some(subscribe_memory_snapshot_versions(memory_snapshot));
     let (engine, initial_version, initial_token_metadata) =
@@ -241,7 +241,7 @@ async fn new_embedded(config: AppConfig) -> Result<AppState> {
         token_metadata.replace_all(token_metadata_map).await;
     }
 
-    let telegram = Chakra_alerts::TelegramAlerter::from_env_api_primary().map(Arc::new);
+    let telegram = lumagg_alerts::TelegramAlerter::from_env_api_primary().map(Arc::new);
     let price_store = configured_price_store()?;
     let state = AppState {
         engine: Arc::new(RwLock::new(engine)),
@@ -381,9 +381,9 @@ async fn run_reserve_refresh(adapters: &[Arc<dyn DexAdapter>], engine: &Arc<Quot
     }
 }
 
-/// Telegram alert only when Arc venue Redis gaps are material (avoids noise on
+/// Telegram alert only when Soroswap Redis gaps are material (avoids noise on
 /// every quote).
-fn should_alert_quote_redis_miss(miss: usize, Arc venue_refs: usize) -> bool {
+fn should_alert_quote_redis_miss(miss: usize, soroswap_refs: usize) -> bool {
     if miss == 0 {
         return false;
     }
@@ -394,14 +394,14 @@ fn should_alert_quote_redis_miss(miss: usize, Arc venue_refs: usize) -> bool {
     if miss < min_miss {
         return false;
     }
-    if Arc venue_refs == 0 {
+    if soroswap_refs == 0 {
         return true;
     }
-    let ratio_bps = miss.saturating_mul(10_000) / Arc venue_refs;
+    let ratio_bps = miss.saturating_mul(10_000) / soroswap_refs;
     let min_ratio_bps = std::env::var("QUOTE_REDIS_MISS_ALERT_RATIO_BPS")
         .ok()
         .and_then(|v| v.parse().ok())
-        .unwrap_or(3000); // 30% of Arc venue hops on candidate paths
+        .unwrap_or(3000); // 30% of soroswap hops on candidate paths
     ratio_bps >= min_ratio_bps
 }
 
@@ -432,44 +432,44 @@ impl AppState {
         };
 
         let hydrate_started = std::time::Instant::now();
-        let (hydration, redis_miss_xyk, Arc venue_refs, oldest_age_ms) = if let Some(store) = &self.pool_state_store {
+        let (hydration, redis_miss_xyk, soroswap_refs, oldest_age_ms) = if let Some(store) = &self.pool_state_store {
             pool_hydrate::hydrate_paths(&engine, &paths, store.as_ref(), &self.rpc, &hydrate_config).await
         } else {
-            tracing::warn!("pool_state_store missing — Arc quotes will not hydrate from Redis");
+            tracing::warn!("pool_state_store missing — Soroban quotes will not hydrate from Redis");
             (router_engine::QuoteHydration::default(), 0, 0, None)
         };
-        if should_alert_quote_redis_miss(redis_miss_xyk, Arc venue_refs) {
+        if should_alert_quote_redis_miss(redis_miss_xyk, soroswap_refs) {
             if let Some(alerter) = &self.telegram {
-                let pct = if Arc venue_refs > 0 {
-                    redis_miss_xyk * 100 / Arc venue_refs
+                let pct = if soroswap_refs > 0 {
+                    redis_miss_xyk * 100 / soroswap_refs
                 } else {
                     0
                 };
                 let detail = format!(
-                    "quote Redis Arc venue misses={redis_miss_xyk}/{Arc venue_refs} ({pct}%) paths={} rpc_hydrate={}",
+                    "quote Redis soroswap misses={redis_miss_xyk}/{soroswap_refs} ({pct}%) paths={} rpc_hydrate={}",
                     paths.len(),
                     hydrate_config.rpc_hydrate_enabled
                 );
                 let _ = alerter
-                    .alert("quote_redis_miss", &format!("⚠️ Chakra API\n{detail}"))
+                    .alert("quote_redis_miss", &format!("⚠️ LumAgg API\n{detail}"))
                     .await;
             }
         }
-        let Arc_path_count = paths
+        let soroban_path_count = paths
             .iter()
             .filter(|p| !p.sources.is_empty() && p.sources.iter().all(|s| s.as_str() != "classic_dex"))
             .count();
         let hydrate_ms = hydrate_started.elapsed().as_millis();
         tracing::info!(
             paths = paths.len(),
-            Arc_paths = Arc_path_count,
+            soroban_paths = soroban_path_count,
             xyk_hydrated = hydration.xyk_pools.len(),
             clmm_hydrated = hydration.clmm_pools.len(),
-            Arc venue_hydrated = hydration.Arc venue_pools.len(),
+            aquarius_hydrated = hydration.aquarius_pools.len(),
             paths_ms,
             hydrate_ms,
             redis_miss_xyk,
-            Arc venue_refs,
+            soroswap_refs,
             oldest_pool_age_ms = oldest_age_ms,
             rpc_hydrate_enabled = hydrate_config.rpc_hydrate_enabled,
             "quote_route hydration"
@@ -588,11 +588,11 @@ impl AppState {
     }
 
     pub async fn new(config: AppConfig) -> Result<Self> {
-        if config.Chakra_mode == ChakraMode::Embedded {
+        if config.lumagg_mode == LumaggMode::Embedded {
             return new_embedded(config).await;
         }
 
-        let rpc = Arc::new(ArcRpc::new(&config.rpc_url, &config.network_passphrase));
+        let rpc = Arc::new(SorobanRpc::new(&config.rpc_url, &config.network_passphrase));
         let token_metadata = Arc::new(TokenMetadataStore::new(rpc.clone()));
 
         if let Some(snapshot_store) = configured_snapshot_store(&config)? {
@@ -603,7 +603,7 @@ impl AppState {
                 token_metadata.replace_all(token_metadata_map).await;
             }
             let pool_state_store = configured_pool_state_store(&config)?;
-            let telegram = Chakra_alerts::TelegramAlerter::from_env_api_primary().map(Arc::new);
+            let telegram = lumagg_alerts::TelegramAlerter::from_env_api_primary().map(Arc::new);
             let price_store = configured_price_store()?;
             if telegram.is_some() {
                 info!("Telegram alerts enabled on API (quote Redis miss)");
@@ -661,13 +661,13 @@ impl AppState {
         let rpc_bg = rpc.clone();
         tokio::spawn(async move {
             let adapters: Vec<Arc<dyn DexAdapter>> = vec![
-                Arc::new(Arc venueAdapter::new(rpc_bg.clone())),
-                Arc::new(Arc venueAdapter::new(rpc_bg.clone())),
-                Arc::new(Arc venueAdapter::new(rpc_bg.clone())),
+                Arc::new(SoroswapAdapter::new(rpc_bg.clone())),
+                Arc::new(AquariusAdapter::new(rpc_bg.clone())),
+                Arc::new(PhoenixAdapter::new(rpc_bg.clone())),
                 Arc::new(SushiAdapter::new(rpc_bg.clone())),
-                Arc::new(Arc venueAdapter::new(rpc_bg.clone())),
+                Arc::new(CometAdapter::new(rpc_bg.clone())),
                 Arc::new(ClassicDexAdapter::new(None)),
-                Arc::new(Arc venueClmmAdapter::new(rpc_bg.clone())),
+                Arc::new(AquariusClmmAdapter::new(rpc_bg.clone())),
             ];
 
             for adapter in &adapters {
@@ -711,7 +711,7 @@ impl AppState {
         });
 
         let pool_state_store = configured_pool_state_store(&config)?;
-        let telegram = Chakra_alerts::TelegramAlerter::from_env_api_primary().map(Arc::new);
+        let telegram = lumagg_alerts::TelegramAlerter::from_env_api_primary().map(Arc::new);
         let price_store = configured_price_store()?;
         let state = Self {
             engine: Arc::new(RwLock::new(engine)),
@@ -857,7 +857,7 @@ mod tests {
                 slippage_bps: Some(50),
                 max_hops: Some(1),
                 max_splits: Some(1),
-                prefer_Arc: None,
+                prefer_soroban: None,
             })
             .await;
 
@@ -881,7 +881,7 @@ mod tests {
                 slippage_bps: Some(50),
                 max_hops: Some(1),
                 max_splits: Some(1),
-                prefer_Arc: None,
+                prefer_soroban: None,
             })
             .await;
 

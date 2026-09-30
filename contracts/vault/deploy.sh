@@ -1,18 +1,18 @@
 #!/usr/bin/env bash
-# Build optimized WASM and deploy a new Chakra arb vault on mainnet (or testnet).
+# Build optimized WASM and deploy a new LumAgg arb vault on mainnet (or testnet).
 #
 # Prerequisites:
-#   - Arc CLI (https://developers.Arc.org/docs/tools/cli)
-#   - Admin key configured: Arc keys add admin --source-file ...
+#   - stellar CLI (https://developers.stellar.org/docs/tools/cli)
+#   - Admin key configured: stellar keys add admin --source-file ...
 #
 # Usage:
 #   ./contracts/vault/deploy.sh
 #   ADMIN=admin ADMIN_G=G... ./contracts/vault/deploy.sh
 #   CALLER=G... ./contracts/vault/deploy.sh   # optional: add_caller after deploy
 #
-# Arc CLI 25+ ships mainnet with a docs placeholder RPC URL (not usable).
+# Stellar CLI 25+ ships mainnet with a docs placeholder RPC URL (not usable).
 # Override RPC if needed:
-#   RPC_URL=https://Arc-rpc.mainnet.Arc.gateway.fm ./contracts/vault/deploy.sh
+#   RPC_URL=https://soroban-rpc.mainnet.stellar.gateway.fm ./contracts/vault/deploy.sh
 #
 # On "transaction submission timeout", this script polls the chain (TX_POLL_SECS).
 
@@ -23,8 +23,8 @@ cd "$ROOT/contracts/vault"
 
 ADMIN="${ADMIN:-admin}"
 ADMIN_G="${ADMIN_G:-}"
-NETWORK_PASSPHRASE="${NETWORK_PASSPHRASE:-Public Global Arc Network ; September 2015}"
-RPC_URL="${RPC_URL:-https://mainnet.Arcrpc.com}"
+NETWORK_PASSPHRASE="${NETWORK_PASSPHRASE:-Public Global Stellar Network ; September 2015}"
+RPC_URL="${RPC_URL:-https://mainnet.sorobanrpc.com}"
 TX_POLL_SECS="${TX_POLL_SECS:-180}"
 RESOURCE_FEE="${RESOURCE_FEE:-200000000}"
 INCLUSION_FEE="${INCLUSION_FEE:-5000000}"
@@ -33,7 +33,7 @@ CALLER="${CALLER:-}"
 AGGREGATOR="${AGGREGATOR:-CC6QAV7JEG5MYRSPO5Z65E5G2M4ZB64BEG2ZXIZXL55TQT35JDI2LC6K}"
 
 if [[ -z "$ADMIN_G" ]]; then
-  ADMIN_G=$(Arc keys address "$ADMIN" 2>/dev/null || true)
+  ADMIN_G=$(stellar keys address "$ADMIN" 2>/dev/null || true)
 fi
 if [[ -z "$ADMIN_G" ]]; then
   echo "ERROR: Set ADMIN_G to the admin public key (G-address) for initialize()."
@@ -45,7 +45,7 @@ poll_tx() {
   local tx_hash="$1"
   local deadline=$((SECONDS + TX_POLL_SECS))
   echo "Polling getTransaction (up to ${TX_POLL_SECS}s): $tx_hash"
-  echo "  https://Arc.expert/explorer/public/tx/$tx_hash"
+  echo "  https://stellar.expert/explorer/public/tx/$tx_hash"
   while (( SECONDS < deadline )); do
     local resp status
     resp=$(curl -sS -X POST "$RPC_URL" \
@@ -69,7 +69,7 @@ poll_tx() {
   return 2
 }
 
-run_Arc_tx() {
+run_stellar_tx() {
   local label="$1"
   shift
   local log
@@ -104,8 +104,8 @@ run_Arc_tx() {
 }
 
 echo "=== Building vault WASM (release) ==="
-Arc contract build --optimize 2>/dev/null || {
-  echo "Arc contract build --optimize failed, trying cargo + Arc optimize..."
+stellar contract build --optimize 2>/dev/null || {
+  echo "stellar contract build --optimize failed, trying cargo + stellar optimize..."
   cargo build -p vault-contract --target wasm32v1-none --profile contract-release
   WASM=""
   for CANDIDATE in \
@@ -125,7 +125,7 @@ Arc contract build --optimize 2>/dev/null || {
     echo "ERROR: Could not find built WASM after cargo build."
     exit 1
   fi
-  Arc contract optimize --wasm "$WASM" --wasm-out "$WASM"
+  stellar contract optimize --wasm "$WASM" --wasm-out "$WASM"
 }
 
 WASM=""
@@ -151,7 +151,7 @@ echo "WASM: $WASM ($(wc -c < "$WASM") bytes)"
 echo "=== Deploying vault via RPC ($RPC_URL) ==="
 DEPLOY_LOG=$(mktemp)
 set +e
-Arc contract deploy \
+stellar contract deploy \
   --rpc-url "$RPC_URL" \
   --network-passphrase "$NETWORK_PASSPHRASE" \
   --source-account "$ADMIN" \
@@ -178,19 +178,19 @@ fi
 rm -f "$DEPLOY_LOG"
 
 if [[ -z "$VAULT_ID" ]]; then
-  echo "WARNING: Could not parse contract id from CLI output. Check Arc CLI logs."
+  echo "WARNING: Could not parse contract id from CLI output. Check stellar CLI logs."
 else
   echo ""
   echo "=== Vault deployed ==="
   echo "VAULT=$VAULT_ID"
-  echo "  https://Arc.expert/explorer/public/contract/$VAULT_ID"
+  echo "  https://stellar.expert/explorer/public/contract/$VAULT_ID"
   echo "$VAULT_ID" > "$ROOT/contracts/vault/.mainnet-vault-id"
   echo "(saved to contracts/vault/.mainnet-vault-id — gitignored if you add it)"
 fi
 
 if [[ -n "$VAULT_ID" ]]; then
   echo "=== initialize(admin=$ADMIN_G) ==="
-  if ! run_Arc_tx "initialize" Arc contract invoke \
+  if ! run_stellar_tx "initialize" stellar contract invoke \
     --id "$VAULT_ID" \
     --source-account "$ADMIN" \
     --rpc-url "$RPC_URL" \
@@ -209,7 +209,7 @@ if [[ -n "$CALLER" && -n "$VAULT_ID" ]]; then
     c=$(echo "$c" | xargs)
     [[ -z "$c" ]] && continue
     echo "=== add_caller $c ==="
-    run_Arc_tx "add_caller" Arc contract invoke \
+    run_stellar_tx "add_caller" stellar contract invoke \
       --id "$VAULT_ID" \
       --source-account "$ADMIN" \
       --rpc-url "$RPC_URL" \
@@ -224,11 +224,11 @@ fi
 echo ""
 echo "=== Next steps ==="
 echo "1. deposit trading principal into the vault (XLM SAC or base token):"
-echo "   Arc contract invoke --id $VAULT_ID --source <funder> \\"
+echo "   stellar contract invoke --id $VAULT_ID --source <funder> \\"
 echo "     --rpc-url $RPC_URL --network-passphrase \"$NETWORK_PASSPHRASE\" \\"
-echo "     -- deposit --from <funder> --token <token_C...> --amount <atomic unitss>"
+echo "     -- deposit --from <funder> --token <token_C...> --amount <stroops>"
 echo "2. add_caller for each arb bot G-address (if not done via CALLER=...):"
-echo "   Arc contract invoke --id $VAULT_ID --source $ADMIN \\"
+echo "   stellar contract invoke --id $VAULT_ID --source $ADMIN \\"
 echo "     --rpc-url $RPC_URL --network-passphrase \"$NETWORK_PASSPHRASE\" \\"
 echo "     -- add_caller --caller G..."
 echo "3. Run arb bot with vault mode:"

@@ -1,6 +1,6 @@
 use {
-    Chakra_contract_types::SubRoute,
-    Arc_sdk::{contractclient, Address, Env, Vec},
+    lumagg_contract_types::SubRoute,
+    soroban_sdk::{contractclient, Address, Env, Vec},
 };
 
 #[contractclient(name = "AggregatorContractClient")]

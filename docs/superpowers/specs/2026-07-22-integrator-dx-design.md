@@ -1,28 +1,28 @@
-# Integrator DX: OpenAPI + SDK 0.2 + wallet browser demo
+# Integrator DX: OpenAPI + SDK 0.2 + Freighter browser demo
 
 **Date:** 2026-07-22  
 **Status:** Approved for planning  
-**Goal:** Make third-party integration copy-paste ready (docs + SDK + runnable wallet path). External pilots and arb volume work are out of scope for this spec.
+**Goal:** Make third-party integration copy-paste ready (docs + SDK + runnable Freighter path). External pilots and arb volume work are out of scope for this spec.
 
 ## Context
 
-Public API at `https://api.Chakra.xyz` already exposes wallet helpers (`balance`, `submit_tx`, `tx_status`, etc.), but:
+Public API at `https://api.lumagg.xyz` already exposes wallet helpers (`balance`, `submit_tx`, `tx_status`, etc.), but:
 
 - `docs/openapi.yaml` omits those paths
-- `@Chakra/sdk` `0.1.0` stops at quote / build / stats / orders / prices
-- Examples stop at unsigned XDR; no minimal wallet → submit → confirm sample
+- `@lumagg/sdk` `0.1.0` stops at quote / build / stats / orders / prices
+- Examples stop at unsigned XDR; no minimal Freighter → submit → confirm sample
 
-External app density on Arc is low; improving DX is the near-term growth lever (vs cold-outreach pilots).
+External app density on Stellar is low; improving DX is the near-term growth lever (vs cold-outreach pilots).
 
 ## Decisions
 
 | Topic | Choice |
 |-------|--------|
-| Scope | OpenAPI sync + SDK methods + wallet browser demo + guide / site docs |
+| Scope | OpenAPI sync + SDK methods + Freighter browser demo + guide / site docs |
 | SDK version | `0.1.0` → **`0.2.0`** (additive) and npm publish |
-| Signing | **Not** in SDK — app uses `@Arc/wallet-api` |
-| wallet demo | `packages/sdk/examples/browser-swap/` (Vite SPA), not a frontend route |
-| Official RPC dual-path | SDK uses Chakra `submit_tx` / `tx_status` only (frontend Advanced toggle stays frontend-only) |
+| Signing | **Not** in SDK — app uses `@stellar/freighter-api` |
+| Freighter demo | `packages/sdk/examples/browser-swap/` (Vite SPA), not a frontend route |
+| Official RPC dual-path | SDK uses LumAgg `submit_tx` / `tx_status` only (frontend Advanced toggle stays frontend-only) |
 | Arb / pilots / embed / referral | Out of scope |
 
 ## 1. OpenAPI
@@ -43,9 +43,9 @@ Add tags `wallet` and `tx`. Schemas must match current JSON field names from `cr
 
 Bump OpenAPI `info.version` to `1.1.0`.
 
-## 2. SDK (`@Chakra/sdk`)
+## 2. SDK (`@lumagg/sdk`)
 
-Extend `ChakraClient` in `packages/sdk/src/index.ts`:
+Extend `LumAggClient` in `packages/sdk/src/index.ts`:
 
 | Method | Behavior |
 |--------|----------|
@@ -66,19 +66,19 @@ Conventions (match existing client):
 
 Publish: bump `package.json` to `0.2.0`, `npm run build`, `./scripts/publish-sdk.sh --publish` (requires npm auth).
 
-## 3. wallet browser demo
+## 3. Freighter browser demo
 
 **Path:** `packages/sdk/examples/browser-swap/`
 
-**Stack:** Vite + TypeScript; depends on workspace `@Chakra/sdk` and `@Arc/wallet-api`.
+**Stack:** Vite + TypeScript; depends on workspace `@lumagg/sdk` and `@stellar/freighter-api`.
 
 **UI (minimal):** connect button, amount input, log panel, “Swap XLM→USDC” action. No cards / marketing chrome beyond what’s needed to run the flow.
 
 **Flow:**
 
-1. wallet `requestAccess` → `G…` address  
+1. Freighter `requestAccess` → `G…` address  
 2. `getBalance` for XLM; for USDC check `hasTrustline` and surface a clear message if missing  
-3. `quoteAndBuild` with `preferArc: true` (amount configurable; default small)  
+3. `quoteAndBuild` with `preferSoroban: true` (amount configurable; default small)  
 4. `signTransaction(unsignedTxXdr, { network: 'PUBLIC' })`  
 5. `submitTx` → `waitForTx(hash)`  
 6. Print hash + final status  
@@ -94,7 +94,7 @@ Publish: bump `package.json` to `0.2.0`, `npm run build`, `./scripts/publish-sdk
 
 | File | Change |
 |------|--------|
-| `docs/integrator-guide.md` | Browser (wallet) section; SDK method table for new APIs |
+| `docs/integrator-guide.md` | Browser (Freighter) section; SDK method table for new APIs |
 | `docs/integrator-guide.zh-CN.md` | Mirror |
 | `packages/sdk/README.md` | 0.2.0 methods + browser-swap link |
 | `packages/frontend/.../ApiReference.tsx` | Add short entries for the new endpoints (hand-maintained page; not a full redesign) |
@@ -108,18 +108,18 @@ Existing `scripts/integrator-smoke.sh` and `examples/quote-build.ts` remain unsi
 | SDK build | `cd packages/sdk && npm run build` |
 | OpenAPI | Paths/params match handlers (manual diff) |
 | CLI smoke | Existing quote-build still works against prod |
-| Browser demo | Connect + quoteAndBuild succeeds with wallet; optional live submit |
-| Publish | `npm view @Chakra/sdk version` shows `0.2.0` after publish |
+| Browser demo | Connect + quoteAndBuild succeeds with Freighter; optional live submit |
+| Publish | `npm view @lumagg/sdk version` shows `0.2.0` after publish |
 
 ## 6. Out of scope
 
 - External integrator pilots / outreach scripts  
 - Arb bot optimization for volume  
 - Embed widget, referral, partner self-serve API keys  
-- SDK dual-submit via official Arc RPC  
+- SDK dual-submit via official Soroban RPC  
 - Multi-wallet (Lobstr / xBull) in the demo  
 - Shipping browser-swap as a published npm package  
 
 ## 7. Success
 
-An integrator can: read OpenAPI or `/docs/api`, `npm i @Chakra/sdk@0.2.0`, and copy the wallet demo flow to complete quote → build → sign → submit → confirm on mainnet without reading api-server source.
+An integrator can: read OpenAPI or `/docs/api`, `npm i @lumagg/sdk@0.2.0`, and copy the Freighter demo flow to complete quote → build → sign → submit → confirm on mainnet without reading api-server source.

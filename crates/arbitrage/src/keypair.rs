@@ -2,7 +2,7 @@
 
 use {
     anyhow::{anyhow, Result},
-    Arc_client::keypair::{Keypair, KeypairBehavior},
+    soroban_client::keypair::{Keypair, KeypairBehavior},
 };
 
 /// Bot signing key.

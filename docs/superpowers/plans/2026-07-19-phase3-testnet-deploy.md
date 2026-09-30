@@ -6,7 +6,7 @@
 
 **Architecture:** Bash scripts mirror `contracts/vault/deploy.sh` / `contracts/aggregator/upgrade.sh` (build WASM, deploy, initialize, poll timeouts) but default to Test SDF Network and exit if asked to use Public Global mainnet. A thin wrapper runs both deploys and writes a local env file for API/indexer/keeper.
 
-**Tech Stack:** bash, Arc CLI, cargo/Arc contract build, gitignore for local id/env files.
+**Tech Stack:** bash, stellar CLI, cargo/stellar contract build, gitignore for local id/env files.
 
 **Spec:** `docs/superpowers/specs/2026-07-19-phase3-testnet-deploy-design.md`
 
@@ -43,7 +43,7 @@ deploy/.env.limit-testnet.local
 ```bash
 refuse_if_mainnet() {
   case "${NETWORK_PASSPHRASE}" in
-    *"Public Global Arc Network"*)
+    *"Public Global Stellar Network"*)
       echo "ERROR: This script is testnet-only. Refusing mainnet passphrase." >&2
       exit 1
       ;;
@@ -55,7 +55,7 @@ Defaults for all new scripts:
 
 ```bash
 NETWORK_PASSPHRASE="${NETWORK_PASSPHRASE:-Test SDF Network ; September 2015}"
-RPC_URL="${RPC_URL:-https://Arc-testnet.Arc.org}"
+RPC_URL="${RPC_URL:-https://soroban-testnet.stellar.org}"
 ```
 
 - [ ] **Step 3:** Commit `chore: gitignore testnet deploy local artifacts`
@@ -70,21 +70,21 @@ RPC_URL="${RPC_URL:-https://Arc-testnet.Arc.org}"
 
 - [ ] **Step 1:** Implement script that:
   1. Sets testnet defaults + calls refuse guard
-  2. Requires `ADMIN` key identity + `ADMIN_G` (or derive from `Arc keys address`)
+  2. Requires `ADMIN` key identity + `ADMIN_G` (or derive from `stellar keys address`)
   3. If `AGGREGATOR` already set to a `C…` id: skip deploy, print reuse message, exit 0 after validating format
   4. Else: build/optimize aggregator WASM (same candidate path list style as vault)
-  5. `Arc contract deploy` with `--rpc-url` / `--network-passphrase`
+  5. `stellar contract deploy` with `--rpc-url` / `--network-passphrase`
   6. Parse `C…` id; poll on submission timeout (copy poll helper from vault)
   7. `initialize --admin "$ADMIN_G"`
   8. Write id to `contracts/aggregator/.testnet-aggregator-id`
-  9. Print testnet explorer link: `https://Arc.expert/explorer/testnet/contract/$ID`
+  9. Print testnet explorer link: `https://stellar.expert/explorer/testnet/contract/$ID`
 
 - [ ] **Step 2:** `chmod +x` the script
 
 - [ ] **Step 3:** Dry-run sanity (no network): `bash -n contracts/aggregator/deploy-testnet.sh` and a quick test that mainnet passphrase fails:
 
 ```bash
-NETWORK_PASSPHRASE='Public Global Arc Network ; September 2015' \
+NETWORK_PASSPHRASE='Public Global Stellar Network ; September 2015' \
   bash contracts/aggregator/deploy-testnet.sh && exit 1 || true
 ```
 

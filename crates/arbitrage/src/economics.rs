@@ -1,4 +1,4 @@
-//! Per-base profit floors and fee conversion (Arc fees are paid in XLM).
+//! Per-base profit floors and fee conversion (Soroban fees are paid in XLM).
 
 /// Native XLM SAC (mainnet).
 pub const XLM_SAC: &str = "CAS3J7GYLGXMF6TDJBBYYSE3HQ6BBSMLNUQ34T6TZMYMW2EVH34XOWMA";
@@ -8,28 +8,28 @@ pub const USDC_SAC: &str = "CCW67TSZV3SSS2HXMBQ5JFGCKJNXKZM7UQUWUZPUTHXSTZLEO7SJ
 /// 1.0 token in 7-decimal base units.
 pub const UNIT_E7: u128 = 10_000_000;
 
-/// Convert a Arc resource fee (XLM atomic unitss) into base-token units for the
+/// Convert a Soroban resource fee (XLM stroops) into base-token units for the
 /// profit gate.
 ///
-/// - XLM base: fee stays in atomic unitss.
+/// - XLM base: fee stays in stroops.
 /// - USDC base: `fee_xlm * xlm_usdc_price_e7 / 1e7` (price = USDC units per 1
 ///   XLM).
-/// - Other bases: treat fee as XLM atomic unitss (conservative / legacy).
-pub fn fee_in_base_units(fee_xlm_atomic unitss: u128, base_token: &str, xlm_usdc_price_e7: u128) -> u128 {
+/// - Other bases: treat fee as XLM stroops (conservative / legacy).
+pub fn fee_in_base_units(fee_xlm_stroops: u128, base_token: &str, xlm_usdc_price_e7: u128) -> u128 {
     if base_token == XLM_SAC || base_token.is_empty() {
-        return fee_xlm_atomic unitss;
+        return fee_xlm_stroops;
     }
     if base_token == USDC_SAC {
         if xlm_usdc_price_e7 == 0 {
-            return fee_xlm_atomic unitss;
+            return fee_xlm_stroops;
         }
         // Round up so we never understate gas in USDC terms.
-        return fee_xlm_atomic unitss
+        return fee_xlm_stroops
             .saturating_mul(xlm_usdc_price_e7)
             .saturating_add(UNIT_E7 - 1) /
             UNIT_E7;
     }
-    fee_xlm_atomic unitss
+    fee_xlm_stroops
 }
 
 /// Resolve min profit floor for a base token (base-token units, 7 decimals).

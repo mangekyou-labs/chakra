@@ -1,14 +1,14 @@
-# Arc DEX 聚合器 (Chakra)
+# Stellar DEX 聚合器 (LumAgg)
 
-[![GitHub](https://img.shields.io/badge/GitHub-ligulfzhou%2FArc--dex--agg-181717?logo=github)](https://github.com/Chakra/Arc-dex-agg)
+[![GitHub](https://img.shields.io/badge/GitHub-ligulfzhou%2Fstellar--dex--agg-181717?logo=github)](https://github.com/Lum-Agg/stellar-dex-agg)
 [![License](https://img.shields.io/badge/License-Apache--2.0-blue.svg)](LICENSE)
 
-Arc Arc 生态的多源流动性聚合路由。
+Stellar Soroban 生态的多源流动性聚合路由。
 
-**仓库：** https://github.com/Chakra/Arc-dex-agg  
+**仓库：** https://github.com/Lum-Agg/stellar-dex-agg  
 **English:** [README.md](README.md)
 
-Chakra 在 **Arc venue**、**Arc venue**（xy=k、稳定币、CLMM）、**Arc venue**、**Sushi V3**、**Arc venue** 之间路由 swap，并可与 **Classic DEX**（Horizon PathPayment）做基准对比。支持多跳路径、跨池拆单，以及通过可选聚合合约原子执行。
+LumAgg 在 **Soroswap**、**Aquarius**（xy=k、稳定币、CLMM）、**Phoenix**、**Sushi V3**、**Comet** 之间路由 swap，并可与 **Classic DEX**（Horizon PathPayment）做基准对比。支持多跳路径、跨池拆单，以及通过可选聚合合约原子执行。
 
 ## 目录
 
@@ -27,6 +27,8 @@ Chakra 在 **Arc venue**、**Arc venue**（xy=k、稳定币、CLMM）、**Arc ve
 
 ## 架构
 
+系统架构（组件、报价、swap、往返套利、限价）与 PlantUML 图见 [`docs/architecture.md`](docs/architecture.md)。
+
 ### 设计原则
 
 | 原则 | 实现 |
@@ -36,7 +38,7 @@ Chakra 在 **Arc venue**、**Arc venue**（xy=k、稳定币、CLMM）、**Arc ve
 | **事件驱动新鲜度** | Ledger 事件只刷新*被触碰*的池；不做周期性全市场扫描 |
 | **冷池仍有效** | 无链上活动的池保留 Redis 中上次写入的值，直到被覆盖 |
 
-池状态更新三条通道：**bootstrap**（worker 启动）、**ledger watcher**（热路径，0.1s 轮询）、**discovery**（约 600s 对账）。详见 [`docs/pool-state-architecture.md`](docs/pool-state-architecture.md)。
+池状态更新三条通道：**bootstrap**（worker 启动）、**ledger watcher**（热路径，0.1s 轮询）、**discovery**（约 600s 对账）。系统视图见 [`docs/architecture.md`](docs/architecture.md)，Redis key 与环境变量见 [`docs/pool-state-architecture.md`](docs/pool-state-architecture.md)。
 
 ### 系统总览
 
@@ -65,7 +67,7 @@ flowchart LR
     FP --> AD
   end
 
-  RPC[(Arc RPC)]
+  RPC[(Soroban RPC)]
 
   AD --> RPC
   LW --> RPC
@@ -104,19 +106,19 @@ flowchart LR
 
 | 键模式 | 内容 |
 |--------|------|
-| `Chakra:snapshot:*` | 版本化路由图 + CLMM 元数据（无 reserves） |
-| `Chakra:pool:xyk:{source}:{pool}` | xy=k reserves |
-| `Chakra:pool:Arc venue:{pool}` | Arc venue 多币 / 稳定币 reserves |
-| `Chakra:pool:Arc venue:{pool}` | Arc venue 加权池（各 token balance + weight + fee） |
-| `Chakra:pool:clmm:{source}:{pool}` | CLMM slot0、流动性、ticks |
-| `Chakra:snapshot:events` | Snapshot 热加载 Pub/Sub 频道 |
+| `lumagg:snapshot:*` | 版本化路由图 + CLMM 元数据（无 reserves） |
+| `lumagg:pool:xyk:{source}:{pool}` | xy=k reserves |
+| `lumagg:pool:aquarius:{pool}` | Aquarius 多币 / 稳定币 reserves |
+| `lumagg:pool:comet:{pool}` | Comet 加权池（各 token balance + weight + fee） |
+| `lumagg:pool:clmm:{source}:{pool}` | CLMM slot0、流动性、ticks |
+| `lumagg:snapshot:events` | Snapshot 热加载 Pub/Sub 频道 |
 
 ### 数据分层
 
 | 层 | 内容 | 存储 | 更新频率 |
 |----|------|------|----------|
-| **图** | 交易对、池地址、费率；CLMM 引用（无 tick） | `Chakra:snapshot:*` | Bootstrap；discovery ~600s |
-| **池状态** | xy=k reserves；Arc venue 多币；Arc venue 加权；CLMM slot0 + ticks + coverage | `Chakra:pool:*` | Ledger 0.1s 轮询 touched 池；bootstrap + discovery 全量发布 |
+| **图** | 交易对、池地址、费率；CLMM 引用（无 tick） | `lumagg:snapshot:*` | Bootstrap；discovery ~600s |
+| **池状态** | xy=k reserves；Aquarius 多币；Comet 加权；CLMM slot0 + ticks + coverage | `lumagg:pool:*` | Ledger 0.1s 轮询 touched 池；bootstrap + discovery 全量发布 |
 
 API **不**在进程内长期缓存池状态。每次 `/quote` 从最新 snapshot 重载路由图，再从 Redis 覆盖池状态（默认 `QUOTE_RPC_HYDRATE_ENABLED=false`）。
 
@@ -134,7 +136,7 @@ sequenceDiagram
   C->>API: GET /api/v1/quote
   API->>PF: find_candidate_paths（内存图）
   PF-->>API: 候选路径
-  API->>R: MGET 池键（xyk + Arc venue + clmm + Arc venue）
+  API->>R: MGET 池键（xyk + aquarius + clmm + comet）
   R-->>API: 缓存的池状态
   API->>QE: 按全额 amount_in 逐路径报价
   QE-->>API: QuotedPath 列表
@@ -148,14 +150,14 @@ sequenceDiagram
 
 1. **路径发现** — 在路由图上 BFS；返回全部候选路径（不按流动性剪枝）。
 2. **收集池键** — 路径上唯一的 `(source, pool_address)`。
-3. **Hydrate 池状态**（`pool_hydrate::hydrate_paths`）— Redis MGET 拉 xy=k、Arc venue、CLMM、Arc venue 加权状态（由 worker 写入）。`QUOTE_RPC_HYDRATE_ENABLED=true` 时 Arc venue xy=k / Arc venue Redis miss 可 RPC 兜底。
-4. **逐路径报价** — 以全额 `amount_in` 做本地 AMM / CLMM / Arc venue 计算；`coverage.is_complete` 为 false 的 CLMM 跳跳过。
+3. **Hydrate 池状态**（`pool_hydrate::hydrate_paths`）— Redis MGET 拉 xy=k、Aquarius、CLMM、Comet 加权状态（由 worker 写入）。`QUOTE_RPC_HYDRATE_ENABLED=true` 时 Soroswap xy=k / Comet Redis miss 可 RPC 兜底。
+4. **逐路径报价** — 以全额 `amount_in` 做本地 AMM / CLMM / Comet 计算；`coverage.is_complete` 为 false 的 CLMM 跳跳过。
 5. **拆单优化** — `SplitOptimizer`：冲击低于阈值则跳过；否则 Brent 法（2 路径）或两两合并（N 路径）最大化总输出。
-6. **Classic 对比** — 可选 Horizon PathPayment 与最优 Arc 路由比较。
+6. **Classic 对比** — 可选 Horizon PathPayment 与最优 Soroban 路由比较。
 
 ### Ledger watcher（热路径）
 
-Arc Arc RPC 无 WebSocket / Geyser 推送 — worker **轮询** `getLatestLedger`（**0.1s**），再**逐 ledger** 拉事件：
+Stellar Soroban RPC 无 WebSocket / Geyser 推送 — worker **轮询** `getLatestLedger`（**0.1s**），再**逐 ledger** 拉事件：
 
 ```text
 getLatestLedger
@@ -172,14 +174,14 @@ getLatestLedger
 
 ## 套利与 Vault
 
-面向运营方的原子往返套利栈（**非**零售产品）。交易本金放在 **vault**；热钱包只付 Arc 手续费。完整手册：[`docs/arb-operator.md`](docs/arb-operator.md)。合约说明：[`contracts/vault/README.zh-CN.md`](contracts/vault/README.zh-CN.md)。
+面向运营方的原子往返套利栈（**非**零售产品）。交易本金放在 **vault**；热钱包只付 Soroban 手续费。完整手册：[`docs/arb-operator.md`](docs/arb-operator.md)。合约说明：[`contracts/vault/README.zh-CN.md`](contracts/vault/README.zh-CN.md)。
 
 ### 运营架构
 
 ```mermaid
 flowchart LR
   W[market-data-worker] -->|Redis 池状态| Q[api-server ×N]
-  Q -->|GET /quote prefer_Arc| S[arb-scanner]
+  Q -->|GET /quote prefer_soroban| S[arb-scanner]
   S -->|simulate + 签名| V[vault.execute_round_trip]
   V -->|CPI| A[aggregator.round_trip_swap]
   A --> D[DEX 池]
@@ -188,7 +190,7 @@ flowchart LR
 
 | 组件 | 包 / 合约 | 职责 |
 |------|-----------|------|
-| 报价 | `api-server` | 与 UI 同一套 `/quote`；套利侧通常 `prefer_Arc=1`、`max_splits=1` |
+| 报价 | `api-server` | 与 UI 同一套 `/quote`；套利侧通常 `prefer_soroban=1`、`max_splits=1` |
 | 扫描器 | `crates/arbitrage` | 扫 bridge → 规模优化 → simulate → 可选上链 |
 | Vault | `contracts/vault` | 白名单 caller；持有 base（如 XLM SAC）本金 |
 | 聚合器 | `contracts/aggregator` | `round_trip_swap`（leg_out + leg_back） |
@@ -228,35 +230,35 @@ bridges × base
 | Caller | 助记词 index 或私钥；发送后约 1 个 ledger 冷却 |
 | 去重 | `ARB_SUBMIT_DEDUP_SECS` 内跳过同路径 |
 | 安全 | 单元默认 `ARB_SUBMIT_TX=0`；线上在 `deploy/arb.env` 打开 |
-| 监控 | `journalctl -u Chakra-arb`；可选 Telegram 盈亏 |
+| 监控 | `journalctl -u lumagg-arb`；可选 Telegram 盈亏 |
 
 ### 部署套利
 
 ```bash
 # Vault 一次性：deploy / deposit / add_caller — 见 contracts/vault/README.zh-CN.md
-./deploy_arb.sh                 # rsync、构建 arb-scanner、重启 Chakra-arb
+./deploy_arb.sh                 # rsync、构建 arb-scanner、重启 lumagg-arb
 # 实盘：服务器 deploy/arb.env 中 ARB_SUBMIT_TX=1
 ```
 
 | 单元 | 角色 |
 |------|------|
-| `Chakra-arb.service` | 往返套利扫描（依赖 Redis + 报价 API） |
+| `lumagg-arb.service` | 往返套利扫描（依赖 Redis + 报价 API） |
 
 ## DEX 数据源
 
 | 来源 | 池类型 | 在路由图中 | Redis 池状态 | 报价数学 |
 |------|--------|------------|--------------|----------|
-| **Arc venue** | xy=k | 是 | Discovery + ledger | 恒定乘积 |
-| **Arc venue** | xy=k + stable | 是 | Discovery + ledger | xy=k / stable |
-| **Arc venue** | xy=k | 是 | Discovery + ledger | 输出扣费 |
+| **soroswap** | xy=k | 是 | Discovery + ledger | 恒定乘积 |
+| **aquarius** | xy=k + stable | 是 | Discovery + ledger | xy=k / stable |
+| **phoenix** | xy=k | 是 | Discovery + ledger | 输出扣费 |
 | **sushi** | CLMM V3 | 是 | Discovery + ledger | 本地 `clmm_math` |
-| **Arc venue_clmm** | CLMM | 是 | Discovery + ledger | 本地 `clmm_math` |
-| **Arc venue** | 加权 | 是 | Discovery + ledger（`Chakra:pool:Arc venue:*`） | Balancer 数学 |
+| **aquarius_clmm** | CLMM | 是 | Discovery + ledger | 本地 `clmm_math` |
+| **comet** | 加权 | 是 | Discovery + ledger（`lumagg:pool:comet:*`） | Balancer 数学 |
 | **classic_dex** | 原生订单簿 | **否** | **按报价**（Horizon） | 仅基准 |
 
 ## 核心特性
 
-- **多源聚合** — 六大 Arc DEX 家族
+- **多源聚合** — 六大 Soroban DEX 家族
 - **多跳路由** — BFS 经中间代币（可配置最大跳数）
 - **拆单** — 冲击或路径竞争足够时，Brent 优化器跨路径分配输入
 - **事件驱动池状态** — ledger watcher + discovery；无周期性全量扫描
@@ -264,13 +266,13 @@ bridges × base
 - **热池亚 2 秒新鲜度** — 0.1s ledger 轮询 + fetch pipeline
 - **链上原子执行** — 可选聚合合约（`split_swap`、`round_trip_swap`）
 - **原子套利运营栈** — vault 集中本金 + `arb-scanner` 往返（见 [套利与 Vault](#套利与-vault)）
-- **Classic 基准** — 每单 Horizon PathPayment，不污染 Arc 图
+- **Classic 基准** — 每单 Horizon PathPayment，不污染 Soroban 图
 
 ## 为何不用 Classic DEX 路由？
 
-原生 PathPayment 的**路由不可控** — Arc Core 自行决定如何在订单簿与池之间拆分。无法指定具体池或路径。
+原生 PathPayment 的**路由不可控** — Stellar Core 自行决定如何在订单簿与池之间拆分。无法指定具体池或路径。
 
-本聚合器面向 **Arc DEX**，每一跳是确定性合约调用。Classic DEX 仅作**每单基准**（及仅存在于原生 DEX 的代币兜底），不是 pathfinder 图中的边。
+本聚合器面向 **Soroban DEX**，每一跳是确定性合约调用。Classic DEX 仅作**每单基准**（及仅存在于原生 DEX 的代币兜底），不是 pathfinder 图中的边。
 
 ## 项目结构
 
@@ -286,14 +288,16 @@ bridges × base
 │   ├── api-server/             # REST API（/quote、/build_tx、/tokens）
 │   ├── arbitrage/              # 往返扫描（vault 或直连聚合器）
 │   ├── analytics-indexer/      # 链上聚合器交易索引
-│   ├── Chakra-alerts/          # Telegram / 监控告警
+│   ├── lumagg-alerts/          # Telegram / 监控告警
 │   └── sdk/                    # 客户端 SDK
 ├── docs/
+│   ├── architecture.md
+│   ├── diagrams/               # PlantUML 源文件与 SVG
 │   ├── pool-state-architecture.md
 │   ├── arb-operator.md         # Vault + arb 部署 / 放量手册
 │   └── analytics-indexer.md
 ├── thirdparty/                 # 可选：本地 clone 上游参考（不入库；见 README）
-├── deploy/                     # systemd（Chakra-api@、Chakra-worker、Chakra-arb）
+├── deploy/                     # systemd（lumagg-api@、lumagg-worker、lumagg-arb）
 ├── deploy_server.sh            # API + worker
 ├── deploy_arb.sh               # 套利扫描器
 └── frontend/                   # SvelteKit 演示 UI
@@ -321,13 +325,13 @@ redis-server --port 6380 --save "" --appendonly no
 
 SNAPSHOT_BACKEND=redis \
 SNAPSHOT_REDIS_URL=redis://127.0.0.1:6380/ \
-SNAPSHOT_REDIS_CHANNEL=Chakra:snapshot:events \
+SNAPSHOT_REDIS_CHANNEL=lumagg:snapshot:events \
 cargo run -p market-data-worker
 
 LISTEN_ADDR=127.0.0.1:3113 \
 SNAPSHOT_BACKEND=redis \
 SNAPSHOT_REDIS_URL=redis://127.0.0.1:6380/ \
-SNAPSHOT_REDIS_CHANNEL=Chakra:snapshot:events \
+SNAPSHOT_REDIS_CHANNEL=lumagg:snapshot:events \
 cargo run -p api-server
 ```
 
@@ -356,9 +360,9 @@ Systemd 单元在 `deploy/`：
 
 | 单元 | 角色 |
 |------|------|
-| `Chakra-worker.service` | 单写者 — discovery、ledger watcher、Redis 发布 |
-| `Chakra-api@.service` | 无状态 API 实例（端口 3100–3103） |
-| `Chakra-arb.service` | 往返套利 bot（`ARB_SUBMIT_TX` 见 `deploy/arb.env`） |
+| `lumagg-worker.service` | 单写者 — discovery、ledger watcher、Redis 发布 |
+| `lumagg-api@.service` | 无状态 API 实例（端口 3100–3103） |
+| `lumagg-arb.service` | 往返套利 bot（`ARB_SUBMIT_TX` 见 `deploy/arb.env`） |
 
 Worker 默认：`LEDGER_POLL_SECS=0.1`、`FETCH_PIPELINE_ENABLED=true`、`DISCOVERY_INTERVAL_SECS=600`。
 
@@ -368,7 +372,7 @@ Worker 默认：`LEDGER_POLL_SECS=0.1`、`FETCH_PIPELINE_ENABLED=true`、`DISCOV
 
 | 变量 | 默认 | 含义 |
 |------|------|------|
-| `RPC_URL` | mainnet gateway.fm | Arc JSON-RPC |
+| `RPC_URL` | mainnet gateway.fm | Soroban JSON-RPC |
 
 ### Snapshot 与 Redis
 
@@ -376,7 +380,7 @@ Worker 默认：`LEDGER_POLL_SECS=0.1`、`FETCH_PIPELINE_ENABLED=true`、`DISCOV
 |------|------|------|------|
 | `SNAPSHOT_BACKEND` | — | worker, API | `file` 或 `redis` |
 | `SNAPSHOT_REDIS_URL` | — | worker, API | Redis URL |
-| `SNAPSHOT_REDIS_CHANNEL` | `Chakra:snapshot:events` | worker, API | Snapshot 热加载 Pub/Sub |
+| `SNAPSHOT_REDIS_CHANNEL` | `lumagg:snapshot:events` | worker, API | Snapshot 热加载 Pub/Sub |
 | `SNAPSHOT_POLL_INTERVAL_MS` | `1000` | API | Pub/Sub 漏消息时的轮询兜底 |
 | `POOL_STATE_TTL_SECS` | `86400` | worker | 池键 Redis EX（淘汰用，非新鲜度 SLA） |
 
@@ -412,14 +416,14 @@ Worker 默认：`LEDGER_POLL_SECS=0.1`、`FETCH_PIPELINE_ENABLED=true`、`DISCOV
 | 变量 | 默认 | 含义 |
 |------|------|------|
 | `SUSHI_DISCOVERY_RPC` | public gateway | Sushi 池探测 RPC |
-| `Arc venue_FACTORY` | Blend mainnet factory | Arc venue factory 合约 |
-| `Arc venue_EXTRA_POOLS` | — | 额外 Arc venue 池 ID（逗号分隔） |
+| `COMET_FACTORY` | Blend mainnet factory | Comet factory 合约 |
+| `COMET_EXTRA_POOLS` | — | 额外 Comet 池 ID（逗号分隔） |
 
 ### 套利 bot（详见 `docs/arb-operator.md`）
 
 | 变量 | 默认 / 说明 | 含义 |
 |------|-------------|------|
-| `ARB_AGGREGATOR_CONTRACT` | 构建时必填 | Chakra 聚合器 |
+| `ARB_AGGREGATOR_CONTRACT` | 构建时必填 | LumAgg 聚合器 |
 | `ARB_VAULT_CONTRACT` | 可选 | Vault 模式；未设则直连 `round_trip_swap` |
 | `ARB_QUOTE_API_URLS` | `http://127.0.0.1:3100,…` | 轮询报价 API |
 | `ARB_BRIDGE_TOKENS` | SAC 列表 | XLM↔token↔XLM 的 bridge |
@@ -427,13 +431,13 @@ Worker 默认：`LEDGER_POLL_SECS=0.1`、`FETCH_PIPELINE_ENABLED=true`、`DISCOV
 | `ARB_MNEMONIC_PATH` + `ARB_CALLER_INDICES` | — | HD 派生 caller（手续费钱包） |
 | `ARB_BUILD_TX` | `0` | 构建 / 模拟 |
 | `ARB_SUBMIT_TX` | `0` | 实盘广播 |
-| `ARB_MIN_PROFIT` | atomic unitss | 扣费后净利下限 |
+| `ARB_MIN_PROFIT` | stroops | 扣费后净利下限 |
 | `ARB_MAX_SPLITS` | 套利侧常为 `1` | 路径更简单、费用更低 |
 | `ARB_POLL_TX` | `0` | 后台 `getTransaction` 统计 SUCCESS/FAILED |
 
 ## 拆单路由
 
-生产环境 `deploy/Chakra-api@.service` 显式设置拆单相关环境变量。
+生产环境 `deploy/lumagg-api@.service` 显式设置拆单相关环境变量。
 
 **SplitOptimizer**（`crates/router-engine/src/split_optimizer.rs`）在 QuoteEngine 内、每条路径按全额报价之后运行：
 
@@ -455,11 +459,12 @@ Brent 默认容差 `0.0001`（0.01%），最多 18 次迭代 — 思路类似 Ju
 |------|------|
 | [`docs/integrator-guide.md`](docs/integrator-guide.md) | 集成方快速上手 — quote、build_tx、API key |
 | [`docs/openapi.yaml`](docs/openapi.yaml) | OpenAPI 3（`/quote`、`/build_tx`、`/tokens`、`/health`） |
+| [`docs/architecture.md`](docs/architecture.md) | 系统架构、PlantUML 图、报价 / swap / 套利 / 限价流程 |
 | [`docs/pool-state-architecture.md`](docs/pool-state-architecture.md) | 池状态设计、环境变量、代码索引 |
 | [`docs/arb-operator.md`](docs/arb-operator.md) | Vault + arb-scanner 部署、放量、监控 |
-| [`contracts/vault/README.zh-CN.md`](contracts/vault/README.zh-CN.md) | Vault 接口、资金流、Arc auth 注意事项 |
+| [`contracts/vault/README.zh-CN.md`](contracts/vault/README.zh-CN.md) | Vault 接口、资金流、Soroban auth 注意事项 |
 | [`docs/arb-executor.md`](docs/arb-executor.md) | 旧命名说明 → vault + `round_trip_swap` |
-| [`docs/scf-venue-comparison.md`](docs/scf-venue-comparison.md) | Chakra vs Arc venue / Arc Broker — venue 覆盖与 SCF 差异化证据 |
+| [`docs/scf-venue-comparison.md`](docs/scf-venue-comparison.md) | LumAgg vs Soroswap / Stellar Broker — venue 覆盖与 SCF 差异化证据 |
 | [`docs/scf-resubmission-budget.md`](docs/scf-resubmission-budget.md) | SCF #44 重新提交 — $80k 三档 deliverables |
 | [`docs/scf-benchmark-results.md`](docs/scf-benchmark-results.md) | 实时 quote 对比结果（`./scripts/scf-benchmark.sh`） |
 

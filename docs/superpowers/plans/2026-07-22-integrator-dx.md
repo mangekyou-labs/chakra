@@ -2,11 +2,11 @@
 
 > **For agentic workers:** Execute task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Align OpenAPI + `@Chakra/sdk@0.2.0` with live wallet/tx APIs, ship a wallet browser demo, and update integrator docs.
+**Goal:** Align OpenAPI + `@lumagg/sdk@0.2.0` with live wallet/tx APIs, ship a Freighter browser demo, and update integrator docs.
 
-**Architecture:** No api-server changes. Document existing handlers in OpenAPI; extend `ChakraClient` with camelCase wrappers; Vite SPA signs via wallet and submits via SDK.
+**Architecture:** No api-server changes. Document existing handlers in OpenAPI; extend `LumAggClient` with camelCase wrappers; Vite SPA signs via Freighter and submits via SDK.
 
-**Tech Stack:** OpenAPI 3, TypeScript SDK (`tsc`), Vite + `@Arc/wallet-api`, markdown docs, hand-maintained `ApiReference.tsx`.
+**Tech Stack:** OpenAPI 3, TypeScript SDK (`tsc`), Vite + `@stellar/freighter-api`, markdown docs, hand-maintained `ApiReference.tsx`.
 
 **Spec:** `docs/superpowers/specs/2026-07-22-integrator-dx-design.md`
 
@@ -20,7 +20,7 @@
 | `packages/sdk/src/index.ts` | New client methods + types |
 | `packages/sdk/package.json` | Version `0.2.0` |
 | `packages/sdk/README.md` | Document 0.2 APIs + browser-swap |
-| `packages/sdk/examples/browser-swap/*` | Vite wallet demo |
+| `packages/sdk/examples/browser-swap/*` | Vite Freighter demo |
 | `docs/integrator-guide.md` | Browser section + endpoint/SDK table |
 | `docs/integrator-guide.zh-CN.md` | Mirror |
 | `packages/frontend/src/components/docs/ApiReference.tsx` | Short endpoint entries |
@@ -75,7 +75,7 @@
   /api/v1/account:
     get:
       tags: [wallet]
-      summary: Account sequence via Arc RPC
+      summary: Account sequence via Soroban RPC
       parameters:
         - name: account
           in: query
@@ -168,7 +168,7 @@ Schemas (under `components/schemas`):
 - Modify: `packages/sdk/src/index.ts`
 - Modify: `packages/sdk/package.json` (version `0.2.0`)
 
-- [ ] **Step 1:** Add types + methods to `ChakraClient` (after `getPriceHistory`, before `getStats`):
+- [ ] **Step 1:** Add types + methods to `LumAggClient` (after `getPriceHistory`, before `getStats`):
 
 ```typescript
 export interface BalanceResult {
@@ -230,13 +230,13 @@ async waitForTx(hash: string, opts: WaitForTxOptions = {}): Promise<TxStatusResu
 
 - [ ] **Step 2:** `cd packages/sdk && npm run build` — expect clean `tsc`.
 
-- [ ] **Step 3:** Smoke against prod (no wallet):
+- [ ] **Step 3:** Smoke against prod (no Freighter):
 
 ```bash
 node -e "
-const { ChakraClient } = require('./dist/index.js');
+const { LumAggClient } = require('./dist/index.js');
 (async () => {
-  const c = new ChakraClient({ apiUrl: 'https://api.Chakra.xyz' });
+  const c = new LumAggClient({ apiUrl: 'https://api.lumagg.xyz' });
   const b = await c.getBalance({
     account: 'GA6RKSBPI2TSP52OW2IJTPK7LRMX24DF42KF3FBGBNMBYCV6NPDMOCBY',
     token: 'CAS3J7GYLGXMF6TDJBBYYSE3HQ6BBSMLNUQ34T6TZMYMW2EVH34XOWMA',
@@ -256,7 +256,7 @@ Expected: numeric/string balance or undefined; ledger sequence > 0; tx_status wi
 
 ---
 
-### Task 3: wallet browser-swap demo
+### Task 3: Freighter browser-swap demo
 
 **Files:**
 - Create: `packages/sdk/examples/browser-swap/package.json`
@@ -267,13 +267,13 @@ Expected: numeric/string balance or undefined; ledger sequence > 0; tx_status wi
 - Create: `packages/sdk/examples/browser-swap/src/style.css`
 - Create: `packages/sdk/examples/browser-swap/README.md`
 
-- [ ] **Step 1:** Scaffold Vite app. Depend on `"@Chakra/sdk": "file:../.."` and `"@Arc/wallet-api"`.
+- [ ] **Step 1:** Scaffold Vite app. Depend on `"@lumagg/sdk": "file:../.."` and `"@stellar/freighter-api"`.
 
 - [ ] **Step 2:** Implement `main.ts` flow: connect → balance/trustline → quoteAndBuild → sign → optional submit+wait. Checkbox `dryRun` default **checked** (stop after sign).
 
 - [ ] **Step 3:** `npm i && npm run build` in browser-swap — expect Vite build success.
 
-- [ ] **Step 4:** Commit `feat(sdk): add wallet browser-swap example`
+- [ ] **Step 4:** Commit `feat(sdk): add Freighter browser-swap example`
 
 ---
 
@@ -285,7 +285,7 @@ Expected: numeric/string balance or undefined; ledger sequence > 0; tx_status wi
 - Modify: `packages/sdk/README.md`
 - Modify: `packages/frontend/src/components/docs/ApiReference.tsx`
 
-- [ ] **Step 1:** Add “Browser (wallet)” section pointing at `packages/sdk/examples/browser-swap`. Update endpoints table with new paths. Update SDK section for 0.2 methods.
+- [ ] **Step 1:** Add “Browser (Freighter)” section pointing at `packages/sdk/examples/browser-swap`. Update endpoints table with new paths. Update SDK section for 0.2 methods.
 
 - [ ] **Step 2:** Mirror zh-CN.
 
@@ -303,7 +303,7 @@ Expected: numeric/string balance or undefined; ledger sequence > 0; tx_status wi
 
 - [ ] **Step 2:** `./scripts/publish-sdk.sh` dry-run, then `./scripts/publish-sdk.sh --publish` (needs npm login).
 
-- [ ] **Step 3:** `npm view @Chakra/sdk version` → `0.2.0`.
+- [ ] **Step 3:** `npm view @lumagg/sdk version` → `0.2.0`.
 
 - [ ] **Step 4:** Commit any leftover version/README tweaks if needed; tag optional `sdk-v0.2.0`.
 

@@ -191,7 +191,7 @@ mod tests {
     }
 
     #[test]
-    fn includes_Arc venue_edges_in_routing_graph() {
+    fn includes_comet_edges_in_routing_graph() {
         let mut finder = PathFinder::new(PathFinderConfig {
             max_hops: 1,
             max_multi_hop_paths: 10,
@@ -201,12 +201,12 @@ mod tests {
         let blnd = contract_token("CDTKPWPLOURQA2SGTKTUQOWRCBZEORB4BWBOMJ3D3ZTQQSGE5F6JBQLV");
         let usdc = contract_token("CCW67TSZV3SSS2HXMBQ5JFGCKJNXKZM7UQUWUZPUTHXSTZLEO7SJMI75");
         finder.update_from_source(
-            "Arc venue",
+            "comet",
             &[TradingPair {
                 token_a: blnd.clone(),
                 token_b: usdc.clone(),
-                source: "Arc venue".to_string(),
-                pool_address: "Arc venue-pool".to_string(),
+                source: "comet".to_string(),
+                pool_address: "comet-pool".to_string(),
                 fee_bps: 30,
                 reserve_a: Some(1_000_000),
                 reserve_b: Some(2_000_000),
@@ -215,7 +215,7 @@ mod tests {
 
         let paths = finder.find_paths(&blnd, &usdc);
         assert_eq!(paths.len(), 1);
-        assert_eq!(paths[0].sources, vec!["Arc venue".to_string()]);
-        assert_eq!(paths[0].pool_addresses, vec!["Arc venue-pool".to_string()]);
+        assert_eq!(paths[0].sources, vec!["comet".to_string()]);
+        assert_eq!(paths[0].pool_addresses, vec!["comet-pool".to_string()]);
     }
 }

@@ -1,4 +1,4 @@
-//! On-chain analytics indexer for Chakra aggregator contract invocations.
+//! On-chain analytics indexer for LumAgg aggregator contract invocations.
 
 pub mod config;
 pub mod events;

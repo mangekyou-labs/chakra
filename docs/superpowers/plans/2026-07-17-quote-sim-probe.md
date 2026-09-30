@@ -6,7 +6,7 @@
 
 **Architecture:** A new `quote-sim-probe` binary in `crates/arbitrage` reuses existing quote-api client + `dex_adapters::on_chain_quote` + optional vault round-trip simulate. It samples one-leg and/or round-trip routes from configured bridge tokens, prints structured JSONL reports (per-hop local vs chain, gap_bps), and exits non-zero when median gap exceeds a threshold. No Redis stream, no arb enqueue.
 
-**Tech Stack:** Rust, reqwest (quote-api), ArcRpc (`estimate_swap` / Arc venue reserves), existing `arbitrage::{bridge,quote_client,prepare,invoke}` helpers.
+**Tech Stack:** Rust, reqwest (quote-api), SorobanRpc (`estimate_swap` / Soroswap reserves), existing `arbitrage::{bridge,quote_client,prepare,invoke}` helpers.
 
 ---
 
@@ -53,7 +53,7 @@ mod tests {
         let hops = vec![
             HopCompare {
                 index: 0,
-                source: "Arc venue".into(),
+                source: "soroswap".into(),
                 pool: "P0".into(),
                 amount_in: 100_000_000,
                 local_out: 50_000_000,
@@ -61,7 +61,7 @@ mod tests {
             },
             HopCompare {
                 index: 1,
-                source: "Arc venue".into(),
+                source: "aquarius".into(),
                 pool: "P1".into(),
                 amount_in: 50_000_000,
                 local_out: 100_200_000,
@@ -247,21 +247,21 @@ use {
         probe::{first_diverging_hop, hop_gap_bps, HopCompare, HopCompareReport, ProbeSampleReport},
         scanner::compute_profit_bps,
     },
-    dex_adapters::{on_chain_quote, rpc::ArcRpc},
+    dex_adapters::{on_chain_quote, rpc::SorobanRpc},
     serde_json::Value,
     std::env,
 };
 
 async fn compare_quote_leg(
     quote_api: &str,
-    rpc: &ArcRpc,
+    rpc: &SorobanRpc,
     token_in: &str,
     token_out: &str,
     amount_in: u128,
     threshold_bps: i64,
 ) -> Result<ProbeSampleReport> {
     let url = format!(
-        "{quote_api}/api/v1/quote?token_in={token_in}&token_out={token_out}&amount_in={amount_in}&prefer_Arc=1&max_splits=1"
+        "{quote_api}/api/v1/quote?token_in={token_in}&token_out={token_out}&amount_in={amount_in}&prefer_soroban=1&max_splits=1"
     );
     let body: Value = reqwest::get(&url).await?.json().await?;
     if body["success"].as_bool() != Some(true) {
@@ -544,8 +544,8 @@ Add under Monitoring:
 ```markdown
 ### Quote vs on-chain probe (offline)
 
-Does **not** run inside `Chakra-arb`. Samples quote-api routes and immediately
-compares each hop to on-chain `estimate_swap` / fresh Arc venue reserves (and
+Does **not** run inside `lumagg-arb`. Samples quote-api routes and immediately
+compares each hop to on-chain `estimate_swap` / fresh Soroswap reserves (and
 optionally a full vault `simulateTransaction`).
 
 ```bash

@@ -1,35 +1,35 @@
 # Self-hosted Aggregator Quickstart
 
-This quickstart runs the split Chakra aggregator stack from release binaries:
+This quickstart runs the split LumAgg aggregator stack from release binaries:
 
 ```text
-Chakra-market-data-worker -> Redis -> Chakra-api-server
+lumagg-market-data-worker -> Redis -> lumagg-api-server
 ```
 
 Use this path when you want a production-like quote API with shared market
 state. For a private single-process service without Redis, use
-[Chakra Swap API](Chakra-swap-api.md).
+[LumAgg Swap API](lumagg-swap-api.md).
 
 ## 1. Download a release
 
 Linux x86_64 archives are published from the monorepo:
 
-<https://github.com/Chakra/Arc-dex-agg/releases>
+<https://github.com/Lum-Agg/stellar-dex-agg/releases>
 
-Download `Chakra-aggregator-linux-x86_64.tar.gz` and `SHA256SUMS`:
+Download `lumagg-aggregator-linux-x86_64.tar.gz` and `SHA256SUMS`:
 
 ```bash
-grep 'Chakra-aggregator-linux-x86_64.tar.gz$' SHA256SUMS | sha256sum --check
-tar -xzf Chakra-aggregator-linux-x86_64.tar.gz
-cd Chakra-aggregator-linux-x86_64
+grep 'lumagg-aggregator-linux-x86_64.tar.gz$' SHA256SUMS | sha256sum --check
+tar -xzf lumagg-aggregator-linux-x86_64.tar.gz
+cd lumagg-aggregator-linux-x86_64
 ```
 
 The archive contains:
 
-- `Chakra-market-data-worker`
-- `Chakra-api-server`
-- `Chakra-analytics-indexer`
-- `Chakra-aggregator.toml`
+- `lumagg-market-data-worker`
+- `lumagg-api-server`
+- `lumagg-analytics-indexer`
+- `lumagg-aggregator.toml`
 - optional `systemd/` examples
 - deployment and configuration docs
 
@@ -48,7 +48,7 @@ encode it in the Redis URL.
 ## 3. Create the config
 
 ```bash
-cp Chakra-aggregator.toml aggregator.toml
+cp lumagg-aggregator.toml aggregator.toml
 chmod 600 aggregator.toml
 ```
 
@@ -56,7 +56,7 @@ Edit at least these values:
 
 ```toml
 [network]
-rpc_url = "https://your-Arc-rpc.example"
+rpc_url = "https://your-soroban-rpc.example"
 
 [redis]
 url = "redis://:YOUR_PASSWORD@127.0.0.1:6379/"
@@ -69,7 +69,7 @@ aggregator_contract = "YOUR_MAINNET_AGGREGATOR_CONTRACT"
 horizon_url = "https://your-horizon.example"
 ```
 
-`network.rpc_url` must be a Arc JSON-RPC endpoint. `dex.horizon_url` is used
+`network.rpc_url` must be a Soroban JSON-RPC endpoint. `dex.horizon_url` is used
 by Classic DEX support and analytics envelope repair; use an archive-capable
 Horizon if historical indexing matters.
 
@@ -78,9 +78,9 @@ See [Aggregator Configuration](aggregator-configuration.md) for every option.
 ## 4. Validate the config
 
 ```bash
-./Chakra-market-data-worker --config ./aggregator.toml --check-config
-./Chakra-api-server --config ./aggregator.toml --check-config
-./Chakra-analytics-indexer --config ./aggregator.toml --check-config
+./lumagg-market-data-worker --config ./aggregator.toml --check-config
+./lumagg-api-server --config ./aggregator.toml --check-config
+./lumagg-analytics-indexer --config ./aggregator.toml --check-config
 ```
 
 Fix every validation error before starting long-running services.
@@ -88,7 +88,7 @@ Fix every validation error before starting long-running services.
 ## 5. Start the worker
 
 ```bash
-./Chakra-market-data-worker --config ./aggregator.toml
+./lumagg-market-data-worker --config ./aggregator.toml
 ```
 
 Wait until it publishes the first topology snapshot to Redis. Startup time
@@ -99,13 +99,13 @@ depends on RPC capacity and enabled DEX sources.
 In another shell:
 
 ```bash
-./Chakra-api-server --config ./aggregator.toml
+./lumagg-api-server --config ./aggregator.toml
 ```
 
 Run additional API replicas with different listen ports:
 
 ```bash
-./Chakra-api-server --config ./aggregator.toml --listen-addr 127.0.0.1:3101
+./lumagg-api-server --config ./aggregator.toml --listen-addr 127.0.0.1:3101
 ```
 
 ## 7. Verify readiness
@@ -125,7 +125,7 @@ Start the indexer only when you need `/stats`, swap history, or arbitrage
 history:
 
 ```bash
-./Chakra-analytics-indexer --config ./aggregator.toml run
+./lumagg-analytics-indexer --config ./aggregator.toml run
 ```
 
 The API and indexer must point to the same `indexer.db_path`.

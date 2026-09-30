@@ -1,0 +1,32 @@
+@startuml pool-state-channels
+!include _theme.iuml
+skinparam linetype polyline
+title Pool-state update channels
+caption Worker is the only Redis writer. Numbers match the Architecture page.
+
+actor "On-chain activity" as Chain
+participant "Soroban RPC" as RPC
+box "lumagg-market-data-worker"
+  participant Bootstrap as Boot
+  participant "Ledger watcher" as LW
+  participant "Fetch pipeline" as FP
+  participant "DEX adapters" as AD
+  participant Discovery as Disc
+end box
+database Redis
+participant "api-server" as API
+
+Boot -> Redis : 1. publish topology +\nfull pool state
+Boot -> API : 1. notify via snapshot events
+LW -> RPC : 2. getLatestLedger every 0.1s
+Chain -> RPC : swap / add / remove
+LW -> RPC : 3. getEvents ∩ known pools
+LW -> FP : 3. touched pools
+FP -> AD : 4. fetch touched pools
+AD -> RPC : getLedgerEntries
+FP -> Redis : 5. SET (CLMM only if\ncoverage complete)
+Disc -> Redis : 6. reconcile + new pools;\nfull publish
+API -> Redis : 7. reload last snapshot
+API -> Redis : 7. MGET on candidate paths
+
+@enduml

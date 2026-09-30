@@ -7,7 +7,7 @@
 
 use {
     anyhow::Result,
-    dex_adapters::{DexAdapter, ArcRpc, SushiAdapter, TokenId},
+    dex_adapters::{DexAdapter, SorobanRpc, SushiAdapter, TokenId},
     std::sync::Arc,
 };
 
@@ -37,12 +37,12 @@ async fn main() -> Result<()> {
     tracing_subscriber::fmt::init();
 
     let rpc_url =
-        std::env::var("RPC_URL").unwrap_or_else(|_| "https://Arc-rpc.mainnet.Arc.gateway.fm".to_string());
+        std::env::var("RPC_URL").unwrap_or_else(|_| "https://soroban-rpc.mainnet.stellar.gateway.fm".to_string());
     println!("RPC: {}\n", rpc_url);
 
-    let rpc = Arc::new(ArcRpc::new(
+    let rpc = Arc::new(SorobanRpc::new(
         &rpc_url,
-        "Public Global Arc Network ; September 2015",
+        "Public Global Stellar Network ; September 2015",
     ));
     let sushi = SushiAdapter::new(rpc);
 

@@ -2,17 +2,17 @@
 //! reserves).
 
 use {
-    dex_adapters::{Arc venue::Arc venueAdapter, Arc venueAdapter, Arc venuePoolQuoteState, DexAdapter},
+    dex_adapters::{comet::CometAdapter, AquariusAdapter, CometPoolQuoteState, DexAdapter},
     market_snapshot::pool_state_store::{
-        Arc venuePoolStateValue, Arc venuePoolStateValue, Arc venueTokenRecordValue, XykPoolStateValue,
+        AquariusPoolStateValue, CometPoolStateValue, CometTokenRecordValue, XykPoolStateValue,
     },
     std::{collections::HashSet, sync::Arc},
 };
 
-const XYK_REDIS_SOURCES: &[&str] = &["Arc venue", "Arc venue"];
+const XYK_REDIS_SOURCES: &[&str] = &["soroswap", "phoenix"];
 
-pub fn Arc venue_state_to_value(pool_address: &str, state: &Arc venuePoolQuoteState) -> Arc venuePoolStateValue {
-    Arc venuePoolStateValue {
+pub fn comet_state_to_value(pool_address: &str, state: &CometPoolQuoteState) -> CometPoolStateValue {
+    CometPoolStateValue {
         pool_address: pool_address.to_string(),
         records: state
             .records
@@ -20,7 +20,7 @@ pub fn Arc venue_state_to_value(pool_address: &str, state: &Arc venuePoolQuoteSt
             .map(|(token, record)| {
                 (
                     token.clone(),
-                    Arc venueTokenRecordValue {
+                    CometTokenRecordValue {
                         balance: record.balance,
                         weight: record.weight,
                         scalar: record.scalar,
@@ -73,27 +73,27 @@ pub async fn collect_xyk_pool_state(adapters: &[Arc<dyn DexAdapter>]) -> Vec<Xyk
     out
 }
 
-/// Arc venue weighted pool state (one Redis key per pool contract).
-pub async fn collect_Arc venue_pool_state(Arc venue: &Arc venueAdapter) -> Vec<Arc venuePoolStateValue> {
+/// Comet weighted pool state (one Redis key per pool contract).
+pub async fn collect_comet_pool_state(comet: &CometAdapter) -> Vec<CometPoolStateValue> {
     let mut out = Vec::new();
-    for (pool_address, state) in Arc venue.export_pool_quote_states().await {
+    for (pool_address, state) in comet.export_pool_quote_states().await {
         if state.records.len() < 2 {
             continue;
         }
-        out.push(Arc venue_state_to_value(&pool_address, &state));
+        out.push(comet_state_to_value(&pool_address, &state));
     }
     out.sort_by(|a, b| a.pool_address.cmp(&b.pool_address));
     out
 }
 
-/// Arc venue pools: token-ordered reserves + stable params (one key per pool
+/// Aquarius pools: token-ordered reserves + stable params (one key per pool
 /// contract).
-pub async fn collect_Arc venue_pool_state(Arc venue: &Arc venueAdapter) -> Vec<Arc venuePoolStateValue> {
-    Arc venue
+pub async fn collect_aquarius_pool_state(aquarius: &AquariusAdapter) -> Vec<AquariusPoolStateValue> {
+    aquarius
         .export_pool_quote_states()
         .await
         .into_iter()
-        .map(|state| Arc venuePoolStateValue {
+        .map(|state| AquariusPoolStateValue {
             pool_address: state.pool_address,
             tokens: state.tokens,
             reserves: state.reserves,

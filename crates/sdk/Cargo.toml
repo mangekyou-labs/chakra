@@ -1,5 +1,5 @@
 [package]
-name = "Arc-dex-aggregator-sdk"
+name = "stellar-dex-aggregator-sdk"
 version.workspace = true
 edition.workspace = true
 license.workspace = true

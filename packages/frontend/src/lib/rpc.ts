@@ -1,26 +1,26 @@
 /**
- * Frontend helpers for signing and submitting through Arc Arc RPC.
- * Chakra's submit endpoint remains available as an optional fallback.
+ * Frontend helpers for signing and submitting through Stellar Soroban RPC.
+ * LumAgg's submit endpoint remains available as an optional fallback.
  */
 
-import { Networks, TransactionBuilder, rpc } from '@Arc/Arc-sdk';
+import { Networks, TransactionBuilder, rpc } from '@stellar/stellar-sdk';
 import { fetchTokenBalance } from '@/lib/balance';
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://api.Chakra.xyz';
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://api.lumagg.xyz';
 const LIMIT_API_URL = process.env.NEXT_PUBLIC_LIMIT_API_URL?.trim() || '';
 
 /** Whitelisted official RPCs (not user-editable). */
-export const OFFICIAL_MAINNET_RPC_URL = 'https://mainnet.Arcrpc.com';
-export const OFFICIAL_TESTNET_RPC_URL = 'https://Arc-testnet.Arc.org';
+export const OFFICIAL_MAINNET_RPC_URL = 'https://mainnet.sorobanrpc.com';
+export const OFFICIAL_TESTNET_RPC_URL = 'https://soroban-testnet.stellar.org';
 
-const SUBMIT_VIA_STORAGE_KEY = 'Chakra.submitViaOfficialRpc';
+const SUBMIT_VIA_STORAGE_KEY = 'lumagg.submitViaOfficialRpc';
 
-export type SubmitVia = 'Chakra' | 'official';
+export type SubmitVia = 'lumagg' | 'official';
 export type SubmitNetwork = 'public' | 'testnet';
 
 export interface SubmitTxOptions {
   apiUrl?: string;
-  /** Default: preference from localStorage, else official Arc RPC. */
+  /** Default: preference from localStorage, else official Soroban RPC. */
   via?: SubmitVia;
   /** Used when via=official. Default: public (mainnet). */
   network?: SubmitNetwork;
@@ -29,7 +29,7 @@ export interface SubmitTxOptions {
 export function getSubmitViaPreference(): SubmitVia {
   if (typeof window === 'undefined') return 'official';
   try {
-    return localStorage.getItem(SUBMIT_VIA_STORAGE_KEY) === 'Chakra' ? 'Chakra' : 'official';
+    return localStorage.getItem(SUBMIT_VIA_STORAGE_KEY) === 'lumagg' ? 'lumagg' : 'official';
   } catch {
     return 'official';
   }
@@ -38,7 +38,7 @@ export function getSubmitViaPreference(): SubmitVia {
 export function setSubmitViaPreference(via: SubmitVia): void {
   if (typeof window === 'undefined') return;
   try {
-    if (via === 'Chakra') localStorage.setItem(SUBMIT_VIA_STORAGE_KEY, 'Chakra');
+    if (via === 'lumagg') localStorage.setItem(SUBMIT_VIA_STORAGE_KEY, 'lumagg');
     else localStorage.removeItem(SUBMIT_VIA_STORAGE_KEY);
   } catch {
     /* ignore quota / private mode */
@@ -212,7 +212,7 @@ async function fetchTxStatusViaApi(hash: string, apiUrl?: string): Promise<TxSta
   };
 }
 
-/** One-shot status check — official RPC or Chakra API (matches submit path). */
+/** One-shot status check — official RPC or LumAgg API (matches submit path). */
 export async function fetchTxStatus(
   hash: string,
   opts?: FetchTxStatusOptions | string,
@@ -297,7 +297,7 @@ export async function waitForTxConfirmation(
   return {
     success: false,
     status: 'TIMEOUT',
-    error: `Transaction submitted but not confirmed within ${Math.ceil(timeoutMs / 1000)}s — check the hash on Arc.expert${
+    error: `Transaction submitted but not confirmed within ${Math.ceil(timeoutMs / 1000)}s — check the hash on stellar.expert${
       lastStatusError ? ` (last status error: ${lastStatusError})` : ''
     }`,
   };

@@ -1,0 +1,43 @@
+- generic [active] [ref=e1]:
+  - generic [ref=e2]:
+    - banner [ref=e3]:
+      - generic [ref=e4]:
+        - generic [ref=e5]:
+          - link "Chakra logo Chakra" [ref=e6] [cursor=pointer]:
+            - /url: /
+            - img "Chakra logo" [ref=e7]
+            - generic [ref=e12]: Chakra
+          - navigation [ref=e14]:
+            - link "Swap" [ref=e15] [cursor=pointer]:
+              - /url: /
+            - link "Stats" [ref=e16] [cursor=pointer]:
+              - /url: /stats
+            - button "Docs" [ref=e18]
+        - generic [ref=e21]:
+          - link "Docs" [ref=e22] [cursor=pointer]:
+            - /url: /docs
+          - link "GitHub" [ref=e23] [cursor=pointer]:
+            - /url: https://github.com/mangekyou-labs/chakra
+          - button "Connect Wallet" [ref=e26]
+    - main [ref=e27]:
+      - main [ref=e28]:
+        - generic [ref=e29]:
+          - generic [ref=e30]:
+            - paragraph [ref=e31]: Network analytics
+            - heading "Stats" [level=1] [ref=e32]
+            - paragraph [ref=e33]: Confirmed routing activity on Arc Testnet.
+          - group "Date range" [ref=e34]:
+            - button "Last 14 days" [ref=e35]: 14d
+            - button "Last 30 days" [pressed] [ref=e36]: 30d
+            - button "Last 90 days" [ref=e37]: 90d
+            - button "All time" [ref=e38]: all
+        - status "Loading statistics" [ref=e39]
+    - contentinfo [ref=e68]:
+      - generic [ref=e69]:
+        - generic [ref=e70]: Chakra — non-custodial best-execution routing across Arc Testnet venues
+        - generic [ref=e71]:
+          - link "Documentation" [ref=e72] [cursor=pointer]:
+            - /url: /docs
+          - link "Open source" [ref=e73] [cursor=pointer]:
+            - /url: https://github.com/mangekyou-labs/chakra
+  - alert [ref=e76]

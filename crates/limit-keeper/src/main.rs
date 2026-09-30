@@ -2,7 +2,7 @@ use {
     anyhow::{Context, Result},
     dex_adapters::{
         rpc::events::{EventFilterSpec, MAX_LEDGER_SCAN_PER_REQUEST},
-        ArcRpc,
+        SorobanRpc,
     },
     limit_keeper::{
         book::OpenOrderBook,
@@ -52,7 +52,7 @@ async fn main() -> Result<()> {
         println!("configuration is valid");
         return Ok(());
     }
-    let rpc = ArcRpc::new(&config.rpc_url, &config.network);
+    let rpc = SorobanRpc::new(&config.rpc_url, &config.network);
     let quote_api = QuoteApiClient::new(&config.quote_api_url);
     let latest = rpc
         .get_latest_ledger()

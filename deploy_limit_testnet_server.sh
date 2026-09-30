@@ -4,8 +4,8 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")" && pwd)"
 SERVER="${SERVER:-root@88.198.16.144}"
-REMOTE_SRC="${REMOTE_SRC:-/opt/Arc-dex-aggregator-src}"
-REMOTE_APP_DIR="${REMOTE_APP_DIR:-/opt/Arc-dex-aggregator}"
+REMOTE_SRC="${REMOTE_SRC:-/opt/stellar-dex-aggregator-src}"
+REMOTE_APP_DIR="${REMOTE_APP_DIR:-/opt/stellar-dex-aggregator}"
 ENV_FILE="${ENV_FILE:-$ROOT/deploy/.env.limit-testnet.local}"
 RESET_TESTNET_DB="${RESET_TESTNET_DB:-0}"
 INDEXER_CONFIG="$(mktemp)"
@@ -25,7 +25,7 @@ if [[ "${KEEPER_NETWORK:-}" != "testnet" ]]; then
   echo "ERROR: KEEPER_NETWORK must be testnet." >&2
   exit 1
 fi
-if [[ "${NETWORK_PASSPHRASE:-}" == *"Public Global Arc Network"* ]]; then
+if [[ "${NETWORK_PASSPHRASE:-}" == *"Public Global Stellar Network"* ]]; then
   echo "ERROR: Refusing mainnet passphrase." >&2
   exit 1
 fi
@@ -36,9 +36,9 @@ then
   exit 1
 fi
 
-INDEXER_RPC_URL="${INDEXER_RPC_URL:-${Arc_RPC_URL:-${RPC_URL:-}}}"
+INDEXER_RPC_URL="${INDEXER_RPC_URL:-${SOROBAN_RPC_URL:-${RPC_URL:-}}}"
 if [[ -z "$INDEXER_RPC_URL" ]]; then
-  echo "ERROR: Missing INDEXER_RPC_URL, Arc_RPC_URL, or RPC_URL in $ENV_FILE." >&2
+  echo "ERROR: Missing INDEXER_RPC_URL, SOROBAN_RPC_URL, or RPC_URL in $ENV_FILE." >&2
   exit 1
 fi
 
@@ -91,16 +91,16 @@ ssh -o StrictHostKeyChecking=no "$SERVER" \
   "REMOTE_SRC='$REMOTE_SRC' REMOTE_APP_DIR='$REMOTE_APP_DIR' RESET_TESTNET_DB='$RESET_TESTNET_DB' bash -s" <<'REMOTE'
 set -euo pipefail
 
-if [[ ! -f /etc/Chakra/testnet-redis.env ]]; then
-  echo "ERROR: Missing /etc/Chakra/testnet-redis.env" >&2
+if [[ ! -f /etc/lumagg/testnet-redis.env ]]; then
+  echo "ERROR: Missing /etc/lumagg/testnet-redis.env" >&2
   exit 1
 fi
 
 systemctl stop \
-  Chakra-limit-keeper-testnet \
-  Chakra-api-testnet \
-  Chakra-indexer-testnet \
-  Chakra-worker-testnet 2>/dev/null || true
+  lumagg-limit-keeper-testnet \
+  lumagg-api-testnet \
+  lumagg-indexer-testnet \
+  lumagg-worker-testnet 2>/dev/null || true
 mkdir -p "$REMOTE_APP_DIR/target/release" "$REMOTE_APP_DIR/data" "$REMOTE_APP_DIR/deploy"
 chmod 600 "$REMOTE_APP_DIR/deploy/.env.limit-testnet.local"
 chmod 600 "$REMOTE_APP_DIR/deploy/indexer-testnet.toml"
@@ -113,50 +113,50 @@ if [[ "$RESET_TESTNET_DB" == "1" ]]; then
   [[ ! -f "$cursor" ]] || mv "$cursor" "${cursor}.bak.${stamp}"
 fi
 
-install -m 755 "$REMOTE_SRC/target/release/Chakra-api-server" \
-  "$REMOTE_APP_DIR/target/release/Chakra-api-server-testnet"
-install -m 755 "$REMOTE_SRC/target/release/Chakra-analytics-indexer" \
-  "$REMOTE_APP_DIR/target/release/Chakra-analytics-indexer-testnet"
+install -m 755 "$REMOTE_SRC/target/release/lumagg-api-server" \
+  "$REMOTE_APP_DIR/target/release/lumagg-api-server-testnet"
+install -m 755 "$REMOTE_SRC/target/release/lumagg-analytics-indexer" \
+  "$REMOTE_APP_DIR/target/release/lumagg-analytics-indexer-testnet"
 install -m 755 "$REMOTE_SRC/target/release/limit-keeper" \
   "$REMOTE_APP_DIR/target/release/limit-keeper-testnet"
-install -m 755 "$REMOTE_SRC/target/release/Chakra-market-data-worker" \
-  "$REMOTE_APP_DIR/target/release/Chakra-market-data-worker-testnet"
+install -m 755 "$REMOTE_SRC/target/release/lumagg-market-data-worker" \
+  "$REMOTE_APP_DIR/target/release/lumagg-market-data-worker-testnet"
 
-install -m 644 "$REMOTE_SRC/deploy/Chakra-api-testnet.service" /etc/systemd/system/
-install -m 644 "$REMOTE_SRC/deploy/Chakra-indexer-testnet.service" /etc/systemd/system/
-install -m 644 "$REMOTE_SRC/deploy/Chakra-limit-keeper-testnet.service" /etc/systemd/system/
-install -m 644 "$REMOTE_SRC/deploy/Chakra-worker-testnet.service" /etc/systemd/system/
+install -m 644 "$REMOTE_SRC/deploy/lumagg-api-testnet.service" /etc/systemd/system/
+install -m 644 "$REMOTE_SRC/deploy/lumagg-indexer-testnet.service" /etc/systemd/system/
+install -m 644 "$REMOTE_SRC/deploy/lumagg-limit-keeper-testnet.service" /etc/systemd/system/
+install -m 644 "$REMOTE_SRC/deploy/lumagg-worker-testnet.service" /etc/systemd/system/
 
 systemctl daemon-reload
 systemctl enable \
-  Chakra-api-testnet \
-  Chakra-indexer-testnet \
-  Chakra-limit-keeper-testnet \
-  Chakra-worker-testnet
-systemctl restart Chakra-worker-testnet
+  lumagg-api-testnet \
+  lumagg-indexer-testnet \
+  lumagg-limit-keeper-testnet \
+  lumagg-worker-testnet
+systemctl restart lumagg-worker-testnet
 
 set -a
 # shellcheck disable=SC1091
-source /etc/Chakra/testnet-redis.env
+source /etc/lumagg/testnet-redis.env
 set +a
 for _ in $(seq 1 90); do
-  if [[ "$(redis-cli -u "$SNAPSHOT_REDIS_URL" --raw EXISTS Chakra:snapshot:current 2>/dev/null)" == "1" ]]; then
+  if [[ "$(redis-cli -u "$SNAPSHOT_REDIS_URL" --raw EXISTS lumagg:snapshot:current 2>/dev/null)" == "1" ]]; then
     break
   fi
   sleep 2
 done
-if [[ "$(redis-cli -u "$SNAPSHOT_REDIS_URL" --raw EXISTS Chakra:snapshot:current 2>/dev/null)" != "1" ]]; then
+if [[ "$(redis-cli -u "$SNAPSHOT_REDIS_URL" --raw EXISTS lumagg:snapshot:current 2>/dev/null)" != "1" ]]; then
   echo "ERROR: testnet worker did not publish a Redis snapshot." >&2
-  journalctl -u Chakra-worker-testnet -n 40 --no-pager >&2
+  journalctl -u lumagg-worker-testnet -n 40 --no-pager >&2
   exit 1
 fi
 
-systemctl restart Chakra-indexer-testnet Chakra-api-testnet Chakra-limit-keeper-testnet
+systemctl restart lumagg-indexer-testnet lumagg-api-testnet lumagg-limit-keeper-testnet
 REMOTE
 
 echo "=== Verify services ==="
 ssh -o StrictHostKeyChecking=no "$SERVER" \
   "systemctl --no-pager --full status \
-    Chakra-worker-testnet Chakra-api-testnet Chakra-indexer-testnet Chakra-limit-keeper-testnet | \
+    lumagg-worker-testnet lumagg-api-testnet lumagg-indexer-testnet lumagg-limit-keeper-testnet | \
     sed -n '1,80p'; \
    curl -fsS http://127.0.0.1:3200/api/v1/health"

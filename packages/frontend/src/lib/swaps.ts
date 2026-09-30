@@ -1,4 +1,4 @@
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://api.Chakra.xyz';
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://api.lumagg.xyz';
 
 export type UserSwap = {
   tx_hash: string;
@@ -38,4 +38,4 @@ export async function fetchUserSwaps(
   };
 }
 
-export const SWAP_SUCCESS_EVENT = 'Chakra:swap-success';
+export const SWAP_SUCCESS_EVENT = 'lumagg:swap-success';

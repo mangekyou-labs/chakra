@@ -7,7 +7,7 @@ import {
   TESTNET_TOKENS,
   EXPIRY_PRESETS,
   type ExpiryPresetId,
-  amountToatomic unitss,
+  amountToStroops,
   buildCreateOrder,
   fetchLatestLedger,
   isLimitApiConfigured,
@@ -52,7 +52,7 @@ export function LimitCard() {
     setTxResult(null);
 
     try {
-      const amountatomic unitss = amountToatomic unitss(amountIn, tokenIn.decimals);
+      const amountStroops = amountToStroops(amountIn, tokenIn.decimals);
       const limitE7 = priceHumanToE7(limitPrice, tokenIn.decimals, tokenOut.decimals);
       const preset = EXPIRY_PRESETS.find((p) => p.id === expiry)!;
       const latest = await fetchLatestLedger();
@@ -62,7 +62,7 @@ export function LimitCard() {
         user: walletAddress,
         tokenIn: tokenIn.id,
         tokenOut: tokenOut.id,
-        amountIn: amountatomic unitss,
+        amountIn: amountStroops,
         limitOutPerInE7: limitE7,
         expiresLedger,
       });
@@ -134,8 +134,8 @@ export function LimitCard() {
         </div>
 
         <p className="text-[13px] text-[var(--text-muted)] mb-4 leading-relaxed">
-          Orders escrow on Arc <span className="text-[var(--text-secondary)]">testnet</span>.
-          Set wallet (or your wallet) to Testnet before signing.
+          Orders escrow on Stellar <span className="text-[var(--text-secondary)]">testnet</span>.
+          Set Freighter (or your wallet) to Testnet before signing.
         </p>
 
         {!configured && (
@@ -290,7 +290,7 @@ export function LimitCard() {
               <div>
                 Limit order submitted.{' '}
                 <a
-                  href={`https://Arc.expert/explorer/testnet/tx/${txResult.hash}`}
+                  href={`https://stellar.expert/explorer/testnet/tx/${txResult.hash}`}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="underline"

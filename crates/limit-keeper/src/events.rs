@@ -5,8 +5,8 @@ use {
     anyhow::{anyhow, Context, Result},
     base64::{engine::general_purpose::STANDARD as BASE64, Engine as _},
     dex_adapters::rpc::events::ContractEvent,
-    Arc_strkey::{ed25519::PublicKey, Contract},
-    Arc_xdr::curr::{self as xdr, Limits, ReadXdr},
+    stellar_strkey::{ed25519::PublicKey, Contract},
+    stellar_xdr::curr::{self as xdr, Limits, ReadXdr},
 };
 
 pub fn parse_escrow_event(event: &ContractEvent) -> Result<Option<OrderEvent>> {
@@ -173,7 +173,7 @@ mod tests {
         crate::book::{OpenOrderBook, OrderKind},
         base64::{engine::general_purpose::STANDARD as BASE64, Engine as _},
         dex_adapters::rpc::events::ContractEvent,
-        Arc_xdr::curr::{self as xdr, Limits, WriteXdr},
+        stellar_xdr::curr::{self as xdr, Limits, WriteXdr},
     };
 
     fn encode(value: xdr::ScVal) -> String {

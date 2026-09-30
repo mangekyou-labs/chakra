@@ -1,14 +1,14 @@
 use {
     anyhow::{bail, Context, Result},
-    Chakra_config::aggregator::AggregatorConfig,
+    lumagg_config::aggregator::AggregatorConfig,
     std::path::PathBuf,
 };
 
 fn print_help() {
     println!(
-        "Chakra-market-data-worker {}\n\n\
-         Usage: Chakra-market-data-worker --config <FILE> [--check-config]\n\n\
-         Options:\n  --config <FILE>  Chakra Aggregator TOML configuration\n  \
+        "lumagg-market-data-worker {}\n\n\
+         Usage: lumagg-market-data-worker --config <FILE> [--check-config]\n\n\
+         Options:\n  --config <FILE>  LumAgg Aggregator TOML configuration\n  \
          --check-config  Validate configuration and exit\n  -h, --help      Show this help\n  \
          -V, --version   Show version",
         env!("CARGO_PKG_VERSION")
@@ -28,7 +28,7 @@ fn parse_args() -> Result<Option<(Option<PathBuf>, bool)>> {
                 return Ok(None);
             }
             "-V" | "--version" => {
-                println!("Chakra-market-data-worker {}", env!("CARGO_PKG_VERSION"));
+                println!("lumagg-market-data-worker {}", env!("CARGO_PKG_VERSION"));
                 return Ok(None);
             }
             _ => bail!("unknown argument: {arg}"),
@@ -43,7 +43,7 @@ async fn main() -> Result<()> {
         return Ok(());
     };
     if let Some(path) = path {
-        let config: AggregatorConfig = Chakra_config::load(&path)?;
+        let config: AggregatorConfig = lumagg_config::load(&path)?;
         config.validate_cluster()?;
         config.apply();
     } else if check {

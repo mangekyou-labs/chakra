@@ -1,9 +1,9 @@
-//! Transaction builder: generates atomic Arc transactions from optimal
+//! Transaction builder: generates atomic Stellar transactions from optimal
 //! routes.
 //!
 //! Determines the appropriate on-chain execution strategy:
-//! - Single path, single Arc DEX: direct contract call
-//! - Single path, multi-hop Arc: aggregator.swap()
+//! - Single path, single Soroban DEX: direct contract call
+//! - Single path, multi-hop Soroban: aggregator.swap()
 //! - Split or single path: aggregator.swap(sub_routes)
 //!
 //! All transactions are simulated before returning to the user.
@@ -11,10 +11,10 @@
 use {
     crate::types::{OptimalRoute, SimulationResult, SubOrder, UnsignedTransaction},
     anyhow::{anyhow, Result},
-    dex_adapters::rpc::ArcRpc,
+    dex_adapters::rpc::SorobanRpc,
     sha2::Digest,
     std::sync::Arc,
-    Arc_xdr::curr as xdr,
+    stellar_xdr::curr as xdr,
 };
 
 /// Configuration for transaction building.
@@ -24,14 +24,14 @@ pub struct TxBuilderConfig {
     pub network_passphrase: String,
     /// Aggregator contract address (deployed on-chain)
     pub aggregator_contract: String,
-    /// Base fee in atomic unitss
+    /// Base fee in stroops
     pub base_fee: u32,
 }
 
 impl TxBuilderConfig {
     pub fn mainnet(aggregator_contract: &str) -> Self {
         Self {
-            network_passphrase: "Public Global Arc Network ; September 2015".to_string(),
+            network_passphrase: "Public Global Stellar Network ; September 2015".to_string(),
             aggregator_contract: aggregator_contract.to_string(),
             base_fee: 10_000,
         }
@@ -40,11 +40,11 @@ impl TxBuilderConfig {
 
 pub struct TransactionBuilder {
     config: TxBuilderConfig,
-    rpc: Arc<ArcRpc>,
+    rpc: Arc<SorobanRpc>,
 }
 
 impl TransactionBuilder {
-    pub fn new(config: TxBuilderConfig, rpc: Arc<ArcRpc>) -> Self {
+    pub fn new(config: TxBuilderConfig, rpc: Arc<SorobanRpc>) -> Self {
         Self { config, rpc }
     }
 
@@ -81,7 +81,7 @@ impl TransactionBuilder {
         let invoke_args = self.build_swap_args(user_address, token_in, token_out, &route.sub_orders, min_output)?;
 
         // Build the InvokeHostFunction operation
-        let aggregator_hash = Arc_strkey::Contract::from_string(&self.config.aggregator_contract)
+        let aggregator_hash = stellar_strkey::Contract::from_string(&self.config.aggregator_contract)
             .map_err(|e| anyhow!("Invalid aggregator contract: {:?}", e))?
             .0;
 
@@ -102,7 +102,7 @@ impl TransactionBuilder {
         };
 
         // Build transaction envelope
-        let user_account_id = Arc_strkey::ed25519::PublicKey::from_string(user_address)
+        let user_account_id = stellar_strkey::ed25519::PublicKey::from_string(user_address)
             .map_err(|e| anyhow!("Invalid user address: {:?}", e))?;
 
         let source_account = xdr::MuxedAccount::Ed25519(xdr::Uint256(user_account_id.0));
@@ -124,7 +124,7 @@ impl TransactionBuilder {
             signatures: xdr::VecM::default(),
         });
 
-        use Arc_xdr::curr::{Limits, WriteXdr};
+        use stellar_xdr::curr::{Limits, WriteXdr};
         let tx_xdr = envelope
             .to_xdr_base64(Limits::none())
             .map_err(|e| anyhow!("XDR encode error: {:?}", e))?;
@@ -205,15 +205,15 @@ impl TransactionBuilder {
             let (in_idx, out_idx) = indices.get(i).copied().unwrap_or((0, 1));
 
             let dex_type_val = match source.as_str() {
-                "Arc venue" => xdr::ScVal::Symbol("Arc venuePair".try_into().unwrap()),
-                "Arc venue" => xdr::ScVal::Symbol("Arc venue".try_into().unwrap()),
-                "Arc venue" => xdr::ScVal::Symbol("Arc venue".try_into().unwrap()),
+                "soroswap" => xdr::ScVal::Symbol("SoroswapPair".try_into().unwrap()),
+                "aquarius" => xdr::ScVal::Symbol("Aquarius".try_into().unwrap()),
+                "phoenix" => xdr::ScVal::Symbol("Phoenix".try_into().unwrap()),
                 "sushi" => xdr::ScVal::Symbol("Sushi".try_into().unwrap()),
-                "Arc venue" => xdr::ScVal::Symbol("Arc venueDex".try_into().unwrap()),
+                "comet" => xdr::ScVal::Symbol("CometDex".try_into().unwrap()),
                 _ => return Err(anyhow!("Unknown DEX source: {}", source)),
             };
 
-            // Keys must be lexicographically sorted for Arc host conversion
+            // Keys must be lexicographically sorted for Soroban host conversion
             let entries = vec![
                 xdr::ScMapEntry {
                     key: xdr::ScVal::Symbol("dex_id".try_into().unwrap()),
@@ -307,7 +307,7 @@ impl TransactionBuilder {
     // ===== Helper methods =====
 
     fn address_to_scval(&self, address: &str) -> Result<xdr::ScVal> {
-        let key = Arc_strkey::ed25519::PublicKey::from_string(address)
+        let key = stellar_strkey::ed25519::PublicKey::from_string(address)
             .map_err(|e| anyhow!("Invalid address: {:?}", e))?;
         Ok(xdr::ScVal::Address(xdr::ScAddress::Account(xdr::AccountId(
             xdr::PublicKey::PublicKeyTypeEd25519(xdr::Uint256(key.0)),
@@ -315,7 +315,7 @@ impl TransactionBuilder {
     }
 
     fn contract_to_scval(&self, contract: &str) -> Result<xdr::ScVal> {
-        let hash = Arc_strkey::Contract::from_string(contract)
+        let hash = stellar_strkey::Contract::from_string(contract)
             .map_err(|e| anyhow!("Invalid contract: {:?}", e))?
             .0;
         Ok(xdr::ScVal::Address(xdr::ScAddress::Contract(xdr::ContractId(

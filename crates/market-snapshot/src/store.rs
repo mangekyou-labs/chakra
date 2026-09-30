@@ -9,7 +9,7 @@ use {
     tracing::warn,
 };
 
-pub const DEFAULT_REDIS_EVENTS_CHANNEL: &str = "Chakra:snapshot:events";
+pub const DEFAULT_REDIS_EVENTS_CHANNEL: &str = "lumagg:snapshot:events";
 pub const DEFAULT_REDIS_SNAPSHOT_HISTORY: usize = 10;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -232,7 +232,7 @@ impl RedisSnapshotStore {
     pub fn with_options(redis_url: &str, events_channel: impl Into<Arc<str>>, keep_latest_versions: usize) -> Self {
         Self {
             client: redis::Client::open(redis_url).expect("invalid redis url"),
-            key_prefix: Arc::from("Chakra:snapshot"),
+            key_prefix: Arc::from("lumagg:snapshot"),
             events_channel: events_channel.into(),
             keep_latest_versions,
         }
@@ -462,11 +462,11 @@ mod tests {
     #[test]
     fn redis_snapshot_store_uses_versioned_keys() {
         let store = RedisSnapshotStore::new("redis://127.0.0.1/");
-        assert_eq!(store.current_key(), "Chakra:snapshot:current");
-        assert_eq!(store.versioned_snapshot_key("v1"), "Chakra:snapshot:data:v1");
-        assert_eq!(store.versioned_meta_key("v1"), "Chakra:snapshot:meta:v1");
-        assert_eq!(store.events_channel(), "Chakra:snapshot:events");
-        assert_eq!(store.versions_index_key(), "Chakra:snapshot:versions");
+        assert_eq!(store.current_key(), "lumagg:snapshot:current");
+        assert_eq!(store.versioned_snapshot_key("v1"), "lumagg:snapshot:data:v1");
+        assert_eq!(store.versioned_meta_key("v1"), "lumagg:snapshot:meta:v1");
+        assert_eq!(store.events_channel(), "lumagg:snapshot:events");
+        assert_eq!(store.versions_index_key(), "lumagg:snapshot:versions");
     }
 
     #[test]

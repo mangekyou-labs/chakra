@@ -1,6 +1,6 @@
 # API Reference
 
-The Chakra REST API is described by the public
+The LumAgg REST API is described by the public
 [OpenAPI 3 specification](openapi.yaml). Import that file into Swagger UI,
 Postman, Insomnia, or an OpenAPI client generator for complete schemas and
 examples.
@@ -8,7 +8,7 @@ examples.
 Production base URL:
 
 ```text
-https://api.Chakra.xyz/api/v1
+https://api.lumagg.xyz/api/v1
 ```
 
 Self-hosted deployments use the address configured by `LISTEN_ADDR`.
@@ -33,16 +33,16 @@ Self-hosted deployments use the address configured by `LISTEN_ADDR`.
 The normal integration flow is:
 
 ```text
-/tokens -> /quote -> /build_tx -> wallet sign -> submit to Arc
+/tokens -> /quote -> /build_tx -> wallet sign -> submit to Stellar
 ```
 
-Chakra never needs the user's secret key. `/build_tx` returns unsigned XDR;
+LumAgg never needs the user's secret key. `/build_tx` returns unsigned XDR;
 the user's wallet signs and submits it. See the [Integrator Guide](integrator-guide.md)
 for request examples, amount units, slippage, maximum hops, maximum splits,
 errors, and partner API keys.
 
 Interactive OpenAPI browsing is also available in the published docs:
-https://Chakra.gitbook.io/Chakra/integrate/api-reference
+https://lumagg.gitbook.io/lumagg/integrate/api-reference
 
 
 ## Limit And DCA

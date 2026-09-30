@@ -264,7 +264,7 @@ export function SwapSettingsModal({ open, settings, onClose, onChange }: Props) 
                   Max splits
                 </span>
                 <InfoTip label="About max splits">
-                  Maximum parallel paths in one swap. Higher may improve price but raises Arc
+                  Maximum parallel paths in one swap. Higher may improve price but raises Soroban
                   resource fees and Budget risk.
                 </InfoTip>
               </div>

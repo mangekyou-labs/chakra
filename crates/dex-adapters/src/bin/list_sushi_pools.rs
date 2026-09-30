@@ -4,7 +4,7 @@
 //!   RPC_URL=... cargo run -p dex-adapters --bin list-sushi-pools
 
 use {
-    dex_adapters::{rpc::ArcRpc, SushiAdapter},
+    dex_adapters::{rpc::SorobanRpc, SushiAdapter},
     std::sync::Arc,
 };
 
@@ -13,10 +13,10 @@ async fn main() -> anyhow::Result<()> {
     tracing_subscriber::fmt::init();
 
     let rpc_url =
-        std::env::var("RPC_URL").unwrap_or_else(|_| "https://Arc-rpc.mainnet.Arc.gateway.fm".to_string());
-    let rpc = Arc::new(ArcRpc::new(
+        std::env::var("RPC_URL").unwrap_or_else(|_| "https://soroban-rpc.mainnet.stellar.gateway.fm".to_string());
+    let rpc = Arc::new(SorobanRpc::new(
         &rpc_url,
-        "Public Global Arc Network ; September 2015",
+        "Public Global Stellar Network ; September 2015",
     ));
     let sushi = SushiAdapter::new(rpc);
 

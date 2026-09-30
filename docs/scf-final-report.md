@@ -1,6 +1,6 @@
-# Chakra SCF Grant — Final Report (draft)
+# LumAgg SCF Grant — Final Report (draft)
 
-**Project:** Arc DEX Aggregator (Chakra)  
+**Project:** Stellar DEX Aggregator (LumAgg)  
 **Grant total:** $90,000 · Tranches Jul–Oct 2026  
 **Status:** Draft — fill evidence links before submission
 
@@ -8,7 +8,7 @@
 
 ## Executive summary
 
-Chakra delivers a production Arc DEX aggregator with split routing across Arc AMMs, a public REST API and TypeScript SDK, swap UI, on-chain analytics indexer, and a mainnet atomic arbitrage vault + operator stack.
+LumAgg delivers a production Stellar DEX aggregator with split routing across Soroban AMMs, a public REST API and TypeScript SDK, swap UI, on-chain analytics indexer, and a mainnet atomic arbitrage vault + operator stack.
 
 ---
 
@@ -18,12 +18,12 @@ Chakra delivers a production Arc DEX aggregator with split routing across Arc AM
 |---|-------------|----------|--------|
 | D1 | Benchmark matrix | [scf-benchmark-results.md](./scf-benchmark-results.md) | ✅ |
 | D2 | Integrator guide + OpenAPI | [integrator-guide.md](./integrator-guide.md), [openapi.yaml](./openapi.yaml), [external smoke evidence](./evidence/d2-integrator-smoke/) | ✅ code · ✅ external tester |
-| D3 | Swap UI | https://Chakra.xyz | ✅ |
+| D3 | Swap UI | https://lumagg.xyz | ✅ |
 | D4 | Analytics indexer v0 | [analytics-indexer.md](./analytics-indexer.md), [sample-indexer-export.json](./sample-indexer-export.json) | ✅ |
-| D5 | npm SDK | [packages/sdk](../packages/sdk), npm: [`@Chakra/sdk`](https://www.npmjs.com/package/@Chakra/sdk) `0.2.0` | ✅ |
+| D5 | npm SDK | [packages/sdk](../packages/sdk), npm: [`@lumagg/sdk`](https://www.npmjs.com/package/@lumagg/sdk) `0.2.0` | ✅ |
 | D6 | Vault + arb mainnet | [arb-operator.md](./arb-operator.md), [arb-evidence-snapshot.md](./arb-evidence-snapshot.md) | ✅ |
 | D7 | ≥2 integrator pilots | [integrator-pilots.md](./integrator-pilots.md) | ✅ |
-| D8 | Public stats API | https://Chakra.xyz/stats, `/api/v1/stats` | ✅ · ☐ 30d data |
+| D8 | Public stats API | https://lumagg.xyz/stats, `/api/v1/stats` | ✅ · ☐ 30d data |
 | D9 | Third-party audit | [audit-scope.md](./audit-scope.md), report PDF | ☐ |
 | D10 | Close-out kit | [maintenance-plan.md](./maintenance-plan.md), [docker-compose.selfhost.yml](../docker-compose.selfhost.yml), demo video | partial |
 
@@ -33,9 +33,9 @@ Chakra delivers a production Arc DEX aggregator with split routing across Arc AM
 
 | Service | URL |
 |---------|-----|
-| API | https://api.Chakra.xyz |
-| Web | https://Chakra.xyz |
-| Stats | https://api.Chakra.xyz/api/v1/stats |
+| API | https://api.lumagg.xyz |
+| Web | https://lumagg.xyz |
+| Stats | https://api.lumagg.xyz/api/v1/stats |
 
 ## Mainnet contracts
 

@@ -9,4 +9,4 @@ Generate with:
 cargo run -p analytics-indexer --bin fetch-fixture
 ```
 
-Or copy `envelopeXdr` from Arc RPC `getTransactions` filtered by `AGGREGATOR_CONTRACT`.
+Or copy `envelopeXdr` from Soroban RPC `getTransactions` filtered by `AGGREGATOR_CONTRACT`.

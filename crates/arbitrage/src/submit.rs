@@ -1,12 +1,12 @@
-//! Sign prepared XDR and submit to Arc RPC (Arc-arb tx_executor
+//! Sign prepared XDR and submit to Soroban RPC (stellar-arb tx_executor
 //! pattern).
 
 use {
     crate::{execute::PreparedArbTx, keypair::ExecutorKeypair, prepare::rpc_server, stats::ArbStats},
     anyhow::{anyhow, Result},
-    Arc_client::{
+    soroban_client::{
         network::{NetworkPassphrase, Networks},
-        Arc_rpc::{SendTransactionStatus, TransactionStatus},
+        soroban_rpc::{SendTransactionStatus, TransactionStatus},
         transaction::{Transaction, TransactionBehavior},
     },
     std::{
@@ -16,28 +16,28 @@ use {
     tracing::{error, info, warn},
 };
 
-/// ~one Arc ledger; poll runs **without** holding caller mutex.
+/// ~one Stellar ledger; poll runs **without** holding caller mutex.
 const POLL_ATTEMPTS: usize = 3;
 const POLL_INTERVAL: Duration = Duration::from_secs(2);
 
-/// `Arc_baselib::Transaction::from_xdr_envelope` drops `TransactionExt::V1`
-/// (footprint/resource fee). Re-attach so `to_envelope()` stays a valid Arc
+/// `stellar_baselib::Transaction::from_xdr_envelope` drops `TransactionExt::V1`
+/// (footprint/resource fee). Re-attach so `to_envelope()` stays a valid Soroban
 /// tx; otherwise RPC rejects with `TxMalformed`.
 fn transaction_from_prepared_xdr(unsigned_xdr: &str) -> Result<Transaction> {
-    use Arc_baselib::xdr::{Limits, ReadXdr, TransactionEnvelope, TransactionExt};
+    use stellar_baselib::xdr::{Limits, ReadXdr, TransactionEnvelope, TransactionExt};
 
     let mut tx = Transaction::from_xdr_envelope(unsigned_xdr, Networks::public());
     let envelope = TransactionEnvelope::from_xdr_base64(unsigned_xdr, Limits::none())
         .map_err(|e| anyhow!("parse prepared envelope: {:?}", e))?;
     if let TransactionEnvelope::Tx(v1) = envelope {
         if let TransactionExt::V1(data) = v1.tx.ext {
-            tx.Arc_data = Some(data);
+            tx.soroban_data = Some(data);
         }
     }
     Ok(tx)
 }
 
-/// Sign Arc-prepared envelope XDR and broadcast.
+/// Sign Soroban-prepared envelope XDR and broadcast.
 pub async fn sign_and_submit(rpc_url: &str, keypair: &ExecutorKeypair, unsigned_xdr: &str) -> Result<String> {
     let mut tx = transaction_from_prepared_xdr(unsigned_xdr)?;
     tx.sign(&[keypair.inner().clone()]);
@@ -96,7 +96,7 @@ struct PollContext {
     route_label: String,
     amount_in: u128,
     simulated_amount_out: u128,
-    estimated_fee_atomic unitss: u128,
+    estimated_fee_stroops: u128,
 }
 
 /// Poll in background so caller mutex is not held (~6s ledger window).
@@ -106,18 +106,18 @@ fn spawn_poll_outcome(rpc_url: String, ctx: PollContext, stats: Arc<ArbStats>, p
             Ok(()) => {
                 stats.txs_succeeded.fetch_add(1, Ordering::Relaxed);
                 let gross = ctx.simulated_amount_out.saturating_sub(ctx.amount_in);
-                profit.record_success(&ctx.hash, ctx.amount_in, gross, ctx.estimated_fee_atomic unitss);
+                profit.record_success(&ctx.hash, ctx.amount_in, gross, ctx.estimated_fee_stroops);
                 info!(
                     hash = %ctx.hash,
                     route = %ctx.route_label,
                     gross_profit = gross,
-                    estimated_fee = ctx.estimated_fee_atomic unitss,
+                    estimated_fee = ctx.estimated_fee_stroops,
                     "arb tx SUCCESS"
                 );
             }
             Err(e) => {
                 if e.to_string() == "tx status poll timeout" {
-                    // A Arc RPC may not expose the final result within the
+                    // A Soroban RPC may not expose the final result within the
                     // short observation window. This is unknown, not failure.
                     warn!(hash = %ctx.hash, "tx status not confirmed within poll window");
                     return;
@@ -153,7 +153,7 @@ pub async fn submit_prepared(
         hash = %hash,
         route = %prepared.route_label,
         profit_bps = prepared.profit_bps,
-        estimated_fee_atomic unitss = prepared.estimated_fee_atomic unitss,
+        estimated_fee_stroops = prepared.estimated_fee_stroops,
         "arb tx submitted"
     );
 
@@ -165,7 +165,7 @@ pub async fn submit_prepared(
                 route_label: prepared.route_label.clone(),
                 amount_in: prepared.amount_in,
                 simulated_amount_out: prepared.simulated_amount_out,
-                estimated_fee_atomic unitss: prepared.estimated_fee_atomic unitss,
+                estimated_fee_stroops: prepared.estimated_fee_stroops,
             },
             stats,
             profit,
@@ -179,12 +179,12 @@ pub async fn submit_prepared(
 mod tests {
     use {
         super::transaction_from_prepared_xdr,
-        Arc_client::{
+        soroban_client::{
             network::{NetworkPassphrase, Networks},
             transaction::{Transaction, TransactionBehavior},
             xdr::WriteXdr,
         },
-        Arc_baselib::xdr::{Limits, ReadXdr, TransactionEnvelope, TransactionExt},
+        stellar_baselib::xdr::{Limits, ReadXdr, TransactionEnvelope, TransactionExt},
     };
 
     fn envelope_ext_kind(xdr: &str) -> &'static str {
@@ -199,14 +199,14 @@ mod tests {
     }
 
     #[test]
-    fn restores_Arc_data_from_prepared_envelope() {
+    fn restores_soroban_data_from_prepared_envelope() {
         let Ok(sample) = std::env::var("TEST_PREPARED_TX_XDR") else {
             return;
         };
-        assert_eq!(envelope_ext_kind(&sample), "V1", "fixture must be assembled Arc tx");
+        assert_eq!(envelope_ext_kind(&sample), "V1", "fixture must be assembled Soroban tx");
 
         let broken = Transaction::from_xdr_envelope(&sample, Networks::public());
-        assert!(broken.Arc_data.is_none(), "baselib parser drops Arc_data");
+        assert!(broken.soroban_data.is_none(), "baselib parser drops soroban_data");
         let broken_xdr = broken
             .to_envelope()
             .expect("broken envelope")
@@ -219,7 +219,7 @@ mod tests {
         );
 
         let fixed = transaction_from_prepared_xdr(&sample).expect("parse prepared tx");
-        assert!(fixed.Arc_data.is_some(), "fix must restore Arc_data");
+        assert!(fixed.soroban_data.is_some(), "fix must restore soroban_data");
         let fixed_xdr = fixed
             .to_envelope()
             .expect("fixed envelope")
@@ -228,7 +228,7 @@ mod tests {
         assert_eq!(
             envelope_ext_kind(&fixed_xdr),
             "V1",
-            "re-encode with fix keeps Arc ext"
+            "re-encode with fix keeps Soroban ext"
         );
     }
 }

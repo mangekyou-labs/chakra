@@ -9,7 +9,7 @@ use {
         Json,
     },
     serde::{Deserialize, Serialize},
-    Arc_strkey::ed25519::PublicKey,
+    stellar_strkey::ed25519::PublicKey,
 };
 
 #[derive(Debug, Deserialize)]
@@ -56,7 +56,7 @@ fn indexer_db_path() -> Option<String> {
     std::env::var("INDEXER_DB_PATH")
         .ok()
         .filter(|s| !s.is_empty())
-        .or_else(|| std::env::var("Chakra_INDEXER_DB_PATH").ok().filter(|s| !s.is_empty()))
+        .or_else(|| std::env::var("LUMAGG_INDEXER_DB_PATH").ok().filter(|s| !s.is_empty()))
 }
 
 fn encode_cursor(created_at: i64, tx_hash: &str) -> String {
@@ -94,7 +94,7 @@ pub async fn get_swaps(Query(params): Query<SwapsQuery>) -> Response {
             Json(SwapsResponse {
                 success: false,
                 data: None,
-                error: Some("user must be a Arc G... address".into()),
+                error: Some("user must be a Stellar G... address".into()),
             }),
         )
             .into_response();
@@ -298,7 +298,7 @@ mod tests {
     async fn no_db_env_is_503() {
         let _guard = env_lock();
         std::env::remove_var("INDEXER_DB_PATH");
-        std::env::remove_var("Chakra_INDEXER_DB_PATH");
+        std::env::remove_var("LUMAGG_INDEXER_DB_PATH");
         let resp = get_swaps(Query(SwapsQuery {
             user: Some(TEST_USER.into()),
             limit: None,

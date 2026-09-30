@@ -30,7 +30,7 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-UNIT="${ARB_UNIT:-Chakra-arb}"
+UNIT="${ARB_UNIT:-lumagg-arb}"
 GENERATED="$(date -u +%Y-%m-%dT%H:%MZ)"
 
 emit() {
@@ -58,7 +58,7 @@ emit() {
     | sed -E 's/.*hash=([a-f0-9]{64}).*/\1/' \
     | tail -20 \
     | while read -r h; do
-      echo "- https://Arc.expert/explorer/public/tx/$h"
+      echo "- https://stellar.expert/explorer/public/tx/$h"
     done
 
   echo

@@ -12,15 +12,15 @@ export function WalletButton({ onConnect }: { onConnect?: (publicKey: string) =>
     setError(null);
 
     try {
-      const walletApi = await import('@Arc/wallet-api');
+      const freighterApi = await import('@stellar/freighter-api');
 
-      const isConnected = await walletApi.isConnected();
+      const isConnected = await freighterApi.isConnected();
       if (!isConnected) {
-        setError('Install wallet wallet extension');
+        setError('Install Freighter wallet extension');
         return;
       }
 
-      const result = await walletApi.requestAccess();
+      const result = await freighterApi.requestAccess();
       const address =
         typeof result === 'string'
           ? result

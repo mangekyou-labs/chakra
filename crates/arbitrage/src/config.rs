@@ -13,10 +13,10 @@ const DEFAULT_BASE_TOKENS: &[&str] = &[
 
 #[derive(Debug, Clone)]
 pub struct ArbConfig {
-    /// Chakra quote-api base URLs (round-robin). Same stack as
-    /// `Chakra-api@{3100..3103}`.
+    /// LumAgg quote-api base URLs (round-robin). Same stack as
+    /// `lumagg-api@{3100..3103}`.
     pub quote_api_urls: Vec<String>,
-    /// Deployed Chakra aggregator contract (round_trip_swap target).
+    /// Deployed LumAgg aggregator contract (round_trip_swap target).
     pub aggregator_contract: Option<String>,
     /// Optional arb vault; when set, txs call vault.execute_round_trip instead
     /// of aggregator directly.
@@ -54,7 +54,7 @@ pub struct ArbConfig {
     pub scan_interval_ms: u64,
     /// Gap between yielding consecutive bridge scan items (milliseconds).
     pub item_gap_ms: u64,
-    /// Parallel quote/sim workers (Arc-arb style).
+    /// Parallel quote/sim workers (stellar-arb style).
     pub worker_count: usize,
     pub build_tx: bool,
     pub optimize_amount: bool,
@@ -100,7 +100,7 @@ impl ArbConfig {
             .unwrap_or_else(|| vec![0]);
 
         let rpc_url =
-            std::env::var("RPC_URL").unwrap_or_else(|_| "https://Arc-rpc.mainnet.Arc.gateway.fm".to_string());
+            std::env::var("RPC_URL").unwrap_or_else(|_| "https://soroban-rpc.mainnet.stellar.gateway.fm".to_string());
 
         let base_tokens = std::env::var("ARB_BASE_TOKENS")
             .ok()
@@ -266,9 +266,9 @@ impl ArbConfig {
         crate::economics::min_profit_for_base(base_token, self.min_profit, self.min_profit_xlm, self.min_profit_usdc)
     }
 
-    /// Convert XLM resource-fee atomic unitss into base-token units for the fee gate.
-    pub fn fee_in_base(&self, fee_xlm_atomic unitss: u128, base_token: &str) -> u128 {
-        crate::economics::fee_in_base_units(fee_xlm_atomic unitss, base_token, self.xlm_usdc_price_e7)
+    /// Convert XLM resource-fee stroops into base-token units for the fee gate.
+    pub fn fee_in_base(&self, fee_xlm_stroops: u128, base_token: &str) -> u128 {
+        crate::economics::fee_in_base_units(fee_xlm_stroops, base_token, self.xlm_usdc_price_e7)
     }
 }
 
@@ -281,7 +281,7 @@ fn parse_quote_api_urls_from_env() -> Vec<String> {
             return urls;
         }
     }
-    for key in ["ARB_QUOTE_API_URL", "QUOTE_API_URL", "Chakra_API_URL"] {
+    for key in ["ARB_QUOTE_API_URL", "QUOTE_API_URL", "LUMAGG_API_URL"] {
         if let Ok(raw) = std::env::var(key) {
             if raw.contains(',') {
                 let urls = parse_url_list(&raw);

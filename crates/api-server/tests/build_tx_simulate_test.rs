@@ -5,17 +5,17 @@
 use {
     api_server::{
         handlers::{build_tx_impl, build_unsigned_tx_xdr, BuildTxRequest, BuildTxStep, BuildTxSubRoute},
-        Arc_prepare::prepare_transaction_xdr,
+        soroban_prepare::prepare_transaction_xdr,
     },
-    dex_adapters::rpc::ArcRpc,
-    Arc_xdr::curr::{Limits, ReadXdr},
+    dex_adapters::rpc::SorobanRpc,
+    stellar_xdr::curr::{Limits, ReadXdr},
 };
 
 const USER: &str = "GA6RKSBPI2TSP52OW2IJTPK7LRMX24DF42KF3FBGBNMBYCV6NPDMOCBY";
 const XLM: &str = "CAS3J7GYLGXMF6TDJBBYYSE3HQ6BBSMLNUQ34T6TZMYMW2EVH34XOWMA";
 const USDC: &str = "CCW67TSZV3SSS2HXMBQ5JFGCKJNXKZM7UQUWUZPUTHXSTZLEO7SJMI75";
 const CAUI: &str = "CAUIKL3IYGMERDRUN6YSCLWVAKIFG5Q4YJHUKM4S4NJZQIA3BAS6OJPK";
-const RPC: &str = "https://Arc-rpc.mainnet.Arc.gateway.fm";
+const RPC: &str = "https://soroban-rpc.mainnet.stellar.gateway.fm";
 
 fn build_request(
     dex_type: &str,
@@ -68,7 +68,7 @@ fn build_hybrid_request() -> BuildTxRequest {
             BuildTxSubRoute {
                 amount_in: "619648".to_string(),
                 steps: vec![BuildTxStep {
-                    dex_type: "Arc venue".to_string(),
+                    dex_type: "aquarius".to_string(),
                     pool_address: "CA6PUJLBYKZKUEKLZJMKBZLEKP2OTHANDEOWSFF44FTSYLKQPIICCJBE".to_string(),
                     token_in: XLM.to_string(),
                     token_out: USDC.to_string(),
@@ -79,7 +79,7 @@ fn build_hybrid_request() -> BuildTxRequest {
             BuildTxSubRoute {
                 amount_in: "51287".to_string(),
                 steps: vec![BuildTxStep {
-                    dex_type: "Arc venue".to_string(),
+                    dex_type: "soroswap".to_string(),
                     pool_address: "CAM7DY53G63XA4AJRS24Z6VFYAFSSF76C3RZ45BE5YU3FQS5255OOABP".to_string(),
                     token_in: XLM.to_string(),
                     token_out: USDC.to_string(),
@@ -118,7 +118,7 @@ async fn rpc_simulate(tx_xdr: &str) -> serde_json::Value {
 }
 
 async fn fetch_sequence(public_key: &str) -> u64 {
-    let url = format!("https://horizon.Arc.org/accounts/{}", public_key);
+    let url = format!("https://horizon.stellar.org/accounts/{}", public_key);
     let value: serde_json::Value = reqwest::get(url).await.unwrap().json().await.unwrap();
     value["sequence"].as_str().unwrap().parse().unwrap()
 }
@@ -136,8 +136,8 @@ async fn assert_request_simulates(body: BuildTxRequest) {
 async fn assert_request_prepares(body: BuildTxRequest) {
     let tx_xdr = build_unsigned_tx_xdr(&body).await.expect("build xdr");
     let envelope =
-        Arc_xdr::curr::TransactionEnvelope::from_xdr_base64(&tx_xdr, Limits::none()).expect("parse raw envelope");
-    let Arc_xdr::curr::TransactionEnvelope::Tx(v1) = envelope else {
+        stellar_xdr::curr::TransactionEnvelope::from_xdr_base64(&tx_xdr, Limits::none()).expect("parse raw envelope");
+    let stellar_xdr::curr::TransactionEnvelope::Tx(v1) = envelope else {
         panic!("unsupported envelope")
     };
     let ops: Vec<_> = v1.tx.operations.to_vec();
@@ -166,8 +166,8 @@ async fn api_build_tx_xdr_sushi_simulates() {
         "1",
     );
     let tx_xdr = build_unsigned_tx_xdr(&body).await.expect("build xdr");
-    std::fs::write("/tmp/Chakra_build_tx.xdr", &tx_xdr).ok();
-    println!("tx_xdr len={} written /tmp/Chakra_build_tx.xdr", tx_xdr.len());
+    std::fs::write("/tmp/lumagg_build_tx.xdr", &tx_xdr).ok();
+    println!("tx_xdr len={} written /tmp/lumagg_build_tx.xdr", tx_xdr.len());
     println!("tx_xdr prefix: {}...", &tx_xdr[..80.min(tx_xdr.len())]);
 
     let resp = rpc_simulate(&tx_xdr).await;
@@ -196,9 +196,9 @@ async fn api_build_tx_xdr_sushi_prepares() {
 
 #[tokio::test]
 #[ignore = "mainnet RPC"]
-async fn api_build_tx_xdr_Arc venue_simulates() {
+async fn api_build_tx_xdr_phoenix_simulates() {
     assert_request_simulates(build_request(
-        "Arc venue",
+        "phoenix",
         "CBHCRSVX3ZZ7EGTSYMKPEFGZNWRVCSESQR3UABET4MIW52N4EVU6BIZX",
         XLM,
         USDC,
@@ -211,9 +211,9 @@ async fn api_build_tx_xdr_Arc venue_simulates() {
 
 #[tokio::test]
 #[ignore = "mainnet RPC"]
-async fn api_build_tx_xdr_Arc venue_simulates() {
+async fn api_build_tx_xdr_soroswap_simulates() {
     assert_request_simulates(build_request(
-        "Arc venue",
+        "soroswap",
         "CDRS7NJPAX2HLYNENMUH3USUV6LP6KYSLZZ4ULY27RQLKIVC5DGLEVKI",
         XLM,
         CAUI,
@@ -226,9 +226,9 @@ async fn api_build_tx_xdr_Arc venue_simulates() {
 
 #[tokio::test]
 #[ignore = "mainnet RPC"]
-async fn api_build_tx_xdr_Arc venue_simulates() {
+async fn api_build_tx_xdr_aquarius_simulates() {
     assert_request_simulates(build_request(
-        "Arc venue",
+        "aquarius",
         "CCSY43EHJAHT3NQDYKAMJXRFBEEH7OXDL3J3VNGO33UUSEXWNN27GBIZ",
         XLM,
         CAUI,
@@ -242,7 +242,7 @@ async fn api_build_tx_xdr_Arc venue_simulates() {
 #[tokio::test]
 #[ignore = "mainnet RPC"]
 async fn api_build_tx_xdr_hybrid_simulates() {
-    let rpc = ArcRpc::mainnet();
+    let rpc = SorobanRpc::mainnet();
     let err = match build_tx_impl(&build_hybrid_request(), &rpc).await {
         Ok(_) => panic!("hybrid build should be rejected"),
         Err(err) => err,

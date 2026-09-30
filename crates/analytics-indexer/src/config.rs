@@ -1,6 +1,6 @@
 use {
     anyhow::{Context, Result},
-    Chakra_config::aggregator::AggregatorConfig,
+    lumagg_config::aggregator::AggregatorConfig,
 };
 
 /// Mainnet contract used by the standalone fixture-fetching utility.
@@ -78,8 +78,8 @@ impl IndexerConfig {
         matches!(self.index_mode, IndexMode::Events | IndexMode::Both)
     }
 
-    pub fn rpc(&self) -> dex_adapters::ArcRpc {
-        dex_adapters::ArcRpc::new(&self.rpc_url, &self.network_passphrase)
+    pub fn rpc(&self) -> dex_adapters::SorobanRpc {
+        dex_adapters::SorobanRpc::new(&self.rpc_url, &self.network_passphrase)
     }
 
     pub fn ensure_parent_dir(&self) -> Result<()> {

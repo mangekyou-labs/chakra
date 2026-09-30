@@ -1,7 +1,7 @@
 //! Curve StableSwap math — pure Rust port for N-token pools.
 //!
 //! Implements the Curve invariant: A*n^n * sum(x_i) + D = A*n^n*D +
-//! D^(n+1)/(n^n * prod(x_i)) Used by Arc venue stableswap pools (2-token and
+//! D^(n+1)/(n^n * prod(x_i)) Used by Aquarius stableswap pools (2-token and
 //! 3-token).
 //!
 //! All calculations use u128 with iterative Newton's method (same as on-chain).
@@ -198,7 +198,7 @@ mod tests {
 
     #[test]
     fn test_stable_3token_router_fixture() {
-        // Same fixture as Arc venue::three_token_stableswap_matches_router_test_vector
+        // Same fixture as aquarius::three_token_stableswap_matches_router_test_vector
         let pool = StablePool {
             reserves: vec![100_0000000, 100_0000000, 100_0000000],
             decimals: vec![7, 7, 7],
@@ -221,7 +221,7 @@ mod tests {
 
         // Swap 1 USDC (token1) -> XLM (token0)
         let out = pool.get_dy(1, 0, 1_0000000);
-        println!("1 USDC -> {} XLM (atomic unitss)", out);
+        println!("1 USDC -> {} XLM (stroops)", out);
         // With these reserves, 1 USDC should get roughly 1 XLM worth
         assert!(out > 0, "should get some output");
     }

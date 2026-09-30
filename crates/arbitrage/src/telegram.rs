@@ -7,9 +7,9 @@ use {
         profit::{format_xlm4, format_xlm4_u, ProfitWindow, RecentTx},
         runtime::ArbRuntime,
         stats::{BridgeStatsSnapshot, QuietWindowTracker},
-        vault::fetch_token_balance_atomic unitss,
+        vault::fetch_token_balance_stroops,
     },
-    Chakra_alerts::TelegramAlerter,
+    lumagg_alerts::TelegramAlerter,
     std::sync::Arc,
     tracing::{info, warn},
 };
@@ -105,7 +105,7 @@ async fn build_profit_report(runtime: &ArbRuntime) -> anyhow::Result<String> {
 async fn fetch_vault_xlm(runtime: &ArbRuntime) -> Option<u128> {
     let vault = runtime.config.vault_contract.as_deref()?;
     let base = runtime.config.base_tokens.first()?;
-    fetch_token_balance_atomic unitss(&runtime.config.rpc_url, &base.canonical(), vault)
+    fetch_token_balance_stroops(&runtime.config.rpc_url, &base.canonical(), vault)
         .await
         .ok()
 }
@@ -135,9 +135,9 @@ fn format_window(label: &str, w: &ProfitWindow) -> String {
         w.succeeded,
         w.failed,
         w.submitted,
-        format_xlm4_u(w.gross_profit_atomic unitss),
-        format_xlm4_u(w.fee_atomic unitss),
-        format_xlm4(w.net_profit_atomic unitss()),
+        format_xlm4_u(w.gross_profit_stroops),
+        format_xlm4_u(w.fee_stroops),
+        format_xlm4(w.net_profit_stroops()),
     )
 }
 
@@ -241,7 +241,7 @@ pub fn format_report(
     );
 
     format!(
-        "📊 Chakra Arb Monitor\n\
+        "📊 LumAgg Arb Monitor\n\
          \n\
          {vault_line}\n\
          \n\
@@ -301,8 +301,8 @@ mod tests {
             succeeded: 2,
             failed: 1,
             submitted: 3,
-            gross_profit_atomic unitss: 500_000,
-            fee_atomic unitss: 1_000_000,
+            gross_profit_stroops: 500_000,
+            fee_stroops: 1_000_000,
         };
         let session = hour.clone();
         let recent = vec![RecentTx {
@@ -320,7 +320,7 @@ mod tests {
             &empty_funnel(),
             &[],
         );
-        assert!(msg.contains("Chakra Arb Monitor"));
+        assert!(msg.contains("LumAgg Arb Monitor"));
         assert!(msg.contains("Last hour"));
         assert!(msg.contains("57132675d489"));
         assert!(msg.contains("59.5035"));

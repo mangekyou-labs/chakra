@@ -3,11 +3,11 @@
 import { useState } from 'react';
 
 const AGGREGATOR = 'CC6QAV7JEG5MYRSPO5Z65E5G2M4ZB64BEG2ZXIZXL55TQT35JDI2LC6K';
-const NETWORK_PASSPHRASE = 'Public Global Arc Network ; September 2015';
+const NETWORK_PASSPHRASE = 'Public Global Stellar Network ; September 2015';
 
 function buildSampleCode(apiUrl: string, rpcUrl: string): string {
   return `// 本地组装交易（不调用 POST /api/v1/build_tx）
-// 依赖: npm install @Arc/Arc-sdk
+// 依赖: npm install @stellar/stellar-sdk
 import {
   Contract,
   Address,
@@ -15,10 +15,10 @@ import {
   Horizon,
   rpc,
   BASE_FEE,
-} from '@Arc/Arc-sdk';
+} from '@stellar/stellar-sdk';
 
 const API_URL = '${apiUrl}';
-const RPC_URL = '${rpcUrl}'; // Arc RPC（仅用于 simulate，非 build_tx）
+const RPC_URL = '${rpcUrl}'; // Soroban RPC（仅用于 simulate，非 build_tx）
 const AGGREGATOR = '${AGGREGATOR}';
 const NETWORK_PASSPHRASE = '${NETWORK_PASSPHRASE}';
 
@@ -27,12 +27,12 @@ const TOKEN_OUT = 'CCW67TSZV3SSS2HXMBQ5JFGCKJNXKZM7UQUWUZPUTHXSTZLEO7SJMI75';
 
 // quote.dex_types → 合约枚举名（与链上一致）
 const DEX_ENUM: Record<string, string> = {
-  Arc venue: 'Arc venue',
-  Arc venue_clmm: 'Arc venue',
-  Arc venue: 'Arc venuePair',
-  Arc venue: 'Arc venue',
+  aquarius: 'Aquarius',
+  aquarius_clmm: 'Aquarius',
+  soroswap: 'SoroswapPair',
+  phoenix: 'Phoenix',
   sushi: 'Sushi',
-  Arc venue: 'Arc venueDex',
+  comet: 'CometDex',
 };
 
 /** 把 /quote 的 sub_routes 转成 aggregator.swap 的 SubRoute[] */
@@ -58,13 +58,13 @@ function quoteToContractSubRoutes(quoteSubRoutes: Array<{
 }
 
 async function swapWithLocalTx(userSecret: string) {
-  const server = new Horizon.Server('https://horizon.Arc.org');
-  const Arc = new rpc.Server(RPC_URL);
+  const server = new Horizon.Server('https://horizon.stellar.org');
+  const soroban = new rpc.Server(RPC_URL);
   const source = await server.loadAccount(Address.fromSecret(userSecret).accountId());
 
   const amountIn = '10000000'; // 1 XLM
 
-  // 1) 只向 Chakra 要路由（quote）
+  // 1) 只向 LumAgg 要路由（quote）
   const q = await fetch(
     \`\${API_URL}/api/v1/quote?token_in=\${TOKEN_IN}&token_out=\${TOKEN_OUT}&amount_in=\${amountIn}&slippage=0.5\`
   );
@@ -94,8 +94,8 @@ async function swapWithLocalTx(userSecret: string) {
     .setTimeout(300)
     .build();
 
-  // 3) Arc 仍需 RPC simulate（填充 footprint / auth），但不是我们的 build_tx
-  const sim = await Arc.simulateTransaction(tx);
+  // 3) Soroban 仍需 RPC simulate（填充 footprint / auth），但不是我们的 build_tx
+  const sim = await soroban.simulateTransaction(tx);
   if (rpc.Api.isSimulationError(sim)) throw new Error(sim.error);
   const prepared = rpc.assembleTransaction(tx, sim).build();
 
@@ -106,12 +106,12 @@ async function swapWithLocalTx(userSecret: string) {
 
 // 注意：
 // - 若 quote 含 classic_dex，需改用 PathPaymentStrictSend，不能走 aggregator.swap
-// - 单条 leg 内不要混 classic 与 Arc hop`;
+// - 单条 leg 内不要混 classic 与 Soroban hop`;
 }
 
 export function BuildTxCodeSample({
   apiUrl,
-  rpcUrl = 'https://Arc-rpc.mainnet.Arc.gateway.fm',
+  rpcUrl = 'https://soroban-rpc.mainnet.stellar.gateway.fm',
 }: {
   apiUrl: string;
   rpcUrl?: string;

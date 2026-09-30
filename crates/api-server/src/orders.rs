@@ -4,7 +4,7 @@
 use {
     crate::{
         handlers::{fetch_sequence_number, BuildTxData, BuildTxResponse},
-        Arc_prepare::{network_passphrase_from_env, prepare_transaction_xdr_on_network},
+        soroban_prepare::{network_passphrase_from_env, prepare_transaction_xdr_on_network},
         state::AppState,
     },
     analytics_indexer::store::IndexStore,
@@ -15,8 +15,8 @@ use {
         Json,
     },
     serde::{Deserialize, Serialize},
-    Arc_strkey::{ed25519::PublicKey, Contract},
-    Arc_xdr::curr as xdr,
+    stellar_strkey::{ed25519::PublicKey, Contract},
+    stellar_xdr::curr as xdr,
 };
 
 #[derive(Debug, Deserialize)]
@@ -112,7 +112,7 @@ fn indexer_db_path() -> Option<String> {
     std::env::var("INDEXER_DB_PATH")
         .ok()
         .filter(|s| !s.is_empty())
-        .or_else(|| std::env::var("Chakra_INDEXER_DB_PATH").ok().filter(|s| !s.is_empty()))
+        .or_else(|| std::env::var("LUMAGG_INDEXER_DB_PATH").ok().filter(|s| !s.is_empty()))
 }
 
 pub async fn get_orders(Query(params): Query<OrdersQuery>) -> Response {
@@ -133,7 +133,7 @@ pub async fn get_orders(Query(params): Query<OrdersQuery>) -> Response {
             Json(OrdersResponse {
                 success: false,
                 data: None,
-                error: Some("user must be a Arc G... address".into()),
+                error: Some("user must be a Stellar G... address".into()),
             }),
         )
             .into_response();
@@ -242,7 +242,7 @@ pub async fn get_dca_orders(Query(params): Query<OrdersQuery>) -> Response {
             Json(OrdersResponse {
                 success: false,
                 data: None,
-                error: Some("user must be a Arc G... address".into()),
+                error: Some("user must be a Stellar G... address".into()),
             }),
         )
             .into_response();
@@ -310,18 +310,18 @@ fn require_escrow_contract(value: Option<String>) -> Result<String, String> {
         .filter(|value| !value.is_empty())
         .ok_or_else(|| "ESCROW_CONTRACT is not configured".to_string())?;
     Contract::from_string(&contract)
-        .map_err(|_| "ESCROW_CONTRACT must be a Arc C... contract address".to_string())?;
+        .map_err(|_| "ESCROW_CONTRACT must be a Stellar C... contract address".to_string())?;
     Ok(contract)
 }
 
 fn parse_user(user: &str) -> Result<PublicKey, String> {
-    PublicKey::from_string(user.trim()).map_err(|_| "user must be a Arc G... address".to_string())
+    PublicKey::from_string(user.trim()).map_err(|_| "user must be a Stellar G... address".to_string())
 }
 
 fn parse_contract(value: &str, field: &str) -> Result<[u8; 32], String> {
     Contract::from_string(value.trim())
         .map(|contract| contract.0)
-        .map_err(|_| format!("{field} must be a Arc C... contract address"))
+        .map_err(|_| format!("{field} must be a Stellar C... contract address"))
 }
 
 fn parse_positive_i128(value: &str, field: &str) -> Result<i128, String> {
@@ -470,12 +470,12 @@ fn build_cancel_dca_operation(contract: &str, request: &BuildCancelRequest) -> R
 }
 
 async fn prepare_order_transaction(
-    rpc: &dex_adapters::rpc::ArcRpc,
+    rpc: &dex_adapters::rpc::SorobanRpc,
     user: &str,
     contract: String,
     operation: xdr::Operation,
 ) -> Result<BuildTxData, String> {
-    const Arc_FEE: u32 = 100_000;
+    const SOROBAN_FEE: u32 = 100_000;
 
     let sequence = fetch_sequence_number(rpc, user).await?;
     let rpc_url = rpc.url().to_string();
@@ -485,7 +485,7 @@ async fn prepare_order_transaction(
         user.trim(),
         sequence as u64,
         &[operation],
-        Arc_FEE,
+        SOROBAN_FEE,
         network,
     )
     .await?;
@@ -493,9 +493,9 @@ async fn prepare_order_transaction(
     Ok(BuildTxData {
         unsigned_tx_xdr,
         num_operations: 1,
-        fee: Arc_FEE.to_string(),
+        fee: SOROBAN_FEE.to_string(),
         contract,
-        execution: "Arc".to_string(),
+        execution: "soroban".to_string(),
     })
 }
 
@@ -719,7 +719,7 @@ mod tests {
     #[tokio::test]
     async fn no_db_env_is_503() {
         std::env::remove_var("INDEXER_DB_PATH");
-        std::env::remove_var("Chakra_INDEXER_DB_PATH");
+        std::env::remove_var("LUMAGG_INDEXER_DB_PATH");
         let resp = get_orders(Query(OrdersQuery {
             user: Some(TEST_USER.into()),
             status: None,
@@ -826,7 +826,7 @@ mod tests {
 
     #[test]
     fn create_and_cancel_operations_target_escrow_abi() {
-        use Arc_xdr::curr as xdr;
+        use stellar_xdr::curr as xdr;
 
         let create = build_create_operation(TEST_ESCROW, &valid_create_request()).unwrap();
         let cancel = build_cancel_operation(

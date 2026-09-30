@@ -13,7 +13,7 @@ MIN_XYK_KEYS="${MIN_XYK_KEYS:-50}"
 POOL_WAIT_SECS="${POOL_WAIT_SECS:-300}"
 
 echo "=== systemd ==="
-for u in Chakra-worker Chakra-api@3100; do
+for u in lumagg-worker lumagg-api@3100; do
   if systemctl list-units --all "$u" &>/dev/null; then
     systemctl is-active "$u" && echo "$u: active" || { echo "$u: NOT active"; exit 1; }
   else
@@ -45,9 +45,9 @@ CLMM_COUNT=0
 if command -v redis-cli >/dev/null; then
   deadline=$((SECONDS + POOL_WAIT_SECS))
   while (( SECONDS < deadline )); do
-    EXISTS=$(redis-cli "${REDIS_ARGS[@]}" EXISTS Chakra:snapshot:current)
-    XYK_COUNT=$(redis-cli "${REDIS_ARGS[@]}" --scan --pattern 'Chakra:pool:xyk:*' 2>/dev/null | wc -l | tr -d ' ')
-    CLMM_COUNT=$(redis-cli "${REDIS_ARGS[@]}" --scan --pattern 'Chakra:pool:clmm:*' 2>/dev/null | wc -l | tr -d ' ')
+    EXISTS=$(redis-cli "${REDIS_ARGS[@]}" EXISTS lumagg:snapshot:current)
+    XYK_COUNT=$(redis-cli "${REDIS_ARGS[@]}" --scan --pattern 'lumagg:pool:xyk:*' 2>/dev/null | wc -l | tr -d ' ')
+    CLMM_COUNT=$(redis-cli "${REDIS_ARGS[@]}" --scan --pattern 'lumagg:pool:clmm:*' 2>/dev/null | wc -l | tr -d ' ')
     echo "  snapshot=$EXISTS xy:k=$XYK_COUNT clmm=$CLMM_COUNT"
     if [[ "$EXISTS" == "1" && "${XYK_COUNT:-0}" -ge "$MIN_XYK_KEYS" ]]; then
       break
@@ -55,7 +55,7 @@ if command -v redis-cli >/dev/null; then
     sleep 5
   done
   if [[ "$EXISTS" != "1" ]]; then
-    echo "FAIL: Chakra:snapshot:current missing after wait"
+    echo "FAIL: lumagg:snapshot:current missing after wait"
     exit 1
   fi
   if [[ "${XYK_COUNT:-0}" -lt "$MIN_XYK_KEYS" ]]; then
@@ -80,14 +80,14 @@ fi
 echo "Quote OK (expected_output=$EXPECTED)"
 
 echo ""
-echo "=== Arc path participation (api log) ==="
-if journalctl -u Chakra-api@3100 --since "3 min ago" --no-pager 2>/dev/null | grep -q "Arc_quoted"; then
-  journalctl -u Chakra-api@3100 --since "3 min ago" --no-pager | grep -E "quote_route hydration|Paths quoted|Comparing classic" | tail -5 || true
+echo "=== Soroban path participation (api log) ==="
+if journalctl -u lumagg-api@3100 --since "3 min ago" --no-pager 2>/dev/null | grep -q "soroban_quoted"; then
+  journalctl -u lumagg-api@3100 --since "3 min ago" --no-pager | grep -E "quote_route hydration|Paths quoted|Comparing classic" | tail -5 || true
 else
-  echo "WARN: no Arc_quoted log yet (trigger another quote)"
+  echo "WARN: no soroban_quoted log yet (trigger another quote)"
   curl -sf --max-time 45 "$QUOTE" >/dev/null || true
   sleep 1
-  journalctl -u Chakra-api@3100 --since "1 min ago" --no-pager | grep -E "quote_route hydration|Paths quoted|Comparing classic" | tail -5 || true
+  journalctl -u lumagg-api@3100 --since "1 min ago" --no-pager | grep -E "quote_route hydration|Paths quoted|Comparing classic" | tail -5 || true
 fi
 
 echo ""

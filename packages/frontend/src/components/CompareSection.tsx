@@ -10,14 +10,14 @@ const IMPROVEMENT_PCT = (
 ).toFixed(1);
 
 const SINGLE_ROUTE = {
-  dex: 'Arc venue',
+  dex: 'Soroswap',
   path: 'XLM → USDC',
   pct: 100,
 };
 
 const SPLIT_ROUTES = [
-  { dex: 'Arc venue CLMM', path: 'XLM → USDC', pct: 58 },
-  { dex: 'Arc venue → Arc venue', path: 'XLM → AQUA → USDC', pct: 42 },
+  { dex: 'Aquarius CLMM', path: 'XLM → USDC', pct: 58 },
+  { dex: 'Soroswap → Aquarius', path: 'XLM → AQUA → USDC', pct: 42 },
 ] as const;
 
 export function CompareSection() {
@@ -27,7 +27,7 @@ export function CompareSection() {
         <p className="section-label">Why aggregate</p>
         <h2 className="section-title md:text-xl">One DEX vs. split routing</h2>
         <p className="text-[13px] text-zinc-400 max-w-xl leading-relaxed">
-          Same trade size, different execution. Chakra can send volume through several venues when
+          Same trade size, different execution. LumAgg can send volume through several venues when
           that beats relying on a single pool.
         </p>
       </div>
@@ -61,7 +61,7 @@ export function CompareSection() {
 
         <div className="surface-panel p-5 flex flex-col gap-4 ring-1 ring-white/[0.06]">
           <div className="flex items-start justify-between gap-3">
-            <span className="text-[13px] font-medium text-zinc-200 shrink-0">Chakra split</span>
+            <span className="text-[13px] font-medium text-zinc-200 shrink-0">LumAgg split</span>
             <div className="flex flex-col items-end gap-1 min-w-0">
               <span className="rounded-md bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 text-[11px] font-medium text-emerald-400 whitespace-nowrap">
                 +{IMPROVEMENT_PCT}% output

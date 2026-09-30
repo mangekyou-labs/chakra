@@ -1,21 +1,28 @@
-# Chakra Documentation
+# LumAgg Documentation
 
-Chakra is a liquidity aggregator for Arc. It quotes routes across Arc
+LumAgg is a liquidity aggregator for Stellar. It quotes routes across Soroban
 DEXes (multi-hop and split when useful) and builds unsigned transactions for
-atomic execution through the Chakra Aggregator contract.
+atomic execution through the LumAgg Aggregator contract.
 
-**Production API:** `https://api.Chakra.xyz`
+**Production API:** `https://api.lumagg.xyz`
 
-**Complete docs:** `https://Chakra.gitbook.io/`
+**Complete docs:** `https://lumagg.gitbook.io/`
 
 ## What do you want to do?
+
+### Understand the system
+
+[Architecture](architecture.md) — components, quote and swap flows,
+pool-state channels, round-trip arbitrage, and testnet limits. PlantUML
+sources are in `diagrams/`. Redis keys and env vars are in
+[Pool state](pool-state-architecture.md).
 
 ### Integrate a wallet, dApp, or bot
 
 1. [Integrator Guide](integrator-guide.md) — `GET /quote` → `POST /build_tx` → sign → submit
 2. [JavaScript / TypeScript Example](javascript-integration-example.md) — browser integration with an application-owned wallet adapter
 3. [API Reference](api-reference.md) and [OpenAPI](openapi.yaml)
-4. npm SDK: [`@Chakra/sdk`](https://www.npmjs.com/package/@Chakra/sdk)
+4. npm SDK: [`@lumagg/sdk`](https://www.npmjs.com/package/@lumagg/sdk)
 
 ### Self-host a quote stack
 
@@ -26,7 +33,7 @@ run the split worker/API topology directly.
 
 | Need | Guide |
 | --- | --- |
-| Single-process quote API | [Chakra Swap API](Chakra-swap-api.md) |
+| Single-process quote API | [LumAgg Swap API](lumagg-swap-api.md) |
 | Split worker/API quote stack | [Self-hosted Aggregator Quickstart](self-hosted-aggregator-quickstart.md) |
 | Shared market state + API replicas | [Production Aggregator](aggregator-deployment.md) |
 | Public stats, swap history, and arbitrage history | [Analytics Indexer](analytics-indexer.md) |
@@ -39,8 +46,8 @@ Start with [Arbitrage Deployment](arbitrage-deployment.md) and
 
 ## Supported liquidity
 
-Arc venue, Arc venue (including CLMM), Arc venue, Sushi V3, and Arc venue. Classic
-Arc DEX routing is available for comparison and Classic-only execution; it
-is not combined with Arc legs in one transaction.
+Soroswap, Aquarius (including CLMM), Phoenix, Sushi V3, and Comet. Classic
+Stellar DEX routing is available for comparison and Classic-only execution; it
+is not combined with Soroban legs in one transaction.
 
-Source and issues: [Chakra monorepo](https://github.com/Chakra/Arc-dex-agg).
+Source and issues: [LumAgg monorepo](https://github.com/Lum-Agg/stellar-dex-agg).

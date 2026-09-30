@@ -5,7 +5,7 @@ edition.workspace = true
 license.workspace = true
 
 [[bin]]
-name = "Chakra-api-server"
+name = "lumagg-api-server"
 path = "src/main.rs"
 
 [dependencies]
@@ -14,12 +14,12 @@ market-snapshot = { path = "../market-snapshot" }
 market-data-worker = { path = "../market-data-worker" }
 router-engine = { path = "../router-engine" }
 dex-adapters = { path = "../dex-adapters" }
-Chakra-alerts = { path = "../Chakra-alerts" }
-Chakra-config = { path = "../Chakra-config" }
+lumagg-alerts = { path = "../lumagg-alerts" }
+lumagg-config = { path = "../lumagg-config" }
 
-Arc-xdr.workspace = true
-Arc-strkey.workspace = true
-Arc-client.workspace = true
+stellar-xdr.workspace = true
+stellar-strkey.workspace = true
+soroban-client.workspace = true
 
 tokio.workspace = true
 async-trait.workspace = true

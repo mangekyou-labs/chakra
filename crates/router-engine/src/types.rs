@@ -126,9 +126,9 @@ pub struct RouteRequest {
     pub max_hops: Option<usize>,
     /// Maximum number of splits (default: 5)
     pub max_splits: Option<usize>,
-    /// When true, Arc AMMs only (no Classic Arc / no Horizon).
+    /// When true, Soroban AMMs only (no Classic SDEX / no Horizon).
     /// Default may still return a pure classic route; mixed hops are never returned.
-    pub prefer_Arc: Option<bool>,
+    pub prefer_soroban: Option<bool>,
 }
 
 /// Result of transaction simulation.
@@ -149,7 +149,7 @@ pub struct UnsignedTransaction {
     pub hash: String,
     /// Number of operations
     pub operation_count: u32,
-    /// Estimated network fee (atomic unitss)
+    /// Estimated network fee (stroops)
     pub estimated_fee: u64,
     /// Simulation result
     pub simulation: SimulationResult,

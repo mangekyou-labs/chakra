@@ -1,11 +1,11 @@
 'use client';
 
 import { createContext, useContext, useState, useCallback, useEffect, type ReactNode } from 'react';
-import { ArcWalletsKit } from '@creit.tech/Arc-wallets-kit';
-import { KitEventType, Networks } from '@creit.tech/Arc-wallets-kit/types';
-import { walletModule } from '@creit.tech/Arc-wallets-kit/modules/wallet';
-import { xBullModule } from '@creit.tech/Arc-wallets-kit/modules/xbull';
-import { LobstrModule } from '@creit.tech/Arc-wallets-kit/modules/lobstr';
+import { StellarWalletsKit } from '@creit.tech/stellar-wallets-kit';
+import { KitEventType, Networks } from '@creit.tech/stellar-wallets-kit/types';
+import { FreighterModule } from '@creit.tech/stellar-wallets-kit/modules/freighter';
+import { xBullModule } from '@creit.tech/stellar-wallets-kit/modules/xbull';
+import { LobstrModule } from '@creit.tech/stellar-wallets-kit/modules/lobstr';
 import { AccountBalancesProvider } from '@/lib/account-balances-context';
 
 export interface SignTxOptions {
@@ -37,10 +37,10 @@ let kitInitialized = false;
 
 function ensureKit() {
   if (kitInitialized) return;
-  ArcWalletsKit.init({
-    // Must be the full passphrase, not the shorthand "public" (wallet rejects signing otherwise).
+  StellarWalletsKit.init({
+    // Must be the full passphrase, not the shorthand "public" (Freighter rejects signing otherwise).
     network: Networks.PUBLIC,
-    modules: [new walletModule(), new xBullModule(), new LobstrModule()],
+    modules: [new FreighterModule(), new xBullModule(), new LobstrModule()],
   });
   kitInitialized = true;
 }
@@ -53,7 +53,7 @@ function ensureKit() {
 async function syncAddressFromWallet(): Promise<string | null> {
   try {
     ensureKit();
-    const { address } = await ArcWalletsKit.getAddress();
+    const { address } = await StellarWalletsKit.getAddress();
     return address || null;
   } catch {
     return null;
@@ -74,10 +74,10 @@ export function WalletProvider({ children }: { children: ReactNode }) {
     })();
 
     ensureKit();
-    const offState = ArcWalletsKit.on(KitEventType.STATE_UPDATED, (event) => {
+    const offState = StellarWalletsKit.on(KitEventType.STATE_UPDATED, (event) => {
       setAddress(event.payload.address ?? null);
     });
-    const offDisconnect = ArcWalletsKit.on(KitEventType.DISCONNECT, () => {
+    const offDisconnect = StellarWalletsKit.on(KitEventType.DISCONNECT, () => {
       setAddress(null);
     });
 
@@ -106,7 +106,7 @@ export function WalletProvider({ children }: { children: ReactNode }) {
     setConnecting(true);
     try {
       ensureKit();
-      const { address: addr } = await ArcWalletsKit.authModal();
+      const { address: addr } = await StellarWalletsKit.authModal();
       if (addr) {
         setAddress(addr);
       }
@@ -119,7 +119,7 @@ export function WalletProvider({ children }: { children: ReactNode }) {
 
   const disconnect = useCallback(async () => {
     try {
-      await ArcWalletsKit.disconnect();
+      await StellarWalletsKit.disconnect();
     } catch {}
     setAddress(null);
   }, []);
@@ -130,7 +130,7 @@ export function WalletProvider({ children }: { children: ReactNode }) {
       // Re-sync right before signing so we never sign for a stale stored address.
       let signer = address;
       try {
-        const live = await ArcWalletsKit.fetchAddress();
+        const live = await StellarWalletsKit.fetchAddress();
         if (live.address) {
           signer = live.address;
           setAddress(live.address);
@@ -138,7 +138,7 @@ export function WalletProvider({ children }: { children: ReactNode }) {
       } catch {
         // Fall back to React state if the wallet is temporarily unavailable.
       }
-      const { signedTxXdr } = await ArcWalletsKit.signTransaction(xdr, {
+      const { signedTxXdr } = await StellarWalletsKit.signTransaction(xdr, {
         networkPassphrase: opts?.networkPassphrase ?? Networks.PUBLIC,
         address: signer ?? undefined,
       });

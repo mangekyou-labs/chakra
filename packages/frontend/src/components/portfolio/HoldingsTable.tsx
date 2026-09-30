@@ -37,7 +37,7 @@ export function HoldingsTable({ holdings }: { holdings: ValuedHolding[] }) {
           No token balances yet
         </h2>
         <p className="mt-1 text-[13px] text-[var(--text-muted)]">
-          Your non-zero Arc token balances will appear here.
+          Your non-zero Stellar token balances will appear here.
         </p>
       </div>
     );

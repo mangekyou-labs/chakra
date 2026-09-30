@@ -354,7 +354,7 @@ pub struct QuietWindowAlert {
 impl QuietWindowAlert {
     pub fn telegram_text(&self) -> String {
         format!(
-            "⚠️ Chakra arb quiet window\n\
+            "⚠️ LumAgg arb quiet window\n\
              · consecutive ticks: {}\n\
              · Δ opportunities: {} (prepared: {})\n\
              · Δ discards: size={} below_quoted={} fee_gate={}\n\

@@ -46,13 +46,13 @@ impl std::fmt::Display for TokenId {
 /// Protocol type classification.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum ProtocolType {
-    /// Arc-based AMM (Uniswap V2 style)
-    ArcAmm,
-    /// Arc-based weighted pool (Balancer style)
-    ArcWeightedPool,
-    /// Arc-based stable swap (Curve style)
-    ArcStableSwap,
-    /// Arc native DEX (orderbook + liquidity pools)
+    /// Soroban-based AMM (Uniswap V2 style)
+    SorobanAmm,
+    /// Soroban-based weighted pool (Balancer style)
+    SorobanWeightedPool,
+    /// Soroban-based stable swap (Curve style)
+    SorobanStableSwap,
+    /// Stellar native DEX (orderbook + liquidity pools)
     ClassicDex,
 }
 
@@ -78,8 +78,8 @@ pub struct AdapterQuote {
 /// Swap operation parameters for transaction building.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum SwapOperation {
-    /// Arc contract invocation
-    ArcInvoke {
+    /// Soroban contract invocation
+    SorobanInvoke {
         contract_id: String,
         function_name: String,
         /// XDR-encoded arguments (base64)
@@ -99,7 +99,7 @@ pub enum SwapOperation {
 /// The core trait all DEX adapters must implement.
 #[async_trait]
 pub trait DexAdapter: Send + Sync {
-    /// Unique identifier for this adapter (e.g., "Arc venue", "Arc venue").
+    /// Unique identifier for this adapter (e.g., "soroswap", "aquarius").
     fn id(&self) -> &str;
 
     /// Human-readable name.

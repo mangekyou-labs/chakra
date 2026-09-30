@@ -1,0 +1,64 @@
+@startuml system-components
+!include _theme.iuml
+skinparam linetype polyline
+title LumAgg system components
+caption HTTP is the API boundary. router-engine and dex-adapters are in-process libraries. Classic-only routes use Horizon PathPayment.
+
+actor "End user" as User
+actor "Integrator" as Integrator
+actor "Arb operator" as ArbOp
+actor "Protocol admin" as Admin
+
+rectangle "Clients" {
+  [Swap UI\nlumagg.xyz] as UI
+  [@lumagg/sdk\nREST client] as SDK
+  [lumagg-arbitrage-bot] as Bot
+  [lumagg-limit-keeper\n(testnet)] as Keeper
+}
+
+rectangle "Quote plane" {
+  [lumagg-api-server\nor lumagg-swap-api] as API
+  [router-engine\nPathFinder · QuoteEngine · SplitOptimizer] as RE
+  [dex-adapters] as AD
+  [lumagg-market-data-worker] as Worker
+  [lumagg-analytics-indexer] as Indexer
+  database "Redis\nsnapshot + pool state" as Redis
+  database "SQLite\nswaps · stats · arb" as SQLite
+}
+
+rectangle "Stellar" {
+  cloud "Soroban RPC" as RPC
+  cloud "Horizon" as Horizon
+  [Aggregator] as Agg
+  [Vault] as Vault
+  [Order escrow\n(testnet)] as Escrow
+  [DEX pools\nSoroswap · Aquarius · Phoenix\nSushi V3 · Comet] as Pools
+}
+
+User --> UI
+Integrator --> SDK
+ArbOp --> Bot
+Admin --> Agg
+Admin --> Vault
+UI --> API
+SDK --> API
+Bot --> API
+Keeper --> API
+API --> RE
+RE --> AD
+Worker --> Redis : single writer
+API --> Redis : hydrate per quote
+Worker --> RPC
+API --> RPC : simulate / submit
+Indexer --> RPC
+Indexer --> SQLite
+API --> SQLite : /stats /swaps /arbitrage
+API --> Horizon : Classic PathPayment
+API --> Agg : unsigned swap XDR
+Bot --> Vault : execute_round_trip
+Keeper --> Escrow : fill
+Vault --> Agg : round_trip_swap
+Escrow --> Agg : swap
+Agg --> Pools : CPI
+
+@enduml

@@ -1,0 +1,34 @@
+@startuml round-trip-arb
+!include _theme.iuml
+skinparam linetype polyline
+title Round-trip arbitrage
+caption Optional vault holds principal. Hot wallets pay fees. One atomic invocation. Numbers match the Architecture page.
+
+actor "Arb operator" as Op
+participant "lumagg-arbitrage-bot" as Bot
+participant "api-server" as API
+participant "Soroban RPC" as RPC
+participant Vault
+participant Aggregator
+participant "DEX pools" as Pools
+
+Op -> Bot : 1. configure bridges · vault · callers
+Bot -> API : 2. GET /quote both directions\nprefer_soroban=1
+API --> Bot : leg_out and leg_back
+Bot -> Bot : 3. size sample · net profit after fees
+Bot -> RPC : 4. simulate vault.execute_round_trip\n(or aggregator.round_trip_swap)
+RPC --> Bot : simulated base_total
+alt net profit >= floor
+  Bot -> RPC : 5. sign + send
+  RPC -> Vault : execute_round_trip(caller, …)
+  Vault -> Vault : 6. require allowlisted caller;\ntransfer amount_in to caller
+  Vault -> Aggregator : round_trip_swap(user=caller)
+  Aggregator -> Pools : 7. leg_out then leg_back
+  Pools --> Aggregator : base_total
+  Aggregator --> Bot : return base to caller
+  Vault -> Vault : 8. transfer_from(caller → vault,\nbase_total)
+else unprofitable or simulation fail
+  Bot -> Bot : skip
+end
+
+@enduml

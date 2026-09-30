@@ -1,16 +1,16 @@
 //! On-chain hop quotes for validating local AMM / CLMM math.
 //!
-//! Arc venue (classic + CLMM) pools expose `estimate_swap(in_idx, out_idx,
-//! in_amount)`. Arc venue pairs use fresh `get_reserves()` + the same xy=k
+//! Aquarius (classic + CLMM) pools expose `estimate_swap(in_idx, out_idx,
+//! in_amount)`. Soroswap pairs use fresh `get_reserves()` + the same xy=k
 //! formula as the adapter.
 
 use {
     crate::{
-        rpc::{scval_to_address, scval_to_u128, ArcRpc},
-        Arc venue::Arc venueAdapter,
+        rpc::{scval_to_address, scval_to_u128, SorobanRpc},
+        soroswap::SoroswapAdapter,
     },
     anyhow::Result,
-    Arc_xdr::curr as xdr,
+    stellar_xdr::curr as xdr,
     tracing::debug,
 };
 
@@ -21,9 +21,9 @@ pub fn amount_u128_scval(amount: u128) -> xdr::ScVal {
     })
 }
 
-/// Pool `estimate_swap(in_idx, out_idx, in_amount)` — Arc venue classic + CLMM.
+/// Pool `estimate_swap(in_idx, out_idx, in_amount)` — Aquarius classic + CLMM.
 pub async fn estimate_swap(
-    rpc: &ArcRpc,
+    rpc: &SorobanRpc,
     pool_address: &str,
     in_idx: u32,
     out_idx: u32,
@@ -53,9 +53,9 @@ pub async fn estimate_swap(
     }
 }
 
-/// Fresh-reserve Arc venue xy=k output (matches on-chain pair math).
-pub async fn Arc venue_amount_out(
-    rpc: &ArcRpc,
+/// Fresh-reserve Soroswap xy=k output (matches on-chain pair math).
+pub async fn soroswap_amount_out(
+    rpc: &SorobanRpc,
     pair_address: &str,
     token_in: &str,
     amount_in: u128,
@@ -74,18 +74,18 @@ pub async fn Arc venue_amount_out(
     let token_1 = scval_to_address(&token_1)?;
 
     let (reserve_in, reserve_out) = if token_in == token_0 {
-        parse_Arc venue_reserves(&reserves, true)?
+        parse_soroswap_reserves(&reserves, true)?
     } else if token_in == token_1 {
-        parse_Arc venue_reserves(&reserves, false)?
+        parse_soroswap_reserves(&reserves, false)?
     } else {
         return Ok(None);
     };
 
-    let out = Arc venueAdapter::compute_output(amount_in, reserve_in, reserve_out);
+    let out = SoroswapAdapter::compute_output(amount_in, reserve_in, reserve_out);
     Ok(if out > 0 { Some(out) } else { None })
 }
 
-fn parse_Arc venue_reserves(val: &xdr::ScVal, token0_is_in: bool) -> Result<(u128, u128)> {
+fn parse_soroswap_reserves(val: &xdr::ScVal, token0_is_in: bool) -> Result<(u128, u128)> {
     let xdr::ScVal::Vec(Some(vec)) = val else {
         anyhow::bail!("get_reserves: expected vec");
     };
@@ -97,9 +97,9 @@ fn parse_Arc venue_reserves(val: &xdr::ScVal, token0_is_in: bool) -> Result<(u12
     Ok(if token0_is_in { (r0, r1) } else { (r1, r0) })
 }
 
-/// Best-effort on-chain output for one Arc hop.
+/// Best-effort on-chain output for one Soroban hop.
 pub async fn hop_amount_out_on_chain(
-    rpc: &ArcRpc,
+    rpc: &SorobanRpc,
     source: &str,
     pool_address: &str,
     token_in: &str,
@@ -109,8 +109,8 @@ pub async fn hop_amount_out_on_chain(
     amount_in: u128,
 ) -> Result<Option<u128>> {
     match source {
-        "Arc venue" | "Arc venue_clmm" => estimate_swap(rpc, pool_address, in_idx, out_idx, amount_in).await,
-        "Arc venue" => Arc venue_amount_out(rpc, pool_address, token_in, amount_in).await,
+        "aquarius" | "aquarius_clmm" => estimate_swap(rpc, pool_address, in_idx, out_idx, amount_in).await,
+        "soroswap" => soroswap_amount_out(rpc, pool_address, token_in, amount_in).await,
         _ => Ok(None),
     }
 }
@@ -118,7 +118,7 @@ pub async fn hop_amount_out_on_chain(
 /// Walk a multi-hop path on-chain; returns final output or None if any hop
 /// fails.
 pub async fn path_amount_out_on_chain(
-    rpc: &ArcRpc,
+    rpc: &SorobanRpc,
     sources: &[String],
     pool_addresses: &[String],
     tokens: &[String],

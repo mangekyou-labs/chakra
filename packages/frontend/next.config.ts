@@ -4,7 +4,7 @@ const nextConfig: NextConfig = {
   reactStrictMode: true,
   output: 'export',
   images: { unoptimized: true },
-  transpilePackages: ['@creit.tech/Arc-wallets-kit'],
+  transpilePackages: ['@creit.tech/stellar-wallets-kit'],
   webpack: (config, { isServer }) => {
     if (!isServer) {
       config.resolve.fallback = {

@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 # Scheduled oneshot wrapper for quote-sim-probe (systemd timer / cron).
-# Does not affect Chakra-arb. Exit 1 = median gap over threshold or no measurable gaps.
+# Does not affect lumagg-arb. Exit 1 = median gap over threshold or no measurable gaps.
 set -euo pipefail
 
-APP_DIR="${APP_DIR:-/opt/Arc-dex-aggregator}"
+APP_DIR="${APP_DIR:-/opt/stellar-dex-aggregator}"
 BIN="${QUOTE_SIM_PROBE_BIN:-${APP_DIR}/target/release/quote-sim-probe}"
 LOG_DIR="${QUOTE_SIM_PROBE_LOG_DIR:-${APP_DIR}/logs}"
 SAMPLES="${PROBE_SAMPLES:-10}"

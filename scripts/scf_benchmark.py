@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""SCF quote benchmark: Chakra vs optional Arc venue API."""
+"""SCF quote benchmark: LumAgg vs optional Soroswap API."""
 
 from __future__ import annotations
 
@@ -14,12 +14,12 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Any
 
-Chakra_API = os.environ.get("Chakra_API", "https://api.Chakra.xyz").rstrip("/")
-Chakra_PREFER_Arc = os.environ.get("Chakra_PREFER_Arc", "").strip() in ("1", "true", "yes")
-Arc venue_API_URL = os.environ.get("Arc venue_API_URL", "https://api.Arc venue.finance").rstrip("/")
-Arc venue_API_KEY = os.environ.get("Arc venue_API_KEY", "").strip()
-Arc venue_PROTOCOLS = os.environ.get(
-    "Arc venue_PROTOCOLS", "Arc venue,Arc venue,aqua"
+LUMAGG_API = os.environ.get("LUMAGG_API", "https://api.lumagg.xyz").rstrip("/")
+LUMAGG_PREFER_SOROBAN = os.environ.get("LUMAGG_PREFER_SOROBAN", "").strip() in ("1", "true", "yes")
+SOROSWAP_API_URL = os.environ.get("SOROSWAP_API_URL", "https://api.soroswap.finance").rstrip("/")
+SOROSWAP_API_KEY = os.environ.get("SOROSWAP_API_KEY", "").strip()
+SOROSWAP_PROTOCOLS = os.environ.get(
+    "SOROSWAP_PROTOCOLS", "soroswap,phoenix,aqua"
 ).strip()
 OUTPUT = os.environ.get("OUTPUT", "").strip()
 
@@ -27,7 +27,7 @@ XLM = "CAS3J7GYLGXMF6TDJBBYYSE3HQ6BBSMLNUQ34T6TZMYMW2EVH34XOWMA"
 USDC = "CCW67TSZV3SSS2HXMBQ5JFGCKJNXKZM7UQUWUZPUTHXSTZLEO7SJMI75"
 AQUA = "CAUIKL3IYGMERDRUN6YSCLWVAKIFG5Q4YJHUKM4S4NJZQIA3BAS6OJPK"
 
-# (label, token_in, token_out, amount_in atomic unitss, size_label)
+# (label, token_in, token_out, amount_in stroops, size_label)
 CASES: list[tuple[str, str, str, int, str]] = [
     ("USDC → XLM", USDC, XLM, 10_000_000, "1 USDC"),
     ("USDC → XLM", USDC, XLM, 100_000_000, "10 USDC"),
@@ -44,7 +44,7 @@ CASES: list[tuple[str, str, str, int, str]] = [
 
 
 @dataclass
-class ChakraQuote:
+class LumAggQuote:
     amount_out: int
     is_split: bool
     legs: int
@@ -54,7 +54,7 @@ class ChakraQuote:
 
 
 @dataclass
-class Arc venueQuote:
+class SoroswapQuote:
     amount_out: int | None
     error: str | None = None
 
@@ -64,7 +64,7 @@ def http_get_json(url: str, timeout: float = 60.0) -> Any:
         url,
         headers={
             "Accept": "application/json",
-            "User-Agent": "Chakra-scf-benchmark/1.0 (SCF evidence script)",
+            "User-Agent": "lumagg-scf-benchmark/1.0 (SCF evidence script)",
         },
     )
     with urllib.request.urlopen(req, timeout=timeout) as resp:
@@ -78,7 +78,7 @@ def http_post_json(url: str, body: dict[str, Any], headers: dict[str, str], time
         return json.loads(resp.read().decode())
 
 
-def Chakra_quote(token_in: str, token_out: str, amount_in: int) -> ChakraQuote:
+def lumagg_quote(token_in: str, token_out: str, amount_in: int) -> LumAggQuote:
     query = {
         "token_in": token_in,
         "token_out": token_out,
@@ -86,20 +86,20 @@ def Chakra_quote(token_in: str, token_out: str, amount_in: int) -> ChakraQuote:
         "slippage": "0.5",
         "debug": "1",
     }
-    if Chakra_PREFER_Arc:
-        query["prefer_Arc"] = "1"
+    if LUMAGG_PREFER_SOROBAN:
+        query["prefer_soroban"] = "1"
     params = urllib.parse.urlencode(query)
-    url = f"{Chakra_API}/api/v1/quote?{params}"
+    url = f"{LUMAGG_API}/api/v1/quote?{params}"
     try:
         raw = http_get_json(url)
     except urllib.error.URLError as e:
-        return ChakraQuote(0, False, 0, [], None, error=str(e))
+        return LumAggQuote(0, False, 0, [], None, error=str(e))
     if not raw.get("success"):
-        return ChakraQuote(0, False, 0, [], None, error=str(raw.get("error", raw)))
+        return LumAggQuote(0, False, 0, [], None, error=str(raw.get("error", raw)))
     data = raw["data"]
     routes = data.get("sub_routes") or []
     sources = [r.get("source", "?") for r in routes]
-    return ChakraQuote(
+    return LumAggQuote(
         amount_out=int(data["expected_output"]),
         is_split=bool(data.get("is_split")),
         legs=len(routes),
@@ -108,11 +108,11 @@ def Chakra_quote(token_in: str, token_out: str, amount_in: int) -> ChakraQuote:
     )
 
 
-def Arc venue_quote(token_in: str, token_out: str, amount_in: int) -> Arc venueQuote:
-    if not Arc venue_API_KEY:
-        return Arc venueQuote(None, error="Arc venue_API_KEY not set")
-    url = f"{Arc venue_API_URL}/quote?network=mainnet"
-    protocols = [p.strip() for p in Arc venue_PROTOCOLS.split(",") if p.strip()]
+def soroswap_quote(token_in: str, token_out: str, amount_in: int) -> SoroswapQuote:
+    if not SOROSWAP_API_KEY:
+        return SoroswapQuote(None, error="SOROSWAP_API_KEY not set")
+    url = f"{SOROSWAP_API_URL}/quote?network=mainnet"
+    protocols = [p.strip() for p in SOROSWAP_PROTOCOLS.split(",") if p.strip()]
     body = {
         "assetIn": token_in,
         "assetOut": token_out,
@@ -121,10 +121,10 @@ def Arc venue_quote(token_in: str, token_out: str, amount_in: int) -> Arc venueQ
         "protocols": protocols,
     }
     headers = {
-        "Authorization": f"Bearer {Arc venue_API_KEY}",
+        "Authorization": f"Bearer {SOROSWAP_API_KEY}",
         "Content-Type": "application/json",
         "Accept": "application/json",
-        "User-Agent": "Chakra-scf-benchmark/1.0 (SCF evidence script)",
+        "User-Agent": "lumagg-scf-benchmark/1.0 (SCF evidence script)",
     }
     try:
         raw = http_post_json(url, body, headers)
@@ -133,33 +133,33 @@ def Arc venue_quote(token_in: str, token_out: str, amount_in: int) -> Arc venueQ
             detail = json.loads(e.read().decode())
         except Exception:
             detail = e.reason
-        return Arc venueQuote(None, error=f"HTTP {e.code}: {detail}")
+        return SoroswapQuote(None, error=f"HTTP {e.code}: {detail}")
     except urllib.error.URLError as e:
-        return Arc venueQuote(None, error=str(e))
+        return SoroswapQuote(None, error=str(e))
 
     amount_out = raw.get("amountOut") or raw.get("amount_out") or raw.get("expectedOutput")
     if amount_out is None:
-        return Arc venueQuote(None, error=f"unexpected response keys: {list(raw.keys())}")
-    return Arc venueQuote(int(amount_out))
+        return SoroswapQuote(None, error=f"unexpected response keys: {list(raw.keys())}")
+    return SoroswapQuote(int(amount_out))
 
 
-def outputs_comparable(Chakra_out: int, Arc venue_out: int | None) -> bool:
-    """Flag rows where APIs likely use different route classes (Classic vs Arc) or bad quotes."""
-    if Arc venue_out is None or Arc venue_out <= 0 or Chakra_out <= 0:
+def outputs_comparable(lumagg_out: int, soroswap_out: int | None) -> bool:
+    """Flag rows where APIs likely use different route classes (Classic vs Soroban) or bad quotes."""
+    if soroswap_out is None or soroswap_out <= 0 or lumagg_out <= 0:
         return True
-    ratio = Chakra_out / Arc venue_out if Chakra_out >= Arc venue_out else Arc venue_out / Chakra_out
+    ratio = lumagg_out / soroswap_out if lumagg_out >= soroswap_out else soroswap_out / lumagg_out
     # ~2× already implies different pool class / bad quote for SCF fair rows.
     return ratio <= 2.0
 
 
-def fmt_atomic unitss(v: int) -> str:
+def fmt_stroops(v: int) -> str:
     return f"{v / 10_000_000:,.4f}"
 
 
-def pct_delta(Chakra: int, other: int | None) -> str:
+def pct_delta(lumagg: int, other: int | None) -> str:
     if other is None or other <= 0:
         return "—"
-    delta = (Chakra - other) / other * 100.0
+    delta = (lumagg - other) / other * 100.0
     sign = "+" if delta >= 0 else ""
     return f"{sign}{delta:.2f}%"
 
@@ -172,59 +172,59 @@ def unique_sources(sources: list[str]) -> str:
     return ", ".join(seen) if seen else "—"
 
 
-def notes_for_case(pair: str, Chakra: ChakraQuote) -> str:
-    if Chakra.error:
-        return Chakra.error
+def notes_for_case(pair: str, lumagg: LumAggQuote) -> str:
+    if lumagg.error:
+        return lumagg.error
     parts: list[str] = []
-    if "classic_dex" in Chakra.sources:
-        parts.append("Chakra picked Classic DEX")
-    if any("clmm" in s or s == "sushi" for s in Chakra.sources):
+    if "classic_dex" in lumagg.sources:
+        parts.append("LumAgg picked Classic DEX")
+    if any("clmm" in s or s == "sushi" for s in lumagg.sources):
         parts.append("CLMM venue in route")
-    if Chakra.is_split:
-        parts.append(f"split {Chakra.legs} legs")
+    if lumagg.is_split:
+        parts.append(f"split {lumagg.legs} legs")
     return "; ".join(parts) if parts else "—"
 
 
 def run_benchmark() -> str:
     ts = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
-    has_Arc venue = bool(Arc venue_API_KEY)
+    has_soroswap = bool(SOROSWAP_API_KEY)
 
     lines: list[str] = [
-        "# Chakra quote benchmark results",
+        "# LumAgg quote benchmark results",
         "",
         f"Generated: **{ts}**",
         "",
-        f"- Chakra API: `{Chakra_API}`"
-        + (" (`prefer_Arc=1`)" if Chakra_PREFER_Arc else " (all venues)"),
-        f"- Arc venue API: `{Arc venue_API_URL}` protocols=`{Arc venue_PROTOCOLS}` "
-        + ("(key provided)" if has_Arc venue else "(**no API key** — Arc venue column empty)"),
+        f"- LumAgg API: `{LUMAGG_API}`"
+        + (" (`prefer_soroban=1`)" if LUMAGG_PREFER_SOROBAN else " (all venues)"),
+        f"- Soroswap API: `{SOROSWAP_API_URL}` protocols=`{SOROSWAP_PROTOCOLS}` "
+        + ("(key provided)" if has_soroswap else "(**no API key** — Soroswap column empty)"),
         "",
         "Reproduce:",
         "",
         "```bash",
         "./scripts/scf-benchmark.sh",
-        "# Arc-only fair compare:",
-        "Chakra_PREFER_Arc=1 Arc venue_PROTOCOLS=Arc venue,Arc venue,aqua Arc venue_API_KEY=sk_... ./scripts/scf-benchmark.sh",
-        "# Full compare (include Arc on both sides when Chakra omits prefer_Arc):",
-        "Arc venue_PROTOCOLS=Arc venue,Arc venue,aqua,Arc Arc venue_API_KEY=sk_... ./scripts/scf-benchmark.sh",
+        "# Soroban-only fair compare:",
+        "LUMAGG_PREFER_SOROBAN=1 SOROSWAP_PROTOCOLS=soroswap,phoenix,aqua SOROSWAP_API_KEY=sk_... ./scripts/scf-benchmark.sh",
+        "# Full compare (include SDEX on both sides when LumAgg omits prefer_soroban):",
+        "SOROSWAP_PROTOCOLS=soroswap,phoenix,aqua,sdex SOROSWAP_API_KEY=sk_... ./scripts/scf-benchmark.sh",
         "OUTPUT=docs/scf-benchmark-results.md ./scripts/scf-benchmark.sh",
         "```",
         "",
-        "> **Interpretation:** Use `Chakra_PREFER_Arc=1` + Arc venue without `Arc` for Arc-only rows. "
-        "Include `Arc` in `Arc venue_PROTOCOLS` when comparing full aggregation. "
-        "Positive Δ = Chakra higher output for same `amount_in`.  ",
-        "> **⚠️ / `n/a` Δ:** not a Chakra failure — Δ suppressed when outputs diverge by >2× "
-        "(often Arc venue aqua multi-hop optimism on small sizes vs Chakra/spot).",
+        "> **Interpretation:** Use `LUMAGG_PREFER_SOROBAN=1` + Soroswap without `sdex` for Soroban-only rows. "
+        "Include `sdex` in `SOROSWAP_PROTOCOLS` when comparing full aggregation. "
+        "Positive Δ = LumAgg higher output for same `amount_in`.  ",
+        "> **⚠️ / `n/a` Δ:** not a LumAgg failure — Δ suppressed when outputs diverge by >2× "
+        "(often Soroswap aqua multi-hop optimism on small sizes vs LumAgg/spot).",
         "",
     ]
 
-    if has_Arc venue:
+    if has_soroswap:
         header = (
-            "| Pair | Size | Chakra out | Split | Sources | Arc venue out | Δ vs Arc venue | Notes |"
+            "| Pair | Size | LumAgg out | Split | Sources | Soroswap out | Δ vs Soroswap | Notes |"
         )
         sep = "|------|------|------------|-------|---------|--------------|---------------|-------|"
     else:
-        header = "| Pair | Size | Chakra out | Split | Sources | Arc venue out | Notes |"
+        header = "| Pair | Size | LumAgg out | Split | Sources | Soroswap out | Notes |"
         sep = "|------|------|------------|-------|---------|--------------|-------|"
 
     lines.extend([header, sep])
@@ -232,61 +232,61 @@ def run_benchmark() -> str:
     split_cases: list[str] = []
 
     for pair, token_in, token_out, amount_in, size_label in CASES:
-        Chakra = Chakra_quote(token_in, token_out, amount_in)
+        lumagg = lumagg_quote(token_in, token_out, amount_in)
         time.sleep(0.12)  # api-server IP limiter: 10 req/s
-        Arc venue = Arc venue_quote(token_in, token_out, amount_in)
-        note = notes_for_case(pair, Chakra)
+        soroswap = soroswap_quote(token_in, token_out, amount_in)
+        note = notes_for_case(pair, lumagg)
 
-        if Chakra.error:
-            Chakra_out = "ERR"
+        if lumagg.error:
+            lumagg_out = "ERR"
             split = "—"
             sources = "—"
         else:
-            Chakra_out = fmt_atomic unitss(Chakra.amount_out)
-            split = "yes" if Chakra.is_split else "no"
+            lumagg_out = fmt_stroops(lumagg.amount_out)
+            split = "yes" if lumagg.is_split else "no"
             # Avoid `|` in cells — it breaks markdown tables.
             sources = (
-                " ;; ".join(Chakra.sources)
-                if Chakra.is_split
-                else unique_sources(Chakra.sources)
+                " ;; ".join(lumagg.sources)
+                if lumagg.is_split
+                else unique_sources(lumagg.sources)
             )
-            if Chakra.is_split:
+            if lumagg.is_split:
                 split_cases.append(
-                    f"{pair} {size_label}: {Chakra.legs} paths (`{'` ;; `'.join(Chakra.sources)}`)"
+                    f"{pair} {size_label}: {lumagg.legs} paths (`{'` ;; `'.join(lumagg.sources)}`)"
                 )
 
-        if Arc venue.error or Arc venue.amount_out is None:
-            ss_out = "—" if not has_Arc venue else f"ERR"
-            if has_Arc venue and Arc venue.error:
-                note = f"{note}; Arc venue: {Arc venue.error}" if note != "—" else f"Arc venue: {Arc venue.error}"
+        if soroswap.error or soroswap.amount_out is None:
+            ss_out = "—" if not has_soroswap else f"ERR"
+            if has_soroswap and soroswap.error:
+                note = f"{note}; Soroswap: {soroswap.error}" if note != "—" else f"Soroswap: {soroswap.error}"
         else:
-            ss_out = fmt_atomic unitss(Arc venue.amount_out)
+            ss_out = fmt_stroops(soroswap.amount_out)
 
-        if has_Arc venue:
-            if Arc venue.amount_out is not None and not Chakra.error:
-                if not outputs_comparable(Chakra.amount_out, Arc venue.amount_out):
-                    # Chakra often matches spot; Arc venue small-size aqua multi-hop can be ~3× optimistic.
+        if has_soroswap:
+            if soroswap.amount_out is not None and not lumagg.error:
+                if not outputs_comparable(lumagg.amount_out, soroswap.amount_out):
+                    # LumAgg often matches spot; Soroswap small-size aqua multi-hop can be ~3× optimistic.
                     ratio = (
-                        max(Chakra.amount_out, Arc venue.amount_out)
-                        / min(Chakra.amount_out, Arc venue.amount_out)
+                        max(lumagg.amount_out, soroswap.amount_out)
+                        / min(lumagg.amount_out, soroswap.amount_out)
                     )
                     gap = (
                         f"⚠️ not comparable (~{ratio:.1f}× gap): "
-                        "Arc venue amountOut diverges from Chakra/spot — do not use Δ; "
-                        "often Arc venue aqua multi-hop optimism on small sizes"
+                        "Soroswap amountOut diverges from LumAgg/spot — do not use Δ; "
+                        "often Soroswap aqua multi-hop optimism on small sizes"
                     )
                     note = f"{note}; {gap}" if note != "—" else gap
                     delta = "n/a"
                 else:
-                    delta = pct_delta(Chakra.amount_out, Arc venue.amount_out)
+                    delta = pct_delta(lumagg.amount_out, soroswap.amount_out)
             else:
-                delta = pct_delta(Chakra.amount_out if not Chakra.error else 0, Arc venue.amount_out)
+                delta = pct_delta(lumagg.amount_out if not lumagg.error else 0, soroswap.amount_out)
             lines.append(
-                f"| {pair} | {size_label} | {Chakra_out} | {split} | {sources} | {ss_out} | {delta} | {note} |"
+                f"| {pair} | {size_label} | {lumagg_out} | {split} | {sources} | {ss_out} | {delta} | {note} |"
             )
         else:
             lines.append(
-                f"| {pair} | {size_label} | {Chakra_out} | {split} | {sources} | {ss_out} | {note} |"
+                f"| {pair} | {size_label} | {lumagg_out} | {split} | {sources} | {ss_out} | {note} |"
             )
 
     lines.extend(
@@ -299,16 +299,16 @@ def run_benchmark() -> str:
             "| Criterion | Where to look |",
             "|-----------|---------------|",
             "| ≥3 pairs × ≥3 sizes | Table rows above |",
-            "| Fair Arc parity (Δ within ~2×) | Rows with numeric Δ (not `n/a`) |",
-            "| Split vs Arc venue single-route | `Split=yes` rows + list below |",
-            "| CLMM coverage | Notes containing `CLMM` / sources `Arc venue_clmm` / `sushi` |",
+            "| Fair Soroban parity (Δ within ~2×) | Rows with numeric Δ (not `n/a`) |",
+            "| Split vs Soroswap single-route | `Split=yes` rows + list below |",
+            "| CLMM coverage | Notes containing `CLMM` / sources `aquarius_clmm` / `sushi` |",
             "",
             "## Summary",
             "",
-            "- **Venue coverage:** See [scf-venue-comparison.md](scf-venue-comparison.md) for Arc Broker CLMM gap (source-based).",
-            "- **Split routing:** Chakra `is_split=true` when Brent optimizer splits `amount_in` across distinct paths; Arc venue API returns a single best route.",
-            "- **Fair compare:** Prefer `Chakra_PREFER_Arc=1` + Arc venue `protocols` without `Arc` so Classic Arc does not dominate Chakra while Arc venue stays Arc-only.",
-            "- **Arc venue API key:** Free registration at https://api.Arc venue.finance/register — pass via `Arc venue_API_KEY` (never commit the key).",
+            "- **Venue coverage:** See [scf-venue-comparison.md](scf-venue-comparison.md) for Stellar Broker CLMM gap (source-based).",
+            "- **Split routing:** LumAgg `is_split=true` when Brent optimizer splits `amount_in` across distinct paths; Soroswap API returns a single best route.",
+            "- **Fair compare:** Prefer `LUMAGG_PREFER_SOROBAN=1` + Soroswap `protocols` without `sdex` so Classic SDEX does not dominate LumAgg while Soroswap stays Soroban-only.",
+            "- **Soroswap API key:** Free registration at https://api.soroswap.finance/register — pass via `SOROSWAP_API_KEY` (never commit the key).",
         ]
     )
     if split_cases:

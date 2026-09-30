@@ -132,11 +132,11 @@ pub fn steps_from_api_sub_route(route: &QuoteSubRoute) -> Result<Vec<QuoteStep>>
 
 fn source_to_dex_type(source: &str) -> Result<&'static str> {
     match source {
-        "Arc venue" | "Arc venue_clmm" => Ok("Arc venue"),
-        "Arc venue" => Ok("Arc venue"),
-        "Arc venue" => Ok("Arc venue"),
+        "aquarius" | "aquarius_clmm" => Ok("aquarius"),
+        "soroswap" => Ok("soroswap"),
+        "phoenix" => Ok("phoenix"),
         "sushi" => Ok("sushi"),
-        "Arc venue" => Ok("Arc venue"),
+        "comet" => Ok("comet"),
         other => Err(anyhow!("unsupported dex source: {other}")),
     }
 }
@@ -192,7 +192,7 @@ mod tests {
                     "sub_routes": [{
                         "path": ["CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD2KM", "CBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBCC2KM"],
                         "pool_addresses": ["CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCDVF"],
-                        "dex_types": ["Arc venue"],
+                        "dex_types": ["soroswap"],
                         "in_indices": [0],
                         "out_indices": [1],
                         "amount_in": "1000",
@@ -210,7 +210,7 @@ mod tests {
         assert_eq!(
             steps,
             vec![QuoteStep {
-                dex_type: "Arc venue".into(),
+                dex_type: "soroswap".into(),
                 pool_address: "CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCDVF".into(),
                 token_in: "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD2KM".into(),
                 token_out: "CBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBCC2KM".into(),

@@ -205,7 +205,7 @@
                                     "val": {
                                       "vec": [
                                         {
-                                          "symbol": "Arc venue"
+                                          "symbol": "Aquarius"
                                         }
                                       ]
                                     }
@@ -285,7 +285,7 @@
                                     "val": {
                                       "vec": [
                                         {
-                                          "symbol": "Arc venuePair"
+                                          "symbol": "SoroswapPair"
                                         }
                                       ]
                                     }
@@ -1167,7 +1167,7 @@
                 "durability": "persistent",
                 "val": {
                   "contract_instance": {
-                    "executable": "Arc_asset",
+                    "executable": "stellar_asset",
                     "storage": [
                       {
                         "key": {
@@ -1571,7 +1571,7 @@
                 "durability": "persistent",
                 "val": {
                   "contract_instance": {
-                    "executable": "Arc_asset",
+                    "executable": "stellar_asset",
                     "storage": [
                       {
                         "key": {

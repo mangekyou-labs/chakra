@@ -1,12 +1,12 @@
 [package]
-name = "Chakra-contract-types"
+name = "lumagg-contract-types"
 version = "0.1.0"
 edition = "2021"
 license = "Apache-2.0"
-repository = "https://github.com/Chakra/Arc-dex-agg"
+repository = "https://github.com/Lum-Agg/stellar-dex-agg"
 
 [lib]
 crate-type = ["rlib"]
 
 [dependencies]
-Arc-sdk = "22.0.0"
+soroban-sdk = "22.0.0"

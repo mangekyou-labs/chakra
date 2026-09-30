@@ -1,5 +1,5 @@
 #!/bin/bash
-# Deploy Chakra analytics-indexer to production server.
+# Deploy LumAgg analytics-indexer to production server.
 #
 # Usage:
 #   ./deploy_indexer.sh
@@ -7,17 +7,17 @@
 set -euo pipefail
 
 SERVER="root@88.198.16.144"
-REMOTE_SRC="/opt/Arc-dex-aggregator-src"
-REMOTE_APP_DIR="/opt/Arc-dex-aggregator"
+REMOTE_SRC="/opt/stellar-dex-aggregator-src"
+REMOTE_APP_DIR="/opt/stellar-dex-aggregator"
 INDEXER_START_LEDGER="${INDEXER_START_LEDGER:-}"
 PRODUCTION_CONFIG="$(dirname "$0")/configs/production-aggregator.toml"
 
 if [[ ! -f "$PRODUCTION_CONFIG" ]]; then
-  echo "ERROR: Missing ${PRODUCTION_CONFIG}; create it from packaging/Chakra-aggregator.toml" >&2
+  echo "ERROR: Missing ${PRODUCTION_CONFIG}; create it from packaging/lumagg-aggregator.toml" >&2
   exit 1
 fi
 
-echo "=== Chakra analytics-indexer deploy ==="
+echo "=== LumAgg analytics-indexer deploy ==="
 
 echo "=== Syncing source code ==="
 rsync -az --delete \
@@ -46,7 +46,7 @@ ssh -o StrictHostKeyChecking=no "$SERVER" \
   "REMOTE_SRC='${REMOTE_SRC}' REMOTE_APP_DIR='${REMOTE_APP_DIR}' bash -s" <<'REMOTE'
 set -euo pipefail
 mkdir -p "${REMOTE_APP_DIR}/target/release" "${REMOTE_APP_DIR}/data" "${REMOTE_APP_DIR}/deploy"
-"${REMOTE_SRC}/target/release/Chakra-analytics-indexer" \
+"${REMOTE_SRC}/target/release/lumagg-analytics-indexer" \
   --config "${REMOTE_APP_DIR}/deploy/aggregator.toml" --check-config
 db="${REMOTE_APP_DIR}/data/analytics-indexer.db"
 if [[ -f "$db" ]]; then
@@ -57,23 +57,23 @@ if [[ -f "$db" ]]; then
   find "$backup_dir" -name 'analytics-indexer-*.db' -type f -printf '%T@ %p\n' \
     | sort -nr | tail -n +6 | cut -d' ' -f2- | xargs -r rm -f
 fi
-rm -f "${REMOTE_APP_DIR}/target/release/Chakra-analytics-indexer"
-cp "${REMOTE_SRC}/target/release/Chakra-analytics-indexer" \
-  "${REMOTE_APP_DIR}/target/release/Chakra-analytics-indexer"
-cp "${REMOTE_SRC}/deploy/Chakra-indexer.service" /etc/systemd/system/Chakra-indexer.service
+rm -f "${REMOTE_APP_DIR}/target/release/lumagg-analytics-indexer"
+cp "${REMOTE_SRC}/target/release/lumagg-analytics-indexer" \
+  "${REMOTE_APP_DIR}/target/release/lumagg-analytics-indexer"
+cp "${REMOTE_SRC}/deploy/lumagg-indexer.service" /etc/systemd/system/lumagg-indexer.service
 systemctl daemon-reload
-systemctl enable Chakra-indexer
-systemctl restart Chakra-indexer
+systemctl enable lumagg-indexer
+systemctl restart lumagg-indexer
 REMOTE
 
 echo "=== Indexer status ==="
 ssh -o StrictHostKeyChecking=no "$SERVER" \
-  "systemctl status Chakra-indexer --no-pager | head -12; echo; journalctl -u Chakra-indexer -n 15 --no-pager; echo; cd ${REMOTE_APP_DIR} && ${REMOTE_APP_DIR}/target/release/Chakra-analytics-indexer --config ${REMOTE_APP_DIR}/deploy/aggregator.toml status"
+  "systemctl status lumagg-indexer --no-pager | head -12; echo; journalctl -u lumagg-indexer -n 15 --no-pager; echo; cd ${REMOTE_APP_DIR} && ${REMOTE_APP_DIR}/target/release/lumagg-analytics-indexer --config ${REMOTE_APP_DIR}/deploy/aggregator.toml status"
 
 if [[ -n "$INDEXER_START_LEDGER" ]]; then
   echo "=== One-shot backfill from ledger ${INDEXER_START_LEDGER} ==="
   ssh -o StrictHostKeyChecking=no "$SERVER" \
-    "cd ${REMOTE_APP_DIR} && ${REMOTE_APP_DIR}/target/release/Chakra-analytics-indexer --config ${REMOTE_APP_DIR}/deploy/aggregator.toml backfill --start-ledger ${INDEXER_START_LEDGER}"
+    "cd ${REMOTE_APP_DIR} && ${REMOTE_APP_DIR}/target/release/lumagg-analytics-indexer --config ${REMOTE_APP_DIR}/deploy/aggregator.toml backfill --start-ledger ${INDEXER_START_LEDGER}"
 fi
 
 echo "=== Done ==="

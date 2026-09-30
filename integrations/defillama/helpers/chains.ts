@@ -4,5 +4,5 @@
  */
 
 export enum CHAIN {
-  Arc = "Arc",
+  STELLAR = "stellar",
 }

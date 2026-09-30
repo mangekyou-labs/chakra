@@ -1,7 +1,7 @@
 /**
- * Chakra TypeScript SDK — quote, build_tx, wallet helpers, submit/poll.
+ * LumAgg TypeScript SDK — quote, build_tx, wallet helpers, submit/poll.
  */
-export class ChakraClient {
+export class LumAggClient {
     constructor(options) {
         this.baseUrl = options.apiUrl.replace(/\/$/, "");
         this.apiKey = options.apiKey;
@@ -54,8 +54,8 @@ export class ChakraClient {
         });
         if (params.slippage !== undefined)
             search.set("slippage", String(params.slippage));
-        if (params.preferArc)
-            search.set("prefer_Arc", "1");
+        if (params.preferSoroban)
+            search.set("prefer_soroban", "1");
         if (params.maxHops !== undefined)
             search.set("max_hops", String(params.maxHops));
         if (params.maxSplits !== undefined)
@@ -93,7 +93,7 @@ export class ChakraClient {
             sub_routes: params.subRoutes.map((sr) => ({
                 amount_in: sr.amountIn,
                 steps: sr.poolAddresses.map((pool, i) => ({
-                    dex_type: sr.dexTypes[i] ?? "Arc venue",
+                    dex_type: sr.dexTypes[i] ?? "aquarius",
                     pool_address: pool,
                     token_in: sr.path[i] ?? params.tokenIn,
                     token_out: sr.path[i + 1] ?? params.tokenOut,
@@ -514,7 +514,7 @@ function mapSubRoute(raw) {
         source: String(raw.source ?? ""),
         path: raw.path ?? [],
         poolAddresses,
-        dexTypes: pad(raw.dex_types, "Arc venue"),
+        dexTypes: pad(raw.dex_types, "aquarius"),
         inIndices: pad(raw.in_indices, 0),
         outIndices: pad(raw.out_indices, 1),
         amountIn: String(raw.amount_in ?? "0"),
@@ -522,8 +522,8 @@ function mapSubRoute(raw) {
         percentage: Number(raw.percentage ?? 0),
     };
 }
-/** @deprecated Use ChakraClient */
-export class ArcAggregator extends ChakraClient {
+/** @deprecated Use LumAggClient */
+export class StellarAggregator extends LumAggClient {
     constructor(options) {
         super({ apiUrl: options.apiUrl });
     }

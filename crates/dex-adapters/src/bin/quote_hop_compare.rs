@@ -1,4 +1,4 @@
-//! Compare local quote-api hop outputs vs on-chain `estimate_swap` / Arc venue
+//! Compare local quote-api hop outputs vs on-chain `estimate_swap` / Soroswap
 //! reserves.
 //!
 //! Usage:
@@ -10,7 +10,7 @@
 
 use {
     anyhow::{Context, Result},
-    dex_adapters::{on_chain_quote, rpc::ArcRpc},
+    dex_adapters::{on_chain_quote, rpc::SorobanRpc},
     serde_json::Value,
     std::env,
 };
@@ -29,11 +29,11 @@ async fn main() -> Result<()> {
         .context("amount_in")?;
 
     let quote_api = env::var("QUOTE_API_URL").unwrap_or_else(|_| "http://127.0.0.1:3100".into());
-    let rpc_url = env::var("RPC_URL").unwrap_or_else(|_| "https://Arc-rpc.mainnet.Arc.gateway.fm".into());
-    let rpc = ArcRpc::new(&rpc_url, "Public Global Arc Network ; September 2015");
+    let rpc_url = env::var("RPC_URL").unwrap_or_else(|_| "https://soroban-rpc.mainnet.stellar.gateway.fm".into());
+    let rpc = SorobanRpc::new(&rpc_url, "Public Global Stellar Network ; September 2015");
 
     let url = format!(
-        "{quote_api}/api/v1/quote?token_in={token_in}&token_out={token_out}&amount_in={amount_in}&prefer_Arc=1"
+        "{quote_api}/api/v1/quote?token_in={token_in}&token_out={token_out}&amount_in={amount_in}&prefer_soroban=1"
     );
     let body: Value = reqwest::get(&url).await?.json().await?;
     if body["success"].as_bool() != Some(true) {

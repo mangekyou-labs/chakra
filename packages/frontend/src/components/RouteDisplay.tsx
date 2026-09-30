@@ -10,12 +10,12 @@ import {
 } from '@/lib/routeDisplay';
 
 const DEX_STYLES: Record<string, { label: string }> = {
-  Arc venue: { label: 'Arc venue' },
-  Arc venue_clmm: { label: 'Arc venue CLMM' },
-  Arc venue: { label: 'Arc venue' },
-  Arc venue: { label: 'Arc venue' },
+  soroswap: { label: 'Soroswap' },
+  aquarius_clmm: { label: 'Aquarius CLMM' },
+  aquarius: { label: 'Aquarius' },
+  phoenix: { label: 'Phoenix' },
   sushi: { label: 'Sushi' },
-  Arc venue: { label: 'Arc venue' },
+  comet: { label: 'Comet' },
   classic: { label: 'Classic DEX' },
 };
 
@@ -84,7 +84,7 @@ function RouteAmountPath({
   tokenInDecimals: number;
   tokenOutDecimals: number;
   resolveTokenSymbol: (contractId: string) => string;
-  formatAmount: (atomic unitss: string, decimals: number) => string;
+  formatAmount: (stroops: string, decimals: number) => string;
 }) {
   const symbols = path.map(resolveTokenSymbol);
   if (symbols.length < 2) return null;
@@ -146,8 +146,8 @@ export function RouteDisplay({
     setOpen(false);
   }, [quote.amount_in, quote.expected_output, quote.sub_routes.length]);
 
-  const formatAmount = (atomic unitss: string, decimals: number) => {
-    const val = parseInt(atomic unitss, 10) / 10 ** decimals;
+  const formatAmount = (stroops: string, decimals: number) => {
+    const val = parseInt(stroops, 10) / 10 ** decimals;
     if (val >= 1000) return val.toFixed(2);
     if (val >= 1) return val.toFixed(4);
     return val.toFixed(Math.min(decimals, 7));

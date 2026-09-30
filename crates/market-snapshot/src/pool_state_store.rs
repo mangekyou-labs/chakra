@@ -1,4 +1,4 @@
-//! Per-pool state cache (Redis or in-memory) for xy=k / Arc venue / Arc venue /
+//! Per-pool state cache (Redis or in-memory) for xy=k / Aquarius / Comet /
 //! CLMM.
 //!
 //! See `docs/pool-state-architecture.md`. Quote + worker share
@@ -21,41 +21,41 @@ use {
 pub const DEFAULT_POOL_STATE_TTL_SECS: u64 = 86_400;
 pub const DEFAULT_QUOTE_HYDRATE_MAX_POOLS: usize = 12;
 
-const XYK_KEY_PREFIX: &str = "Chakra:pool:xyk";
-const CLMM_KEY_PREFIX: &str = "Chakra:pool:clmm";
+const XYK_KEY_PREFIX: &str = "lumagg:pool:xyk";
+const CLMM_KEY_PREFIX: &str = "lumagg:pool:clmm";
 // N token + N reserve + stable params
 
-const Arc venue_KEY_PREFIX: &str = "Chakra:pool:Arc venue";
-const Arc venue_KEY_PREFIX: &str = "Chakra:pool:Arc venue";
+const AQUARIUS_KEY_PREFIX: &str = "lumagg:pool:aquarius";
+const COMET_KEY_PREFIX: &str = "lumagg:pool:comet";
 
-/// One token slot in a Arc venue weighted pool (Balancer V1).
+/// One token slot in a Comet weighted pool (Balancer V1).
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-pub struct Arc venueTokenRecordValue {
+pub struct CometTokenRecordValue {
     pub balance: i128,
     pub weight: i128,
     pub scalar: i128,
 }
 
-/// Full Arc venue pool state for local weighted-pool quotes.
+/// Full Comet pool state for local weighted-pool quotes.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-pub struct Arc venuePoolStateValue {
+pub struct CometPoolStateValue {
     pub pool_address: String,
-    pub records: HashMap<String, Arc venueTokenRecordValue>,
+    pub records: HashMap<String, CometTokenRecordValue>,
     pub swap_fee: i128,
     /// Unix millis when worker last wrote this key (`0` = legacy / unknown).
     #[serde(default)]
     pub updated_at_ms: u64,
 }
 
-impl Arc venuePoolStateValue {
+impl CometPoolStateValue {
     pub fn redis_key(pool_address: &str) -> String {
-        format!("{Arc venue_KEY_PREFIX}:{pool_address}")
+        format!("{COMET_KEY_PREFIX}:{pool_address}")
     }
 }
 
-/// Full Arc venue pool state (token-ordered reserves + stable params).
+/// Full Aquarius pool state (token-ordered reserves + stable params).
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-pub struct Arc venuePoolStateValue {
+pub struct AquariusPoolStateValue {
     pub pool_address: String,
     pub tokens: Vec<String>,
     pub reserves: Vec<u128>,
@@ -67,9 +67,9 @@ pub struct Arc venuePoolStateValue {
     pub updated_at_ms: u64,
 }
 
-impl Arc venuePoolStateValue {
+impl AquariusPoolStateValue {
     pub fn redis_key(pool_address: &str) -> String {
-        format!("{Arc venue_KEY_PREFIX}:{pool_address}")
+        format!("{AQUARIUS_KEY_PREFIX}:{pool_address}")
     }
 }
 
@@ -158,19 +158,19 @@ pub trait PoolStateStore: Send + Sync {
         &self,
         xyk_values: &[XykPoolStateValue],
         clmm_pools: &[ClmmPoolSnapshot],
-        Arc venue_pools: &[Arc venuePoolStateValue],
-        Arc venue_pools: &[Arc venuePoolStateValue],
+        aquarius_pools: &[AquariusPoolStateValue],
+        comet_pools: &[CometPoolStateValue],
     ) -> Result<()>;
 
     async fn set_xyk_batch(&self, values: &[XykPoolStateValue]) -> Result<()>;
     async fn set_clmm_batch(&self, pools: &[ClmmPoolSnapshot]) -> Result<()>;
-    async fn set_Arc venue_batch(&self, values: &[Arc venuePoolStateValue]) -> Result<()>;
-    async fn set_Arc venue_batch(&self, values: &[Arc venuePoolStateValue]) -> Result<()>;
+    async fn set_aquarius_batch(&self, values: &[AquariusPoolStateValue]) -> Result<()>;
+    async fn set_comet_batch(&self, values: &[CometPoolStateValue]) -> Result<()>;
 
     async fn fetch_xyk(&self, refs: &[(String, String)]) -> Result<HashMap<String, XykPoolStateValue>>;
     async fn fetch_clmm(&self, refs: &[(String, String)]) -> Result<HashMap<String, ClmmPoolSnapshot>>;
-    async fn fetch_Arc venue(&self, pool_addresses: &[String]) -> Result<HashMap<String, Arc venuePoolStateValue>>;
-    async fn fetch_Arc venue(&self, pool_addresses: &[String]) -> Result<HashMap<String, Arc venuePoolStateValue>>;
+    async fn fetch_aquarius(&self, pool_addresses: &[String]) -> Result<HashMap<String, AquariusPoolStateValue>>;
+    async fn fetch_comet(&self, pool_addresses: &[String]) -> Result<HashMap<String, CometPoolStateValue>>;
 }
 
 /// In-process pool cache for embedded mode (no Redis).
@@ -178,8 +178,8 @@ pub trait PoolStateStore: Send + Sync {
 pub struct MemoryPoolStateStore {
     xyk: RwLock<HashMap<String, XykPoolStateValue>>,
     clmm: RwLock<HashMap<String, ClmmPoolSnapshot>>,
-    Arc venue: RwLock<HashMap<String, Arc venuePoolStateValue>>,
-    Arc venue: RwLock<HashMap<String, Arc venuePoolStateValue>>,
+    aquarius: RwLock<HashMap<String, AquariusPoolStateValue>>,
+    comet: RwLock<HashMap<String, CometPoolStateValue>>,
 }
 
 impl MemoryPoolStateStore {
@@ -198,12 +198,12 @@ impl PoolStateStore for MemoryPoolStateStore {
         &self,
         xyk_values: &[XykPoolStateValue],
         clmm_pools: &[ClmmPoolSnapshot],
-        Arc venue_pools: &[Arc venuePoolStateValue],
-        Arc venue_pools: &[Arc venuePoolStateValue],
+        aquarius_pools: &[AquariusPoolStateValue],
+        comet_pools: &[CometPoolStateValue],
     ) -> Result<()> {
         self.set_xyk_batch(xyk_values).await?;
-        self.set_Arc venue_batch(Arc venue_pools).await?;
-        self.set_Arc venue_batch(Arc venue_pools).await?;
+        self.set_aquarius_batch(aquarius_pools).await?;
+        self.set_comet_batch(comet_pools).await?;
         let complete: Vec<ClmmPoolSnapshot> = clmm_pools
             .iter()
             .filter(|p| should_publish_clmm_to_redis(p))
@@ -249,7 +249,7 @@ impl PoolStateStore for MemoryPoolStateStore {
         Ok(())
     }
 
-    async fn set_Arc venue_batch(&self, values: &[Arc venuePoolStateValue]) -> Result<()> {
+    async fn set_aquarius_batch(&self, values: &[AquariusPoolStateValue]) -> Result<()> {
         if values.is_empty() {
             return Ok(());
         }
@@ -261,14 +261,14 @@ impl PoolStateStore for MemoryPoolStateStore {
                 v
             })
             .collect();
-        let mut map = self.Arc venue.write().await;
+        let mut map = self.aquarius.write().await;
         for value in stamped {
             map.insert(value.pool_address.clone(), value);
         }
         Ok(())
     }
 
-    async fn set_Arc venue_batch(&self, values: &[Arc venuePoolStateValue]) -> Result<()> {
+    async fn set_comet_batch(&self, values: &[CometPoolStateValue]) -> Result<()> {
         if values.is_empty() {
             return Ok(());
         }
@@ -280,7 +280,7 @@ impl PoolStateStore for MemoryPoolStateStore {
                 v
             })
             .collect();
-        let mut map = self.Arc venue.write().await;
+        let mut map = self.comet.write().await;
         for value in stamped {
             map.insert(value.pool_address.clone(), value);
         }
@@ -311,8 +311,8 @@ impl PoolStateStore for MemoryPoolStateStore {
         Ok(out)
     }
 
-    async fn fetch_Arc venue(&self, pool_addresses: &[String]) -> Result<HashMap<String, Arc venuePoolStateValue>> {
-        let map = self.Arc venue.read().await;
+    async fn fetch_aquarius(&self, pool_addresses: &[String]) -> Result<HashMap<String, AquariusPoolStateValue>> {
+        let map = self.aquarius.read().await;
         let mut out = HashMap::new();
         for pool in pool_addresses {
             if let Some(v) = map.get(pool) {
@@ -322,8 +322,8 @@ impl PoolStateStore for MemoryPoolStateStore {
         Ok(out)
     }
 
-    async fn fetch_Arc venue(&self, pool_addresses: &[String]) -> Result<HashMap<String, Arc venuePoolStateValue>> {
-        let map = self.Arc venue.read().await;
+    async fn fetch_comet(&self, pool_addresses: &[String]) -> Result<HashMap<String, CometPoolStateValue>> {
+        let map = self.comet.read().await;
         let mut out = HashMap::new();
         for pool in pool_addresses {
             if let Some(v) = map.get(pool) {
@@ -359,7 +359,7 @@ impl RedisPoolStateStore {
     pub async fn snapshot_exists(&self) -> Result<bool> {
         let mut conn = self.client.get_multiplexed_async_connection().await?;
         let exists: bool = redis::cmd("EXISTS")
-            .arg("Chakra:snapshot:current")
+            .arg("lumagg:snapshot:current")
             .query_async(&mut conn)
             .await?;
         Ok(exists)
@@ -372,12 +372,12 @@ impl PoolStateStore for RedisPoolStateStore {
         &self,
         xyk_values: &[XykPoolStateValue],
         clmm_pools: &[ClmmPoolSnapshot],
-        Arc venue_pools: &[Arc venuePoolStateValue],
-        Arc venue_pools: &[Arc venuePoolStateValue],
+        aquarius_pools: &[AquariusPoolStateValue],
+        comet_pools: &[CometPoolStateValue],
     ) -> Result<()> {
         self.set_xyk_batch(xyk_values).await?;
-        self.set_Arc venue_batch(Arc venue_pools).await?;
-        self.set_Arc venue_batch(Arc venue_pools).await?;
+        self.set_aquarius_batch(aquarius_pools).await?;
+        self.set_comet_batch(comet_pools).await?;
         let complete_clmm: Vec<ClmmPoolSnapshot> = clmm_pools
             .iter()
             .filter(|pool| should_publish_clmm_to_redis(pool))
@@ -386,8 +386,8 @@ impl PoolStateStore for RedisPoolStateStore {
         self.set_clmm_batch(&complete_clmm).await?;
         tracing::debug!(
             xyk_written = xyk_values.len(),
-            Arc venue_written = Arc venue_pools.len(),
-            Arc venue_written = Arc venue_pools.len(),
+            aquarius_written = aquarius_pools.len(),
+            comet_written = comet_pools.len(),
             clmm_written = complete_clmm.len(),
             ttl_secs = self.ttl_secs,
             "Published per-pool state to Redis"
@@ -395,7 +395,7 @@ impl PoolStateStore for RedisPoolStateStore {
         Ok(())
     }
 
-    async fn set_Arc venue_batch(&self, values: &[Arc venuePoolStateValue]) -> Result<()> {
+    async fn set_aquarius_batch(&self, values: &[AquariusPoolStateValue]) -> Result<()> {
         if values.is_empty() {
             return Ok(());
         }
@@ -403,20 +403,20 @@ impl PoolStateStore for RedisPoolStateStore {
         for value in values {
             let mut value = value.clone();
             value.updated_at_ms = stamp_pool_updated_at_ms(Some(value.updated_at_ms));
-            let key = Arc venuePoolStateValue::redis_key(&value.pool_address);
+            let key = AquariusPoolStateValue::redis_key(&value.pool_address);
             let bytes = serde_json::to_vec(&value)?;
             conn.set_ex::<_, _, ()>(key, bytes, self.ttl_secs).await?;
         }
         Ok(())
     }
 
-    async fn fetch_Arc venue(&self, pool_addresses: &[String]) -> Result<HashMap<String, Arc venuePoolStateValue>> {
+    async fn fetch_comet(&self, pool_addresses: &[String]) -> Result<HashMap<String, CometPoolStateValue>> {
         if pool_addresses.is_empty() {
             return Ok(HashMap::new());
         }
         let keys: Vec<String> = pool_addresses
             .iter()
-            .map(|pool| Arc venuePoolStateValue::redis_key(pool))
+            .map(|pool| CometPoolStateValue::redis_key(pool))
             .collect();
         let mut conn = self.client.get_multiplexed_async_connection().await?;
         let values: Vec<Option<Vec<u8>>> = conn.mget(&keys).await?;
@@ -425,13 +425,13 @@ impl PoolStateStore for RedisPoolStateStore {
             let Some(bytes) = bytes else {
                 continue;
             };
-            let value: Arc venuePoolStateValue = serde_json::from_slice(&bytes)?;
+            let value: CometPoolStateValue = serde_json::from_slice(&bytes)?;
             out.insert(pool.clone(), value);
         }
         Ok(out)
     }
 
-    async fn set_Arc venue_batch(&self, values: &[Arc venuePoolStateValue]) -> Result<()> {
+    async fn set_comet_batch(&self, values: &[CometPoolStateValue]) -> Result<()> {
         if values.is_empty() {
             return Ok(());
         }
@@ -439,20 +439,20 @@ impl PoolStateStore for RedisPoolStateStore {
         for value in values {
             let mut value = value.clone();
             value.updated_at_ms = stamp_pool_updated_at_ms(Some(value.updated_at_ms));
-            let key = Arc venuePoolStateValue::redis_key(&value.pool_address);
+            let key = CometPoolStateValue::redis_key(&value.pool_address);
             let bytes = serde_json::to_vec(&value)?;
             conn.set_ex::<_, _, ()>(key, bytes, self.ttl_secs).await?;
         }
         Ok(())
     }
 
-    async fn fetch_Arc venue(&self, pool_addresses: &[String]) -> Result<HashMap<String, Arc venuePoolStateValue>> {
+    async fn fetch_aquarius(&self, pool_addresses: &[String]) -> Result<HashMap<String, AquariusPoolStateValue>> {
         if pool_addresses.is_empty() {
             return Ok(HashMap::new());
         }
         let keys: Vec<String> = pool_addresses
             .iter()
-            .map(|pool| Arc venuePoolStateValue::redis_key(pool))
+            .map(|pool| AquariusPoolStateValue::redis_key(pool))
             .collect();
         let mut conn = self.client.get_multiplexed_async_connection().await?;
         let values: Vec<Option<Vec<u8>>> = conn.mget(&keys).await?;
@@ -461,7 +461,7 @@ impl PoolStateStore for RedisPoolStateStore {
             let Some(bytes) = bytes else {
                 continue;
             };
-            let value: Arc venuePoolStateValue = serde_json::from_slice(&bytes)?;
+            let value: AquariusPoolStateValue = serde_json::from_slice(&bytes)?;
             out.insert(pool.clone(), value);
         }
         Ok(out)
@@ -610,22 +610,22 @@ mod tests {
     #[test]
     fn xyk_redis_keys_are_stable() {
         assert_eq!(
-            XykPoolStateValue::redis_key("Arc venue", "POOL"),
-            "Chakra:pool:xyk:Arc venue:POOL"
+            XykPoolStateValue::redis_key("soroswap", "POOL"),
+            "lumagg:pool:xyk:soroswap:POOL"
         );
         assert_eq!(
             ClmmPoolSnapshot::redis_key("sushi", "POOL"),
-            "Chakra:pool:clmm:sushi:POOL"
+            "lumagg:pool:clmm:sushi:POOL"
         );
-        assert_eq!(Arc venuePoolStateValue::redis_key("POOL"), "Chakra:pool:Arc venue:POOL");
+        assert_eq!(CometPoolStateValue::redis_key("POOL"), "lumagg:pool:comet:POOL");
     }
 
     #[tokio::test]
     async fn memory_pool_store_xyk_round_trip() {
         let store = MemoryPoolStateStore::new();
-        let value = XykPoolStateValue::new("Arc venue", "POOL1", "A", "B", 30, 100, 200);
+        let value = XykPoolStateValue::new("soroswap", "POOL1", "A", "B", 30, 100, 200);
         store.set_xyk_batch(&[value.clone()]).await.unwrap();
-        let got = store.fetch_xyk(&[("Arc venue".into(), "POOL1".into())]).await.unwrap();
-        assert_eq!(got.get("Arc venue:POOL1"), Some(&value));
+        let got = store.fetch_xyk(&[("soroswap".into(), "POOL1".into())]).await.unwrap();
+        assert_eq!(got.get("soroswap:POOL1"), Some(&value));
     }
 }

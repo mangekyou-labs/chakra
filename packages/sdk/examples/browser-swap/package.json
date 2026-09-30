@@ -1,5 +1,5 @@
 {
-  "name": "Chakra-browser-swap-example",
+  "name": "lumagg-browser-swap-example",
   "private": true,
   "version": "0.1.0",
   "type": "module",
@@ -9,8 +9,8 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "@Chakra/sdk": "file:../..",
-    "@Arc/wallet-api": "^3.0.0"
+    "@lumagg/sdk": "file:../..",
+    "@stellar/freighter-api": "^3.0.0"
   },
   "devDependencies": {
     "typescript": "^5.4.0",

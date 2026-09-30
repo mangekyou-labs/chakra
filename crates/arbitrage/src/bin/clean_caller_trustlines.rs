@@ -12,7 +12,7 @@
 use {
     anyhow::{anyhow, Context, Result},
     std::{collections::HashSet, env, time::Duration},
-    Arc_baselib::{
+    stellar_baselib::{
         account::{Account, AccountBehavior},
         asset::{Asset, AssetBehavior},
         keypair::{Keypair, KeypairBehavior},
@@ -37,7 +37,7 @@ enum TrustLineKind {
 #[derive(Debug, Clone)]
 struct BalanceEntry {
     kind: TrustLineKind,
-    balance_atomic unitss: i64,
+    balance_stroops: i64,
 }
 
 #[tokio::main]
@@ -45,7 +45,7 @@ async fn main() -> Result<()> {
     tracing_subscriber::fmt::init();
 
     let mnemonic_path = env::var("MNEMONIC_PATH").unwrap_or_else(|_| "/etc/mnemonic_code.txt".into());
-    let horizon_url = env::var("HORIZON_URL").unwrap_or_else(|_| "https://horizon.Arc.org".into());
+    let horizon_url = env::var("HORIZON_URL").unwrap_or_else(|_| "https://horizon.stellar.org".into());
     let dry_run = env::var("DRY_RUN").ok().as_deref() == Some("1");
     let sweep = env::var("SWEEP").ok().as_deref() != Some("0");
     let dest_index: u32 = env::var("DESTINATION_INDEX")
@@ -84,7 +84,7 @@ async fn main() -> Result<()> {
             let entries = fetch_balances(&horizon_url, &kp.public_key()).await?;
             for entry in &entries {
                 if let TrustLineKind::Credit { asset } = &entry.kind {
-                    if entry.balance_atomic unitss > 0 {
+                    if entry.balance_stroops > 0 {
                         assets_to_receive.insert(asset_key(asset));
                     }
                 }
@@ -143,8 +143,8 @@ async fn main() -> Result<()> {
                 entries
                     .iter()
                     .filter_map(|e| match &e.kind {
-                        TrustLineKind::Credit { asset } if !asset.is_native() && e.balance_atomic unitss > 0 => {
-                            Some((asset.clone(), e.balance_atomic unitss))
+                        TrustLineKind::Credit { asset } if !asset.is_native() && e.balance_stroops > 0 => {
+                            Some((asset.clone(), e.balance_stroops))
                         }
                         _ => None,
                     })
@@ -173,7 +173,7 @@ async fn main() -> Result<()> {
                         if asset.is_native() {
                             continue;
                         }
-                        if entry.balance_atomic unitss > 0 {
+                        if entry.balance_stroops > 0 {
                             continue;
                         }
                         close_ops.push(
@@ -183,11 +183,11 @@ async fn main() -> Result<()> {
                         );
                     }
                     TrustLineKind::PoolShare { pool_id } => {
-                        if entry.balance_atomic unitss > 0 {
+                        if entry.balance_stroops > 0 {
                             eprintln!(
                                 "WARN index={idx}: pool share {} has balance {}, withdraw manually",
                                 hex::encode(pool_id),
-                                entry.balance_atomic unitss
+                                entry.balance_stroops
                             );
                             continue;
                         }
@@ -204,7 +204,7 @@ async fn main() -> Result<()> {
             if close_ops.is_empty() {
                 let with_balance = entries
                     .iter()
-                    .filter(|e| !is_native_only(e) && e.balance_atomic unitss > 0)
+                    .filter(|e| !is_native_only(e) && e.balance_stroops > 0)
                     .count();
                 if with_balance > 0 {
                     println!("index={idx}: {with_balance} trustlines kept (non-zero balance)");
@@ -255,7 +255,7 @@ fn asset_from_key(key: &str) -> Option<Asset> {
 
 fn horizon_client() -> Result<reqwest::Client> {
     reqwest::Client::builder()
-        .user_agent("Chakra-clean-trustlines/1.0")
+        .user_agent("lumagg-clean-trustlines/1.0")
         .timeout(Duration::from_secs(30))
         .build()
         .context("build horizon http client")
@@ -306,13 +306,13 @@ async fn fetch_balances(horizon_url: &str, public_key: &str) -> Result<Vec<Balan
     let mut out = Vec::new();
     for bal in balances {
         let asset_type = bal.get("asset_type").and_then(|v| v.as_str()).unwrap_or("");
-        let balance_atomic unitss = balance_to_atomic unitss(bal.get("balance").and_then(|v| v.as_str()).unwrap_or("0"))?;
+        let balance_stroops = balance_to_stroops(bal.get("balance").and_then(|v| v.as_str()).unwrap_or("0"))?;
 
         match asset_type {
             "native" => {
                 out.push(BalanceEntry {
                     kind: TrustLineKind::Credit { asset: Asset::native() },
-                    balance_atomic unitss,
+                    balance_stroops,
                 });
             }
             "credit_alphanum4" | "credit_alphanum12" => {
@@ -324,7 +324,7 @@ async fn fetch_balances(horizon_url: &str, public_key: &str) -> Result<Vec<Balan
                 let asset = Asset::new(code, Some(issuer)).map_err(|e| anyhow!(e))?;
                 out.push(BalanceEntry {
                     kind: TrustLineKind::Credit { asset },
-                    balance_atomic unitss,
+                    balance_stroops,
                 });
             }
             "liquidity_pool_shares" => {
@@ -335,7 +335,7 @@ async fn fetch_balances(horizon_url: &str, public_key: &str) -> Result<Vec<Balan
                 let pool_id = decode_pool_id(pool_id_hex)?;
                 out.push(BalanceEntry {
                     kind: TrustLineKind::PoolShare { pool_id },
-                    balance_atomic unitss,
+                    balance_stroops,
                 });
             }
             other => eprintln!("skip unknown asset_type {other}"),
@@ -404,7 +404,7 @@ fn parse_horizon_asset(raw: &str) -> Result<Asset> {
     Asset::new(code, Some(issuer)).map_err(|e| anyhow!(e))
 }
 
-fn balance_to_atomic unitss(balance: &str) -> Result<i64> {
+fn balance_to_stroops(balance: &str) -> Result<i64> {
     let balance = balance.trim();
     if balance.is_empty() || balance == "0" {
         return Ok(0);

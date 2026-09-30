@@ -33,7 +33,7 @@ pub fn output_gap_bps(local_out: u128, chain_out: u128) -> i64 {
 /// Venues without `hop_amount_out_on_chain` support — missing chain_out is not
 /// a divergence signal.
 pub fn on_chain_hop_supported(source: &str) -> bool {
-    matches!(source, "Arc venue" | "Arc venue_clmm" | "Arc venue")
+    matches!(source, "aquarius" | "aquarius_clmm" | "soroswap")
 }
 
 pub fn first_diverging_hop(hops: &[HopCompare], threshold_bps: i64) -> Option<usize> {
@@ -150,7 +150,7 @@ mod tests {
         let hops = vec![
             HopCompare {
                 index: 0,
-                source: "Arc venue".into(),
+                source: "phoenix".into(),
                 pool: "P0".into(),
                 amount_in: 100_000_000,
                 local_out: 0,
@@ -158,7 +158,7 @@ mod tests {
             },
             HopCompare {
                 index: 1,
-                source: "Arc venue".into(),
+                source: "aquarius".into(),
                 pool: "P1".into(),
                 amount_in: 50_000_000,
                 local_out: 100_200_000,
@@ -190,7 +190,7 @@ mod tests {
         let hops = vec![
             HopCompare {
                 index: 0,
-                source: "Arc venue".into(),
+                source: "soroswap".into(),
                 pool: "P0".into(),
                 amount_in: 100_000_000,
                 local_out: 50_000_000,
@@ -198,7 +198,7 @@ mod tests {
             },
             HopCompare {
                 index: 1,
-                source: "Arc venue".into(),
+                source: "aquarius".into(),
                 pool: "P1".into(),
                 amount_in: 50_000_000,
                 local_out: 100_200_000,
@@ -223,7 +223,7 @@ mod tests {
         let hops = vec![
             HopCompare {
                 index: 0,
-                source: "Arc venue".into(),
+                source: "soroswap".into(),
                 pool: "P0".into(),
                 amount_in: 100_000_000,
                 local_out: 0,
@@ -231,7 +231,7 @@ mod tests {
             },
             HopCompare {
                 index: 1,
-                source: "Arc venue".into(),
+                source: "aquarius".into(),
                 pool: "P1".into(),
                 amount_in: 50_000_000,
                 local_out: 100_200_000,
@@ -247,7 +247,7 @@ mod tests {
         let hops = vec![
             HopCompare {
                 index: 0,
-                source: "Arc venue".into(),
+                source: "soroswap".into(),
                 pool: "P0".into(),
                 amount_in: 100_000_000,
                 local_out: 0,
@@ -255,7 +255,7 @@ mod tests {
             },
             HopCompare {
                 index: 1,
-                source: "Arc venue".into(),
+                source: "aquarius".into(),
                 pool: "P1".into(),
                 amount_in: 50_000_000,
                 local_out: 0,
@@ -270,7 +270,7 @@ mod tests {
     fn hop_compare_report_omits_gap_when_local_out_unknown() {
         let hop = HopCompare {
             index: 0,
-            source: "Arc venue".into(),
+            source: "soroswap".into(),
             pool: "P0".into(),
             amount_in: 100_000_000,
             local_out: 0,

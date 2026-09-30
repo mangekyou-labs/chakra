@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
-# Build optimized WASM and deploy Chakra aggregator on Arc **testnet**.
+# Build optimized WASM and deploy LumAgg aggregator on Stellar **testnet**.
 #
 # Hard rule: refuses mainnet / Public Global passphrase.
 #
 # Prerequisites:
-#   - Arc CLI
-#   - Admin key: Arc keys add admin --secret-key ... (testnet-funded)
+#   - stellar CLI
+#   - Admin key: stellar keys add admin --secret-key ... (testnet-funded)
 #
 # Usage:
 #   ./contracts/aggregator/deploy-testnet.sh
@@ -13,7 +13,7 @@
 #   AGGREGATOR=C... ./contracts/aggregator/deploy-testnet.sh   # reuse existing id
 #
 # Env overrides (still must be testnet):
-#   RPC_URL=https://Arc-testnet.Arc.org
+#   RPC_URL=https://soroban-testnet.stellar.org
 
 set -euo pipefail
 
@@ -46,12 +46,12 @@ CONTRACT_ID=$(deploy_wasm "$WASM")
 echo ""
 echo "=== Aggregator deployed ==="
 echo "AGGREGATOR=$CONTRACT_ID"
-echo "  https://Arc.expert/explorer/testnet/contract/$CONTRACT_ID"
+echo "  https://stellar.expert/explorer/testnet/contract/$CONTRACT_ID"
 echo "$CONTRACT_ID" > "$ID_FILE"
 echo "(saved to $ID_FILE)"
 
 echo "=== initialize(admin=$ADMIN_G) ==="
-run_Arc_tx "initialize" Arc contract invoke \
+run_stellar_tx "initialize" stellar contract invoke \
   --id "$CONTRACT_ID" \
   --source-account "$ADMIN" \
   --rpc-url "$RPC_URL" \

@@ -1,4 +1,4 @@
-//! HTTP client for Chakra quote-api (`GET /api/v1/quote`).
+//! HTTP client for LumAgg quote-api (`GET /api/v1/quote`).
 
 use {
     crate::{config::ArbConfig, invoke::ArbSwapStep},
@@ -114,7 +114,7 @@ impl QuoteApiClient {
         let slippage_pct = config.slippage_bps as f64 / 100.0;
         let base_url = self.next_base_url();
         let mut url = format!(
-            "{base_url}/api/v1/quote?token_in={}&token_out={}&amount_in={}&slippage={slippage_pct}&prefer_Arc=1&max_hops={}&max_splits={}",
+            "{base_url}/api/v1/quote?token_in={}&token_out={}&amount_in={}&slippage={slippage_pct}&prefer_soroban=1&max_hops={}&max_splits={}",
             token_in.canonical(),
             token_out.canonical(),
             amount_in,
@@ -178,7 +178,7 @@ impl QuoteApiClient {
         }
         let base_url = self.next_base_url();
         let url = format!(
-            "{base_url}/api/v1/quote?token_in={token_in}&token_out={token_out}&amount_in={amount_in}&slippage=0.5&prefer_Arc=1&max_hops=3&max_splits=1"
+            "{base_url}/api/v1/quote?token_in={token_in}&token_out={token_out}&amount_in={amount_in}&slippage=0.5&prefer_soroban=1&max_hops=3&max_splits=1"
         );
         let resp = self
             .http
@@ -326,13 +326,13 @@ mod tests {
             is_split: false,
             compute_time_ms: 3,
             sub_routes: vec![QuoteApiSubRoute {
-                source: "Arc venue".into(),
+                source: "soroswap".into(),
                 path: vec![
                     "CAS3J7GYLGXMF6TDJBBYYSE3HQ6BBSMLNUQ34T6TZMYMW2EVH34XOWMA".into(),
                     "CCW67TSZV3SSS2HXMBQ5JFGCKJNXKZM7UQUWUZPUTHXSTZLEO7SJMI75".into(),
                 ],
                 pool_addresses: vec!["POOL123".into()],
-                dex_types: vec!["Arc venue".into()],
+                dex_types: vec!["soroswap".into()],
                 in_indices: vec![0],
                 out_indices: vec![1],
                 amount_in: "1000000000".into(),

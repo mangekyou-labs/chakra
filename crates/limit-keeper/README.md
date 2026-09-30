@@ -1,7 +1,7 @@
 # limit-keeper
 
-Self-hosted operator binary that discovers open limit orders on the Chakra
-`order-escrow` contract via Arc `getEvents`, quotes through the Chakra API,
+Self-hosted operator binary that discovers open limit orders on the LumAgg
+`order-escrow` contract via Soroban `getEvents`, quotes through the LumAgg API,
 and permissionlessly submits `fill` when the on-chain limit price is met.
 
 The keeper also executes due DCA chunks. Limit and DCA IDs use separate
@@ -11,16 +11,16 @@ namespaces and are tracked as `(order_kind, order_id)` to avoid collisions.
 
 | Variable | Required | Default | Purpose |
 |----------|----------|---------|---------|
-| `KEEPER_RPC_URL` | yes | — | Arc RPC endpoint |
+| `KEEPER_RPC_URL` | yes | — | Soroban RPC endpoint |
 | `KEEPER_SECRET` | yes* | — | Filler account secret seed (signs fill txs) |
 | `KEEPER_NETWORK` | yes | — | Network passphrase (`public` or `testnet`) |
 | `ESCROW_CONTRACT` | yes | — | Deployed `order-escrow` contract ID (`C…`) |
-| `AGGREGATOR_CONTRACT` | yes | — | Chakra aggregator contract ID (`C…`) |
-| `QUOTE_API_URL` | yes | — | Chakra quote API base URL (e.g. `https://api.Chakra.xyz`) |
+| `AGGREGATOR_CONTRACT` | yes | — | LumAgg aggregator contract ID (`C…`) |
+| `QUOTE_API_URL` | yes | — | LumAgg quote API base URL (e.g. `https://api.lumagg.xyz`) |
 | `KEEPER_POLL_SECS` | no | `10` | Seconds between poll loops |
 | `KEEPER_CURSOR_PATH` | no | `keeper.cursor` | Atomic checkpoint containing the ledger cursor and open orders |
 | `KEEPER_DRY_RUN` | no | off | Set to `1` to quote and log only; never sign or submit |
-| `KEEPER_MAX_FILL` | no | — | Optional cap per fill (atomic unitss) |
+| `KEEPER_MAX_FILL` | no | — | Optional cap per fill (stroops) |
 | `KEEPER_RECLAIM` | no | off | **MVP skip:** when `1`, expired orders are logged but reclaim txs are not submitted |
 
 \* `KEEPER_SECRET` is optional when `KEEPER_DRY_RUN=1` (dry-run never signs).
@@ -40,11 +40,11 @@ Validate discovery, quoting, and fillability without spending fees or submitting
 transactions:
 
 ```bash
-export KEEPER_RPC_URL=https://Arc-testnet.Arc.org
+export KEEPER_RPC_URL=https://soroban-testnet.stellar.org
 export KEEPER_NETWORK=testnet
 export ESCROW_CONTRACT=C…
 export AGGREGATOR_CONTRACT=C…
-export QUOTE_API_URL=https://api.Chakra.xyz
+export QUOTE_API_URL=https://api.lumagg.xyz
 export KEEPER_DRY_RUN=1
 export KEEPER_POLL_SECS=15
 

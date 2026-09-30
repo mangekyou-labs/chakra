@@ -1,6 +1,6 @@
 ## Goal
 
-Refactor the Arc contracts from single-file `lib.rs` implementations into
+Refactor the Soroban contracts from single-file `lib.rs` implementations into
 small, focused modules without changing external behavior.
 
 This design covers:
@@ -277,15 +277,15 @@ so it should have a dedicated boundary.
 
 Responsibilities:
 
-- `Arc venue_fee`
-- `Arc venue_get_amount_out`
+- `soroswap_fee`
+- `soroswap_get_amount_out`
 - route scaling helpers
 - any pure calculation helper
 
 Rules:
 
 - pure functions only
-- no `Env` unless absolutely necessary for Arc collection construction
+- no `Env` unless absolutely necessary for Soroban collection construction
 
 ### `aggregator/src/validate.rs`
 

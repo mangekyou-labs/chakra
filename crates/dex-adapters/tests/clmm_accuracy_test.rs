@@ -1,30 +1,30 @@
 //! CLMM accuracy test: compare local tick-math computation vs on-chain
 //! simulate.
 //!
-//! Tests Arc venue concentrated pools and Sushi V3 pools.
+//! Tests Aquarius concentrated pools and Sushi V3 pools.
 //! Run with: cargo test --test clmm_accuracy_test -- --ignored --nocapture
 //!
-//! Requires network access to Arc mainnet RPC.
+//! Requires network access to Stellar mainnet RPC.
 
 use {
     dex_adapters::{
-        Arc venue_clmm::Arc venueClmmAdapter,
+        aquarius_clmm::AquariusClmmAdapter,
         clmm_math,
-        rpc::{scval_to_address, scval_to_i128, scval_to_u128, ArcRpc},
+        rpc::{scval_to_address, scval_to_i128, scval_to_u128, SorobanRpc},
         traits::TokenId,
         DexAdapter,
     },
     std::sync::Arc,
-    Arc_xdr::curr as xdr,
+    stellar_xdr::curr as xdr,
 };
 
-/// XLM SAC (Arc Asset Contract) address on mainnet
+/// XLM SAC (Stellar Asset Contract) address on mainnet
 const XLM_CONTRACT: &str = "CAS3J7GYLGXMF6TDJBBYYSE3HQ6BBSMLNUQ34T6TZMYMW2EVH34XOWMA";
 /// USDC SAC address on mainnet
 const USDC_CONTRACT: &str = "CCW67TSZV3SSS2HXMBQ5JFGCKJNXKZM7UQUWUZPUTHXSTZLEO7SJMI75";
 
-/// Arc venue Router
-const Arc venue_ROUTER: &str = "CBQDHNBFBZYE4MKPWBSJOPIYLW4SFSXAXUTSXJN76GNKYVYPCKWC6QUK";
+/// Aquarius Router
+const AQUARIUS_ROUTER: &str = "CBQDHNBFBZYE4MKPWBSJOPIYLW4SFSXAXUTSXJN76GNKYVYPCKWC6QUK";
 
 /// Sushi V3 Pool Lens (for reading tick data)
 const SUSHI_POOL_LENS: &str = "CDFGDFKEN7EVMI3DKIEQ6BKDAKEPHTEPWC6G2ZTDY7ATVCLD24AAU2IN";
@@ -32,20 +32,20 @@ const SUSHI_POOL_LENS: &str = "CDFGDFKEN7EVMI3DKIEQ6BKDAKEPHTEPWC6G2ZTDY7ATVCLD2
 /// Sushi V3 Factory
 const SUSHI_FACTORY: &str = "CD3KRKGDRVWPXVB3VXLUMQKMX6XZ6Q2H334IVZD4XXNAMKSRVQL5GLYF";
 
-fn mainnet_rpc() -> Arc<ArcRpc> {
-    Arc::new(ArcRpc::mainnet())
+fn mainnet_rpc() -> Arc<SorobanRpc> {
+    Arc::new(SorobanRpc::mainnet())
 }
 
-/// Helper: simulate a swap on an Arc venue concentrated pool contract.
+/// Helper: simulate a swap on an Aquarius concentrated pool contract.
 /// Returns (amount0, amount1) where positive = user pays, negative = user
 /// receives.
-async fn Arc venue_clmm_simulate_swap(
-    rpc: &ArcRpc,
+async fn aquarius_clmm_simulate_swap(
+    rpc: &SorobanRpc,
     pool_address: &str,
     zero_for_one: bool,
     amount_in: i128,
 ) -> Option<(i128, i128)> {
-    // Arc venue concentrated pool has: simulate_swap(zero_for_one: bool,
+    // Aquarius concentrated pool has: simulate_swap(zero_for_one: bool,
     // amount_specified: i128, sqrt_price_limit_x96: U256) Returns (amount0:
     // i128, amount1: i128)
     let zero_for_one_val = xdr::ScVal::Bool(zero_for_one);
@@ -97,14 +97,14 @@ async fn Arc venue_clmm_simulate_swap(
 /// Helper: simulate a swap on a Sushi V3 pool via pool-lens
 /// quote_exact_input_single.
 async fn sushi_simulate_quote(
-    rpc: &ArcRpc,
+    rpc: &SorobanRpc,
     token_in: &str,
     token_out: &str,
     fee: u32,
     amount_in: i128,
 ) -> Option<i128> {
-    let token_in_hash = Arc_strkey::Contract::from_string(token_in).ok()?.0;
-    let token_out_hash = Arc_strkey::Contract::from_string(token_out).ok()?.0;
+    let token_in_hash = stellar_strkey::Contract::from_string(token_in).ok()?.0;
+    let token_out_hash = stellar_strkey::Contract::from_string(token_out).ok()?.0;
 
     // Call pool-lens quote_exact_input_single(token_in, token_out, fee, amount_in,
     // sqrt_price_limit_x96)
@@ -140,8 +140,8 @@ async fn sushi_simulate_quote(
     }
 }
 
-/// Discover Arc venue concentrated pools containing XLM.
-async fn find_Arc venue_clmm_pools_with_xlm(rpc: &ArcRpc) -> Vec<String> {
+/// Discover Aquarius concentrated pools containing XLM.
+async fn find_aquarius_clmm_pools_with_xlm(rpc: &SorobanRpc) -> Vec<String> {
     let mut pool_addresses = Vec::new();
 
     // Query in batches to cover more pools
@@ -157,7 +157,7 @@ async fn find_Arc venue_clmm_pools_with_xlm(rpc: &ArcRpc) -> Vec<String> {
         });
 
         match rpc
-            .simulate_call(Arc venue_ROUTER, "get_pools_for_tokens_range", vec![start_val, end_val])
+            .simulate_call(AQUARIUS_ROUTER, "get_pools_for_tokens_range", vec![start_val, end_val])
             .await
         {
             Ok(result) => {
@@ -182,7 +182,7 @@ async fn find_Arc venue_clmm_pools_with_xlm(rpc: &ArcRpc) -> Vec<String> {
             }
             Err(e) => {
                 if batch_start == 0 {
-                    println!("Failed to query Arc venue router: {}", e);
+                    println!("Failed to query Aquarius router: {}", e);
                 }
                 break; // Likely past the end
             }
@@ -207,18 +207,18 @@ fn check_tokens_contain_xlm(val: &xdr::ScVal) -> bool {
     false
 }
 
-/// Test: Read Arc venue concentrated pool state and compare local vs simulate
+/// Test: Read Aquarius concentrated pool state and compare local vs simulate
 /// quote.
 #[tokio::test]
 #[ignore] // requires network
-async fn test_Arc venue_clmm_quote_accuracy() {
+async fn test_aquarius_clmm_quote_accuracy() {
     let rpc = mainnet_rpc();
 
-    println!("=== Arc venue CLMM Quote Accuracy Test ===\n");
+    println!("=== Aquarius CLMM Quote Accuracy Test ===\n");
 
     // 1. Find concentrated pools with XLM
-    println!("Discovering Arc venue concentrated pools with XLM...");
-    let pool_addresses = find_Arc venue_clmm_pools_with_xlm(&rpc).await;
+    println!("Discovering Aquarius concentrated pools with XLM...");
+    let pool_addresses = find_aquarius_clmm_pools_with_xlm(&rpc).await;
     println!("Found {} candidate pools", pool_addresses.len());
 
     if pool_addresses.is_empty() {
@@ -255,7 +255,7 @@ async fn test_Arc venue_clmm_quote_accuracy() {
 
     // 3. For each concentrated pool, compare on-chain estimate_swap vs local
     //    computation
-    let adapter = Arc venueClmmAdapter::new(rpc.clone());
+    let adapter = AquariusClmmAdapter::new(rpc.clone());
 
     for pool_addr in concentrated_pools.iter().take(3) {
         println!("\n--- Pool: {} ---", pool_addr);
@@ -314,7 +314,7 @@ async fn test_Arc venue_clmm_quote_accuracy() {
             println!("  Loading pool state for local computation...");
 
             // Direct debug: try reading instance storage
-            let contract_hash = Arc_strkey::Contract::from_string(pool_addr).unwrap().0;
+            let contract_hash = stellar_strkey::Contract::from_string(pool_addr).unwrap().0;
             let instance_key = xdr::LedgerKey::ContractData(xdr::LedgerKeyContractData {
                 contract: xdr::ScAddress::Contract(xdr::ContractId(xdr::Hash(contract_hash))),
                 key: xdr::ScVal::LedgerKeyContractInstance,
@@ -526,7 +526,7 @@ async fn test_sushi_v3_local_quote_accuracy() {
         println!("  tick={}, liq={}, spacing={}", tick, liquidity, tick_spacing);
 
         // Read tick data via pool-lens
-        let pool_hash = Arc_strkey::Contract::from_string(pool_addr).unwrap().0;
+        let pool_hash = stellar_strkey::Contract::from_string(pool_addr).unwrap().0;
         let pool_scval = xdr::ScVal::Address(xdr::ScAddress::Contract(xdr::ContractId(xdr::Hash(pool_hash))));
 
         let compressed_tick = floor_div(tick, tick_spacing);
@@ -725,8 +725,8 @@ async fn test_sushi_pool_state_reading() {
     println!("=== Sushi V3 Pool State Reading ===\n");
 
     // Find XLM/USDC pool (try 3000 bps = 0.3%)
-    let token_a_hash = Arc_strkey::Contract::from_string(XLM_CONTRACT).unwrap().0;
-    let token_b_hash = Arc_strkey::Contract::from_string(USDC_CONTRACT).unwrap().0;
+    let token_a_hash = stellar_strkey::Contract::from_string(XLM_CONTRACT).unwrap().0;
+    let token_b_hash = stellar_strkey::Contract::from_string(USDC_CONTRACT).unwrap().0;
 
     let args = vec![
         xdr::ScVal::Address(xdr::ScAddress::Contract(xdr::ContractId(xdr::Hash(token_a_hash)))),

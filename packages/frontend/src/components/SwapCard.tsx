@@ -33,7 +33,7 @@ import {
   type SwapSettings,
 } from '@/lib/swap-settings';
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://api.Chakra.xyz';
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://api.lumagg.xyz';
 
 export function SwapCard() {
   const [tokenIn, setTokenIn] = useState<Token>(TOKENS[0]);
@@ -97,8 +97,8 @@ export function SwapCard() {
       }
 
       try {
-        const amountatomic unitss = decimalToAtomicUnits(amountIn, tokenIn.decimals);
-        const result = await getQuote(tokenIn.id, tokenOut.id, amountatomic unitss, {
+        const amountStroops = decimalToAtomicUnits(amountIn, tokenIn.decimals);
+        const result = await getQuote(tokenIn.id, tokenOut.id, amountStroops, {
           slippage,
           maxHops,
           maxSplits,
@@ -193,8 +193,8 @@ export function SwapCard() {
     [tokenIn, tokenOut],
   );
 
-  const formatOutput = (atomic unitss: string) => {
-    const val = parseInt(atomic unitss) / 10 ** tokenOut.decimals;
+  const formatOutput = (stroops: string) => {
+    const val = parseInt(stroops) / 10 ** tokenOut.decimals;
     if (val >= 1000) return val.toFixed(2);
     if (val >= 1) return val.toFixed(4);
     return val.toFixed(7);
@@ -211,7 +211,7 @@ export function SwapCard() {
     kind?: 'trustline' | 'swap';
   } | null>(null);
 
-  const balanceatomic unitss = walletAddress ? getBalance(tokenIn.id) : null;
+  const balanceStroops = walletAddress ? getBalance(tokenIn.id) : null;
   const outputHasTrustline = walletAddress ? getHasTrustline(tokenOut.id) : null;
 
   useEffect(() => {
@@ -260,12 +260,12 @@ export function SwapCard() {
 
   const applyBalancePercent = useCallback(
     (percent: number) => {
-      if (balanceatomic unitss === null || balanceatomic unitss === BigInt(0)) return;
-      setAmountIn(percentToAmountInput(balanceatomic unitss, percent, tokenIn.decimals, tokenIn.id));
+      if (balanceStroops === null || balanceStroops === BigInt(0)) return;
+      setAmountIn(percentToAmountInput(balanceStroops, percent, tokenIn.decimals, tokenIn.id));
       setQuote(null);
       setTxResult(null);
     },
-    [balanceatomic unitss, tokenIn.decimals, tokenIn.id],
+    [balanceStroops, tokenIn.decimals, tokenIn.id],
   );
 
   const handleSwap = useCallback(async () => {
@@ -314,7 +314,7 @@ export function SwapCard() {
       const sub_routes = buildRoutes.map((route) => ({
         amount_in: route.amount_in,
         steps: route.pool_addresses.map((pool: string, i: number) => ({
-          dex_type: route.dex_types[i] ?? 'Arc venue',
+          dex_type: route.dex_types[i] ?? 'aquarius',
           pool_address: pool,
           token_in: route.path[i] ?? '',
           token_out: route.path[i + 1] ?? '',
@@ -541,9 +541,9 @@ export function SwapCard() {
               <span className="text-[var(--text-secondary)] truncate tabular-nums font-[family-name:var(--font-mono)] text-[13px]">
                 {balancesLoading && !balancesReady ? (
                   'Balance…'
-                ) : balanceatomic unitss !== null ? (
+                ) : balanceStroops !== null ? (
                   <>
-                    {formatBalanceDisplay(balanceatomic unitss, tokenIn.decimals)} {tokenIn.symbol}
+                    {formatBalanceDisplay(balanceStroops, tokenIn.decimals)} {tokenIn.symbol}
                   </>
                 ) : (
                   '—'
@@ -572,8 +572,8 @@ export function SwapCard() {
           </div>
           {walletAddress &&
             balancesReady &&
-            balanceatomic unitss !== null &&
-            balanceatomic unitss > BigInt(0) && (
+            balanceStroops !== null &&
+            balanceStroops > BigInt(0) && (
               <div className="flex items-center gap-1.5 mt-3">
                 {[25, 50, 75, 100].map((pct) => (
                   <button
@@ -697,7 +697,7 @@ export function SwapCard() {
                   ? 'Trustline added. You can swap now. '
                   : 'Swap submitted successfully. '}
                 <a
-                  href={`https://Arc.expert/explorer/public/tx/${txResult.hash}`}
+                  href={`https://stellar.expert/explorer/public/tx/${txResult.hash}`}
                   target="_blank"
                   rel="noopener"
                   className="underline"
