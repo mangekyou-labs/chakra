@@ -466,3 +466,32 @@ commit / push onto PR #10 when asked. Do not merge.
 - Public on-chain balance checks returned 1.949753 USDC and
   1.949753248 native units for the QA wallet. The live split is unfundable, so
   no transaction was built or broadcast and T11.12-F remains open.
+
+## Historical Arc split-swap evidence (2026-09-08)
+
+TDD red/green:
+
+- Red: six Node tests failed against explicit unimplemented behavior for the
+  recorded fixture, state-override payload, success invariants, rollback
+  invariants, ABI decoding, and `uint256.max` rollback calldata.
+- Green: `npm run test:historical-arc-split` passed all 6 tests.
+
+Read-only integration at block `60,763,000`:
+
+- `npm run qa:swap:historical` compiled the injected harness with
+  `forge build --offline` and issued two `eth_call`s. No transaction was sent.
+- Success: Presto received 20,516,011,900 and Xylo received 950,988,100 USDC
+  micros; the user spent exactly 21,467,000,000 and received exactly the
+  aggregator's returned 25,254,638,021 EURC micros, clearing the recorded
+  24,805,280,879 minimum. Both venues' reserves changed and all three
+  aggregator catalog balances finished at zero.
+- Rollback: `minAmountOut = uint256.max` returned the aggregator's
+  `SlippageExceeded(uint256,uint256)` selector. User balances, aggregator
+  catalog balances, Xylo reserves, and Presto reserves matched their pre-call
+  snapshots exactly.
+
+This proves deployed execution and atomic rollback against historical Arc
+state. It cannot prove a mined receipt, emitted-log ingestion, or a
+`split_swaps` increment, so T11.12-F remains open. Evidence status: split quote
+generation — proven; deployed split execution against historical Arc state —
+proven; public mined split transaction and Arcscan receipt — pending.

@@ -1,0 +1,31 @@
+@startuml pool-state-channels
+!include _theme.iuml
+skinparam linetype polyline
+title Pool-state update channels
+caption Worker is the only Redis writer. Numbers match the Architecture page.
+
+actor "On-chain activity" as Chain
+participant "Arc RPC" as RPC
+box "chakra-market-data-worker"
+  participant Bootstrap as Boot
+  participant "Log watcher" as LW
+  participant "Fetch pipeline" as FP
+  participant "DEX adapters" as AD
+  participant Discovery as Disc
+end box
+database Redis
+participant "api-server" as API
+
+Boot -> Redis : 1. publish topology +\nfull pool state
+LW -> RPC : 2. eth_subscribe logs\ninclusion is final
+Chain -> RPC : swap / mint / burn
+LW -> RPC : 3. eth_getLogs fallback\nevery 500 ms · topic0 batches of 10
+LW -> FP : 3. touched pools
+FP -> AD : 4. fetch touched pools
+AD -> RPC : eth_call
+FP -> Redis : 5. SET (CLMM only if\ncoverage complete)
+Disc -> Redis : 6. discovery ~600 s\nfull republish
+API -> Redis : 7. reload last snapshot
+API -> Redis : 7. MGET on candidate paths
+
+@enduml

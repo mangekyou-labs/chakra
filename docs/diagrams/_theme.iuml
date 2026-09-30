@@ -1,0 +1,69 @@
+' Shared look for Chakra architecture diagrams. Included, not rendered alone.
+' Smetana: built-in layout so Graphviz is not required.
+' Print/GitBook canvas is light paper; product UI is dark-first (see brand.md).
+!pragma layout smetana
+skinparam backgroundColor #FFFFFF
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+skinparam defaultFontSize 13
+skinparam ArrowColor #15100D
+skinparam ArrowFontColor #15100D
+skinparam ArrowThickness 1.2
+skinparam RoundCorner 8
+skinparam Padding 6
+skinparam wrapWidth 180
+skinparam maxMessageSize 180
+
+skinparam ActorBackgroundColor #FFFFFF
+skinparam ActorBorderColor #15100D
+skinparam ActorFontColor #15100D
+
+skinparam ParticipantBackgroundColor #F6F3EE
+skinparam ParticipantBorderColor #15100D
+skinparam ParticipantFontColor #15100D
+skinparam ParticipantPadding 12
+skinparam SequenceLifeLineBorderColor #B8AFA6
+skinparam SequenceLifeLineBackgroundColor #FFFFFF
+skinparam SequenceGroupBackgroundColor #FFFDF9
+skinparam SequenceGroupBorderColor #15100D
+skinparam SequenceGroupHeaderFontColor #15100D
+skinparam SequenceDividerBackgroundColor #F7EDE4
+skinparam SequenceDividerFontColor #15100D
+skinparam SequenceBoxBackgroundColor #FFFDF9
+skinparam SequenceBoxBorderColor #5D5148
+skinparam SequenceBoxFontColor #15100D
+
+skinparam ComponentBackgroundColor #F6F3EE
+skinparam ComponentBorderColor #15100D
+skinparam ComponentFontColor #15100D
+skinparam ComponentStyle uml2
+
+skinparam DatabaseBackgroundColor #F7EDE4
+skinparam DatabaseBorderColor #15100D
+skinparam DatabaseFontColor #15100D
+
+skinparam CloudBackgroundColor #F6F3EE
+skinparam CloudBorderColor #15100D
+skinparam CloudFontColor #15100D
+
+skinparam PackageBackgroundColor #FFFDF9
+skinparam PackageBorderColor #5D5148
+skinparam PackageFontColor #15100D
+skinparam PackageTitleFontColor #15100D
+skinparam PackageStyle rectangle
+
+skinparam RectangleBackgroundColor #FFFDF9
+skinparam RectangleBorderColor #5D5148
+skinparam RectangleFontColor #15100D
+
+skinparam NoteBackgroundColor #F7EDE4
+skinparam NoteBorderColor #EC7A3A
+skinparam NoteFontColor #15100D
+
+skinparam TitleFontSize 16
+skinparam TitleFontColor #15100D
+skinparam FooterFontColor #5D5148
+skinparam FooterFontSize 11
+
+hide stereotype
+skinparam linetype ortho

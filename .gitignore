@@ -37,6 +37,11 @@ contracts/evm/cache/
 contracts/evm/broadcast/
 contracts/evm/lib/
 
+# Local PlantUML jar used by docs/diagrams/render.sh (~24MB)
+docs/diagrams/plantuml.jar
+docs/diagrams/node_modules
+docs/grants/node_modules
+
 # Playwright QA output (ephemeral)
 output/
 playwright-report/

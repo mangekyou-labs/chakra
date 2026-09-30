@@ -337,3 +337,36 @@ commit ID to Render as `dep-daenql8u01pc73f9prfg`. The deployment reached
 smallest observed split at 21,467 USDC and 21,466 USDC still single-route.
 The documented QA wallet has 1.949753 USDC, so no transaction was built or
 broadcast. T11.12 remains open at F pending a fundable split and live receipt.
+
+## Historical Arc split simulation (2026-09-08)
+
+- Added `contracts/evm/test/HistoricalArcSplitHarness.sol`, whose runtime
+  bytecode is injected at unused address `0x000000000000000000000000000000000000c0de`
+  solely through an `eth_call` code override at block `60,763,000`. The same
+  override assigns 21,467 native USDC ephemerally; the harness approves the
+  real Arc USDC contract to Permit2, approves the deployed aggregator through
+  Permit2, then calls the deployed `splitSwap`.
+- The harness pins two distinct single-hop routes: 20,516,011,900 USDC micros
+  through Presto `0x5794...24d6`, and 950,988,100 through Xylo
+  `0x3DF3...bb1`; deadline is `uint256.max` for historical execution.
+- The harness returns before/after user and aggregator catalog balances,
+  Xylo `getReserves()`, and Presto EURC spoke `pathReserves` / `tokenReserves`.
+  It catches revert bytes so a forced-slippage call can return rollback
+  snapshots without weakening atomicity.
+- Added `historical-arc-split-lib.mjs`, its Node unit tests, and the
+  `qa:swap:historical` runner. The runner compiles the harness offline, sends
+  only `eth_call`, decodes snapshots, enforces all success/rollback invariants,
+  and prints evidence. It has no private-key or broadcast path.
+- No production contract, router, API, frontend, architecture, or interface
+  changed for this simulation. The lifecycle and Circle grant documents now
+  distinguish historical deployed-contract validation from public mined
+  two-route evidence.
+
+Fresh Arc evidence returned 25,254,638,021 EURC micros for the recorded
+21,467,000,000-USDC-micro input, above the 24,805,280,879 minimum. Both venues
+moved and aggregator catalog balances ended at zero. The max-minimum call
+returned `SlippageExceeded` and all tracked balances/reserves were unchanged.
+This does not close T11.12-F: `eth_call` has no receipt and does not increment
+analytics. Split quote generation and deployed split execution against
+historical Arc state are proven; a public mined split transaction and Arcscan
+receipt remain pending.

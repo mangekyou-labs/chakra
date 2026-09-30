@@ -17,7 +17,9 @@
     "qa:wallet:setup": "node qa/wallet/setup.mjs",
     "qa:wallet": "npx playwright test --config=qa.wallet.config.ts",
     "qa:wallet:cleanup": "rm -rf output/playwright",
-    "qa:swap:smoke": "node qa/swap/smoke.mjs"
+    "qa:swap:smoke": "node qa/swap/smoke.mjs",
+    "qa:swap:historical": "node qa/swap/historical-arc-split.mjs",
+    "test:historical-arc-split": "node --test qa/swap/historical-arc-split.test.mjs"
   },
   "dependencies": {
     "@tanstack/react-query": "^5.102.3",

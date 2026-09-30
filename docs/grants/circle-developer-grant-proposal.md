@@ -1,709 +1,185 @@
-# Circle 2026 Cohort 2 — Submit Proposal Workbook
+# Chakra — Circle Developer Grant Proposal
 
-**Program:** Circle Developer Grants — Circle 2026 Cohort 2
-**Portal:** [circle.questbook.app](https://circle.questbook.app/)
-**RFP:** [circle.com/grant](https://www.circle.com/grant)
-**Use case alignment:** Stablecoin FX on Arc (not Circle's StableFX product)
-**Evidence checked:** 4 September 2026
-**Companion architecture:** [Chakra Technical Architecture](../chakra-architecture.md)
+**Application draft · 30 September 2026**  
+**Request: 24,000 USDC · four milestones · 20 sequential weeks**
 
-This file is a paste workbook for the Questbook **Submit Proposal** form. Each
-heading matches a portal section. Each field has a labeled **Paste** or
-**Select** block in portal order. Copy only the fenced block (or the Select
-line) into the form.
+[Product](https://chakra-ag.vercel.app) · [Source](https://github.com/mangekyou-labs/chakra) · [Founder](https://github.com/MrSufferer) · [Demo](https://youtu.be/12hvXfd5rsE)
 
-Unknown legal and identity values are `TO_BE_FILLED`. Do not invent them at
-submit time. Character counts on limited fields were measured on 4 September
-2026.
+[Editable deck](Chakra-Circle-Grant-Pitch-Deck.pptx) · [PDF deck](Chakra-Circle-Grant-Pitch-Deck.pdf) · [Word proposal](Chakra-Circle-Grant-Proposal.docx)
 
-The 60,000 USDC request and 16-week plan live inside milestone details and the
-roadmap answers. The portal has no standalone budget field.
-
----
-
-## How to submit
-
-1. Complete every `TO_BE_FILLED` value in the checklist below.
-2. Paste Applicant Details through Conflict of Interest in portal order.
-3. Tick Circle product boxes from the Checked / Unchecked lists. If a live
-   label differs, tick the closest honest match and keep the prose the same.
-4. Record the 5-minute video from the shot list, then paste the unlisted URL.
-5. Paste the investor-deck URL if you have one; otherwise leave that field
-   empty and do not invent a link.
-6. Do not file until fill-ins, video, and conflict-of-interest confirmation
-   are real.
-
-This pass does not record the video, build a deck, or submit Questbook.
-
----
-
-## Fill-ins required before Questbook submit
-
-Replace every `TO_BE_FILLED` below. The rewrite can be used for every other
-field today.
-
-| Portal field | Status |
-| --- | --- |
-| Email address | `TO_BE_FILLED` |
-| Company Legal Entity Name | `TO_BE_FILLED` (GitHub org `mangekyou-labs` is not a legal entity) |
-| Project X handle | `TO_BE_FILLED` |
-| Founder / team locations (City, State/Province, Country) | `TO_BE_FILLED` |
-| Business location (country) | `TO_BE_FILLED` |
-| Is your business incorporated? | `TO_BE_FILLED` (Yes / No) |
-| Are you funded? | `TO_BE_FILLED` (Yes / No) |
-| Conflict of interest | `TO_BE_FILLED` (recommended **No** only if you confirm there is no Circle relationship) |
-| Video demo URL | `TO_BE_FILLED` |
-| Investor deck URL | `TO_BE_FILLED` |
-
----
-
-## Submit Proposal
-
-### Circle 2026 Cohort 2
-
-### Grant Program Details
-
-Click to view program RFP. Not a paste field.
-
-**RFP URL:** https://www.circle.com/grant
-
-Chakra's honest fit is the RFP **Stablecoin FX** use case on Arc, with USDC and
-EURC live today and Circle Wallets plus Gas Station as grant work. Do not
-reframe this application around CCTP, Gateway, Nanopayments, Agent Stack, or
-Circle's StableFX product.
-
----
+The existing Arc Testnet proof is separated from the proposed Circle integration work. Historical QA figures are dated. Applicant/legal confirmations and upload links remain explicit submission inputs.
 
 ## Applicant Details
 
-Provide personal or organizational details, including contact information and
-company details.
+**Primary contact first name:** Kyler  
+**Primary contact last name:** Nguyen  
+**Email address:** kylernguyeen@gmail.com **[confirm spelling]**  
+**Company Legal Entity Name:** Mangekyou Labs **[confirm against incorporation status]**  
+**Company Doing-Business-As (DBA) name:** Chakra **[confirm whether this is a registered DBA; otherwise use it as the project name per form instructions]**
 
-### Primary contact first name
+**Co-founder information (one line per founder):**  
+Kyler Nguyen | CEO | LinkedIn: [add link or state unavailable] | GitHub: https://github.com/MrSufferer | Technical founder responsible for Chakra's Solidity execution contract, Rust routing/API, and TypeScript integration surface; public GitHub: https://github.com/MrSufferer
 
-**Select / paste:**
-
-```
-Ligang
-```
-
-### Primary contact last name
-
-```
-Zhou
-```
-
-### Email address
-
-```
-TO_BE_FILLED
-```
-
-Use a monitored address. Do not invent one.
-
-### Company Legal Entity Name
-
-```
-TO_BE_FILLED
-```
-
-`mangekyou-labs` is the GitHub organization. It is not proof of incorporation
-or a legal entity name.
-
-### Company Doing-Business-As (DBA) name
-
-Portal hint: if you do not have a DBA name, provide your project name.
-
-```
-Chakra
-```
-
-### Founder names, roles, bios
-
-Jackson is core team, not a founder. Keep that distinction in the paste.
-
-```
-Ligang Zhou — Founder and Project Lead. Ligang owns Chakra's Solidity aggregator, Rust market-data worker, routing engine, REST API, TypeScript SDK, release operations, and the planned Circle Wallets / Gas Station backend. He previously shipped LumAgg, a multi-venue DEX aggregator on Stellar covering worker ingestion, Redis snapshots, pathfinding, split optimization, API, SDK, frontend, and on-chain execution. His background includes DEX routing and atomic execution across Flare, Stellar, Solana, Sui, Aptos, and Fuel, including price discovery, slippage controls, and production bot operations. GitHub: https://github.com/ligulfzhou — LinkedIn: https://www.linkedin.com/in/ligangzhou/
-
-Jackson (Jianhao Bi) — Frontend Engineer (core team; not a founder). Jackson owns the Next.js swap interface, wallet connection and transaction-state UX, responsive layout, and SDK integration examples. He will implement the user-facing Circle Wallets and Gas Station flows while keeping the existing external-wallet path. GitHub: https://github.com/Billshimmer — LinkedIn: https://www.linkedin.com/in/%E5%BB%BA%E6%B5%A9-%E6%AF%95-467967415/
-```
-
-### Project website
-
-```
-https://chakra-ag.vercel.app
-```
-
-### Project X handle
-
-```
-TO_BE_FILLED
-```
-
-### Project GitHub URL
-
-Portal hint: optional, if publicly available.
-
-```
-https://github.com/mangekyou-labs/chakra
-```
-
-### Where are you and your founders located?
-
-Portal format, one line per person: Full Name, Title, Location (City,
-State/Province, Country).
-
-```
-Ligang Zhou, Founder and Project Lead, TO_BE_FILLED (City, State/Province, Country)
-Jackson (Jianhao Bi), Frontend Engineer, TO_BE_FILLED (City, State/Province, Country)
-```
-
-### Where is your business located?
-
-**Select country:** `TO_BE_FILLED`
-
-### Is your business incorporated?
-
-**Select:** `TO_BE_FILLED` (Yes / No)
-
----
+**Project website:** https://chakra-ag.vercel.app  
+**Project X handle:** @chakraaggregator **[confirm]**  
+**Project GitHub URL:** https://github.com/mangekyou-labs/chakra  
+**Founder locations:** Kyler Nguyen, CEO, Da Nang, Vietnam **[confirm]**  
+**Business location:** Vietnam **[confirm legal location]**  
+**Is your business incorporated?:** [answer]
 
 ## Project Abstract
 
-### Project Name
+**Project Name (80-character limit):** Chakra
 
-Limit 80 characters. Recommended paste is 6 characters.
+**One-line description (200-character limit):** Chakra is an open-source Arc DEX aggregator that compares supported USDC/EURC venues and returns wallet-ready swap transactions through one API and web app.
 
-```
-Chakra
-```
+**What problem are you solving, why is it important, and what has kept it from being solved so far? (750-character limit):**
 
-If the portal wants a descriptive name, use this 32-character alternative
-instead, not both:
+Arc has USDC and EURC liquidity spread across DEX venues with different pool math and swap interfaces. A wallet or payments app offering a USDC/EURC swap must select a venue, build its own route adapter, and arrange gas for the user. Circle user-controlled wallets and Gas Station can handle authorization and eligible sponsorship, but they still need a reliable Arc quote and transaction payload. Chakra connects venue-aware same-chain routing to that wallet path, with an honest no-route result when liquidity is unavailable.
 
-```
-Chakra: Arc Stablecoin FX Router
-```
+**What is your solution to that problem? (750-character limit):**
 
-### Please provide a one liner description of your project (Limit to one sentence)
+Chakra's live Arc Testnet proof of concept quotes supported USDC/EURC pools and returns unsigned `build_tx` calldata for an external wallet to authorize. Its factory-gated aggregator settles atomic routes; unsupported or empty venues fail closed. This grant proposes a new SDK release with a Circle SCA adapter, distinct mined Arc Testnet SCA and Gas Station-sponsored swaps, mainnet integration readiness against a self-funded live route, and a CCTP V2 inbound USDC handoff. Arc mainnet deployment and an external-wallet proof are self-funded prerequisites, not Circle-funded deliverables.
 
-Limit 200 characters. This paste is 144 characters, one sentence.
-
-```
-Chakra is a non-custodial aggregator that compares executable USDC and EURC routes across Arc venues and returns wallet-ready swap transactions.
-```
-
-### What problem are you solving and why is it important?
-
-```
-Stablecoin liquidity on Arc is split across venues that use different pool mathematics, factories, and swap interfaces. A wallet or payment application that talks to each venue itself has to rebuild market observation, quote validation, and transaction construction. Users then see one venue's price instead of an executable comparison, and integrators cannot share a common USDC/EURC routing layer.
-
-That gap matters because Arc is being positioned as a settlement network for real-world financial flows. If exchanging USDC and EURC on Arc requires a custom adapter per venue, those assets stay harder to embed in wallets, payments, and treasury workflows. A shared, non-custodial comparison layer is infrastructure for the rest of the Arc application surface, not a single-app feature.
-```
-
-### What is your solution to that problem?
-
-```
-Chakra is an open-source, self-hostable aggregator for Arc. A market-data worker observes supported DEX pools from Arc logs and RPC state. A local router compares healthy constant-product, stable-swap, and concentrated-liquidity routes, including split orders when more than one healthy path exists. The REST API returns the best valid quote plus unsigned transaction data for a Solidity aggregator that supports Permit2. The user authorizes the swap in their own wallet. Chakra never holds keys and never submits on the user's behalf.
-
-Integrators can use the hosted REST API, the published TypeScript SDK (@chakra-ag/sdk), or a self-hosted stack. The current hosted product is live on Arc Testnet (chain ID 5042002) at https://chakra-ag.vercel.app with API https://chakra-api-0a5i.onrender.com.
-
-The grant does not rebuild that router. It adds a Circle user-controlled smart contract wallet on ARC-TESTNET and Circle Gas Station sponsorship for eligible transactions, so a user can approve a compared USDC/EURC route in an embedded wallet with policy-bound fee sponsorship.
-```
-
-### Why hasn’t this problem been solved yet? What are the barriers (regulatory, technical, etc.) that previously existed?
-
-```
-Arc is early. Venue interfaces are not standardized, live testnet reserves are thin, and an honest router has to fail closed when pool state is stale or incomplete. Seeding liquidity would manufacture a demo without proving the product.
-
-Quoting and custody are different problems. Comparing routes is not the same as issuing a user-controlled smart contract account or sponsoring gas under a policy. Those Circle Developer Platform pieces were not required to ship a first quote, and they are not present in the current codebase.
-
-Aggregators on other chains do not give Arc applications a native USDC/EURC execution layer. Cross-chain products such as CCTP or Gateway also do not solve same-chain venue comparison. This grant therefore stays on Arc-native routing plus Wallets and Gas Station, rather than expanding into a cross-chain story that the product does not need yet.
-```
-
-### Why are you and your team uniquely suited to solve this problem?
-
-```
-Ligang has already shipped a multi-venue DEX aggregator, LumAgg on Stellar, with the same operational shape Chakra uses: a market-data worker, Redis snapshots, pathfinder, split optimizer, REST API, TypeScript SDK, frontend, and on-chain aggregator. Chakra is that architecture on Arc, rewritten for Solidity, Permit2, and Arc's native USDC/EURC. It is not a slide-deck router. The hosted Arc Testnet API already returns USDC/EURC quotes from live Presto and Xylo venues.
-
-Jackson owns the wallet-facing interface, which is the surface Circle Wallets and Gas Station have to land on without breaking the existing external-wallet path.
-
-The team is two people who already operate the Arc stack. The grant is asked to fund confirmed execution evidence, Circle product integration, integrator validation, and independent security review — not to invent the aggregator from zero.
-```
-
-LumAgg is prior shipping evidence for this answer only. Do not list Stellar as
-a live chain in Product Alignment.
-
----
+**Team track record of acquiring these users/customers, with verifiable numbers (500-character limit):** Chakra has shipped an Arc Testnet app, quote/build API and wallet execution flow. A 30 September 2026 API fetch reports 5 indexed swaps, 5 USDC notional and 2 addresses, with about 44 hours of index freshness lag. These are testnet activity, not verified customers. Next: secure one Arc-supporting wallet integrator and publish its first swap receipt. Founder: https://github.com/MrSufferer
 
 ## Product Alignment Track
 
-Tell us about your product's current status, Arc integration, and Circle
-product usage.
+**Is your project currently live in production?:** [verify the current Arc mainnet deployment, live route, and transaction evidence at submission, then answer according to the form's definition; the hosted Arc Testnet proof is evidenced]
 
-### Is your project currently live in production?
+**Are you live on Arc?:** [select Arc Testnet based on existing evidence; also select mainnet if a verified Chakra deployment and currently quoteable route are public at submission]
 
-**Select:** Yes
+**Other production chains:** None for Chakra **[confirm]**
 
-Qualify in the chains field and traction answer: this means a public hosted
-Arc Testnet product (frontend, API, SDK, aggregator). It does not mean Arc
-mainnet.
+**Circle products currently integrated (video must validate each):** USDC and EURC token usage on Arc Testnet **[select only exact applicable form options]**. Do not select Circle Wallets, Gas Station, or CCTP as currently integrated without working code and a demonstrable flow.
 
-### Are you live on Arc?
-
-**Select:** Yes
-
-Arc Testnet, chain ID `5042002`. Aggregator
-`0xeb12351602c56d47c4ee955193335848952b29d8`. Native USDC is gas and ERC-20 at
-`0x3600000000000000000000000000000000000000`. EURC is
-`0x89B50855Aa3bE2F677cD6303Cec089B5F319D72a`.
-
-### Which other chain(s) are you currently live on?
-
-```
-None. Chakra is Arc-only.
-```
-
-Do not list Stellar, Flare, Solana, Sui, Aptos, or Fuel. Those appear only as
-Ligang's prior routing background.
-
-### Which Circle products are currently integrated into your project?
-
-Portal hint: the video must validate this.
-
-Tick only products the current codebase and live demo can show. Native Arc
-USDC (gas + ERC-20) and EURC in the token catalog, quotes, and aggregator
-calldata count. Circle Wallets, Gas Station, CCTP, and Gateway are not in the
-codebase.
-
-**Checked:**
-
-- USDC
-- EURC
-
-**Unchecked (do not tick, even if the label is tempting):**
-
-- Circle Wallets / Programmable Wallets / user-controlled wallets
-- Circle Gas Station
-- Circle Paymaster
-- CCTP
-- Bridge Kit
-- Circle Gateway
-- Nanopayments / x402
-- Circle Contracts (Chakra ships its own Solidity aggregator; it does not use
-  Circle contract templates as a product integration)
-- StableFX (the RFP use case is Stablecoin FX; StableFX is a different Circle
-  product and is not integrated)
-- Agent Stack
-- Circle Payments Network
-- App Kits
-- USYC
-
-If the portal uses a combined "USDC / EURC" box, tick that single box. If a
-label differs slightly, tick the closest honest match and leave the rest
-unchecked.
-
-### Which Circle products do you plan to integrate into your project?
-
-**Checked:**
-
-- Circle Wallets (user-controlled smart contract account on `ARC-TESTNET`;
-  email-OTP; server-only API credentials)
-- Circle Gas Station (policy-bound sponsorship for eligible Circle
-  smart-account transactions)
-
-**Unchecked:**
-
-- CCTP
-- Bridge Kit
-- Circle Gateway
-- Nanopayments / x402
-- Circle Paymaster
-- StableFX
-- Agent Stack
-- Circle Payments Network
-- App Kits
-- USYC
-- Circle Contracts as a Circle product
-
-USDC and EURC remain in use; they are current integrations, not merely planned.
-Do not add CCTP or Gateway to look more aligned. Architecture already excludes
-them from this grant.
-
----
+**Circle products planned:** Circle user-controlled Wallets / smart contract account **[match exact form options]**.  
+**Other Circle products planned:** Gas Station, policy-bound on the Circle SCA path; CCTP V2 inbound USDC handoff.
 
 ## Milestones and Timelines
 
-The portal repeats milestone title (limit 1,024 characters) and details (limit
-2,048 characters). Add six milestones in this order. Budget slices are inside
-the details because the form has no amount field. Combined request: **60,000
-USDC over 16 weeks from kickoff**.
+**Proposed Circle request:** 24,000 USDC over 20 sequential weeks after an agreed kickoff, led by one engineer. At Kyler's planning cost of 40 hours per week and 30 USDC per hour, this is 800 engineer hours × 30 USDC/hour. No other expense or markup is included. These are application estimates, not an award or guaranteed payout schedule. Portal dates should come from the agreed schedule. The budget covers new Circle integration, verification, and documentation; already shipped Chakra work and the self-funded mainnet proof are excluded.
 
-Do not group these under older SCF-style phase labels.
+Each milestone's deliverable, budget basis, metrics, and acceptance criteria below belong in its **Details** field. Replace evidence placeholders with direct public links before submission.
 
-### Milestone 01 — title
+### 01 — Publish a Circle adapter for the Chakra SDK
 
-Limit 1,024. This paste is 73 characters.
+**4,800 USDC; 4 weeks. Details (2,048-character limit):**
 
-```
-Confirmed Arc Testnet execution baseline (kickoff + 4 weeks; 13,000 USDC)
-```
+**Deliverable:** Publish a Circle user-controlled smart contract account (SCA) adapter in a new `@chakra-ag/sdk` release. It converts Chakra's existing unsigned `build_tx` response into Circle authorization data.
 
-### Milestone 01 — details
+**Budget basis:** 160 hours × 30 USDC/hour = 4,800 USDC. Estimate: adapter and mapping 80 hours; examples and instructions 40; release and public proof 40.
 
-Limit 2,048. This paste is 1,947 characters.
+**Metrics:**
+- One public npm version newer than `0.3.0` [add link] and matching source tag [add link].
+- Two runnable examples with commands and expected output [add links]; at least one builds Circle authorization data rather than stopping at a quote.
+- One saved `build_tx` input, resulting authorization fields, and steps to reproduce the conversion [add link].
 
-```
-Chakra is already hosted on Arc Testnet. This milestone does not rebuild the router, worker, API, SDK, or frontend. It establishes a confirmed execution baseline.
+**Acceptance criteria:** All three metrics must be publicly checkable and the conversion must reproduce. An unpublished adapter, republished `0.3.0`, or quote-only examples fail. The existing quote/build client, OpenAPI, and guide are baseline work. A mined SCA swap belongs to milestone 02.
 
-Work:
-1. Execution evidence. Complete at least one USDC-to-EURC swap from genuine Arc Testnet reserves using Chakra quote and build_tx. Publish a public explorer receipt linked to the same-day quote, route identity, built transaction, hash, receipt status, and observed token balance change. Document remaining wallet-provider limits without treating incomplete attempts as successful swaps.
-2. Quote integrity. Add automated tests for stale or missing pool state, mutated pair, venue, fee, or factory metadata, expired deadlines, and minimum-output enforcement. Keep /build_tx rejection of routes that do not match the market snapshot. Pass constant-product, stable-swap, concentrated-liquidity, and Xylo fixtures with documented tolerances. Keep existing API and SDK contracts backward compatible.
-3. Swap UX recovery. Distinguish quote loading, authorization, submission, confirmation, rejection, and failure. Link successful transactions to Arc's testnet explorer. Provide specific recovery for chain mismatch, wallet rejection, expired quote, rate limit, and unavailable route. Pass desktop and mobile quote-to-wallet regression.
-4. Telemetry v0. Aggregate daily counts and success rates for quote, build, submit, and confirm stages, plus no-route, stale-state, invalid-route, wallet-rejection, RPC, and confirmation failures. Never record private keys, Circle access tokens, authorization material, or personal login data. Document fields, retention, and measurement limits.
+### 02 — Complete a swap with a Circle smart account
 
-Acceptance: a reviewer can repeat quote and build_tx from published instructions; one public USDC-to-EURC receipt exists; integrity tests pass; UX recovery states are visible; telemetry documentation is published.
+**8,400 USDC; 7 weeks. Details (2,048-character limit):**
 
-Timing: grant kickoff + 4 weeks.
-Budget slice: 13,000 USDC of the 60,000 USDC request.
-```
+**Deliverable:** Add a Circle SCA path for Chakra USDC/EURC swaps and configure it for the separately funded Chakra contract on Arc mainnet. Keep the external-wallet path working.
 
-### Milestone 02 — title
+**Budget basis:** 280 hours × 30 USDC/hour = 8,400 USDC. Estimate: authorization path 120 hours; Testnet swap and debugging 80; external-wallet check 20; mainnet configuration 40; public proof 20.
 
-Limit 1,024. This paste is 78 characters.
+**Metrics:**
+- One mined, successful Arc Testnet USDC/EURC swap authorized by a Circle SCA: explorer transaction [add link] and matching quote, `build_tx`, and Circle authorization data [add links].
+- One linked check that an external-wallet swap still works [add link]; a new receipt is not required.
+- One dated Arc mainnet (chain 5042) SCA configuration and reproducible quote → `build_tx` → authorization payload for the self-funded contract and a USDC/EURC route live at review time [add links].
 
-```
-Circle user-controlled Wallets on Arc Testnet (kickoff + 8 weeks; 14,000 USDC)
-```
+**Acceptance criteria:** The Testnet links must identify the SCA account, Chakra contract, tokens, chain, and successful result. The mainnet links must identify the deployed contract and live route. All three metrics must pass. A simulation, an external-wallet swap presented as SCA execution, or mainnet `NO_ROUTE` fails. The mainnet payload proves readiness; a mined mainnet SCA swap is not required. If the self-funded contract or route is unavailable, ask Circle to change this milestone date.
 
-### Milestone 02 — details
+### 03 — Pay gas for a separate Circle smart account swap
 
-Limit 2,048. This paste is 1,194 characters.
+**4,800 USDC; 4 weeks. Details (2,048-character limit):**
 
-```
-Add an embedded Circle Wallets option using a user-controlled smart contract account on ARC-TESTNET. Users authenticate by email one-time passcode, retain authority over their wallet, review the Chakra route, and authorize the final transaction. Circle API credentials and short-lived session issuance remain on the server. Chakra never receives or stores user private keys, PINs, one-time passcodes, or signing material.
+**Deliverable:** Sponsor eligible Circle SCA swaps with Gas Station and configure a bounded policy for the self-funded Arc mainnet contract. External-wallet swaps remain unsponsored.
 
-The Circle wallet consumes the same to, data, chain_id, value, deadline, and authorization information returned by the existing /quote and /build_tx path. No Circle-specific quote format is introduced. User and session creation is idempotent. The existing external-wallet flow remains available and must pass regression testing.
+**Budget basis:** 160 hours × 30 USDC/hour = 4,800 USDC. Estimate: integration and policy 60 hours; sponsored Testnet swap 40; failure checks 20; mainnet policy and checks 20; public proof 20.
 
-Acceptance:
-- A new user can authenticate, create or recover an Arc Testnet wallet, and view its address and supported token balances.
-- The Circle wallet completes quote, transaction build, user authorization, submission, and confirmation for USDC-to-EURC.
-- Credentials stay server-only; no key material is logged.
-- External-wallet regression passes.
+**Metrics:**
+- One mined, successful Arc Testnet USDC/EURC SCA swap, different from milestone 02's transaction [add explorer link], plus a redacted Circle record tying Gas Station sponsorship to that transaction [add link].
+- One Testnet policy naming allowed chain, contract, transaction type, and spend limit; show reproducible ineligible and unavailable outcomes [add links].
+- One dated active mainnet policy for the self-funded contract, with eligible, ineligible, and unavailable checks against a USDC/EURC route live at review time [add links].
 
-Timing: grant kickoff + 8 weeks.
-Budget slice: 14,000 USDC of the 60,000 USDC request.
-```
+**Acceptance criteria:** The explorer transaction and Circle sponsorship record must match. All policy limits and outcomes must be checkable. All three metrics must pass. Reusing milestone 02's transaction, showing only a policy, or mainnet `NO_ROUTE` fails. Mainnet policy checks prove readiness; a sponsored mainnet swap is not required. If the contract or route is unavailable, ask Circle to change this milestone date.
 
-### Milestone 03 — title
+### 04 — Bring USDC to Arc with CCTP V2 and try a Chakra swap
 
-Limit 1,024. This paste is 63 characters.
+**6,000 USDC; 5 weeks. Details (2,048-character limit):**
 
-```
-Circle Gas Station sponsorship (kickoff + 10 weeks; 8,000 USDC)
-```
+**Deliverable:** Publish a runnable CCTP V2 USDC handoff from a supported source chain to Arc mainnet, then try to route the received USDC through Chakra.
 
-### Milestone 03 — details
+**Budget basis:** 200 hours × 30 USDC/hour = 6,000 USDC. Estimate: runnable handoff 80 hours; confirmed transfer and debugging 60; post-receive Chakra check 20; instructions and public proof 40.
 
-Limit 2,048. This paste is 1,001 characters.
+**Metrics:**
+- One confirmed source-chain USDC burn [add link] and one confirmed Arc mainnet receive [add link], with matching transfer/message ID and amount.
+- One dated Chakra quote request using that Arc USDC after the receive [add link]. If it finds a route, save the `build_tx` payload [add link].
+- One confirmed Chakra swap if a live route exists [add link]; otherwise one dated venue scan and Chakra `NO_ROUTE` response showing that no swap could be built or sent [add links].
+- One public runnable handoff with commands, expected output, and steps to inspect the receipts and Chakra result [add link].
 
-```
-Configure and integrate Circle Gas Station for eligible Circle smart-account transactions on Arc Testnet. Show sponsorship eligibility before authorization where the Circle interface permits it, record the result, and return a clear error when a transaction falls outside the policy or the sponsorship service is unavailable. Do not submit a misleading or partially formed transaction in those cases.
+**Acceptance criteria:** A reviewer can run the handoff and match both transaction links to the same transfer. The Chakra attempt must follow the receive. All four metrics must pass, using the applicable third outcome. Dry runs, unrelated transactions, and pre-receive quotes fail. A general cross-chain swap interface is outside this milestone.
 
-The application must explain that sponsorship is subject to policy and is not a permanent promise of free transactions. The policy limits supported network, contracts, transaction types, and spend.
+**Total:** 24,000 USDC; 20 weeks; 800 engineer hours at 30 USDC/hour. A mined two-venue split is outside these paid milestones. Do not seed liquidity to create evidence. Mainnet SCA or sponsored swap transactions, if achieved, are extra evidence rather than payment conditions.
 
-Acceptance:
-- A documented testnet sponsorship policy is published.
-- At least 10 confirmed sponsored Chakra swaps are documented with transaction hashes and aggregate Gas Station evidence.
-- Ineligible, policy-limited, and unavailable-service cases fail honestly.
-- The UI does not claim unconditional free gas.
-
-Timing: grant kickoff + 10 weeks.
-Budget slice: 8,000 USDC of the 60,000 USDC request.
-```
-
-### Milestone 04 — title
-
-Limit 1,024. This paste is 63 characters.
-
-```
-Two-path integrator validation (kickoff + 12 weeks; 7,000 USDC)
-```
-
-### Milestone 04 — details
-
-Limit 2,048. This paste is 853 characters.
-
-```
-Validate Chakra through two distinct integration paths. Path A is the in-repository reference application using Circle Wallets and Gas Station. Path B is an independent developer or reviewer using Chakra's REST API or TypeScript SDK with either a self-hosted or public API deployment.
-
-Acceptance:
-- Both paths have reproducible quote and transaction-build instructions.
-- Path A includes a confirmed user-controlled Circle Wallets swap with the sponsorship result shown.
-- Path B is completed from the public documentation, with public or anonymized role-based feedback recorded.
-- At least one documented walkthrough reaches a valid transaction build in under 30 minutes from a clean project.
-- Feedback is incorporated into the SDK examples and integrator guide.
-
-Timing: grant kickoff + 12 weeks.
-Budget slice: 7,000 USDC of the 60,000 USDC request.
-```
-
-### Milestone 05 — title
-
-Limit 1,024. This paste is 87 characters.
-
-```
-Public routing report and independent security review (kickoff + 15 weeks; 15,000 USDC)
-```
-
-### Milestone 05 — details
-
-Limit 2,048. This paste is 1,134 characters.
-
-```
-Publish a public routing report and complete an independent security review. The report is built from telemetry, not from seeded volume.
-
-Report: public daily totals for quotes, valid transaction builds, confirmed swaps, failures by category, and sponsorship outcomes, covering at least 30 days. Identify controlled QA transactions separately from external activity when that distinction is known. State collection limits and that the report is not a revenue or user-growth claim.
-
-Security: commission a scoped independent review of the aggregator contract, route-to-calldata validation, Permit2 authorization path, Circle Wallets integration, and Gas Station policy boundaries. Disclose reviewer and scope. Publish a final report or public summary. Resolve all critical and high-severity findings before any mainnet deployment; document dispositions for medium and low findings. Include remediation regression tests and remaining operational assumptions in the launch checklist.
-
-Timing: grant kickoff + 15 weeks.
-Budget slice: 15,000 USDC of the 60,000 USDC request (public report 3,000; independent review and remediation 12,000).
-```
-
-### Milestone 06 — title
-
-Limit 1,024. This paste is 69 characters.
-
-```
-Grant close-out and launch-readiness (kickoff + 16 weeks; 3,000 USDC)
-```
-
-### Milestone 06 — details
-
-Limit 2,048. This paste is 1,066 characters.
-
-```
-Produce the grant close-out and launch-readiness package. A mainnet deployment occurs only if Arc mainnet, the required Circle products, suitable liquidity, and the project's security gate are available during the grant period. Otherwise completion is the security, deployment, operations, and handoff evidence needed for a later launch.
-
-Acceptance:
-- A final report links each milestone to code, documentation, tests, and public evidence.
-- A short public demo covers quote, route review, Circle wallet authorization, sponsorship result, submission, and confirmation.
-- The self-host guide covers API, worker, Redis, frontend, configuration, monitoring, and recovery.
-- A six-month maintenance plan assigns responsibility for RPC health, Circle service changes, venue allowlists, dependency updates, and incident response.
-- Any mainnet deployment includes public addresses and a confirmed transaction; otherwise the report states which external or security condition remains.
-
-Timing: grant kickoff + 16 weeks.
-Budget slice: 3,000 USDC of the 60,000 USDC request.
-```
-
----
+**Budget explanation for reviewers:** One engineer plans 40 hours a week for 20 sequential weeks at 30 USDC per hour. The 800 hours cost 24,000 USDC. Each milestone's weeks times 1,200 USDC per week gives its requested amount: 4,800 / 8,400 / 4,800 / 6,000 USDC. The hours cover implementation, debugging, public evidence, and documentation. There is no separate expense or markup line. Chakra does not charge Circle for the existing router, quote/build API, or self-funded Arc mainnet proof. These are estimated work weeks, not recorded labor or a market-rate claim. If a milestone needs fewer weeks, reduce its price before submission. Circle agrees on final milestones and payments after selection.
 
 ## Project Traction and Roadmap
 
-### Tell us about your current traction and success already achieved (transaction volume, project growth, MAU, AUM, etc.)
+**Where can we verify traction? (300-character limit):** Arc Testnet controlled-QA swap: https://testnet.arcscan.app/tx/0xee7bc19a990ce6691a68e9b387585baee13edc846cbf3a43551ab3dd7cfcda6c ; product stats: https://chakra-ag.vercel.app/stats . Single-route testnet activity, not organic customer volume.
 
-This paste is 1,616 characters. The portal does not publish a limit here; keep it short anyway.
+**Nonpublic verification folder:** [Google Drive folder with view/download access if supporting documents exist; otherwise leave blank as the form permits]  
+**Are you funded?:** [answer, including any Arc Microgrant award if one exists at submission]
 
-```
-Chakra is a hosted Arc Testnet product, not an Arc mainnet launch. It has no MAU, AUM, revenue, or organic volume to report.
+**Technical Roadmap (2–4 lines; 1,250-character limit; replace relative dates for final portal entry):**
 
-Live on 4 September 2026:
-- Frontend https://chakra-ag.vercel.app (HTTP 200).
-- API https://chakra-api-0a5i.onrender.com: /api/v1/health ok; /api/v1/ready ready true.
-- SDK @chakra-ag/sdk and repo https://github.com/mangekyou-labs/chakra.
-- Aggregator 0xeb12351602c56d47c4ee955193335848952b29d8 on Arc Testnet (chain ID 5042002).
-- 1 USDC → EURC: expected_output 823,415 via Presto hub, price_impact_bps 1765.
-- 1 EURC → USDC: expected_output 1,232,732 via Xylo stable pool, price_impact_bps 0.
-- /api/v1/stats?range=all: lag_blocks 0, freshness about 4 seconds; six catalog directions (USDC, EURC, cirBTC) report usable Presto, Xylo, or UnitFlow pools.
+Publish an SDK version with a Circle SCA adapter | Circle Wallets | kickoff + 4 weeks | npm version, source tag, two examples, saved input and output  
+Complete an SCA swap on Arc Testnet; configure the mainnet path | Circle Wallets | kickoff + 11 weeks | Testnet transaction, authorization data, mainnet configuration and live route  
+Use Gas Station for a separate Testnet swap; set a mainnet policy | Gas Station | kickoff + 15 weeks | sponsored transaction, policy limits, rejected cases, mainnet checks  
+Transfer USDC to Arc mainnet through CCTP V2 and try a Chakra swap | CCTP | kickoff + 20 weeks | source and Arc transactions, Chakra quote and swap or `NO_ROUTE`
 
-Not claimed:
-- No organic public Chakra user volume. One controlled QA swap is confirmed;
-  stats show 2 confirmed swaps and 2,000,000 stablecoin-notional micros total,
-  including the pre-existing unattributed 2026-08-30 row and the new
-  Presto/UnitFlow-attributed QA receipt.
-- No Dune dashboard. https://chakra-ag.vercel.app/stats is 404; the public analytics surface is the API stats endpoint.
-- /api/v1/ready returns pool_keys [] while /quote still succeeds, so readiness is not a complete pool inventory.
-- Split routes and cirBTC stay follow-ups until genuine reserves support them. The project will not seed liquidity to manufacture those cases.
+**Seeking funding/support for an audit or security review?:** No audit is priced in these four milestones **[confirm before selecting]**.  
+**Prior internal or third-party audit findings (500-character limit):** [write N/A if none; otherwise identify actual scope, date, and findings]
 
-Repository evidence includes the September 4 controlled QA USDC→EURC→cirBTC
-swap, its explorer receipt, and post-confirmation stats attribution. This single
-wallet-controlled transaction is execution evidence, not organic traction.
-Manifest deployment hashes are not swap evidence.
-```
+**Distribution and reporting for narrative fields or deck:** Target one Arc-supporting wallet integrator as the first adopter, not a signed or paying customer. Report its dated time to first live swap if achieved; weekly npm downloads with version/date range; public API rate-limit, observable 429s, and stated-interval uptime; monthly Chakra swap count, volume, and pair mix; and Circle policy plus sponsored receipt. With fewer than ten swaps, link the transaction list instead of a percentage. Independent SDK consumption and two-venue route comparison are reporting goals, not payment gates.
 
-### Please share your Dune Analytics or any other public analytics dashboard link (if you have one)
+**Revenue path, separate from the grant budget:** Chakra proposes a disclosed 2 bps (0.02%) protocol fee on successful Arc mainnet Chakra swaps, shown separately from pool fees and gas. At 1 million USDC of routed volume, that rate would yield 200 USDC before operating costs; do not portray it as enough to sustain the protocol at launch or as revenue already earned. Current Testnet quotes show 0 bps.
 
-There is no Dune dashboard. Paste the live API stats endpoint, not the 404
-`/stats` page.
+**Funding boundary for narrative fields or deck:** The Arc mainnet contract, token/venue configuration, scanner, single-route API/UI, and external-wallet receipt are self-funded proof work. Apply to the separate 500 USDC Arc Microgrant only if a mined mainnet swap and live route exist before its deadline. Disclose any award and exclude separately funded work from Circle's request. The funded Circle-wallet and Gas Station gates require two distinct mined Arc Testnet receipts plus mainnet readiness checks; verify any claim that a Circle path is live against dated receipts.
 
-```
-https://chakra-api-0a5i.onrender.com/api/v1/stats?range=all
-```
+**Outside this request:** Existing testnet router, quote/build API, in-repo SDK methods, OpenAPI, and guide; self-funded mainnet proof; liquidity seeding; two-venue comparison and independent integrator run as paid gates; split receipt; independent audit; operator vault; multi-chain expansion beyond the bounded CCTP inbound handoff; general cross-chain routing; Paymaster, Gateway, StableFX, Agent Stack, x402, USYC, and Bridge Kit.
 
-If the portal requires a Dune URL and rejects a non-Dune link, leave the field
-empty rather than inventing a dashboard.
+## Existing Arc Testnet evidence
 
-### Are you funded?
+The previous grant draft and Chakra testing record establish the following dated baseline. Historical figures are retained as historical evidence; they are not a claim about today's live totals.
 
-**Select:** `TO_BE_FILLED`
+- **Wallet execution:** 5 September 2026, 10:24:14 UTC; block `60563600`; successful MetaMask-authorized `splitSwap`; **1 USDC → 1.629188 EURC**, via Presto. [Public receipt](https://testnet.arcscan.app/tx/0xee7bc19a990ce6691a68e9b387585baee13edc846cbf3a43551ab3dd7cfcda6c).
+- **Network:** Arc Testnet, chain `5042002`. [Aggregator](https://testnet.arcscan.app/address/0xeb12351602c56d47c4ee955193335848952b29d8): `0xeb12351602c56d47c4ee955193335848952b29d8`. [Public manifest](https://github.com/mangekyou-labs/chakra/blob/feature-chakra/docs/arc-testnet-manifest.json).
+- **Controlled QA snapshot, 5 September 2026:** 3 confirmed swaps; 3 USDC notional; 1 unique test trader; 0 mined split swaps. [Stats UI](https://chakra-ag.vercel.app/stats) and [stats API](https://chakra-api-0a5i.onrender.com/api/v1/stats?range=all) are inspection links, not archived proof of those historical totals.
+- **Indexed snapshot fetched 30 September 2026:** 5 confirmed swaps; 5 USDC notional; 2 unique addresses; 0 split swaps. The API reports `freshness_secs: 157662` (about 44 hours). This is indexed testnet activity, not real-time freshness or verified organic adoption. [Saved JSON](https://github.com/mangekyou-labs/chakra/blob/feature-chakra/docs/evidence/grant-testnet/stats-2026-09-30.json).
+- **Execution boundary:** The receipt is a single-route swap through the `splitSwap` entry point. The historical two-venue harness at block `60763000` is simulation evidence; it created neither a mined transaction nor user volume. No Circle SCA, Gas Station, CCTP or mainnet execution is established by this receipt.
+- **Developer surface:** [Source](https://github.com/mangekyou-labs/chakra), [OpenAPI](https://github.com/mangekyou-labs/chakra/blob/feature-chakra/docs/openapi.yaml), [integrator guide](https://github.com/mangekyou-labs/chakra/blob/feature-chakra/docs/integrator-guide.md), and [SDK source](https://github.com/mangekyou-labs/chakra/tree/feature-chakra/packages/sdk). These source links do not establish independent adoption or a fresh npm release.
+- **Evidence provenance:** Existing `feature-chakra` grant proposal and `docs/ai/testing/2026-09-03-feature-chakra.md`, headed MetaMask and T11.12 records. Public URLs must remain reviewer-accessible at submission. The new Circle milestone links above are future acceptance evidence, not gaps in the existing testnet proof.
 
-Recommended **No** only after you confirm there is no outside capital to
-disclose. Do not select No without that confirmation.
+## Team capability
 
-### Technical Roadmap: Timeline and grant milestones. Provide a high-level technical plan that includes Circle product integration timelines.
-
-```
-Four-month Arc-first plan from grant kickoff. Combined funding request: 60,000 USDC, paid against the six form milestones.
-
-Weeks 0–4 — Execution baseline (13,000 USDC). One public USDC-to-EURC swap with quote/build/receipt linkage; quote-integrity tests; swap UX recovery states; aggregate telemetry v0. Circle products in this window remain the current USDC and EURC catalog.
-
-Weeks 4–8 — Circle user-controlled Wallets (14,000 USDC). Email-OTP SCA on ARC-TESTNET; server-only credentials; same /quote and /build_tx path; external-wallet regression.
-
-Weeks 8–10 — Circle Gas Station (8,000 USDC). Policy-bound sponsorship; at least 10 documented sponsored swaps; honest ineligible/unavailable errors.
-
-Weeks 10–12 — Two-path integrator validation (7,000 USDC). Path A: in-repo app with Wallets and Gas Station. Path B: independent REST/SDK walkthrough to a valid transaction build in under 30 minutes.
-
-Weeks 12–15 — Public routing report and independent security review (15,000 USDC). Thirty days of aggregate metrics without claiming organic growth; scoped review of aggregator, route validation, Permit2, Wallets, and Gas Station; critical and high findings fixed before any mainnet.
-
-Week 16 — Close-out and launch-readiness (3,000 USDC). Final report, demo, self-host/runbook, six-month maintenance plan.
-
-Conditional Arc mainnet only if, during the grant period, Arc mainnet is available (Circle has pointed to 16 September 2026), Circle Wallets and Gas Station support that network, genuine liquidity exists, and the security gate is green. CCTP, Gateway, Paymaster, Nanopayments, and StableFX stay out of this grant. Split routes and cirBTC are reported only when live reserves support them.
-```
-
-### How will this grant support your technical roadmap?
-
-```
-The grant funds the work that is not yet shipped: quote-to-transaction integrity
-hardening, swap recovery UX, operational telemetry, Circle user-controlled
-Wallets on ARC-TESTNET, Circle Gas Station sponsorship, two integrator paths, an
-independent security review, and a close-out package.
-
-It does not rebuild the existing router, worker, API, SDK, frontend, or aggregator. Those are already hosted on Arc Testnet and already quote USDC and EURC from live venues. The grant turns that proof of concept into a reviewable Circle-integrated product: an embedded wallet path, sponsored eligible fees, documented integrator adoption, and a security bar before any mainnet discussion.
-
-Funding is requested as 60,000 USDC over 16 weeks, released against the six milestones above.
-```
-
----
+Kyler Nguyen leads Chakra's contract, routing, API, integration and release work. The implementation spans a Solidity aggregator, Rust services, a TypeScript SDK and a hosted web app. The dated wallet receipt connects this engineering surface to an executed testnet swap. Public profile: https://github.com/MrSufferer; project: https://github.com/mangekyou-labs/chakra. Public GitHub contribution history also records work on [Kamui](https://github.com/mangekyou-labs/kamui), [MGK Protocol](https://github.com/mangekyou-labs/mgk-protocol) and [Oreka](https://github.com/mangekyou-labs/oreka), spanning VRF, perpetuals and prediction-market infrastructure. These are contributions, not a claim of sole authorship. The proposal is scoped to one engineer and four sequential milestones. Public repositories demonstrate engineering work; they do not establish customers, revenue, awards or professional employment history.
 
 ## Deck and Demo
 
-Technical video requirements (no longer than 5 minutes):
+**Video demo (public/unlisted, no longer than five minutes):** [Recorded Chakra demo](https://youtu.be/12hvXfd5rsE), supplied by Kyler on 30 September 2026. Check duration, access and product claims before submission. The existing receipt is supporting evidence, not a replacement video. Current USDC/EURC use must be distinguished from proposed Circle Wallets and Gas Station work.
 
-**Codebase walkthrough (required).** Show the actual code where Circle
-technologies are implemented. Current code can show native USDC (gas + ERC-20
-`0x3600…0000`), EURC `0x89B5…D72a`, Permit2, Arc chain ID `5042002`, `/quote`,
-and `/build_tx`. Circle Wallets and Gas Station are not in the repository yet;
-say that clearly and point at the planned architecture, not at fictional
-source files.
-
-**Integration demonstration (required).** Show the user flow where Circle
-infrastructure powers the product. Today that is a USDC/EURC quote and a
-wallet-ready transaction on Arc Testnet. If some integrations are planned,
-describe the intended approach.
-
-Upload to a private link (Google Drive, YouTube unlisted, or similar).
-
-### Video demo of the product
-
-```
-TO_BE_FILLED
-```
-
-### Video shot list (do not paste into Questbook; use while recording)
-
-Keep the video at or under 5 minutes. Suggested order:
-
-1. **Open (15s).** Product name, Arc Testnet only, non-custodial. Live URLs:
-   https://chakra-ag.vercel.app and https://chakra-api-0a5i.onrender.com.
-2. **Catalog / USDC / EURC (45s).** `docs/arc-testnet-manifest.json`: chain ID
-   `5042002`, USDC `0x3600000000000000000000000000000000000000`, EURC
-   `0x89B50855Aa3bE2F677cD6303Cec089B5F319D72a`, Permit2
-   `0x000000000022D473030F116dDEE9F6B43aC78BA3`, aggregator
-   `0xeb12351602c56d47c4ee955193335848952b29d8`. Note that USDC is native gas
-   on Arc and an ERC-20 at that address.
-3. **Quote path (45s).** `crates/api-server` quote handler and
-   `packages/sdk/src/index.ts` `/api/v1/quote`. Show a live USDC→EURC quote
-   (Presto) and EURC→USDC quote (Xylo) with venue, pool, and price-impact
-   fields.
-4. **Build / Permit2 (45s).** `crates/api-server/src/build_tx.rs` Permit2
-   allowance and typed data; `contracts/evm/src/Aggregator.sol` constructor
-   immutables and Permit2 `permit` call. Explain that the wallet, not Chakra,
-   submits.
-5. **Live UI (60–90s).** Connect an external wallet, switch to Arc, USDC→EURC
-   quote, route disclosure in `packages/frontend/src/components/RouteDisplay.tsx`.
-   Call `build_tx` if the quote is still valid. Submit only if a real receipt
-   exists that day; otherwise stop at the unsigned transaction and say so.
-6. **Planned Circle products (45s).** `docs/chakra-architecture.md` Circle
-   Wallets and Gas Station sections. State that these are grant milestones 2
-   and 3, not shipped code: user-controlled SCA on `ARC-TESTNET`, email-OTP,
-   server-only credentials, policy-bound Gas Station. Explicitly not CCTP or
-   Gateway.
-7. **Close (15s).** What grant money buys: confirmed execution, Wallets, Gas
-   Station, integrator paths, independent review.
-
-### Please upload your investor deck
-
-```
-TO_BE_FILLED
-```
-
-Do not invent a Drive link. If you later attach a deck, cover: problem, Arc
-stablecoin FX, what is live, Circle products current vs planned, traction with
-the caveats above, six milestones totaling 60,000 USDC / 16 weeks, team. This
-pass does not create a slide file.
-
----
+**Transcript folder:** [add Google Drive link with view/download access]. Name each Circle product discussed, its code location, and whether it is current or planned.  
+**Code screenshots:** [add Google Drive link to PNG/JPG files for products actually integrated when recording].  
+**Investor deck:** Updated editable PowerPoint and PDF in the `feature-chakra` worktree: `docs/grants/Chakra-Circle-Grant-Pitch-Deck.pptx` and `.pdf`. Upload either supported format and add the shareable link; the local file path is not a submission URL.
 
 ## Conflict of Interest
 
-Do you, your organization, or any key individuals involved in this application
-currently have, or have had, any actual, potential, or perceived conflict of
-interest in relation to Circle or this grant? This includes, but is not limited
-to:
+**Conflict of interest:** No **[confirm this remains accurate for the applicant and key people at submission]**.
 
-- A financial, business, or advisory relationship with Circle or any of its
-  subsidiaries
-- A family, personal, or close personal relationship with a current Circle
-  employee, officer, director, or contractor
-- Any role, interest, or relationship that could reasonably be seen as giving
-  you an unfair advantage or improperly influencing Circle’s decision
+## Remaining submission facts
 
-### Conflict of interest
-
-**Select:** `TO_BE_FILLED`
-
-Recommended **No** only if Ligang, Jackson, and the legal entity have no
-Circle employment, investment, advisory, family, or other covered
-relationship. Do not select No without that confirmation. If a relationship
-exists, select Yes and attach a factual description.
-
----
-
-## Operator notes (not portal fields)
-
-- The September 4, 2026 live API check supersedes the earlier `NO_ROUTE`
-  snapshot: the guarded 1-USDC probe returned canonical USDC→EURC→cirBTC via
-  UnitFlow at 27 bps impact (363 cirBTC atomic output, 361 minimum output). The
-  explicitly authorized transaction confirmed in block `60438104` (explorer:
-  https://testnet.arcscan.app/tx/0x2df6e81aa9ff0805aad7d49241ccdd9e979dd7c0dae1b261c51ed469542236c5),
-  and `/api/v1/stats?range=all` recorded one attributed swap, one additional
-  confirmed swap, and 2,000,000 stablecoin-notional micros total, with Presto
-  and UnitFlow attribution.
-- `/api/v1/ready` returning `pool_keys: []` while `/quote` succeeds is an
-  honesty note, not a reason to claim the service is down.
-- Do not check StableFX because the RFP use case is named Stablecoin FX.
-- Do not implement Wallets or Gas Station in order to tick them as current.
-- Circle Wallets docs list `ARC-TESTNET` for user-controlled accounts; reconfirm
-  product availability before recording the video and before submit.
-- Arc mainnet timing (Circle public comments around 16 September 2026) is an
-  external gate, not a Chakra commitment.
-
-## Reference sources
-
-- [Circle Developer Grants](https://www.circle.com/grant)
-- [Circle Wallets supported blockchains](https://developers.circle.com/wallets/supported-blockchains)
-- [Circle user-controlled wallet application guide](https://developers.circle.com/wallets/user-controlled/build-a-wallet-app)
-- [Circle Gas Station policy management](https://developers.circle.com/wallets/gas-station/policy-management)
-- [Arc Testnet manifest](../arc-testnet-manifest.json)
-- [Chakra Technical Architecture](../chakra-architecture.md)
+Applicant legal/incorporation status, private contact confirmations, funding and audit declarations, the existing video URL, and viewable upload links remain submission-time inputs. Future milestone receipts remain future work. No invented team members, customers, volume, partners or awards are supplied.

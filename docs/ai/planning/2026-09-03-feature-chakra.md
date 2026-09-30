@@ -167,9 +167,11 @@ Do not merge. Do not claim T11.12 closed.
   `split_swaps` 0, and the required bidirectional quote matrix was recorded.
   USDC→EURC first returned a split in the bounded search at 21,467 USDC
   (21,466 USDC was single-route), across Presto and Xylo.
-- [ ] T11.12-F: blocked because the QA wallet has only 1.949753 USDC versus
-  the 21,467-USDC split input. No unfundable broadcast was attempted; require
-  one atomic split receipt and a `split_swaps` increment before closure.
+- [ ] T11.12-F: Pending public mined evidence. Close this task only after a
+  current two-route quote is simulated, explicitly approved for broadcast,
+  mined successfully, visible on Arcscan, and reflected in `split_swaps`.
+  The last observed split required 21,467 USDC while the QA wallet held only
+  1.949753 USDC, so no unfundable broadcast was attempted.
 
 Progress summary: the local diagnosis is implemented without changing
 `split_threshold_bps`, `min_split_improvement_bps`, or `max_splits`. Off-peg
@@ -178,3 +180,47 @@ fixture records the optimizer's honest non-winning result. Deployment proved
 that current live liquidity does produce a two-pool split, but only far above
 the QA wallet balance. T11.12 stays Follow-up until a fundable live split,
 Arcscan receipt, and analytics increment all exist.
+
+## Historical Arc split simulation (2026-09-08)
+
+- [x] T11.12-G: reproduce the recorded 21,467-USDC Presto/Xylo allocation at
+  Arc block `60,763,000` with a read-only `eth_call` state override. The
+  injected test harness receives only an ephemeral native-USDC balance and
+  calls the deployed aggregator, real Permit2, Arc USDC, and both live venues.
+- [x] Prove the success-path allocation, complete input spend, returned/received
+  EURC equality, recorded minimum, both venue reserve changes, and zero final
+  aggregator catalog balances.
+- [x] Prove atomic rollback with `minAmountOut = uint256.max`: catch
+  `SlippageExceeded` inside the harness and compare unchanged user/aggregator
+  balances plus unchanged Presto/Xylo reserves.
+
+The deployed aggregator passed a read-only historical Arc state simulation at
+block `60,763,000`. The simulation executed a real two-venue Presto/Xylo split
+through Arc USDC and Permit2, verified output accounting and reserve changes,
+and proved atomic rollback under forced slippage. It created no transaction,
+receipt, event record, or analytics increment.
+
+| Capability | Status |
+| --- | --- |
+| Split quote generation | Proven |
+| Deployed split execution against historical Arc state | Proven |
+| Public mined split transaction and Arcscan receipt | Pending |
+
+### Live execution gate
+
+Before spending funded testnet USDC:
+
+1. Request a fresh split quote.
+2. Confirm it still contains two distinct venues.
+3. Simulate that exact calldata against the latest Arc block.
+4. Verify full input spending, minimum output, zero aggregator balances, and
+   atomic rollback.
+5. Broadcast only after explicit approval.
+6. Close T11.12-F only after recording the Arcscan receipt, split event, and
+   `split_swaps` increment.
+
+The historical result does not guarantee a future transaction: a current quote
+can become stale, liquidity can change, a deadline can expire, an allowance can
+be missing, or the RPC can fail. Atomic rollback prevents a failed split from
+leaving only one route executed, but the sender can still pay transaction gas
+and existing approvals remain active.

@@ -1,5 +1,8 @@
 # Pool-state architecture
 
+Operator Redis keys, env, and the fetch pipeline. For quote, swap, and
+system diagrams, see [Architecture](chakra-architecture.md).
+
 Chakra separates the routing graph from live per-pool state. One market-data
 worker observes Arc EVM logs and RPC, writes Redis snapshots, and publishes
 topology. API instances read the snapshot, hydrate candidate pools, and quote

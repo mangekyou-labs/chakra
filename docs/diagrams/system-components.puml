@@ -1,0 +1,49 @@
+@startuml system-components
+!include _theme.iuml
+skinparam linetype polyline
+title Chakra system components
+caption HTTP is the API boundary. router-engine and dex-adapters are in-process libraries. Circle is a grant target, not a live path.
+
+actor "End user" as User
+actor "Integrator" as Integrator
+actor "Chakra operator" as Operator
+
+rectangle "Clients" {
+  [Swap UI\nchakra-ag.vercel.app] as UI
+  [@chakra-ag/sdk\nREST client] as SDK
+}
+
+rectangle "Quote plane" {
+  [chakra-api-server] as API
+  [router-engine\nPathFinder · QuoteEngine · SplitOptimizer] as RE
+  [dex-adapters] as AD
+  [chakra-market-data-worker] as Worker
+  database "Redis\nchakra:snapshot:* · chakra:pool:*" as Redis
+}
+
+rectangle "Arc Testnet" {
+  cloud "Arc RPC\nrpc.testnet.arc.io" as RPC
+  [Aggregator\nsplitSwap] as Agg
+  [Venues\nXylo · Presto · UnitFlow] as Pools
+}
+
+[Circle SCA / Gas Station\ngrant target] as Circle
+
+User --> UI
+Integrator --> SDK
+Operator --> Worker
+UI --> API
+SDK --> API
+API --> RE
+RE --> AD
+Worker --> Redis : single writer
+API --> Redis : hydrate per quote
+Worker --> RPC
+API --> RPC : paused / allowances
+API --> Agg : unsigned splitSwap calldata
+UI ..> Circle : grant target
+Circle ..> Agg
+Agg --> Pools
+Pools --> RPC
+
+@enduml

@@ -1,0 +1,30 @@
+@startuml swap-execution
+!include _theme.iuml
+skinparam linetype polyline
+title Swap
+caption Quote to aggregator.splitSwap. Wallet submits. Output returns to msg.sender. Numbers match the Architecture page.
+
+actor User
+participant Wallet
+participant "api-server" as API
+participant "Arc RPC" as RPC
+participant Aggregator
+participant "DEX venues" as Pools
+
+User -> API : 1. GET /api/v1/quote
+API --> User : 2. expected_output · sub_routes
+User -> API : 3. POST /api/v1/build_tx
+API -> RPC : 4. paused · ERC-20 and Permit2 allowances
+RPC --> API : state
+API --> User : calldata · value 0 · optional typedData
+User -> Wallet : 5. sign approvals / Permit2 / swap
+Wallet --> User : signed txs
+User -> RPC : 6. submit (wallet, not the API)
+RPC -> Aggregator : splitSwap
+Aggregator -> Aggregator : 7. Permit2 pull
+Aggregator -> Pools : 7. execute each hop
+Pools --> Aggregator : hop outputs
+Aggregator -> Aggregator : 7. require amountOut >= minAmountOut
+Aggregator --> User : 7. transfer tokenOut + catalog sweep
+
+@enduml

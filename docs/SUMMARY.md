@@ -3,7 +3,8 @@
 ## Product
 
 - [Documentation home](README.md)
-- [Pool-state architecture](pool-state-architecture.md)
+- [Architecture](chakra-architecture.md)
+  - [Pool-state architecture](pool-state-architecture.md)
 - [Arc Testnet manifest](arc-testnet-manifest.json)
 
 ## Integrate
@@ -11,6 +12,12 @@
 - [Integrator guide](integrator-guide.md)
 - [API reference](api-reference.md)
 - [OpenAPI](openapi.yaml)
+
+## Grants
+
+- [Circle Developer Grant proposal](grants/circle-developer-grant-proposal.md)
+  - [Shareable Word](grants/Chakra-Circle-Grant-Proposal.docx)
+  - [3-minute demo script](grants/circle-3min-demo-script.md)
 
 ## Deploy and operate
 

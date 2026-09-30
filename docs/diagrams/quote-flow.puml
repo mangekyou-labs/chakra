@@ -1,0 +1,26 @@
+@startuml quote-flow
+!include _theme.iuml
+skinparam linetype polyline
+title Quote
+caption GET /api/v1/quote. Local math over Redis. Never RPC. Numbers match the Architecture page.
+
+actor Client
+participant "api-server" as API
+participant "PathFinder" as PF
+database Redis
+participant "QuoteEngine" as QE
+participant "SplitOptimizer" as SO
+
+Client -> API : 1. GET /api/v1/quote
+API -> API : 2. load snapshot engine
+API -> PF : 3. find_candidate_paths
+PF --> API : candidate paths\n(no liquidity prune)
+API -> Redis : 4. MGET pool keys\nxyk · stable · clmm
+Redis --> API : cached pool state
+API -> QE : 5. quote each path at amount_in
+QE --> API : QuotedPath list
+API -> SO : 6. split if impact or\ncompetitive delta warrants it
+SO --> API : OptimalRoute
+API --> Client : 7. expected_output · min_out · sub_routes
+
+@enduml
