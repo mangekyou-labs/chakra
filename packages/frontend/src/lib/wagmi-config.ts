@@ -1,16 +1,16 @@
 import { http } from 'wagmi';
 import { createConfig, injected } from 'wagmi';
-import { arc } from 'wagmi/chains';
+import { arcMainnet } from './chain';
 
 /**
  * EIP-6963 injected connector only (T6.1). Arc mainnet official chain
  * definition — native gas is USDC 18 dp.
  */
 export const wagmiConfig = createConfig({
-  chains: [arc],
+  chains: [arcMainnet],
   connectors: [injected()],
   transports: {
-    [arc.id]: http('https://rpc.mainnet.arc.io'),
+    [arcMainnet.id]: http('https://rpc.mainnet.arc.io'),
   },
 });
 

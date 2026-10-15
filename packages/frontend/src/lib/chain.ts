@@ -10,6 +10,14 @@ export const ARC_CHAIN_ID_HEX = '0x13B2';
 export const ARC_RPC_URLS = ['https://rpc.mainnet.arc.io'];
 export const ARC_BLOCK_EXPLORER_URLS = ['https://explorer.arc.io'];
 
+/** Complete the SDK definition, whose default RPC list is empty. */
+export const arcMainnet = {
+  ...arc,
+  name: 'Arc Mainnet',
+  rpcUrls: { default: { http: ARC_RPC_URLS } },
+  blockExplorers: { default: { name: 'Arc Explorer', url: ARC_BLOCK_EXPLORER_URLS[0] } },
+} as const;
+
 /**
  * `wallet_addEthereumChain` params. Matches the viem `arc` definition —
  * native gas is USDC at 18 dp (wallet may still label it ETH; UI copy says USDC).

@@ -12,7 +12,8 @@ import { SwapSettingsModal } from './SwapSettingsModal';
 import { UnauditedModal } from './UnauditedModal';
 import { RecentSwaps } from './RecentSwaps';
 import { formatErc20, formatNativeUsdc, slippageToBps, usdcMaxAtomic } from '@/lib/decimals';
-import { formatImpactPercent } from '@/lib/quote-format';
+import { routeSourceLabel } from '@/lib/venue-labels';
+import { formatImpactPercent, formatProtocolFeePercent, formatPoolFees } from '@/lib/quote-format';
 import {
   DEFAULT_SWAP_SETTINGS,
   formatSlippageLabel,
@@ -52,7 +53,7 @@ const VALID_INPUT_RE = /^\d*\.?\d*$/;
 type SendState = 'idle' | SwapExecutionState;
 
 export function SwapCard() {
-  const { address, onArcMainnet, connect, switchToArc } = useWallet();
+  const { address, onArcMainnet, connecting, connect, switchToArc } = useWallet();
   const {
     getErc20Balance,
     nativeBalance,
@@ -200,19 +201,19 @@ export function SwapCard() {
   }, [address, onArcMainnet, amountIn, quoteLoading, quoteStale, quote, sendState, sendError]);
 
   const primaryDisabled =
-    !address ||
-    !onArcMainnet ||
-    !amountIn ||
-    parseFloat(amountIn) <= 0 ||
-    quoteLoading ||
-    quoteStale ||
-    !quote ||
-    sendState === 'building' ||
-    sendState === 'approving' ||
-    sendState === 'permitting' ||
-    sendState === 'sending' ||
-    sendState === 'confirming' ||
-    sendState === 'confirmed';
+    connecting ||
+    (Boolean(address && onArcMainnet) &&
+      (!amountIn ||
+        parseFloat(amountIn) <= 0 ||
+        quoteLoading ||
+        quoteStale ||
+        !quote ||
+        sendState === 'building' ||
+        sendState === 'approving' ||
+        sendState === 'permitting' ||
+        sendState === 'sending' ||
+        sendState === 'confirming' ||
+        sendState === 'confirmed'));
 
   const handlePrimary = useCallback(async () => {
     if (!address) {
@@ -220,7 +221,11 @@ export function SwapCard() {
       return;
     }
     if (!onArcMainnet) {
-      void switchToArc();
+      try {
+        await switchToArc();
+      } catch (error) {
+        setSendError(error instanceof Error ? error.message : 'Could not switch network');
+      }
       return;
     }
     if (!quote || !tokenIn || !tokenOut || !amountIn || !walletClient || !publicClient) return;
@@ -458,15 +463,21 @@ export function SwapCard() {
           {quote && (
             <div className="mt-3.5 px-0.5 space-y-1.5 text-[13px] sm:text-[14px] text-[var(--text-muted)]">
               <div className="flex items-center justify-between gap-3">
-                <span>Price impact</span>
+                <span>Price impact (est.)</span>
                 <span className="tabular-nums font-[family-name:var(--font-mono)] text-[var(--text-secondary)]">
                   {formatImpactPercent(quote.price_impact_bps)}
                 </span>
               </div>
               <div className="flex items-center justify-between gap-3">
-                <span>Protocol fee</span>
+                <span>Chakra fee</span>
                 <span className="tabular-nums font-[family-name:var(--font-mono)] text-[var(--text-secondary)]">
-                  {formatImpactPercent(quote.protocol_fee_bps)}
+                  {formatProtocolFeePercent(quote.protocol_fee_bps)}
+                </span>
+              </div>
+              <div className="flex items-center justify-between gap-3">
+                <span>Pool fees (included)</span>
+                <span className="tabular-nums font-[family-name:var(--font-mono)] text-[var(--text-secondary)]">
+                  {formatPoolFees(quote.sub_routes)}
                 </span>
               </div>
               <div className="flex items-center justify-between gap-3">
@@ -483,7 +494,7 @@ export function SwapCard() {
                 <span className="tabular-nums font-[family-name:var(--font-mono)] text-[var(--text-secondary)]">
                   {subRoutes.length > 1
                     ? `${subRoutes.length} paths`
-                    : (subRoutes[0]?.source ?? '—')}
+                    : routeSourceLabel(subRoutes[0]?.source)}
                 </span>
               </div>
             </div>

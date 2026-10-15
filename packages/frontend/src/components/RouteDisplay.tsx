@@ -2,26 +2,8 @@
 
 import { useEffect, useState } from 'react';
 import type { SubRoute } from '@/lib/aggregator';
-import { formatImpactPercent } from '@/lib/quote-format';
-
-const DEX_LABELS: Record<string, string> = {
-  xyk: 'xy=k',
-  stable: 'Stable',
-  clmm: 'CLMM',
-  xylo: 'Xylo',
-  presto: 'Presto',
-  'chakra-xyk': 'xy=k',
-  'chakra-stable': 'Stable',
-  'chakra-clmm': 'UnitFlow V3',
-  'xylo-stable': 'Xylo',
-  'presto-hub': 'Presto',
-  'unitflow-v25': 'UnitFlow',
-};
-
-function dexLabel(dex: string): string {
-  const key = dex.toLowerCase();
-  return DEX_LABELS[key] ?? dex.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
-}
+import { dexLabel, routeSourceLabel } from '@/lib/venue-labels';
+import { formatImpactPercent, formatProtocolFeePercent, formatPoolFees } from '@/lib/quote-format';
 
 /** Per-hop venue list from the Chakra `source` string ("xyk → clmm"). */
 export function routeDexHops(route: SubRoute): string[] {
@@ -67,7 +49,7 @@ export function RouteDisplay({
   return (
     <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface)]/80 px-4 py-3 space-y-2.5">
       <div className="flex justify-between text-[13px] sm:text-[14px]">
-        <span className="text-[var(--text-muted)]">Price impact</span>
+        <span className="text-[var(--text-muted)]">Price impact (est.)</span>
         <span
           className={
             quote.price_impact_bps > 100 ? 'text-amber-400' : 'text-[var(--text-secondary)]'
@@ -77,9 +59,16 @@ export function RouteDisplay({
         </span>
       </div>
       <div className="flex justify-between text-[13px] sm:text-[14px]">
-        <span className="text-[var(--text-muted)]">Protocol fee</span>
+        <span className="text-[var(--text-muted)]">Chakra fee</span>
         <span className="text-[var(--text-secondary)] font-[family-name:var(--font-mono)]">
-          {formatImpactPercent(quote.protocol_fee_bps)}
+          {formatProtocolFeePercent(quote.protocol_fee_bps)}
+        </span>
+      </div>
+
+      <div className="flex justify-between text-[13px] sm:text-[14px]">
+        <span className="text-[var(--text-muted)]">Pool fees (included)</span>
+        <span className="text-[var(--text-secondary)] font-[family-name:var(--font-mono)]">
+          {formatPoolFees(quote.sub_routes)}
         </span>
       </div>
 
@@ -94,7 +83,7 @@ export function RouteDisplay({
           <span className="rounded-full border border-[var(--border)] bg-[var(--bg-0)]/60 px-2.5 py-0.5 text-[12px] font-medium text-[var(--text-secondary)] truncate max-w-[12rem] sm:max-w-[16rem]">
             {quote.sub_routes.length > 1
               ? `${quote.sub_routes.length} paths`
-              : (quote.sub_routes[0]?.source ?? '—')}
+              : routeSourceLabel(quote.sub_routes[0]?.source)}
           </span>
           <svg
             className={`h-3.5 w-3.5 text-[var(--text-muted)] transition-transform ${open ? 'rotate-180' : ''}`}

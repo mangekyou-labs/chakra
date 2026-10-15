@@ -1,9 +1,9 @@
 'use client';
 
-import { createContext, useCallback, useContext, useMemo, type ReactNode } from 'react';
+import { createContext, useCallback, useContext, useEffect, useMemo, type ReactNode } from 'react';
 import { useConnect, useConnection, useDisconnect, useSwitchChain } from 'wagmi';
 import { AccountBalancesProvider } from '@/lib/account-balances-context';
-import { ARC_ADD_CHAIN_PARAMS, isArcMainnet } from '@/lib/chain';
+import { ARC_CHAIN_ID, isArcMainnet } from '@/lib/chain';
 
 export interface WalletState {
   address: `0x${string}` | null;
@@ -32,7 +32,7 @@ export function useWallet() {
 }
 
 export function WalletProvider({ children }: { children: ReactNode }) {
-  const { address, chainId, isConnected, isConnecting } = useConnection();
+  const { address, chainId, connector, isConnected, isConnecting } = useConnection();
   const { connect, connectors, isPending: connectPending } = useConnect();
   const { disconnect } = useDisconnect();
   const { switchChainAsync } = useSwitchChain();
@@ -49,25 +49,38 @@ export function WalletProvider({ children }: { children: ReactNode }) {
     disconnect();
   }, [disconnect]);
 
-  const switchToArc = useCallback(async () => {
-    try {
-      await switchChainAsync({ chainId: 5042 });
-    } catch {
-      // Wallet does not know Arc — prompt `wallet_addEthereumChain`.
-      const provider = (
-        window as unknown as {
-          ethereum?: {
-            request?: (args: { method: string; params?: unknown[] }) => Promise<unknown>;
-          };
+  // MetaMask can switch without emitting chainChanged. Reconcile the selected
+  // connector on restore and focus, updating Wagmi so all consumers agree.
+  useEffect(() => {
+    if (!isConnected || !connector) return;
+    let active = true;
+    const reconcile = async () => {
+      try {
+        const currentChainId = await connector.getChainId();
+        if (active && currentChainId !== chainId) {
+          connector.emitter.emit('change', { chainId: currentChainId });
         }
-      ).ethereum;
-      if (provider?.request) {
-        await provider.request({
-          method: 'wallet_addEthereumChain',
-          params: [ARC_ADD_CHAIN_PARAMS],
-        });
+      } catch {
+        // Keep the existing chain gate if the wallet is temporarily unavailable.
       }
-    }
+    };
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') void reconcile();
+    };
+    void reconcile();
+    window.addEventListener('focus', reconcile);
+    document.addEventListener('visibilitychange', onVisible);
+    return () => {
+      active = false;
+      window.removeEventListener('focus', reconcile);
+      document.removeEventListener('visibilitychange', onVisible);
+    };
+  }, [connector, chainId, isConnected]);
+
+  const switchToArc = useCallback(async () => {
+    // The connector handles unknown-chain (4902) fallback on its own provider.
+    // User rejection must propagate rather than trigger a second wallet prompt.
+    await switchChainAsync({ chainId: ARC_CHAIN_ID });
   }, [switchChainAsync]);
 
   const value = useMemo<WalletState>(

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  arcMainnet,
   ARC_CHAIN_ID,
   ARC_CHAIN_ID_HEX,
   ARC_ADD_CHAIN_PARAMS,
@@ -45,4 +46,10 @@ describe('nativeGasSymbol', () => {
     expect(nativeGasSymbol('USDC')).toBe('USDC');
     expect(nativeGasSymbol(undefined)).toBe('USDC');
   });
+});
+
+it('supplies wallet network onboarding with a usable RPC and explorer', () => {
+  expect(arcMainnet.id).toBe(ARC_CHAIN_ID);
+  expect(arcMainnet.rpcUrls.default.http).toEqual(ARC_ADD_CHAIN_PARAMS.rpcUrls);
+  expect(arcMainnet.blockExplorers.default.url).toBe(ARC_ADD_CHAIN_PARAMS.blockExplorerUrls[0]);
 });

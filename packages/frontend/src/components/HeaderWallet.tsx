@@ -25,6 +25,8 @@ export function HeaderWallet() {
     setSwitching(true);
     try {
       await switchToArc();
+    } catch {
+      // Rejection leaves the switch action available for another attempt.
     } finally {
       setSwitching(false);
     }
