@@ -57,6 +57,10 @@ Vercel production deployment `dpl_4w6CVxK7XULttwKaUNBS5iHH7kMD` was promoted
 after Render passed the production quote and transaction-building checks.
 Analytics namespaces normalize the aggregator address to lowercase so the
 worker and API share the same cursor and totals regardless of environment casing.
+The final Render release is `dep-db84q6689jmc73c7chcg`, running commit
+`eaefcb703202f8b60b2a6909ac4be4bcc385d0d7`; it became live at
+2026-10-15 03:51:30 UTC. Render tracks `feature-chakra` with automatic deploys
+disabled; future backend releases require an explicit deployment.
 
 ## Verification and operation
 
@@ -73,6 +77,13 @@ worker and API share the same cursor and totals regardless of environment casing
   testnet acknowledgement does not suppress it.
 - Owner, token immutables, Permit2, factory allowlist and pause state were
   checked on the deployed contract.
+- Production acceptance after the final Render restart: all six directed
+  USDC/EURC/cirBTC routes quote and build transactions for chain 5042 and the
+  deployed aggregator; `/api/v1/ready` returns HTTP 200.
+- Analytics caught up to confirmed block 26031463 (chain head 26031475),
+  with zero indexing lag and a 17-second freshness age at the final check.
+- Vercel CLI inspection of `chakra-ag.vercel.app` resolves to the promoted
+  deployment above with status Ready and target production.
 
 Re-run the read-only quote check with `ARC_RPC_URL` in the environment:
 `cargo run -p dex-adapters --example mainnet_quote`.
