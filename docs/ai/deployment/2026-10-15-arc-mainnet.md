@@ -149,3 +149,14 @@ Production acceptance after the callback release:
   `dpl_E3gb3X5C57n4PMbXr67uXs5Uxj2X`, Ready, production.
 - No funded user swap was submitted. Cancel stale wallet prompts and reload
   the application before signing for the replacement contract.
+
+The final backend metadata correction is commit
+`6b1d4a268a9f3b356f33212686b391099474510c`, Render deployment
+`dep-db85ofgn74is73dtk1b0`. The API now loads the stats deployment block from
+`CHAKRA_ANALYTICS_START_BLOCK`, matching the worker, instead of displaying the
+initial contract's hardcoded block. API tests, including a regression for this
+configured metadata, pass. The frontend release is unchanged.
+
+The metadata correction is live. Final `/api/v1/stats` acceptance reports the
+replacement aggregator, deployment block 26037823, and zero indexing lag;
+`/api/v1/ready` returns HTTP 200.
