@@ -40,7 +40,7 @@ fn chakra_snapshot() -> MarketSnapshot {
     MarketSnapshot::from_sources(
         "chakra-local-1",
         1_700_000_000_000,
-        "arc-testnet",
+        "arc-mainnet",
         vec![
             SourceSnapshot {
                 source: "chakra-xyk".to_string(),

@@ -42,3 +42,6 @@ output/
 playwright-report/
 __pycache__/
 *.pyc
+
+# Local Vercel linkage and downloaded environment files
+.vercel/

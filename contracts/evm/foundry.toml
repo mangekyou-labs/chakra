@@ -40,3 +40,6 @@ evm_version = "istanbul"
 paths = "venues/uniswap-v3/**"
 version = "=0.7.6"
 evm_version = "istanbul"
+
+[rpc_endpoints]
+arc_mainnet = "${ARC_RPC_URL}"

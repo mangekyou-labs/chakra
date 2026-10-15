@@ -197,7 +197,7 @@ export default function StatsPage() {
           <p className="section-label">Network analytics</p>
           <h1 className="mt-1 text-3xl font-semibold tracking-tight">Stats</h1>
           <p className="mt-2 text-sm text-[var(--text-secondary)]">
-            Confirmed routing activity on Arc Testnet.
+            Confirmed routing activity on Arc Mainnet.
           </p>
         </div>
         <div

@@ -1,12 +1,9 @@
 //! Thin EVM JSON-RPC client for Arc (HTTP). No alloy/ethers — reqwest + hex.
 //!
-//! Only public Arc RPC endpoints are allowed by configuration:
-//! `https://rpc.testnet.arc.io` plus the documented failovers
-//! (Blockdaemon HTTP; dRPC HTTP/WS; QuickNode HTTP/WS). The Canteen `$RPC`
-//! proxy (`rpc.testnet.arc-node.thecanteenapp.com`) is authenticated and
-//! method-allowlisted — it does not expose `eth_subscribe` — so configuration
-//! **fails** when a URL host resolves to it. Alchemy has no public Arc URL in
-//! `connect-to-arc.md`; no invented Alchemy URLs may be configured either.
+//! Arc mainnet RPC endpoints are allowed by configuration:
+//! `https://rpc.mainnet.arc.io`, documented public failovers and Alchemy's
+//! official `arc-mainnet.g.alchemy.com` endpoint. Testnet endpoints and the
+//! method-restricted Canteen proxy are rejected by configuration.
 
 use {
     anyhow::{bail, Context, Result},
@@ -19,23 +16,25 @@ use {
 
 // ─── RPC URL policy (T3.3.1) ────────────────────────────────────────────────
 
-pub const ARC_RPC_HTTP: &str = "https://rpc.testnet.arc.io";
-pub const ARC_RPC_WS: &str = "wss://rpc.testnet.arc.io";
+pub const ARC_RPC_HTTP: &str = "https://rpc.mainnet.arc.io";
+pub const ARC_RPC_WS: &str = "wss://rpc.blockdaemon.mainnet.arc.io/websocket";
 pub const CANTEEN_RPC_HOST: &str = "rpc.testnet.arc-node.thecanteenapp.com";
 
 /// Documented public HTTP failovers (design: Blockdaemon HTTP; dRPC; QuickNode).
 pub const ALLOWED_HTTP_HOSTS: &[&str] = &[
-    "rpc.testnet.arc.io",
-    "rpc.blockdaemon.testnet.arc.io",
-    "rpc.drpc.testnet.arc.io",
-    "rpc.quicknode.testnet.arc.io",
+    "rpc.mainnet.arc.io",
+    "arc-mainnet.g.alchemy.com",
+    "rpc.blockdaemon.mainnet.arc.io",
+    "rpc.drpc.mainnet.arc.io",
+    "rpc.quicknode.mainnet.arc.io",
 ];
 
 /// Documented public WS endpoints (design: dRPC WS; QuickNode WS).
 pub const ALLOWED_WS_HOSTS: &[&str] = &[
-    "rpc.testnet.arc.io",
-    "rpc.drpc.testnet.arc.io",
-    "rpc.quicknode.testnet.arc.io",
+    "rpc.mainnet.arc.io",
+    "arc-mainnet.g.alchemy.com",
+    "rpc.blockdaemon.mainnet.arc.io",
+    "rpc.quicknode.mainnet.arc.io",
 ];
 
 fn host_of(url: &str) -> Option<String> {
@@ -282,6 +281,17 @@ impl EvmRpcClient {
         let result = self.request("eth_blockNumber", json!([])).await?;
         let hex = result.as_str().context("eth_blockNumber result not a hex string")?;
         parse_hex_u64(hex)
+    }
+
+    /// Pin related reads to one block so price, liquidity and ticks agree.
+    pub async fn eth_call_at(&self, to: &str, data: &str, block: u64) -> Result<String> {
+        let result = self
+            .request("eth_call", json!([{"to": to, "data": data}, format!("0x{block:x}")]))
+            .await?;
+        result
+            .as_str()
+            .map(str::to_string)
+            .context("eth_call result not a hex string")
     }
 
     /// `eth_call` returning the raw `0x`-prefixed 32-byte result word.
@@ -701,31 +711,31 @@ mod tests {
                 "ws url should be allowed: {host}"
             );
         }
-        // HTTP list may include Blockdaemon; WS list may not.
-        assert!(evm_http_url_allowed("https://rpc.blockdaemon.testnet.arc.io"));
-        assert!(!evm_ws_url_allowed("wss://rpc.blockdaemon.testnet.arc.io"));
+        // Mainnet Blockdaemon supports both HTTP and WebSocket.
+        assert!(evm_http_url_allowed("https://rpc.blockdaemon.mainnet.arc.io"));
+        assert!(evm_ws_url_allowed("wss://rpc.blockdaemon.mainnet.arc.io/websocket"));
         // Scheme/scheme-host mismatch rejected.
-        assert!(!evm_http_url_allowed("wss://rpc.testnet.arc.io"));
-        assert!(!evm_ws_url_allowed("https://rpc.testnet.arc.io"));
+        assert!(!evm_http_url_allowed("wss://rpc.mainnet.arc.io"));
+        assert!(!evm_ws_url_allowed("https://rpc.mainnet.arc.io"));
     }
 
     #[test]
-    fn rejects_invented_alchemy_url() {
-        assert!(!evm_http_url_allowed("https://arc-mainnet.g.alchemy.com/v2/xxxx"));
-        assert!(!evm_http_url_allowed("https://arc-testnet.alchemy.com/v2/xxxx"));
-        assert!(!evm_ws_url_allowed("wss://arc-mainnet.g.alchemy.com/v2/xxxx"));
+    fn accepts_documented_mainnet_alchemy_only() {
+        assert!(evm_http_url_allowed("https://arc-mainnet.g.alchemy.com/v2/xxxx"));
+        assert!(!evm_http_url_allowed("https://arc-mainnet.alchemy.com/v2/xxxx"));
+        assert!(evm_ws_url_allowed("wss://arc-mainnet.g.alchemy.com/v2/xxxx"));
     }
 
     #[test]
     fn validate_lists_reject_canteen_and_accept_documented() {
         let ok =
-            validate_http_urls(&[ARC_RPC_HTTP.to_string(), "https://rpc.drpc.testnet.arc.io".to_string()]).unwrap();
+            validate_http_urls(&[ARC_RPC_HTTP.to_string(), "https://rpc.drpc.mainnet.arc.io".to_string()]).unwrap();
         assert_eq!(ok.len(), 2);
         assert!(validate_http_urls(&[CANTEEN_RPC_HOST.to_string()]).is_err());
         assert!(validate_http_urls(&["not a url".to_string()]).is_err());
-        let ws = validate_ws_urls(&[ARC_RPC_WS.to_string(), "wss://rpc.quicknode.testnet.arc.io".to_string()]).unwrap();
+        let ws = validate_ws_urls(&[ARC_RPC_WS.to_string(), "wss://rpc.quicknode.mainnet.arc.io".to_string()]).unwrap();
         assert_eq!(ws.len(), 2);
-        assert!(validate_ws_urls(&["https://rpc.testnet.arc.io".to_string()]).is_err());
+        assert!(validate_ws_urls(&["https://rpc.mainnet.arc.io".to_string()]).is_err());
     }
 
     // ─── Client tests (fixture server, never live Arc) ────────

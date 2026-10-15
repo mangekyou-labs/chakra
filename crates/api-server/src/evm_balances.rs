@@ -10,7 +10,7 @@ use {
     serde_json::{json, Value},
 };
 
-/// Multicall3 predeploy on Arc testnet.
+/// Multicall3 predeploy on Arc mainnet.
 pub const MULTICALL3: &str = "0xcA11bde05977b3631167028862bE2a173976CA11";
 
 /// `aggregate3((address,bytes,bool)[])` selector.

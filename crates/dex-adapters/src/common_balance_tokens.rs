@@ -1,10 +1,10 @@
 //! Curated catalog tokens queried in `/api/v1/balances`.
 //!
-//! Includes the frozen Arc testnet catalog tokens (USDC, EURC, cirBTC).
+//! Includes the frozen Arc mainnet catalog tokens (USDC, EURC, cirBTC).
 pub const COMMON_BALANCE_TOKEN_IDS: &[&str] = &[
     "0x3600000000000000000000000000000000000000", // USDC
-    "0x89B50855Aa8D51744b8062fa4173AC0d1c4CD72a", // EURC
-    "0x6De6cAC86b864aA2B7b2d56125A0F5952Ac0e774", // cirBTC
+    "0xbEf5f6d51CB62b58e6A8f77868681825C6fe21c1", // EURC
+    "0x171A4217b86A807A64eB94757Db6849fb4bDbAA0", // cirBTC
 ];
 
 pub fn is_common_balance_token(contract_id: &str) -> bool {
@@ -20,7 +20,7 @@ mod tests {
     #[test]
     fn includes_core_swap_tokens() {
         assert!(is_common_balance_token("0x3600000000000000000000000000000000000000"));
-        assert!(is_common_balance_token("0x89b50855aa8d51744b8062fa4173ac0d1c4cd72a"));
+        assert!(is_common_balance_token("0xbef5f6d51cb62b58e6a8f77868681825c6fe21c1"));
     }
 
     #[test]

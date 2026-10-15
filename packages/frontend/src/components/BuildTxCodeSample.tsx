@@ -4,7 +4,7 @@ import { useState } from 'react';
 
 const API_URL = process.env.NEXT_PUBLIC_CHAKRA_API_URL || 'http://localhost:8080';
 const USDC = '0x3600000000000000000000000000000000000000';
-const EURC = '0x89b50855aa3be2f677cd6303cec089b5f319d72a';
+const EURC = '0xbef5f6d51cb62b58e6a8f77868681825c6fe21c1';
 
 function buildSampleCode(): string {
   return `// Chakra quote → build_tx (no wallet secrets)
@@ -55,7 +55,7 @@ const tx = await buildResp.json();
 // tx.data = { to, data, chain_id, value: "0", deadline, typed_data, required_approvals }
 
 // 4) Sign with EIP-1193 wallet (MetaMask) and send
-// docs: https://testnet.arcscan.app`;
+// docs: https://explorer.arc.io`;
 }
 
 export function BuildTxCodeSample() {

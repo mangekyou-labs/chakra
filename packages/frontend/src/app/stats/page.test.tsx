@@ -59,14 +59,14 @@ function route(tokenIn: string, tokenOut: string, multihop: boolean): RouteHealt
   };
 }
 
-const CIRBTC = '0xf0C4a4CE82A5746AbAAd9425360Ab04fbBA432BF';
+const CIRBTC = '0x171A4217b86A807A64eB94757Db6849fb4bDbAA0';
 const USDC = '0x3600000000000000000000000000000000000000';
-const EURC = '0x89B50855Aa3bE2F677cD6303Cec089B5F319D72a';
+const EURC = '0xbEf5f6d51CB62b58e6A8f77868681825C6fe21c1';
 
 function payload(overrides?: Partial<Payload['data']>): Payload {
   const base: Payload['data'] = {
     meta: {
-      chain: 'arc-testnet',
+      chain: 'arc-mainnet',
       chain_head: 60_001_000,
       confirmed_head: 60_000_988,
       indexed_head: 60_000_988,

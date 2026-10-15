@@ -12,7 +12,7 @@ const DEX_LABELS: Record<string, string> = {
   presto: 'Presto',
   'chakra-xyk': 'xy=k',
   'chakra-stable': 'Stable',
-  'chakra-clmm': 'CLMM',
+  'chakra-clmm': 'UnitFlow V3',
   'xylo-stable': 'Xylo',
   'presto-hub': 'Presto',
   'unitflow-v25': 'UnitFlow',

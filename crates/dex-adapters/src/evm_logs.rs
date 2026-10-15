@@ -351,7 +351,7 @@ mod tests {
     const TRANSFER_TOPIC0: &str = "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef";
 
     const USDC: &str = "0x3600000000000000000000000000000000000000";
-    const EURC: &str = "0x89B50855Aa3bE2F677cD6303Cec089B5F319D72a";
+    const EURC: &str = "0xbEf5f6d51CB62b58e6A8f77868681825C6fe21c1";
     const POOL: &str = "0x0000000000000000000000000000000000000001";
 
     fn evm_data(values: &[u128]) -> String {
@@ -569,14 +569,14 @@ mod tests {
     #[test]
     fn normalize_pads_and_lowercases() {
         assert_eq!(
-            normalize_evm_address("0x89B50855Aa3bE2F677cD6303Cec089B5F319D72a"),
-            "0x89b50855aa3be2f677cd6303cec089b5f319d72a"
+            normalize_evm_address("0xbEf5f6d51CB62b58e6A8f77868681825C6fe21c1"),
+            "0xbef5f6d51cb62b58e6a8f77868681825c6fe21c1"
         );
         assert_eq!(
             normalize_evm_address("0x1"),
             "0x0000000000000000000000000000000000000001"
         );
-        assert!(is_evm_address("0x89b50855aa3be2f677cd6303cec089b5f319d72a"));
+        assert!(is_evm_address("0xbef5f6d51cb62b58e6a8f77868681825c6fe21c1"));
         assert!(!is_evm_address(
             "CA4HEQTL2WPEUYKYKCDOHCDNIV4QHNJ7EL4J4NQ6VADP7SYHVRYZ7AW2"
         ));

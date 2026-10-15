@@ -3,28 +3,28 @@ import {
   ARC_CHAIN_ID,
   ARC_CHAIN_ID_HEX,
   ARC_ADD_CHAIN_PARAMS,
-  isArcTestnet,
+  isArcMainnet,
   nativeGasSymbol,
 } from './chain';
 
-describe('isArcTestnet', () => {
-  it('accepts Arc testnet chain id 5042002', () => {
-    expect(isArcTestnet(5042002)).toBe(true);
+describe('isArcMainnet', () => {
+  it('accepts Arc mainnet chain id 5042', () => {
+    expect(isArcMainnet(5042)).toBe(true);
   });
 
   it('rejects other chain ids and undefined', () => {
-    expect(isArcTestnet(1)).toBe(false);
-    expect(isArcTestnet(14)).toBe(false);
-    expect(isArcTestnet(114)).toBe(false);
-    expect(isArcTestnet(undefined as unknown as number)).toBe(false);
+    expect(isArcMainnet(1)).toBe(false);
+    expect(isArcMainnet(14)).toBe(false);
+    expect(isArcMainnet(114)).toBe(false);
+    expect(isArcMainnet(undefined as unknown as number)).toBe(false);
   });
 });
 
 describe('ARC_ADD_CHAIN_PARAMS', () => {
-  it('pins the Arc testnet chain id as 0x4CEF52', () => {
-    expect(ARC_CHAIN_ID).toBe(5042002);
-    expect(ARC_CHAIN_ID_HEX).toBe('0x4CEF52');
-    expect(ARC_ADD_CHAIN_PARAMS.chainId).toBe('0x4CEF52');
+  it('pins the Arc mainnet chain id as 0x13B2', () => {
+    expect(ARC_CHAIN_ID).toBe(5042);
+    expect(ARC_CHAIN_ID_HEX).toBe('0x13B2');
+    expect(ARC_ADD_CHAIN_PARAMS.chainId).toBe('0x13B2');
   });
 
   it('uses USDC 18 dp native currency, public Arc RPC, and Arcscan explorer', () => {
@@ -33,8 +33,8 @@ describe('ARC_ADD_CHAIN_PARAMS', () => {
       symbol: 'USDC',
       decimals: 18,
     });
-    expect(ARC_ADD_CHAIN_PARAMS.rpcUrls).toEqual(['https://rpc.testnet.arc.io']);
-    expect(ARC_ADD_CHAIN_PARAMS.blockExplorerUrls).toEqual(['https://testnet.arcscan.app']);
+    expect(ARC_ADD_CHAIN_PARAMS.rpcUrls).toEqual(['https://rpc.mainnet.arc.io']);
+    expect(ARC_ADD_CHAIN_PARAMS.blockExplorerUrls).toEqual(['https://explorer.arc.io']);
   });
 });
 

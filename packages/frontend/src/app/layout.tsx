@@ -20,9 +20,9 @@ const jetbrains = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
-  title: 'Chakra — Non-custodial best-execution routing across Arc Testnet venues',
+  title: 'Chakra — Non-custodial best-execution routing across Arc Mainnet venues',
   description:
-    'Chakra routes swaps across Arc Testnet venues for optimal execution. Split orders, best prices.',
+    'Chakra routes swaps across Arc Mainnet venues for optimal execution. Split orders, best prices.',
   icons: {
     icon: '/icon.svg',
     shortcut: '/icon.svg',
@@ -85,7 +85,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             <footer className="relative mt-auto w-full">
               <div className="w-full px-6 sm:px-8 lg:px-14 py-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-[14px] sm:text-[15px] text-[var(--text-secondary)]">
                 <span className="max-w-xl leading-relaxed">
-                  Chakra — non-custodial best-execution routing across Arc Testnet venues
+                  Chakra — non-custodial best-execution routing across Arc Mainnet venues
                 </span>
                 <div className="flex items-center gap-4 shrink-0">
                   <a

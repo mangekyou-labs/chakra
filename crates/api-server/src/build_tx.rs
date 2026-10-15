@@ -589,7 +589,14 @@ pub async fn build_tx_data(
         // Use the on-chain nonce and the same deadline for both typed data and
         // the encoded PermitSingle so the contract matches what the wallet signed.
         let nonce = permit2.nonce;
-        let typed = permit_single_typed_data(&token_in, amount_in, &aggregator, nonce, deadline, 5042002);
+        let typed = permit_single_typed_data(
+            &token_in,
+            amount_in,
+            &aggregator,
+            nonce,
+            deadline,
+            state.config.chakra_chain_id,
+        );
 
         // Parse token and spender into bytes for the PermitSingle encoding.
         let token_bytes = hex::decode(token_in.trim_start_matches("0x"))?;

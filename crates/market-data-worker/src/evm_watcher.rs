@@ -112,7 +112,7 @@ pub struct EvmConfig {
 impl Default for EvmConfig {
     fn default() -> Self {
         Self {
-            chain_id: 5042002,
+            chain_id: 5042,
             http_urls: vec![ARC_RPC_HTTP.to_string()],
             ws_urls: vec![ARC_RPC_WS.to_string()],
             ws_enabled: true,
@@ -171,9 +171,7 @@ impl EvmConfig {
             .collect::<Result<Vec<_>>>()?;
         let (seed_factories, discovery_factories) = dedupe_factories(seed_factories, discovery_factories)?;
 
-        let chain_id = env_var("CHAKRA_CHAIN_ID")
-            .and_then(|v| v.parse().ok())
-            .unwrap_or(5042002);
+        let chain_id = env_var("CHAKRA_CHAIN_ID").and_then(|v| v.parse().ok()).unwrap_or(5042);
         let poll_ms = env_var("CHAKRA_EVM_POLL_INTERVAL_MS")
             .and_then(|v| v.parse().ok())
             .unwrap_or(500)
@@ -259,8 +257,8 @@ pub fn catalog_pairs() -> Vec<(String, String)> {
     ]
 }
 
-/// CLMM fees probed during discovery: 3000 (30 bps) required, 500 (5 bps) optional.
-pub const CLMM_DISCOVERY_FEES: &[(u32, u32, i32)] = &[(3000, 30, 60), (500, 5, 10)];
+/// Standard V3 fee tiers probed during mainnet discovery (raw fee, bps, spacing).
+pub const CLMM_DISCOVERY_FEES: &[(u32, u32, i32)] = &[(100, 1, 1), (500, 5, 10), (3000, 30, 60), (10000, 100, 200)];
 
 fn pair_key(a: &str, b: &str) -> (String, String) {
     let (a, b) = (normalize_evm_address(a), normalize_evm_address(b));
@@ -567,11 +565,10 @@ impl EvmRunner {
                                     tick_spacing: *tick_spacing,
                                     factory: factory.address.clone(),
                                 };
-                                let Ok(state) = dex_adapters::evm_fetch::fetch_clmm_state(
+                                let Ok(state) = dex_adapters::evm_fetch::fetch_clmm_snapshot(
                                     &self.http,
                                     &factory.source,
                                     &pool_ref,
-                                    None,
                                 )
                                 .await
                                 else {
@@ -582,24 +579,13 @@ impl EvmRunner {
                                     warn!(pool = %pool, "clmm pool has zero liquidity or price — skipped");
                                     continue;
                                 }
-                                let pool_state = dex_adapters::clmm_math::ClmmPoolState {
-                                    sqrt_price_x96: dex_adapters::clmm_math::U256(state.sqrt_price_x96),
-                                    tick: state.tick,
-                                    liquidity: state.liquidity,
-                                    fee_bps: *fee_bps,
-                                    tick_spacing: *tick_spacing,
-                                    token0: a.clone(),
-                                    token1: b.clone(),
-                                };
-                                let tick_store = dex_adapters::clmm_math::TickDataStore::new();
-                                let Some((amount_out, _, _)) =
-                                    dex_adapters::clmm_math::simulate_swap(&pool_state, &tick_store, 1_000_000, true)
-                                else {
-                                    warn!(pool = %pool, "clmm pool probe quote failed — skipped");
-                                    continue;
-                                };
-                                if amount_out == 0 {
-                                    warn!(pool = %pool, "clmm pool probe quote zero — skipped");
+                                let (pool_state, tick_store) = dex_adapters::clmm_math::clmm_pool_from_snapshot(&state);
+                                let coverage = dex_adapters::clmm_math::ClmmCoverageInput::from_snapshot(
+                                    &pool_state,
+                                    state.coverage.as_ref().expect("loaded coverage"),
+                                );
+                                if !dex_adapters::clmm_math::clmm_quote_allowed(&tick_store, &coverage) {
+                                    warn!(pool = %pool, "clmm pool lacks usable tick coverage — skipped");
                                     continue;
                                 }
                                 clmm_pools.push(state);
@@ -723,7 +709,7 @@ impl EvmRunner {
         let snapshot = MarketSnapshot::from_sources(
             format!("snapshot-{}", now_ms()),
             now_ms(),
-            "arc-testnet",
+            "arc-mainnet",
             sources.clone(),
         )
         .with_clmm_pool_refs(
@@ -1302,7 +1288,7 @@ pub(crate) async fn run_arc(config: crate::worker::WorkerConfig) -> Result<()> {
     if analytics_config.enabled {
         match (evm.redis_url.as_deref(), std::env::var("CHAKRA_AGGREGATOR").ok()) {
             (Some(redis_url), Some(aggregator)) if !aggregator.is_empty() => {
-                let store = Arc::new(AnalyticsStore::new(redis_url, 5042002, &aggregator)?);
+                let store = Arc::new(AnalyticsStore::new(redis_url, evm.chain_id, &aggregator)?);
                 let indexer = AnalyticsIndexer::new(analytics_config, Arc::new(http.clone()), store, aggregator);
                 tokio::spawn(async move {
                     if let Err(error) = indexer.run().await {
@@ -1343,7 +1329,7 @@ pub(crate) mod tests {
     };
 
     const USDC: &str = "0x3600000000000000000000000000000000000000";
-    const EURC: &str = "0x89B50855Aa3bE2F677cD6303Cec089B5F319D72a";
+    const EURC: &str = "0xbEf5f6d51CB62b58e6A8f77868681825C6fe21c1";
     const POOL: &str = "0x2222222222222222222222222222222222222222";
     const XYK_FACTORY: &str = "0x3333333333333333333333333333333333333333";
     const PRESTO_HUB: &str = "0x5794a8284A29493871Fbfa3c4f343D42001424D6";
@@ -1560,18 +1546,18 @@ pub(crate) mod tests {
         for (name, _) in &original {
             std::env::remove_var(name);
         }
-        std::env::set_var("CHAKRA_RPC_HTTP", "https://rpc.testnet.arc.io");
-        std::env::set_var("CHAKRA_RPC_WS", "wss://rpc.testnet.arc.io");
-        std::env::set_var("CHAKRA_RPC_HTTP_FAILOVERS", "https://rpc.drpc.testnet.arc.io");
-        std::env::set_var("CHAKRA_RPC_WS_FAILOVERS", "wss://rpc.quicknode.testnet.arc.io");
+        std::env::set_var("CHAKRA_RPC_HTTP", "https://rpc.mainnet.arc.io");
+        std::env::set_var("CHAKRA_RPC_WS", "wss://rpc.mainnet.arc.io");
+        std::env::set_var("CHAKRA_RPC_HTTP_FAILOVERS", "https://rpc.drpc.mainnet.arc.io");
+        std::env::set_var("CHAKRA_RPC_WS_FAILOVERS", "wss://rpc.quicknode.mainnet.arc.io");
         std::env::set_var("CHAKRA_REDIS_URL", "redis://127.0.0.1:6379/");
-        std::env::set_var("CHAKRA_CHAIN_ID", "5042002");
+        std::env::set_var("CHAKRA_CHAIN_ID", "5042");
         std::env::set_var("CHAKRA_SEED_FACTORIES", "0xAAA:xyk,0xBBB:stable");
         std::env::set_var("CHAKRA_DISCOVERY_FACTORIES", "0xCCC:clmm");
         std::env::set_var("CHAKRA_EVM_POLL_INTERVAL_MS", "250");
 
         let config = EvmConfig::from_env().unwrap();
-        assert_eq!(config.chain_id, 5042002);
+        assert_eq!(config.chain_id, 5042);
         assert_eq!(config.http_urls.len(), 2);
         assert!(config.ws_enabled);
         assert_eq!(config.redis_url.as_deref(), Some("redis://127.0.0.1:6379/"));

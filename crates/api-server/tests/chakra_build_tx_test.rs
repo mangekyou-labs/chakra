@@ -42,7 +42,7 @@ fn split_swap_calldata_matches_solidity_abi_for_nested_routes() {
     }];
     // Snapshot without the pool → omitted fee falls back to the venue default
     // (30 for xyk), keeping the canonical fixture byte-identical.
-    let snapshot = MarketSnapshot::from_sources("chakra-encode-1", 1_700_000_000_000, "arc-testnet", vec![]);
+    let snapshot = MarketSnapshot::from_sources("chakra-encode-1", 1_700_000_000_000, "arc-mainnet", vec![]);
 
     let encoded = api_server::build_tx::encode_split_swap(
         "0x0000000000000000000000000000000000000001",
@@ -110,7 +110,7 @@ fn chakra_snapshot() -> MarketSnapshot {
     MarketSnapshot::from_sources(
         "chakra-build-1",
         1_700_000_000_000,
-        "arc-testnet",
+        "arc-mainnet",
         vec![
             SourceSnapshot {
                 source: "chakra-xyk".to_string(),
@@ -400,7 +400,7 @@ async fn build_tx_encodes_split_swap_with_matching_route() {
     assert_eq!(head.amount_in, 1_000_000);
     assert_eq!(head.min_amount_out, 990_000);
     assert!(head.deadline > 0, "deadline must be set (now+120s)");
-    assert_eq!(body["data"]["chain_id"], 5042002);
+    assert_eq!(body["data"]["chain_id"], 5042);
     assert_eq!(body["data"]["value"], "0");
 
     // routes array: one sub-route with one stable hop.
@@ -681,7 +681,7 @@ fn two_factory_snapshot() -> MarketSnapshot {
     MarketSnapshot::from_sources(
         "chakra-build-2fact",
         1_700_000_000_000,
-        "arc-testnet",
+        "arc-mainnet",
         vec![SourceSnapshot {
             source: "chakra-xyk".to_string(),
             pairs: vec![
@@ -770,12 +770,12 @@ fn unitflow_snapshot() -> MarketSnapshot {
     MarketSnapshot::from_sources(
         "chakra-build-unitflow",
         1_700_000_000_000,
-        "arc-testnet",
+        "arc-mainnet",
         vec![SourceSnapshot {
             source: "unitflow-v25".to_string(),
             pairs: vec![TradingPairSnapshot {
                 token_a: EURC.to_string(),
-                token_b: "0xf0c4a4ce82a5746abaad9425360ab04fbba432bf".to_string(),
+                token_b: "0x171a4217b86a807a64eb94757db6849fb4bdbaa0".to_string(),
                 pool_address: UNITFLOW_PAIR.to_string(),
                 fee_bps: 30,
                 dex_type: "xyk".to_string(),
@@ -816,7 +816,7 @@ async fn build_tx_accepts_unitflow_v25_factory_membership() {
     let body = json!({
         "user": USER,
         "token_in": EURC.to_ascii_lowercase(),
-        "token_out": "0xf0c4a4ce82a5746abaad9425360ab04fbba432bf",
+        "token_out": "0x171a4217b86a807a64eb94757db6849fb4bdbaa0",
         "amount_in": "1000000",
         "min_amount_out": "990000",
         "sub_routes": [{
@@ -825,7 +825,7 @@ async fn build_tx_accepts_unitflow_v25_factory_membership() {
                 "dex_type": "xyk",
                 "pool_address": UNITFLOW_PAIR.to_ascii_lowercase(),
                 "token_in": EURC.to_ascii_lowercase(),
-                "token_out": "0xf0c4a4ce82a5746abaad9425360ab04fbba432bf"
+                "token_out": "0x171a4217b86a807a64eb94757db6849fb4bdbaa0"
             }]
         }]
     });
@@ -873,7 +873,7 @@ async fn build_tx_rejects_unitflow_when_factory_mismatched() {
     let body = json!({
         "user": USER,
         "token_in": EURC.to_ascii_lowercase(),
-        "token_out": "0xf0c4a4ce82a5746abaad9425360ab04fbba432bf",
+        "token_out": "0x171a4217b86a807a64eb94757db6849fb4bdbaa0",
         "amount_in": "1000000",
         "min_amount_out": "990000",
         "sub_routes": [{
@@ -882,7 +882,7 @@ async fn build_tx_rejects_unitflow_when_factory_mismatched() {
                 "dex_type": "xyk",
                 "pool_address": UNITFLOW_PAIR.to_ascii_lowercase(),
                 "token_in": EURC.to_ascii_lowercase(),
-                "token_out": "0xf0c4a4ce82a5746abaad9425360ab04fbba432bf"
+                "token_out": "0x171a4217b86a807a64eb94757db6849fb4bdbaa0"
             }]
         }]
     });
@@ -905,7 +905,7 @@ fn clmm_snapshot() -> MarketSnapshot {
     MarketSnapshot::from_sources(
         "chakra-build-clmm",
         1_700_000_000_000,
-        "arc-testnet",
+        "arc-mainnet",
         vec![SourceSnapshot {
             source: "chakra-clmm".to_string(),
             pairs: vec![],
@@ -1083,7 +1083,7 @@ fn clmm_5bps_snapshot() -> MarketSnapshot {
     MarketSnapshot::from_sources(
         "chakra-build-clmm5",
         1_700_000_000_000,
-        "arc-testnet",
+        "arc-mainnet",
         vec![SourceSnapshot {
             source: "chakra-clmm".to_string(),
             pairs: vec![],

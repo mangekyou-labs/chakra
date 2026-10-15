@@ -123,7 +123,7 @@ describe('swap-send', () => {
   });
 
   describe('isChainAllowed', () => {
-    it('allows Arc testnet', () => {
+    it('allows Arc mainnet', () => {
       expect(isChainAllowed(ARC_CHAIN_ID)).toBe(true);
     });
     it('rejects other chains', () => {

@@ -27,8 +27,8 @@ describe('unaudited-ack', () => {
     vi.clearAllMocks();
   });
 
-  it('storage key is chakra:unaudited-ack:v1', () => {
-    expect(UNAUDITED_ACK_KEY).toBe('chakra:unaudited-ack:v1');
+  it('storage key is chakra:unaudited-ack:5042:v1', () => {
+    expect(UNAUDITED_ACK_KEY).toBe('chakra:unaudited-ack:5042:v1');
   });
 
   it('hasAck returns false when key is missing', () => {

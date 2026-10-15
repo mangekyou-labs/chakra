@@ -156,11 +156,11 @@ describe('chartGeometry (BigInt scale before Number)', () => {
 
 describe('statsTokenLabel', () => {
   it('uses the canonical cirBTC spelling', () => {
-    expect(statsTokenLabel('0xf0C4a4CE82A5746AbAAd9425360Ab04fbBA432BF')).toBe('cirBTC');
+    expect(statsTokenLabel('0x171A4217b86A807A64eB94757Db6849fb4bDbAA0')).toBe('cirBTC');
   });
   it('labels USDC and EURC and shortens unknown addresses', () => {
     expect(statsTokenLabel('0x3600000000000000000000000000000000000000')).toBe('USDC');
-    expect(statsTokenLabel('0x89B50855Aa3bE2F677cD6303Cec089B5F319D72a')).toBe('EURC');
+    expect(statsTokenLabel('0xbEf5f6d51CB62b58e6A8f77868681825C6fe21c1')).toBe('EURC');
     expect(statsTokenLabel('0xabcdef')).toBe('0xabcd…');
   });
 });

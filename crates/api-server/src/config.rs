@@ -3,8 +3,8 @@
 use serde::{Deserialize, Serialize};
 
 /// Parse + validate the Chakra HTTP RPC URL (T4.3.8 RPC policy).
-/// Public Arc + documented failovers only; Canteen `$RPC` and invented
-/// Alchemy URLs fail at config load.
+/// Arc mainnet public endpoints and official Alchemy URLs only; testnet
+/// and invented hosts fail at config load.
 pub fn parse_chakra_rpc_http(value: Option<String>) -> anyhow::Result<String> {
     let value = value.unwrap_or_else(|| dex_adapters::evm_rpc::ARC_RPC_HTTP.to_string());
     dex_adapters::evm_rpc::validate_http_urls(std::slice::from_ref(&value))?;
@@ -84,6 +84,8 @@ pub struct AppConfig {
     pub snapshot_redis_url: Option<String>,
     /// Chakra EVM HTTP RPC URL (public Arc + documented failovers only).
     pub chakra_rpc_http: String,
+    /// Chain used for transaction payloads, Permit2 and analytics.
+    pub chakra_chain_id: u64,
     /// Aggregator contract address for `build_tx` `to` (empty until T5.2).
     pub chakra_aggregator: String,
     /// Allowlisted CORS origins (comma-separated).
@@ -109,6 +111,7 @@ impl Default for AppConfig {
             snapshot_backend: None,
             snapshot_dir: None,
             snapshot_redis_url: None,
+            chakra_chain_id: 5042,
             chakra_rpc_http: dex_adapters::evm_rpc::ARC_RPC_HTTP.to_string(),
             chakra_aggregator: String::new(),
             chakra_cors_origins: vec!["http://localhost:3000".to_string()],
@@ -178,6 +181,10 @@ impl AppConfig {
                 .unwrap_or_default()
                 .trim()
                 .to_ascii_lowercase(),
+            chakra_chain_id: std::env::var("CHAKRA_CHAIN_ID")
+                .ok()
+                .and_then(|s| s.parse().ok())
+                .unwrap_or(5042),
             chakra_cors_origins: std::env::var("CHAKRA_CORS_ORIGINS")
                 .unwrap_or_default()
                 .split(',')

@@ -66,7 +66,7 @@ type SendState =
   | 'error';
 
 export function SwapCard() {
-  const { address, onArcTestnet, connect, switchToArc } = useWallet();
+  const { address, onArcMainnet, connect, switchToArc } = useWallet();
   const {
     getErc20Balance,
     nativeBalance,
@@ -198,7 +198,7 @@ export function SwapCard() {
 
   const primaryLabel = useMemo(() => {
     if (!address) return 'Connect Wallet';
-    if (!onArcTestnet) return 'Switch to Arc Testnet';
+    if (!onArcMainnet) return 'Switch to Arc Mainnet';
     if (!amountIn || parseFloat(amountIn) <= 0) return 'Enter amount';
     if (quoteLoading) return 'Finding route…';
     if (quoteStale) return 'Finding route…';
@@ -211,11 +211,11 @@ export function SwapCard() {
     if (sendState === 'confirmed') return 'Confirmed ✓';
     if (sendError?.includes('paused')) return 'Protocol paused';
     return 'Swap';
-  }, [address, onArcTestnet, amountIn, quoteLoading, quoteStale, quote, sendState, sendError]);
+  }, [address, onArcMainnet, amountIn, quoteLoading, quoteStale, quote, sendState, sendError]);
 
   const primaryDisabled =
     !address ||
-    !onArcTestnet ||
+    !onArcMainnet ||
     !amountIn ||
     parseFloat(amountIn) <= 0 ||
     quoteLoading ||
@@ -233,7 +233,7 @@ export function SwapCard() {
       connect();
       return;
     }
-    if (!onArcTestnet) {
+    if (!onArcMainnet) {
       void switchToArc();
       return;
     }
@@ -353,7 +353,7 @@ export function SwapCard() {
     }
   }, [
     address,
-    onArcTestnet,
+    onArcMainnet,
     quote,
     tokenIn,
     tokenOut,

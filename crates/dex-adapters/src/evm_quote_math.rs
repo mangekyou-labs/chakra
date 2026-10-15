@@ -255,7 +255,7 @@ mod tests {
             "chakra-stable",
             "0xSTABLEUSDC_EURC",
             "0x3600000000000000000000000000000000000000",
-            "0x89B50855Aa3bE2F677cD6303Cec089B5F319D72a",
+            "0xbEf5f6d51CB62b58e6A8f77868681825C6fe21c1",
             USDC_EURC_SEED,
             USDC_EURC_SEED,
             100,

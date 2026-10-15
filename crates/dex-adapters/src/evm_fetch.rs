@@ -126,7 +126,7 @@ pub async fn verify_canonical_token_endpoints(
 ) -> Result<bool> {
     if dex_type == "presto" {
         const USDC_PATH: &str = "0x3600000000000000000000000000000000000000";
-        const EURC_ADDR: &str = "0x89b50855aa3be2f677cd6303cec089b5f319d72a";
+        const EURC_ADDR: &str = "0xbef5f6d51cb62b58e6a8f77868681825c6fe21c1";
         let is_canonical_pair = (token_a.eq_ignore_ascii_case(USDC_PATH) && token_b.eq_ignore_ascii_case(EURC_ADDR))
             || (token_a.eq_ignore_ascii_case(EURC_ADDR) && token_b.eq_ignore_ascii_case(USDC_PATH));
         if !is_canonical_pair {
@@ -365,6 +365,143 @@ pub async fn fetch_clmm_state(
     })
 }
 
+/// Read a bounded, complete V3 tick window at a single block. Every refresh
+/// reloads bitmap and tick state: retaining old ticks across Mint/Burn is unsafe.
+/// Quotes that leave this window are rejected by the existing coverage guard.
+pub async fn fetch_clmm_snapshot(
+    client: &EvmRpcClient,
+    source: &str,
+    pool_ref: &ClmmPoolRefSnapshot,
+) -> Result<ClmmPoolSnapshot> {
+    use futures::{stream, StreamExt, TryStreamExt};
+    use market_snapshot::{ClmmBitmapWordSnapshot, ClmmCoverageSnapshot, ClmmTickSnapshot};
+    use std::collections::BTreeMap;
+
+    let block = client.eth_block_number().await?;
+    let address = &pool_ref.pool_address;
+    let read = |data: String| async move { client.eth_call_at(address, &data, block).await };
+    let (slot0, liquidity, spacing) = tokio::try_join!(
+        read(slot0_selector()),
+        read(liquidity_selector()),
+        read(function_selector_hex("tickSpacing()"))
+    )?;
+    let words = split_words(&slot0)?;
+    if words.len() < 2 {
+        bail!("incomplete V3 slot0");
+    }
+    let tick = word_to_i32_bytes(&words[1])?;
+    let spacing = word_to_i32(&spacing)?;
+    if spacing <= 0 || spacing != pool_ref.tick_spacing {
+        bail!("V3 tick spacing mismatch");
+    }
+    let liquidity = word_to_u128(&liquidity)?;
+    if liquidity == 0 {
+        bail!("V3 pool has no active liquidity");
+    }
+    let center = tick.div_euclid(spacing).div_euclid(256);
+    let start = (center - 4).max((-887272i32).div_euclid(spacing).div_euclid(256));
+    let end = (center + 4).min(887272i32.div_euclid(spacing).div_euclid(256));
+    let bitmaps: Vec<(i32, [u8; 32])> = stream::iter(start..=end)
+        .map(|word| async move {
+            let arg = signed_arg(word);
+            let response = client
+                .eth_call_at(
+                    address,
+                    &calldata(&function_selector_hex("tickBitmap(int16)"), &[arg]),
+                    block,
+                )
+                .await?;
+            let words = split_words(&response)?;
+            if words.len() != 1 {
+                bail!("invalid V3 bitmap response");
+            }
+            Ok::<_, anyhow::Error>((word, words[0]))
+        })
+        .buffer_unordered(8)
+        .try_collect()
+        .await?;
+    let mut initialized = Vec::new();
+    for (word, bits) in bitmaps {
+        for bit in 0..256 {
+            if bits[31 - bit / 8] & (1 << (bit % 8)) != 0 {
+                initialized.push((word * 256 + bit as i32) * spacing);
+            }
+        }
+    }
+    // Bound work for unexpectedly dense or incompatible pools; never publish a
+    // truncated tick set as complete.
+    if initialized.len() > 256 {
+        bail!("V3 tick window exceeds read budget");
+    }
+    let mut ticks: Vec<ClmmTickSnapshot> = stream::iter(initialized)
+        .map(|tick| async move {
+            let response = client
+                .eth_call_at(
+                    address,
+                    &calldata(&function_selector_hex("ticks(int24)"), &[signed_arg(tick)]),
+                    block,
+                )
+                .await?;
+            let words = split_words(&response)?;
+            if words.len() < 8 || words[7][31] != 1 {
+                bail!("V3 initialized tick missing");
+            }
+            let gross = word_to_u128_bytes(&words[0])?;
+            if gross == 0 {
+                bail!("V3 initialized tick has zero liquidity");
+            }
+            let net = i128::from_be_bytes(words[1][16..].try_into().unwrap());
+            Ok::<_, anyhow::Error>(ClmmTickSnapshot {
+                tick,
+                liquidity_gross: gross,
+                liquidity_net: net,
+            })
+        })
+        .buffer_unordered(8)
+        .try_collect()
+        .await?;
+    ticks.sort_by_key(|t| t.tick);
+    // The local simulator uses 16-tick chunks, unlike Uniswap's bitmap.
+    let mut chunks = BTreeMap::<i32, [u8; 32]>::new();
+    for t in &ticks {
+        let chunk = t.tick.div_euclid(spacing).div_euclid(crate::clmm_math::TICKS_PER_CHUNK);
+        let word = chunk.div_euclid(256);
+        let bit = chunk.rem_euclid(256) as usize;
+        chunks.entry(word).or_insert([0; 32])[31 - bit / 8] |= 1 << (bit % 8);
+    }
+    Ok(ClmmPoolSnapshot {
+        source: source.to_string(),
+        pool_address: address.clone(),
+        token0: pool_ref.token0.clone(),
+        token1: pool_ref.token1.clone(),
+        fee_bps: pool_ref.fee_bps,
+        tick_spacing: spacing,
+        sqrt_price_x96: word_to_u256_limbs(&word_hex(&words[0]))?,
+        tick,
+        liquidity,
+        factory: pool_ref.factory.clone(),
+        ticks,
+        chunk_bitmaps: chunks
+            .into_iter()
+            .map(|(word_pos, word)| ClmmBitmapWordSnapshot { word_pos, word })
+            .collect(),
+        word_bitmaps: vec![],
+        coverage: Some(ClmmCoverageSnapshot {
+            is_complete: true,
+            min_loaded_tick: Some((start * 256 * spacing).max(-887272)),
+            max_loaded_tick: Some(((end + 1) * 256 * spacing - 1).min(887272)),
+            scanned_word_start: Some(start),
+            scanned_word_end: Some(end),
+        }),
+    })
+}
+
+fn signed_arg(value: i32) -> String {
+    let mut bytes = if value < 0 { [255; 32] } else { [0; 32] };
+    bytes[28..].copy_from_slice(&value.to_be_bytes());
+    format!("0x{}", hex::encode(bytes))
+}
+
 // ─── Factory discovery (topology rebuild, ~600 s) ───────────────────────────
 
 /// Asks a V2-style factory for the pair; non-zero address → `Some`.
@@ -442,7 +579,7 @@ mod tests {
     };
 
     const USDC: &str = "0x3600000000000000000000000000000000000000";
-    const EURC: &str = "0x89B50855Aa3bE2F677cD6303Cec089B5F319D72a";
+    const EURC: &str = "0xbEf5f6d51CB62b58e6A8f77868681825C6fe21c1";
     const MBTC: &str = "0x1111111111111111111111111111111111111111";
     const POOL: &str = "0x2222222222222222222222222222222222222222";
 
@@ -691,5 +828,82 @@ mod tests {
         assert_eq!(word_to_u128_bytes(&words[0]).unwrap(), 1);
         // Local math cross-check: hydrated reserves feed xyk_quote.
         assert_eq!(crate::evm_quote_math::xyk_quote(10_000, 10_000, 1_000), 906);
+    }
+}
+
+#[cfg(test)]
+mod v3_snapshot_tests {
+    use super::*;
+    use crate::evm_rpc::fixture;
+    use serde_json::json;
+
+    #[tokio::test]
+    async fn pinned_v3_window_decodes_negative_ticks_and_local_bitmaps() {
+        let (url, _server) = fixture::spawn(|method, params| {
+            if method == "eth_blockNumber" {
+                return Ok(json!("0x42"));
+            }
+            assert_eq!(method, "eth_call");
+            assert_eq!(params[1], "0x42", "all state must use the same block");
+            let data = params[0]["data"].as_str().unwrap();
+            let result = if data == slot0_selector() {
+                format!("0x{:064x}{}", 1u128 << 96, &signed_arg(-1)[2..])
+            } else if data == liquidity_selector() {
+                encode_uint_arg(1_000_000)
+            } else if data == function_selector_hex("tickSpacing()") {
+                encode_uint_arg(10)
+            } else if data.starts_with(&function_selector_hex("tickBitmap(int16)")) {
+                // compressed -1 = word -1, bit 255; compressed 1 = word 0, bit 1.
+                if data.ends_with(&signed_arg(-1)[2..]) {
+                    format!("0x80{}", "00".repeat(31))
+                } else if data.ends_with(&signed_arg(0)[2..]) {
+                    encode_uint_arg(2)
+                } else {
+                    encode_uint_arg(0)
+                }
+            } else if data.starts_with(&function_selector_hex("ticks(int24)")) {
+                let net = if data.ends_with(&signed_arg(-10)[2..]) {
+                    signed_arg(-100)
+                } else {
+                    signed_arg(100)
+                };
+                format!(
+                    "0x{}{}{}{}",
+                    &encode_uint_arg(1000)[2..],
+                    &net[2..],
+                    "0".repeat(64 * 5),
+                    &encode_uint_arg(1)[2..]
+                )
+            } else {
+                panic!("unexpected call {data}");
+            };
+            Ok(json!(result))
+        });
+        let pool_ref = ClmmPoolRefSnapshot {
+            source: "chakra-clmm".into(),
+            pool_address: "0xpool".into(),
+            token0: "a".into(),
+            token1: "b".into(),
+            fee_bps: 5,
+            tick_spacing: 10,
+            factory: "factory".into(),
+        };
+        let snapshot = fetch_clmm_snapshot(&EvmRpcClient::single(&url).unwrap(), "chakra-clmm", &pool_ref)
+            .await
+            .unwrap();
+        assert_eq!(snapshot.factory, "factory");
+        assert_eq!(
+            snapshot
+                .ticks
+                .iter()
+                .map(|t| (t.tick, t.liquidity_net))
+                .collect::<Vec<_>>(),
+            vec![(-10, -100), (10, 100)]
+        );
+        let (pool, ticks) = crate::clmm_math::clmm_pool_from_snapshot(&snapshot);
+        assert_eq!(ticks.find_initialized_tick(-1, 10, true), (-10, true));
+        assert_eq!(ticks.find_initialized_tick(-1, 10, false), (10, true));
+        let coverage = crate::clmm_math::ClmmCoverageInput::from_snapshot(&pool, snapshot.coverage.as_ref().unwrap());
+        assert!(crate::clmm_math::clmm_quote_allowed(&ticks, &coverage));
     }
 }

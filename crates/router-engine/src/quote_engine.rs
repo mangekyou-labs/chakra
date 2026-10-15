@@ -901,7 +901,7 @@ mod tests {
         }
     }
 
-    const CIRBTC: &str = "0xf0C4a4CE82A5746AbAAd9425360Ab04fbBA432BF";
+    const CIRBTC: &str = "0x171A4217b86A807A64eB94757Db6849fb4bDbAA0";
     const XYK_POOL_UE: &str = "0x0000000000000000000000000000000000000001";
     const STABLE_POOL_UE: &str = "0x0000000000000000000000000000000000000002";
     const XYK_POOL_UM: &str = "0x0000000000000000000000000000000000000003";
@@ -916,7 +916,7 @@ mod tests {
         MarketSnapshot::from_sources(
             "chakra-1",
             1_700_000_000_000,
-            "arc-testnet",
+            "arc-mainnet",
             vec![
                 SourceSnapshot {
                     source: "chakra-xyk".to_string(),
@@ -1923,7 +1923,7 @@ mod tests {
         MarketSnapshot::from_sources(
             "chakra-1",
             1_700_000_000_000,
-            "arc-testnet",
+            "arc-mainnet",
             vec![
                 SourceSnapshot {
                     source: "chakra-xyk".to_string(),
@@ -2072,7 +2072,7 @@ mod tests {
         let snapshot = MarketSnapshot::from_sources(
             "curated-snap",
             1_700_000_000_000,
-            "arc-testnet",
+            "arc-mainnet",
             vec![SourceSnapshot {
                 source: "xylo-stable".to_string(),
                 pairs: vec![TradingPairSnapshot {
@@ -2170,7 +2170,7 @@ mod tests {
         let snapshot = MarketSnapshot::from_sources(
             "disc-snap",
             1_700_000_000_000,
-            "arc-testnet",
+            "arc-mainnet",
             vec![SourceSnapshot {
                 source: "discovered:xylo".to_string(),
                 pairs: vec![TradingPairSnapshot {
@@ -2297,7 +2297,7 @@ mod tests {
         MarketSnapshot::from_sources(
             "chakra-xylo-1",
             1_700_000_000_000,
-            "arc-testnet",
+            "arc-mainnet",
             vec![
                 SourceSnapshot {
                     source: "chakra-stable".to_string(),

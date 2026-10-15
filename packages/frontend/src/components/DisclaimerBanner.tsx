@@ -5,10 +5,10 @@ export function DisclaimerBanner({ className = '' }: { className?: string }) {
       role="status"
     >
       <p>
-        Arc Testnet · Contracts unaudited · Verify amounts before signing · Not financial advice
+        Arc Mainnet · Contracts unaudited · Verify amounts before signing · Not financial advice
       </p>
       <p className="mt-1">
-        Testnet liquidity may deplete or reset at any time. Unavailable venues are never hidden —
+        Liquidity can be limited and prices can move quickly. Unavailable venues are shown —
         quotes degrade honestly with NO_ROUTE.
       </p>
     </div>

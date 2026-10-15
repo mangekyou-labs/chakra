@@ -8,7 +8,7 @@ import { ChakraClient } from '../src/index';
 
 const API_URL = process.env.API_URL || 'http://127.0.0.1:8080';
 const USDC = '0x3600000000000000000000000000000000000000';
-const EURC = '0x89b50855aa3be2f677cd6303cec089b5f319d72a';
+const EURC = '0xbef5f6d51cb62b58e6a8f77868681825c6fe21c1';
 
 async function main() {
   const client = new ChakraClient({ apiUrl: API_URL });

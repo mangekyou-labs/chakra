@@ -33,7 +33,7 @@ use {
     tower::ServiceExt,
 };
 
-const CIRBTC: &str = "0xf0C4a4CE82A5746AbAAd9425360Ab04fbBA432BF";
+const CIRBTC: &str = "0x171A4217b86A807A64eB94757Db6849fb4bDbAA0";
 const XYK_POOL_UE: &str = "0x0000000000000000000000000000000000000001";
 const STABLE_POOL_UE: &str = "0x0000000000000000000000000000000000000002";
 const XYK_POOL_UM: &str = "0x0000000000000000000000000000000000000003";
@@ -56,7 +56,7 @@ fn chakra_snapshot() -> MarketSnapshot {
     MarketSnapshot::from_sources(
         "chakra-api-1",
         1_700_000_000_000,
-        "arc-testnet",
+        "arc-mainnet",
         vec![
             SourceSnapshot {
                 source: "chakra-xyk".to_string(),
@@ -664,7 +664,7 @@ fn config_rejects_canteen_and_invented_alchemy_urls() {
     for bad in [
         "https://rpc.testnet.arc-node.thecanteenapp.com",
         "https://rpc.testnet.arc-node.thecanteenapp.com/v2/xyz",
-        "https://arc-testnet.g.alchemy.com/v2/xxxx",
+        "https://arc-testnet.alchemy.com/v2/xxxx",
     ] {
         assert!(!dex_adapters::evm_rpc::evm_http_url_allowed(bad), "must reject {bad}");
         assert!(
@@ -673,10 +673,11 @@ fn config_rejects_canteen_and_invented_alchemy_urls() {
         );
     }
     for good in [
-        "https://rpc.testnet.arc.io",
-        "https://rpc.blockdaemon.testnet.arc.io",
-        "https://rpc.drpc.testnet.arc.io",
-        "https://rpc.quicknode.testnet.arc.io",
+        "https://rpc.mainnet.arc.io",
+        "https://arc-mainnet.g.alchemy.com/v2/xxxx",
+        "https://rpc.blockdaemon.mainnet.arc.io",
+        "https://rpc.drpc.mainnet.arc.io",
+        "https://rpc.quicknode.mainnet.arc.io",
     ] {
         assert!(dex_adapters::evm_rpc::evm_http_url_allowed(good));
         assert!(
@@ -699,7 +700,7 @@ async fn ready_and_clmm_only_snapshot_quotes_and_builds() {
     let snapshot = MarketSnapshot::from_sources(
         "chakra-worker-clmm-1",
         1_700_000_000_000,
-        "arc-testnet",
+        "arc-mainnet",
         vec![SourceSnapshot {
             source: "chakra-clmm".to_string(),
             pairs: vec![],

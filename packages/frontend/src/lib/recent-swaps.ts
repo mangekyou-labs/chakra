@@ -32,9 +32,9 @@ function safeStorage(): Storage | null {
   return null;
 }
 
-/** Derive Arcscan testnet explorer URL for a tx hash. */
+/** Derive Arc mainnet explorer URL for a tx hash. */
 export function arcscanTxUrl(txHash: string): string {
-  return `https://testnet.arcscan.app/tx/${txHash}`;
+  return `https://explorer.arc.io/tx/${txHash}`;
 }
 
 /** Read recent swaps for a wallet address on a given chain. Newest first. */

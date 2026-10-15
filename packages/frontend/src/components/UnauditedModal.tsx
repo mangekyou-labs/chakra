@@ -49,7 +49,7 @@ export function UnauditedModal({ open, onAck }: Props) {
             ⚠️ Unaudited Contracts
           </h3>
           <p className="text-[13px] text-[var(--text-secondary)] leading-relaxed mb-4">
-            The smart contracts on Arc Testnet have <strong>not been audited</strong>. Use at your
+            The smart contracts on Arc Mainnet have <strong>not been audited</strong>. Use at your
             own risk. There is no guarantee of funds safety.
           </p>
           <p className="text-[12px] text-[var(--text-muted)] mb-5">

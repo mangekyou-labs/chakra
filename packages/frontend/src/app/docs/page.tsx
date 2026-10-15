@@ -6,7 +6,7 @@ const API_URL = process.env.NEXT_PUBLIC_CHAKRA_API_URL || 'http://localhost:8080
 const WHY_CARDS = [
   {
     title: 'Best route',
-    body: 'Quotes across xy=k, stable, and CLMM venues on Arc Testnet with split routing when it helps execution.',
+    body: 'Quotes across xy=k, stable, and CLMM venues on Arc Mainnet with split routing when it helps execution.',
   },
   {
     title: 'Integrator-ready',
@@ -20,7 +20,7 @@ const WHY_CARDS = [
 
 const QUICKSTART = `API=${API_URL}
 USDC=0x3600000000000000000000000000000000000000
-EURC=0x89b50855aa3be2f677cd6303cec089b5f319d72a
+EURC=0xbef5f6d51cb62b58e6a8f77868681825c6fe21c1
 
 # 1) Quote 1 USDC → EURC (slippage_bps integer, default 50 = 0.5%)
 curl -sG "$API/api/v1/quote" \\
@@ -37,7 +37,7 @@ export default function DocsOverviewPage() {
       <header className="docs-intro">
         <h1 className="docs-title">Developer documentation</h1>
         <p className="docs-lead">
-          Integrate Chakra swap routing on Arc Testnet — quote, build the splitSwap calldata, and
+          Integrate Chakra swap routing on Arc Mainnet — quote, build the splitSwap calldata, and
           sign in your wallet or bot.
         </p>
         <dl className="docs-ref">

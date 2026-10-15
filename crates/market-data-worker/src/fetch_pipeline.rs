@@ -351,7 +351,7 @@ async fn execute_fetch_task(ctx: &FetchWorkerContext, task: FetchTask) -> Result
             pool_address,
         } => {
             debug_assert_eq!(dex_type, "clmm");
-            let (pool_ref, existing) = {
+            let (pool_ref, _existing) = {
                 let guard = ctx.shared.read().await;
                 let existing = guard
                     .clmm_pools
@@ -377,13 +377,8 @@ async fn execute_fetch_task(ctx: &FetchWorkerContext, task: FetchTask) -> Result
                     existing.clone(),
                 )
             };
-            let snapshot = dex_adapters::evm_fetch::fetch_clmm_state(
-                ctx.evm.as_ref(),
-                &pool_ref.source,
-                &pool_ref,
-                Some(&existing),
-            )
-            .await?;
+            let snapshot =
+                dex_adapters::evm_fetch::fetch_clmm_snapshot(ctx.evm.as_ref(), &pool_ref.source, &pool_ref).await?;
             if let Some(metrics) = &ctx.clmm_metrics {
                 metrics.record_snapshot(&snapshot);
             }
@@ -514,14 +509,14 @@ mod tests {
                 pairs: vec![
                     TradingPairSnapshot {
                         token_a: "0x3600000000000000000000000000000000000000".to_string(),
-                        token_b: "0x89b50855aa3be2f677cd6303cec089b5f319d72a".to_string(),
+                        token_b: "0xbef5f6d51cb62b58e6a8f77868681825c6fe21c1".to_string(),
                         pool_address: "0x5794a8284A29493871Fbfa3c4f343D42001424D6".to_string(),
                         fee_bps: 30,
                         dex_type: "presto".to_string(),
                         factory: "0x5794a8284A29493871Fbfa3c4f343D42001424D6".to_string(),
                     },
                     TradingPairSnapshot {
-                        token_a: "0x89b50855aa3be2f677cd6303cec089b5f319d72a".to_string(),
+                        token_a: "0xbef5f6d51cb62b58e6a8f77868681825c6fe21c1".to_string(),
                         token_b: "0x3600000000000000000000000000000000000000".to_string(),
                         pool_address: "0x5794a8284A29493871Fbfa3c4f343D42001424D7".to_string(),
                         fee_bps: 30,

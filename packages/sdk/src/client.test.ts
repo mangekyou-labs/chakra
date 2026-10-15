@@ -3,7 +3,7 @@ import { ChakraClient, quoteSubRoutesToSteps } from './index';
 
 const API = 'http://127.0.0.1:8080';
 const USDC = '0x3600000000000000000000000000000000000000';
-const EURC = '0x89b50855aa3be2f677cd6303cec089b5f319d72a';
+const EURC = '0xbef5f6d51cb62b58e6a8f77868681825c6fe21c1';
 
 afterEach(() => {
   vi.unstubAllGlobals();
@@ -103,7 +103,7 @@ describe('ChakraClient.buildTx', () => {
         data: {
           to: '0x00000000000000000000000000000000000000aa',
           data: '0x2e3be0c1',
-          chain_id: 5042002,
+          chain_id: 5042,
           value: '0',
           deadline: 1780000000,
           typed_data: null,

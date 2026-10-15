@@ -2,13 +2,13 @@
  * Swap send helpers (T6.3).
  *
  * Gas estimation, chain gate, paused check, and Permit2 signature splice.
- * Public Arc RPC only: `https://rpc.testnet.arc.io`.
+ * Public Arc RPC only: `https://rpc.mainnet.arc.io`.
  */
 
 import type { BuildTxData } from './aggregator';
 
-/** Arc testnet chain id. */
-export const ARC_CHAIN_ID = 5042002;
+/** Arc mainnet chain id. */
+export const ARC_CHAIN_ID = 5042;
 
 /**
  * Minimum 20 gwei `maxFeePerGas` — ensures competitive inclusion on Arc.
@@ -16,8 +16,8 @@ export const ARC_CHAIN_ID = 5042002;
  */
 export const MIN_FEE_PER_GAS_WEI = BigInt(20) * BigInt(1e9);
 
-/** Public Arc testnet RPC — never Canteen `$RPC`, never invented URLs. */
-const ARC_RPC_URL = 'https://rpc.testnet.arc.io';
+/** Public Arc mainnet RPC — never Canteen `$RPC`, never invented URLs. */
+const ARC_RPC_URL = 'https://rpc.mainnet.arc.io';
 
 /** splitSwap function selector (8 hex chars). */
 const SPLIT_SWAP_SELECTOR = '2e3be0c1';
@@ -111,7 +111,7 @@ export function isPausedEnvelope(resp: {
   return !resp.success && resp.error?.code === 'PAUSED';
 }
 
-/** True when the connected chain is Arc testnet. */
+/** True when the connected chain is Arc mainnet. */
 export function isChainAllowed(chainId: number | undefined): boolean {
   return chainId === ARC_CHAIN_ID;
 }

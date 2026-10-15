@@ -8,7 +8,7 @@ const API_URL = process.env.NEXT_PUBLIC_CHAKRA_API_URL || 'http://localhost:8080
 
 const TOKENS: Record<string, string> = {
   USDC: '0x3600000000000000000000000000000000000000',
-  EURC: '0x89b50855aa3be2f677cd6303cec089b5f319d72a',
+  EURC: '0xbef5f6d51cb62b58e6a8f77868681825c6fe21c1',
 };
 
 const DEMO_USER = '0x0000000000000000000000000000000000000001';
@@ -59,7 +59,7 @@ export function ApiReference() {
       <header className="docs-intro">
         <h1 className="docs-title">API Documentation</h1>
         <p className="docs-lead">
-          Chakra — swap routing across xy=k, stable, and CLMM venues on Arc Testnet.
+          Chakra — swap routing across xy=k, stable, and CLMM venues on Arc Mainnet.
         </p>
         <p className="docs-meta">
           <a href={GITHUB_REPO_URL} target="_blank" rel="noopener noreferrer">
@@ -84,7 +84,7 @@ export function ApiReference() {
           <div className="docs-ref-row">
             <dt>Chain</dt>
             <dd>
-              <code>Arc Testnet · 5042002 (0x4CEF52)</code>
+              <code>Arc Mainnet · 5042 (0x13B2)</code>
             </dd>
           </div>
         </dl>

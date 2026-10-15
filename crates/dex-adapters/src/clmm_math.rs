@@ -937,6 +937,9 @@ pub mod bitmap {
 /// Maps chunk_pos -> Vec of (liquidity_gross, liquidity_net) for each slot.
 #[derive(Debug, Clone)]
 pub struct TickDataStore {
+    /// A fully scanned interval, including intervals without initialized ticks.
+    /// Set only from complete, bounded bitmap coverage.
+    pub scanned_range: Option<(i32, i32)>,
     /// chunk_pos -> [TickState; TICKS_PER_CHUNK]
     pub chunks: std::collections::HashMap<i32, Vec<TickState>>,
     /// Chunk bitmap: word_pos -> [u8; 32] (big-endian 256-bit word)
@@ -948,6 +951,7 @@ pub struct TickDataStore {
 impl TickDataStore {
     pub fn new() -> Self {
         Self {
+            scanned_range: None,
             chunks: std::collections::HashMap::new(),
             chunk_bitmap: std::collections::HashMap::new(),
             word_bitmap: std::collections::HashMap::new(),
@@ -1227,6 +1231,25 @@ pub fn clmm_pool_from_snapshot(snapshot: &ClmmPoolSnapshot) -> (ClmmPoolState, T
     };
 
     let mut tick_store = TickDataStore::new();
+    if let Some(coverage) = &snapshot.coverage {
+        if coverage.is_complete && snapshot.tick_spacing > 0 {
+            if let (Some(start), Some(end), Some(min), Some(max)) = (
+                coverage.scanned_word_start,
+                coverage.scanned_word_end,
+                coverage.min_loaded_tick,
+                coverage.max_loaded_tick,
+            ) {
+                if start <= end
+                    && min <= max
+                    && min == (start * 256 * snapshot.tick_spacing).max(MIN_TICK)
+                    && max == ((end + 1) * 256 * snapshot.tick_spacing - 1).min(MAX_TICK)
+                    && snapshot.ticks.iter().all(|t| t.tick >= min && t.tick <= max)
+                {
+                    tick_store.scanned_range = Some((min, max));
+                }
+            }
+        }
+    }
     for tick in &snapshot.ticks {
         let compressed = bitmap::compress_tick(tick.tick, snapshot.tick_spacing);
         let (chunk_pos, slot) = bitmap::chunk_address(compressed);
@@ -1314,7 +1337,7 @@ pub fn clmm_quote_allowed(tick_store: &TickDataStore, coverage: &ClmmCoverageInp
     if !coverage.is_complete {
         return false;
     }
-    if !clmm_has_initialized_ticks(tick_store) {
+    if !clmm_has_initialized_ticks(tick_store) && tick_store.scanned_range.is_none() {
         return false;
     }
     if let (Some(start), Some(end)) = (coverage.scanned_word_start, coverage.scanned_word_end) {
@@ -1366,7 +1389,10 @@ pub fn clmm_swap_allowed(
     if !clmm_quote_allowed(ticks, coverage) {
         return false;
     }
-    let Some((range_min, range_max)) = loaded_tick_range(ticks, pool.tick_spacing) else {
+    let Some((range_min, range_max)) = ticks
+        .scanned_range
+        .or_else(|| loaded_tick_range(ticks, pool.tick_spacing))
+    else {
         return false;
     };
     let min_loaded = coverage.min_loaded_tick.unwrap_or(range_min).min(range_min);
@@ -1406,7 +1432,10 @@ pub fn simulate_swap(
     if amount_in == 0 || pool.liquidity == 0 {
         return None;
     }
-    if let Some((min_loaded, max_loaded)) = loaded_tick_range(ticks, pool.tick_spacing) {
+    if let Some((min_loaded, max_loaded)) = ticks
+        .scanned_range
+        .or_else(|| loaded_tick_range(ticks, pool.tick_spacing))
+    {
         if tick_outside_loaded_range(pool.tick, min_loaded, max_loaded) {
             return None;
         }
@@ -1435,7 +1464,19 @@ pub fn simulate_swap(
             break;
         }
 
-        let (next_tick, next_tick_initialized) = ticks.find_initialized_tick(tick, pool.tick_spacing, zero_for_one);
+        let (mut next_tick, mut next_tick_initialized) =
+            ticks.find_initialized_tick(tick, pool.tick_spacing, zero_for_one);
+        if let Some((min, max)) = ticks.scanned_range {
+            if !next_tick_initialized {
+                next_tick = if zero_for_one { min } else { max };
+            }
+            let bounded = next_tick.clamp(min, max);
+            if bounded != next_tick {
+                next_tick_initialized = false;
+            }
+            next_tick = bounded;
+        }
+        next_tick = next_tick.clamp(MIN_TICK, MAX_TICK);
 
         let next_tick_price = sqrt_ratio_at_tick(next_tick);
 
@@ -1469,6 +1510,13 @@ pub fn simulate_swap(
         amount_calculated = amount_calculated.saturating_add(step.amount_out);
 
         sqrt_price = step.sqrt_next;
+        if ticks.scanned_range.is_some()
+            && !next_tick_initialized
+            && sqrt_price == next_tick_price
+            && amount_remaining > 0
+        {
+            return None;
+        }
 
         if sqrt_price == next_tick_price && next_tick_initialized {
             // Cross tick: apply liquidity_net
@@ -1494,7 +1542,7 @@ pub fn simulate_swap(
         }
     }
 
-    if amount_calculated == 0 {
+    if amount_calculated == 0 || amount_remaining > 0 {
         return None;
     }
 
@@ -1890,5 +1938,42 @@ mod tests {
 
         assert!(!snapshot.word_bitmaps.is_empty());
         assert!(!restored_ticks.word_bitmap.is_empty());
+    }
+}
+
+#[cfg(test)]
+mod scanned_interval_tests {
+    use super::*;
+
+    #[test]
+    fn empty_scanned_interval_quotes_only_inside_proven_bounds() {
+        let pool = ClmmPoolState {
+            sqrt_price_x96: sqrt_ratio_at_tick(0),
+            tick: 0,
+            liquidity: 1_000_000_000,
+            fee_bps: 5,
+            tick_spacing: 10,
+            token0: "a".into(),
+            token1: "b".into(),
+        };
+        let coverage = ClmmCoverageInput {
+            pool_tick: 0,
+            tick_spacing: 10,
+            is_complete: true,
+            min_loaded_tick: Some(-2560),
+            max_loaded_tick: Some(2559),
+            scanned_word_start: Some(-1),
+            scanned_word_end: Some(0),
+        };
+        let mut ticks = TickDataStore::new();
+        assert!(!clmm_quote_allowed(&ticks, &coverage), "unproven empty state is unsafe");
+        ticks.scanned_range = Some((-2560, 2559));
+        for direction in [true, false] {
+            assert!(clmm_swap_allowed(&pool, &ticks, 10_000, direction, &coverage));
+            assert!(
+                simulate_swap(&pool, &ticks, 1_000_000_000_000, direction).is_none(),
+                "no partial quote beyond scan boundary"
+            );
+        }
     }
 }

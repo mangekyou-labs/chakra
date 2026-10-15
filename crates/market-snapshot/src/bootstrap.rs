@@ -71,14 +71,14 @@ mod tests {
         MarketSnapshot::from_sources(
             "bootstrap-1",
             1_700_000_000_000,
-            "arc-testnet",
+            "arc-mainnet",
             vec![
                 SourceSnapshot {
                     source: "chakra-xyk".to_string(),
                     pairs: vec![
                         TradingPairSnapshot {
                             token_a: "0x3600000000000000000000000000000000000000".to_string(),
-                            token_b: "0x89B50855Aa3bE2F677cD6303Cec089B5F319D72a".to_string(),
+                            token_b: "0xbEf5f6d51CB62b58e6A8f77868681825C6fe21c1".to_string(),
                             pool_address: "0xXYKUSDC_EURC".to_string(),
                             fee_bps: 30,
                             dex_type: "xyk".to_string(),
@@ -98,7 +98,7 @@ mod tests {
                     source: "chakra-stable".to_string(),
                     pairs: vec![TradingPairSnapshot {
                         token_a: "0x3600000000000000000000000000000000000000".to_string(),
-                        token_b: "0x89B50855Aa3bE2F677cD6303Cec089B5F319D72a".to_string(),
+                        token_b: "0xbEf5f6d51CB62b58e6A8f77868681825C6fe21c1".to_string(),
                         pool_address: "0xSTABLEUSDC_EURC".to_string(),
                         fee_bps: 4,
                         dex_type: "stable".to_string(),
@@ -114,7 +114,7 @@ mod tests {
             "chakra-xyk",
             "0xXYKUSDC_EURC",
             "0x3600000000000000000000000000000000000000",
-            "0x89B50855Aa3bE2F677cD6303Cec089B5F319D72a",
+            "0xbEf5f6d51CB62b58e6A8f77868681825C6fe21c1",
             30,
             10_000_000_000,
             10_000_000_000,
@@ -126,7 +126,7 @@ mod tests {
             "chakra-stable",
             "0xSTABLEUSDC_EURC",
             "0x3600000000000000000000000000000000000000",
-            "0x89B50855Aa3bE2F677cD6303Cec089B5F319D72a",
+            "0xbEf5f6d51CB62b58e6A8f77868681825C6fe21c1",
             200_000_000_000,
             200_000_000_000,
             100,

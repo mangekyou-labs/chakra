@@ -30,7 +30,7 @@ impl Default for AnalyticsConfig {
     fn default() -> Self {
         Self {
             enabled: false,
-            start_block: 59_424_918,
+            start_block: 26_029_398,
             poll_secs: 30,
             confirmations: 12,
             page_blocks: 10_000,
@@ -547,7 +547,7 @@ mod tests {
         let c = AnalyticsConfig::default();
         assert_eq!(
             (c.start_block, c.poll_secs, c.confirmations, c.page_blocks),
-            (59_424_918, 30, 12, 10_000)
+            (26_029_398, 30, 12, 10_000)
         );
     }
 

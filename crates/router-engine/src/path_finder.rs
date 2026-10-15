@@ -284,7 +284,7 @@ mod tests {
         MarketSnapshot::from_sources(
             "chakra-1",
             1_700_000_000_000,
-            "arc-testnet",
+            "arc-mainnet",
             vec![
                 SourceSnapshot {
                     source: "chakra-xyk".to_string(),
@@ -375,7 +375,7 @@ mod tests {
         let snapshot = MarketSnapshot::from_sources(
             "other-1",
             1_700_000_000_000,
-            "arc-testnet",
+            "arc-mainnet",
             vec![SourceSnapshot {
                 source: "chakra-xyk".to_string(),
                 pairs: vec![pair(
@@ -397,7 +397,7 @@ mod tests {
         let snapshot = MarketSnapshot::from_sources(
             "native-1",
             1_700_000_000_000,
-            "arc-testnet",
+            "arc-mainnet",
             vec![SourceSnapshot {
                 source: "chakra-xyk".to_string(),
                 pairs: vec![

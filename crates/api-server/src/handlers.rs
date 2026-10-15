@@ -59,9 +59,11 @@ pub async fn get_stats(State(state): State<AppState>, Query(query): Query<StatsQ
     let mut response = stats::empty(range, state.config.chakra_aggregator.clone());
     response.route_health = stats::route_health_for_engine(&engine).await;
     if let Some(redis_url) = state.config.snapshot_redis_url.as_deref() {
-        if let Ok(store) =
-            market_data_worker::analytics::AnalyticsStore::new(redis_url, 5042002, &state.config.chakra_aggregator)
-        {
+        if let Ok(store) = market_data_worker::analytics::AnalyticsStore::new(
+            redis_url,
+            state.config.chakra_chain_id,
+            &state.config.chakra_aggregator,
+        ) {
             let now = chrono::Utc::now().timestamp().max(0) as u64;
             let from = match response.meta.range.as_str() {
                 "14d" => now.saturating_sub(14 * 86_400),
@@ -496,7 +498,7 @@ pub async fn build_tx(State(state): State<AppState>, Json(body): Json<BuildTxReq
             Json(Envelope::ok(json!(BuildTxDataEnvelope {
                 to: state.config.chakra_aggregator.clone(),
                 data,
-                chain_id: 5042002,
+                chain_id: state.config.chakra_chain_id,
                 value: "0".to_string(),
                 deadline,
                 typed_data,

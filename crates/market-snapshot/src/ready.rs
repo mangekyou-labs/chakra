@@ -70,7 +70,7 @@ mod tests {
         MarketSnapshot::from_sources(
             "v1",
             123,
-            "arc-testnet",
+            "arc-mainnet",
             vec![SourceSnapshot {
                 source: "chakra-xyk".to_string(),
                 pairs: vec![TradingPairSnapshot {

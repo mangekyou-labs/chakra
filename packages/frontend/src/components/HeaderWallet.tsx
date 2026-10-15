@@ -5,7 +5,7 @@ import { useWallet } from '@/lib/wallet-context';
 import { nativeGasSymbol } from '@/lib/chain';
 
 export function HeaderWallet() {
-  const { address, onArcTestnet, connect, disconnect, switchToArc, connecting } = useWallet();
+  const { address, onArcMainnet, connect, disconnect, switchToArc, connecting } = useWallet();
   const [showMenu, setShowMenu] = useState(false);
   const [switching, setSwitching] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -38,7 +38,7 @@ export function HeaderWallet() {
           className="flex items-center gap-2 rounded-full bg-[var(--surface-raised)] px-4 py-2 transition-colors hover:bg-[var(--surface)]"
         >
           <span
-            className={`w-1.5 h-1.5 rounded-full ${onArcTestnet ? 'bg-[var(--accent)]' : 'bg-amber-400'}`}
+            className={`w-1.5 h-1.5 rounded-full ${onArcMainnet ? 'bg-[var(--accent)]' : 'bg-amber-400'}`}
           />
           <span className="text-[14px] font-[family-name:var(--font-mono)] text-[var(--text-primary)]">
             {address.slice(0, 4)}…{address.slice(-4)}
@@ -47,7 +47,7 @@ export function HeaderWallet() {
 
         {showMenu && (
           <div className="absolute right-0 top-full mt-2 z-[60] bg-[var(--surface)] border border-[var(--border)] rounded-xl overflow-hidden min-w-[220px]">
-            {!onArcTestnet && (
+            {!onArcMainnet && (
               <button
                 onClick={() => {
                   void handleSwitch();
@@ -56,7 +56,7 @@ export function HeaderWallet() {
                 disabled={switching}
                 className="w-full px-4 py-2.5 text-left text-[13px] text-amber-300 hover:bg-amber-500/[0.06] disabled:opacity-50 transition-colors"
               >
-                {switching ? 'Switching…' : 'Switch to Arc Testnet'}
+                {switching ? 'Switching…' : 'Switch to Arc Mainnet'}
               </button>
             )}
             <div className="px-4 py-3 text-[11px] text-[var(--text-muted)] font-[family-name:var(--font-mono)] break-all border-b border-[var(--border)]">

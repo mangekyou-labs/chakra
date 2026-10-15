@@ -4,12 +4,12 @@
 
 use std::collections::HashSet;
 
-/// Arc testnet ERC-20 USDC (6 decimals). Same economic balance as native gas.
+/// Arc mainnet ERC-20 USDC (6 decimals). Same economic balance as native gas.
 pub const USDC_ERC20: &str = "0x3600000000000000000000000000000000000000";
-/// Arc testnet EURC (6 decimals).
-pub const EURC: &str = "0x89B50855Aa3bE2F677cD6303Cec089B5F319D72a";
-/// Arc testnet canonical cirBTC (8 decimals, Presto/App Kit canonical address).
-pub const CIRBTC: &str = "0xf0C4a4CE82A5746AbAAd9425360Ab04fbBA432BF";
+/// Arc mainnet EURC (6 decimals).
+pub const EURC: &str = "0xbEf5f6d51CB62b58e6A8f77868681825C6fe21c1";
+/// Arc mainnet canonical cirBTC (8 decimals, Presto/App Kit canonical address).
+pub const CIRBTC: &str = "0x171A4217b86A807A64eB94757Db6849fb4bDbAA0";
 /// Native gas encoding — not a catalog swap token.
 pub const NATIVE_USDC: &str = "native_usdc";
 

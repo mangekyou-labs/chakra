@@ -17,18 +17,18 @@ const DEFAULT_LIST_URLS: &[&str] = &[];
 // frozen Arc catalog address (USDC / EURC / cirBTC).
 const VERIFIED_LOGO_OVERRIDES: &[(&str, &str)] = &[
     (
-        // USDC (native Arc testnet, 6 dp).
+        // USDC (native Arc mainnet, 6 dp).
         "0x3600000000000000000000000000000000000000",
         "https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/ethereum/assets/0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48/logo.png",
     ),
     (
         // EURC (Circle euro).
-        "0x89b50855aa3be2f677cd6303cec089b5f319d72a",
+        "0xbef5f6d51cb62b58e6a8f77868681825c6fe21c1",
         "https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/ethereum/assets/0x1aBaEA1f7C830bD89Acc67eC4af516284b1bC33c/logo.png",
     ),
     (
-        // cirBTC (canonical Arc testnet, 8 dp; 2026-08-29 rebaseline).
-        "0xf0c4a4ce82a5746abaad9425360ab04fbba432bf",
+        // cirBTC (canonical Arc mainnet, 8 dp; 2026-08-29 rebaseline).
+        "0x171a4217b86a807a64eb94757db6849fb4bdbaa0",
         "https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/bitcoin/info/logo.png",
     ),
 ];

@@ -7,7 +7,7 @@ import { CHAKRA_API_URL } from '@/lib/aggregator';
 import { FALLBACK_SWAP_TOKENS, filterSwapTokens } from '@/lib/swap-tokens';
 import { CIRBTC_ADDRESS, USDC_ERC20_ADDRESS, EURC_ADDRESS, NATIVE_USDC_KEY } from '@/lib/decimals';
 
-const ARC_RPC_URL = 'https://rpc.testnet.arc.io';
+const ARC_RPC_URL = 'https://rpc.mainnet.arc.io';
 
 // ── Token Catalog ──────────────────────────────────────────────────────
 

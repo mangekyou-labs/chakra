@@ -24,7 +24,7 @@ const mockStorage = {
 vi.stubGlobal('localStorage', mockStorage);
 
 const ADDR = '0x1234567890abcdef1234567890abcdef12345678';
-const CHAIN_ID = 5042002;
+const CHAIN_ID = 5042;
 
 describe('recent-swaps', () => {
   beforeEach(() => {

@@ -1,30 +1,30 @@
-/** Arc testnet chain gate (T6.1). */
+/** Arc mainnet chain gate (T6.1). */
 
-import { arcTestnet } from 'wagmi/chains';
+import { arc } from 'wagmi/chains';
 
-/** Arc testnet chain id 5042002 (0x4CEF52). */
-export const ARC_CHAIN_ID = 5042002;
-export const ARC_CHAIN_ID_HEX = '0x4CEF52';
+/** Arc mainnet chain id 5042 (0x13B2). */
+export const ARC_CHAIN_ID = 5042;
+export const ARC_CHAIN_ID_HEX = '0x13B2';
 
-/** Arc testnet public RPC + explorer — never Canteen `$RPC`, never invented URLs. */
-export const ARC_RPC_URLS = ['https://rpc.testnet.arc.io'];
-export const ARC_BLOCK_EXPLORER_URLS = ['https://testnet.arcscan.app'];
+/** Arc mainnet public RPC + explorer — never Canteen `$RPC`, never invented URLs. */
+export const ARC_RPC_URLS = ['https://rpc.mainnet.arc.io'];
+export const ARC_BLOCK_EXPLORER_URLS = ['https://explorer.arc.io'];
 
 /**
- * `wallet_addEthereumChain` params. Matches the viem `arcTestnet` definition —
+ * `wallet_addEthereumChain` params. Matches the viem `arc` definition —
  * native gas is USDC at 18 dp (wallet may still label it ETH; UI copy says USDC).
  */
 export const ARC_ADD_CHAIN_PARAMS = {
   chainId: ARC_CHAIN_ID_HEX,
-  chainName: 'Arc Testnet',
+  chainName: 'Arc Mainnet',
   nativeCurrency: { name: 'USDC', symbol: 'USDC', decimals: 18 },
   rpcUrls: ARC_RPC_URLS,
   blockExplorerUrls: ARC_BLOCK_EXPLORER_URLS,
 } as const;
 
-/** True when the wallet's chain is Arc testnet (5042002). */
-export function isArcTestnet(chainId: number | undefined): boolean {
-  return chainId === arcTestnet.id;
+/** True when the wallet's chain is Arc mainnet (5042). */
+export function isArcMainnet(chainId: number | undefined): boolean {
+  return chainId === arc.id;
 }
 
 /**

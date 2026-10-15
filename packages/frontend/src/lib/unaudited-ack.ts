@@ -1,11 +1,11 @@
 /**
  * Unaudited-contract acknowledgement (T6.3).
  *
- * Key: `chakra:unaudited-ack:v1` → ISO timestamp.
+ * Key: `chakra:unaudited-ack:5042:v1` → ISO timestamp.
  * The modal appears once before the first swap; user must Ack to proceed.
  */
 
-export const UNAUDITED_ACK_KEY = 'chakra:unaudited-ack:v1';
+export const UNAUDITED_ACK_KEY = 'chakra:unaudited-ack:5042:v1';
 
 function safeStorage(): Storage | null {
   try {

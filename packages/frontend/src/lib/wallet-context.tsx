@@ -3,13 +3,13 @@
 import { createContext, useCallback, useContext, useMemo, type ReactNode } from 'react';
 import { useConnect, useConnection, useDisconnect, useSwitchChain } from 'wagmi';
 import { AccountBalancesProvider } from '@/lib/account-balances-context';
-import { ARC_ADD_CHAIN_PARAMS, isArcTestnet } from '@/lib/chain';
+import { ARC_ADD_CHAIN_PARAMS, isArcMainnet } from '@/lib/chain';
 
 export interface WalletState {
   address: `0x${string}` | null;
   chainId: number | undefined;
-  /** True when the connected wallet is on Arc testnet (5042002). */
-  onArcTestnet: boolean;
+  /** True when the connected wallet is on Arc mainnet (5042). */
+  onArcMainnet: boolean;
   connecting: boolean;
   connect: () => void;
   disconnect: () => void;
@@ -20,7 +20,7 @@ export interface WalletState {
 const WalletContext = createContext<WalletState>({
   address: null,
   chainId: undefined,
-  onArcTestnet: false,
+  onArcMainnet: false,
   connecting: false,
   connect: () => {},
   disconnect: () => {},
@@ -51,7 +51,7 @@ export function WalletProvider({ children }: { children: ReactNode }) {
 
   const switchToArc = useCallback(async () => {
     try {
-      await switchChainAsync({ chainId: 5042002 });
+      await switchChainAsync({ chainId: 5042 });
     } catch {
       // Wallet does not know Arc — prompt `wallet_addEthereumChain`.
       const provider = (
@@ -74,7 +74,7 @@ export function WalletProvider({ children }: { children: ReactNode }) {
     () => ({
       address: isConnected ? (address ?? null) : null,
       chainId: isConnected ? chainId : undefined,
-      onArcTestnet: isConnected ? isArcTestnet(chainId) : false,
+      onArcMainnet: isConnected ? isArcMainnet(chainId) : false,
       connecting,
       connect: connectWallet,
       disconnect: disconnectWallet,

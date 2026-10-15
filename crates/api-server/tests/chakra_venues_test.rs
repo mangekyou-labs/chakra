@@ -51,7 +51,7 @@ fn canonical_snapshot() -> MarketSnapshot {
     MarketSnapshot::from_sources(
         "chakra-canonic-1",
         1_800_000_000_000,
-        "arc-testnet",
+        "arc-mainnet",
         vec![
             SourceSnapshot {
                 source: "xylo-stable".to_string(),

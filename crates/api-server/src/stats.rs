@@ -176,9 +176,9 @@ pub fn empty(range: String, aggregator: String) -> StatsResponse {
     }
     StatsResponse {
         meta: StatsMeta {
-            chain: "arc-testnet".into(),
+            chain: "arc-mainnet".into(),
             aggregator,
-            deployment_block: 59_424_918,
+            deployment_block: 26_029_398,
             chain_head: 0,
             indexed_head: 0,
             confirmed_head: 0,
@@ -389,7 +389,7 @@ mod tests {
             .route_health
             .iter()
             .all(|route| !route.direct && !route.multihop));
-        assert_eq!(response.meta.deployment_block, 59_424_918);
+        assert_eq!(response.meta.deployment_block, 26_029_398);
     }
 
     #[test]

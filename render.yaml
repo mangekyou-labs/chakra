@@ -1,4 +1,4 @@
-# Render Blueprint — Chakra Arc Testnet DEX Aggregator
+# Render Blueprint — Chakra Arc Mainnet DEX Aggregator
 
 services:
   - type: kv
@@ -8,53 +8,53 @@ services:
   - type: web
     name: chakra-api
     plan: free
-    runtime: image
+    runtime: docker
     dockerfilePath: ./Dockerfile
     dockerContext: .
     healthCheckPath: /api/v1/health
     envVars:
       - key: CHAKRA_REDIS_URL
-        fromKeyValue:
-          name: chakra-redis
-          property: connectionString
+        # Set the existing Key Value connection URL with /1 for mainnet.
+        # Keep testnet snapshots in database 0; never copy that URL unchanged.
+        sync: false
       - key: CHAKRA_RPC_HTTP
-        value: https://rpc.testnet.arc.io
+        value: "https://rpc.mainnet.arc.io"
       - key: CHAKRA_RPC_WS
-        value: wss://rpc.testnet.arc.io
+        value: "wss://rpc.blockdaemon.mainnet.arc.io/websocket"
       - key: CHAKRA_RPC_HTTP_FAILOVERS
-        value: https://rpc.blockdaemon.testnet.arc.io,https://rpc.drpc.testnet.arc.io,https://rpc.quicknode.testnet.arc.io
+        value: "https://rpc.blockdaemon.mainnet.arc.io,https://rpc.drpc.mainnet.arc.io,https://rpc.quicknode.mainnet.arc.io"
       - key: CHAKRA_RPC_WS_FAILOVERS
-        value: wss://rpc.drpc.testnet.arc.io,wss://rpc.quicknode.testnet.arc.io
+        value: "wss://rpc.quicknode.mainnet.arc.io"
       - key: CHAKRA_CHAIN_ID
-        value: "5042002"
+        value: "5042"
       - key: CHAKRA_CORS_ORIGINS
         value: "https://chakra-ag.vercel.app,https://chakra-arc-dex.vercel.app,http://localhost:3000"
       - key: CHAKRA_LISTEN_ADDR
         value: "0.0.0.0:10000"
       - key: CHAKRA_AGGREGATOR
-        value: "0xeb12351602c56d47c4ee955193335848952b29d8"
+        value: "0x824af7339b4fFC04D0FD867953eCbfCc75dEAf18"
       - key: CHAKRA_CIRBTC_ADDRESS
-        value: "0xf0C4a4CE82A5746AbAAd9425360Ab04fbBA432BF"
+        value: "0x171A4217b86A807A64eB94757Db6849fb4bDbAA0"
       - key: CHAKRA_USDC_ADDRESS
         value: "0x3600000000000000000000000000000000000000"
       - key: CHAKRA_EURC_ADDRESS
-        value: "0x89B50855Aa3bE2F677cD6303Cec089B5F319D72a"
+        value: "0xbEf5f6d51CB62b58e6A8f77868681825C6fe21c1"
       - key: CHAKRA_PERMIT2
         value: "0x000000000022D473030F116dDEE9F6B43aC78BA3"
       - key: CHAKRA_XYLO_ROUTER
-        value: "0x73742278c31a76dBb0D2587d03ef92E6E2141023"
+        value: ""
       - key: CHAKRA_PRESTO_HUB
-        value: "0x5794a8284A29493871Fbfa3c4f343D42001424D6"
+        value: ""
       - key: CHAKRA_UNITFLOW_FACTORY
-        value: "0xd67F63A4F26a497b364d1C82e6747Aec8B5743a5"
+        value: "0x5bfBCeb73d39F722B1cB83fD2F11736b28c1Be6d"
       - key: CHAKRA_SEED_FACTORIES
-        value: "0x60EDeFB094B84BBC6430cc130B358A43Ba1979e2:xylo,0x5794a8284A29493871Fbfa3c4f343D42001424D6:presto,0xd67F63A4F26a497b364d1C82e6747Aec8B5743a5:xyk"
+        value: "0x5bfBCeb73d39F722B1cB83fD2F11736b28c1Be6d:clmm"
       - key: CHAKRA_DISCOVERY_FACTORIES
         value: ""
       - key: CHAKRA_ANALYTICS_ENABLED
         value: "true"
       - key: CHAKRA_ANALYTICS_START_BLOCK
-        value: "59424918"
+        value: "26029398"
       - key: CHAKRA_ANALYTICS_POLL_SECS
         value: "30"
       - key: CHAKRA_ANALYTICS_CONFIRMATIONS
@@ -66,7 +66,7 @@ services:
       - key: CHAKRA_EVM_WS_ENABLED
         value: "true"
       - key: CHAKRA_EVM_POLL_INTERVAL_MS
-        value: "500"
+        value: "1000"
       - key: CHAKRA_EVM_MAX_CATCHUP_BLOCKS
         value: "64"
       - key: CHAKRA_DISCOVERY_INTERVAL_SECS
