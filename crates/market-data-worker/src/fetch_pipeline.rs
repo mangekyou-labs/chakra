@@ -354,7 +354,7 @@ async fn execute_fetch_task(ctx: &FetchWorkerContext, task: FetchTask) -> Result
             let refresh = ctx.shared.read().await.begin_clmm_refresh(&source, &pool_address)?;
             let pool_ref = &refresh.pool;
             let snapshot =
-                dex_adapters::evm_fetch::fetch_clmm_snapshot(ctx.evm.as_ref(), &pool_ref.source, &pool_ref).await?;
+                dex_adapters::evm_fetch::fetch_clmm_snapshot(ctx.evm.as_ref(), &pool_ref.source, pool_ref).await?;
             if let Some(metrics) = &ctx.clmm_metrics {
                 metrics.record_snapshot(&snapshot);
             }

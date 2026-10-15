@@ -48,6 +48,8 @@ were removed.
 - Real isolated Redis verifies legacy rejection, normalized namespaces,
   repeated concurrent coherent progress reads, integer records and replay
   healing of a missing time index.
-- Rust workspace tests and formatting pass.
+- Rust workspace tests, formatting and Clippy with warnings denied pass.
+- Independent Standards and Spec reviews found no blocking findings. The
+  Standards review noted optional existing duplication in pool insertion.
 - Frontend: 116 tests pass; typecheck, lint and webpack production build pass.
 - External wallet execution and funded transactions were not run.
