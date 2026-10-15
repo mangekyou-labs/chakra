@@ -215,7 +215,7 @@ impl AnalyticsStore {
     pub fn new(redis_url: &str, chain_id: u64, aggregator: &str) -> Result<Self> {
         Ok(Self {
             client: redis::Client::open(redis_url)?,
-            namespace: format!("chakra:analytics:v1:{chain_id}:{aggregator}"),
+            namespace: format!("chakra:analytics:v1:{chain_id}:{}", aggregator.to_ascii_lowercase()),
         })
     }
     pub async fn put_swap(&self, summary: &SwapSummary) -> Result<bool> {
@@ -511,6 +511,13 @@ impl AnalyticsIndexer {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn analytics_namespace_normalizes_aggregator_case() {
+        let mixed = AnalyticsStore::new("redis://127.0.0.1:6379/1", 5042, "0xAbCd").unwrap();
+        let lower = AnalyticsStore::new("redis://127.0.0.1:6379/1", 5042, "0xabcd").unwrap();
+        assert_eq!(mixed.namespace, lower.namespace);
+    }
 
     fn word(value: usize) -> [u8; 32] {
         let mut out = [0u8; 32];

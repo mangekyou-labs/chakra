@@ -13,8 +13,8 @@ trap cleanup SIGTERM SIGINT
 
 # ─── Defaults ──────────────────────────────────────────────────────────────────
 export CHAKRA_LISTEN_ADDR="${CHAKRA_LISTEN_ADDR:-0.0.0.0:${PORT:-8080}}"
-export CHAKRA_RPC_HTTP="${CHAKRA_RPC_HTTP:-https://rpc.testnet.arc.io}"
-export CHAKRA_RPC_WS="${CHAKRA_RPC_WS:-wss://rpc.testnet.arc.io}"
+export CHAKRA_RPC_HTTP="${CHAKRA_RPC_HTTP:-https://rpc.mainnet.arc.io}"
+export CHAKRA_RPC_WS="${CHAKRA_RPC_WS:-wss://rpc.blockdaemon.mainnet.arc.io/websocket}"
 
 echo "[entrypoint] starting market-data-worker..."
 chakra-market-data-worker &

@@ -52,6 +52,12 @@ Vercel project: `chakra-arc-dex`, production aliases
 Set production `NEXT_PUBLIC_CHAKRA_API_URL` to the Render URL and rebuild.
 Only the public API URL is needed in the frontend hosting environment.
 
+The initial migration commit is `0c3a94e0302fcd031de0b13f679d39fe0829d696`.
+Vercel production deployment `dpl_4w6CVxK7XULttwKaUNBS5iHH7kMD` was promoted
+after Render passed the production quote and transaction-building checks.
+Analytics namespaces normalize the aggregator address to lowercase so the
+worker and API share the same cursor and totals regardless of environment casing.
+
 ## Verification and operation
 
 - Rust workspace tests pass.
