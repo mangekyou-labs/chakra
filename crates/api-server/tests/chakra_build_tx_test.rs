@@ -1071,7 +1071,7 @@ async fn build_tx_encodes_step_fee_not_hardcoded_30() {
     // Hop layout: pool(32) + dexType(32) + tokenIn(32) + tokenOut(32) + fee(32)
     let hop_data = hops_base + 32; // skip the length word
     let fee_encoded = u256_at(&bytes, hop_data + 4 * 32);
-    assert_eq!(fee_encoded, 30, "fee must be 30 bps from the step, not hardcoded");
+    assert_eq!(fee_encoded, 3000, "30 bps must encode the V3 fee tier 3000");
 }
 
 // ─── 10. T4.6 remainder: omitted fee encodes the snapshot fee; 5 bps tier ────
@@ -1168,13 +1168,13 @@ async fn build_tx_omit_fee_encodes_snapshot_clmm_fee_not_default() {
     let hop_data = hops_base + 32;
     let fee_encoded = u256_at(&bytes, hop_data + 4 * 32);
     assert_eq!(
-        fee_encoded, 5,
-        "omitted fee must encode the snapshot CLMM fee tier (5 bps), not 30"
+        fee_encoded, 500,
+        "omitted fee must encode the snapshot V3 fee tier (5 bps = 500)"
     );
 }
 
 /// T4.6: the optional 5 bps tier is representable end-to-end — explicit
-/// `fee_bps: 5` encodes 5 and validates against the snapshot.
+/// `fee_bps: 5` encodes V3 tier 500 and validates against the snapshot.
 #[tokio::test]
 async fn build_tx_encodes_and_validates_5bps_clmm_tier() {
     use market_snapshot::pool_state_store::FactoryRecord;
@@ -1217,7 +1217,7 @@ async fn build_tx_encodes_and_validates_5bps_clmm_tier() {
     let hops_offset = u256_at(&bytes, sub_base + 32) as usize;
     let hops_base = sub_base + hops_offset;
     let hop_data = hops_base + 32;
-    assert_eq!(u256_at(&bytes, hop_data + 4 * 32), 5, "fee must encode 5 bps");
+    assert_eq!(u256_at(&bytes, hop_data + 4 * 32), 500, "5 bps must encode V3 tier 500");
 
     // Wrong tier (30) against the 5 bps snapshot → rejected.
     let mut body = clmm_body_omit_fee(CLMM_POOL_5BPS);

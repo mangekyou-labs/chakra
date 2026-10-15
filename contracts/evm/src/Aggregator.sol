@@ -516,6 +516,19 @@ contract Aggregator is Ownable, Pausable, ReentrancyGuard {
     function uniswapV3SwapCallback(int256 amount0Delta, int256 amount1Delta, bytes calldata data)
         external
     {
+        _clmmSwapCallback(amount0Delta, amount1Delta, data);
+    }
+
+    /// @notice UnitFlow V3 uses its own callback selector with the same V3 ABI.
+    function unitFlowV3SwapCallback(int256 amount0Delta, int256 amount1Delta, bytes calldata data)
+        external
+    {
+        _clmmSwapCallback(amount0Delta, amount1Delta, data);
+    }
+
+    function _clmmSwapCallback(int256 amount0Delta, int256 amount1Delta, bytes calldata data)
+        internal
+    {
         (address pool, address tokenIn) = abi.decode(data, (address, address));
         if (msg.sender != pool) revert CallbackSenderMismatch();
         if (!_isAllowlistedClmmPool(pool)) revert CallbackPoolNotAllowlisted();

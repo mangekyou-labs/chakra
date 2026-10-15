@@ -78,7 +78,17 @@ fn encode_hop(step: &BuildTxStep, dex_type: DexType, fee_bps: u32) -> Result<Vec
     out.extend_from_slice(&abi::uint_word(dex_type.as_u8() as u128));
     out.extend_from_slice(&abi::address_word(&step.token_in)?);
     out.extend_from_slice(&abi::address_word(&step.token_out)?);
-    out.extend_from_slice(&abi::uint24_word(fee_bps));
+    // Public quote fees use basis points; V3 pools identify tiers in
+    // hundredths of a basis point (e.g. 1 bps -> fee() == 100).
+    let contract_fee = if dex_type == DexType::Clmm {
+        fee_bps.checked_mul(100).ok_or_else(|| anyhow!("CLMM fee overflow"))?
+    } else {
+        fee_bps
+    };
+    if contract_fee > 0x00ff_ffff {
+        bail!("pool fee exceeds uint24");
+    }
+    out.extend_from_slice(&abi::uint24_word(contract_fee));
     Ok(out)
 }
 
@@ -635,6 +645,26 @@ pub async fn build_tx_data(
 #[cfg(test)]
 mod tests {
     use super::step_factory_source;
+
+    #[test]
+    fn clmm_fee_tiers_use_v3_units_without_changing_other_venues() {
+        use super::{encode_hop, BuildTxStep, DexType};
+        let step = BuildTxStep {
+            pool_address: "0x0000000000000000000000000000000000000003".into(),
+            dex_type: "clmm".into(),
+            token_in: "0x0000000000000000000000000000000000000001".into(),
+            token_out: "0x0000000000000000000000000000000000000002".into(),
+            fee_bps: None,
+        };
+        for bps in [1, 5, 30, 100] {
+            let hop = encode_hop(&step, DexType::Clmm, bps).unwrap();
+            assert_eq!(&hop[128..160], &crate::abi::uint24_word(bps * 100));
+        }
+        let hop = encode_hop(&step, DexType::Xyk, 30).unwrap();
+        assert_eq!(&hop[128..160], &crate::abi::uint24_word(30));
+        assert!(encode_hop(&step, DexType::Clmm, u32::MAX).is_err());
+        assert!(encode_hop(&step, DexType::Clmm, 167_773).is_err());
+    }
 
     /// 2026-08-29 rebaseline: the worker stamps `chakra:factories` records
     /// with the canonical venue source ids. `step_factory_source` must match

@@ -11,7 +11,7 @@ import { TokenSelector } from './TokenSelector';
 import { SwapSettingsModal } from './SwapSettingsModal';
 import { UnauditedModal } from './UnauditedModal';
 import { RecentSwaps } from './RecentSwaps';
-import { formatErc20, formatNativeUsdc, slippageToBps, usdcMaxAtomic } from '@/lib/decimals';
+import { formatErc20, formatNativeUsdc, slippageToBps, usdcMaxAtomic, USDC_ERC20_ADDRESS } from '@/lib/decimals';
 import { routeSourceLabel } from '@/lib/venue-labels';
 import { formatImpactPercent, formatProtocolFeePercent, formatPoolFees } from '@/lib/quote-format';
 import {
@@ -254,6 +254,17 @@ export function SwapCard() {
       sign: (data) => walletClient.signTypedData({ ...data, account: address }),
       receipt: (params) => publicClient.waitForTransactionReceipt(params),
       fee: fetchSuggestedFee,
+      nativeSpend: tokenIn.address.toLowerCase() === USDC_ERC20_ADDRESS ? BigInt(atomic) * 10n ** 12n : 0n,
+      balance: () => publicClient.getBalance({ address }),
+      estimate: async (params) => {
+        try {
+          return await publicClient.estimateGas({ ...params, account: address });
+        } catch (error) {
+          const detail = error && typeof error === 'object' && 'shortMessage' in error
+            ? String(error.shortMessage) : 'The transaction would fail.';
+          throw new Error(`Swap simulation failed. Refresh the quote and try again. ${detail}`);
+        }
+      },
       progress: ({ state, txHash, error }) => {
         setSendState(state);
         setTxHash(txHash ?? null);

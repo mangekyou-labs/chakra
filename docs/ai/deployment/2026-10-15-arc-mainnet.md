@@ -9,7 +9,7 @@ hosting environments.
 
 | Contract | Mainnet address |
 | --- | --- |
-| Chakra Aggregator | `0x824af7339b4fFC04D0FD867953eCbfCc75dEAf18` |
+| Chakra Aggregator | `0xC977ABf5F9c529C39dac9306998eC130439150c0` |
 | USDC | `0x3600000000000000000000000000000000000000` |
 | EURC | `0xbEf5f6d51CB62b58e6A8f77868681825C6fe21c1` |
 | cirBTC | `0x171A4217b86A807A64eB94757Db6849fb4bDbAA0` |
@@ -21,10 +21,10 @@ USDC and EURC have 6 ERC-20 decimals; cirBTC has 8. Native USDC has
 18 decimals. The Quoter uses the original five-argument V3 ABI, not QuoterV2.
 
 Deployment transaction:
-`0xd31438f148a025a4c16f5812b9d3441f231e0823671adfc087ff00b76993f1ae`,
-block **26029398**. Factory allowlist transaction:
-`0x15e1180bd22b4ce248825a3b16e1754d8aea6b89c17510a501a77147068ec9bd`.
-Both receipts succeeded. Total gas cost: **0.072215682 native USDC**.
+`0xdb821192b3ad21a22b67aee04312f149cb82b1af4fa6526fb3fbd17c0d08dccc`,
+block **26037823**. Factory allowlist transaction:
+`0xae59465a3cf4c41e5d080e3c6a84333623abf2232e05279d9862c957c3190f04`.
+Both receipts succeeded. Total gas cost: **0.072392103 native USDC**.
 The operator owns the unpaused aggregator; the UnitFlow factory is enabled as
 `DexType.Clmm`. No swaps, token approvals or liquidity positions were created.
 
@@ -43,7 +43,7 @@ than returned as a partial fill. The UI identifies `chakra-clmm` as UnitFlow V3.
 Render service: `srv-da8g4non74is73ds1jgg`,
 `https://chakra-api-0a5i.onrender.com`. Use a dedicated Redis logical database
 (index 1) for mainnet so testnet snapshots and analytics cannot leak across.
-Analytics starts at deployment block 26029398. Disable automatic deployment
+Analytics starts at deployment block 26037823. Disable automatic deployment
 from the old branch before the cutover; deploy the validated migration commit
 explicitly. Preserve the original service configuration privately for rollback.
 
@@ -57,7 +57,7 @@ Vercel production deployment `dpl_4w6CVxK7XULttwKaUNBS5iHH7kMD` was promoted
 after Render passed the production quote and transaction-building checks.
 Analytics namespaces normalize the aggregator address to lowercase so the
 worker and API share the same cursor and totals regardless of environment casing.
-The final Render release is `dep-db84q6689jmc73c7chcg`, running commit
+The initial migration Render release was `dep-db84q6689jmc73c7chcg`, running commit
 `eaefcb703202f8b60b2a6909ac4be4bcc385d0d7`; it became live at
 2026-10-15 03:51:30 UTC. Render tracks `feature-chakra` with automatic deploys
 disabled; future backend releases require an explicit deployment.
@@ -65,9 +65,9 @@ disabled; future backend releases require an explicit deployment.
 ## Verification and operation
 
 - Rust workspace tests pass.
-- Frontend type checking and all 104 tests pass.
+- Frontend type checking and all 128 tests pass.
 - Frontend static production build passes with webpack locally.
-- Solidity suite: 88 passing tests.
+- Solidity suite after the callback fix: 91 passing tests.
 - Six directed live quotes match UnitFlow's onchain Quoter at the tested
   small amounts (0.01 USDC/EURC and 10 cirBTC atomic units).
 - Local Redis-backed worker/API: all six directions quote at readiness probe
@@ -106,3 +106,24 @@ Rolling back application code does not undo the mainnet contract deployment.
 - [UnitFlow contracts](https://docs.unitflow.finance/docs/dev/contracts)
 - [Render environment API](https://api-docs.render.com/reference/update-env-vars-for-service)
 - [Render deploy API](https://api-docs.render.com/reference/create-deploy)
+
+## UnitFlow execution fix — 2026-10-15
+
+The replacement deployment above supersedes the initial aggregator
+`0x824af7339b4fFC04D0FD867953eCbfCc75dEAf18`. The initial mainnet
+quote/build checks did not execute a complete swap and missed two incompatibilities:
+`build_tx` encoded CLMM fees in basis points instead of V3 tiers (1 bps must
+encode 100), and UnitFlow pools invoke `unitFlowV3SwapCallback`, while the initial
+aggregator exposed only `uniswapV3SwapCallback`. The replacement shares the
+existing callback authentication between both entry points.
+
+The frontend estimates the signed swap before opening the final wallet prompt,
+sets a gas limit with 20% headroom, and checks the post-approval native USDC
+balance against both swap input and maximum gas cost. Native and ERC-20 USDC
+share a balance on Arc. Simulations use mainnet `eth_call` with only a Permit2
+allowance override; no funded user swaps are submitted. A local Anvil fork does
+not reproduce Arc native USDC precompile behavior and is unsuitable for this check.
+
+Validation: frontend type checking and 128 tests pass; Rust workspace tests pass;
+Solidity regression tests cover a full swap using the UnitFlow callback, spoofed
+callers and unregistered pools. The one-basis-point fee tier is covered explicitly.

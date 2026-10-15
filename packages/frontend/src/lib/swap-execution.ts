@@ -22,7 +22,12 @@ export interface SwapExecutionPorts {
     data: `0x${string}`;
     value?: bigint;
     maxFeePerGas?: bigint;
+    gas?: bigint;
   }): Promise<`0x${string}`>;
+  estimate(params: { to: `0x${string}`; data: `0x${string}`; value: bigint; maxFeePerGas: bigint }): Promise<bigint>;
+  balance(): Promise<bigint>;
+  /** Native and ERC-20 USDC share one balance on Arc (18 native decimals). */
+  nativeSpend: bigint;
   sign(data: PermitTypedData): Promise<string>;
   receipt(params: { hash: `0x${string}`; confirmations: number }): Promise<{ status: string }>;
   fee(): Promise<bigint>;
@@ -66,12 +71,20 @@ export async function executeSwap(ports: SwapExecutionPorts): Promise<SwapExecut
     }
     report('sending');
     const params = buildSendParams(tx, await ports.fee());
-    txHash = await ports.send({
+    const request = {
       to: params.to,
       data: calldata as `0x${string}`,
       value: 0n,
       maxFeePerGas: params.maxFeePerGas,
-    });
+    };
+    // Estimate the exact signed calldata before opening the final wallet prompt.
+    // A revert must surface here rather than as a misleading wallet gas warning.
+    const estimated = await ports.estimate(request);
+    const gas = (estimated * 120n + 99n) / 100n;
+    if (await ports.balance() < ports.nativeSpend + gas * request.maxFeePerGas) {
+      throw new Error('Not enough USDC to cover the swap and network gas. Reduce the amount or add USDC.');
+    }
+    txHash = await ports.send({ ...request, gas });
     report('confirming');
     const receipt = await ports.receipt({ hash: txHash, confirmations: 1 });
     if (receipt.status !== 'success') throw new Error('Swap transaction failed');

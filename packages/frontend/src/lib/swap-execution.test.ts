@@ -24,6 +24,9 @@ function ports(data = tx) {
     sign: vi.fn(async () => '0x' + 'ab'.repeat(65)),
     receipt: vi.fn<SwapExecutionPorts['receipt']>(async () => ({ status: 'success' })),
     fee: vi.fn(async () => 1n),
+    estimate: vi.fn<SwapExecutionPorts['estimate']>(async () => 250_000n),
+    balance: vi.fn(async () => 140_000_000_000_000_000n),
+    nativeSpend: 100_000_000_000_000_000n,
     progress: vi.fn(),
   } satisfies SwapExecutionPorts;
 }
@@ -87,6 +90,7 @@ it('skips unrequested approvals and signing and keeps higher fees', async () => 
     data: tx.data,
     value: 0n,
     maxFeePerGas: 30_000_000_000n,
+    gas: 300_000n,
   });
   expect(p.sign).not.toHaveBeenCalled();
 });
@@ -148,4 +152,35 @@ it('rejects an envelope from the historical testnet', async () => {
   const p = ports({ ...tx, chain_id: 5042002 });
   expect((await executeSwap(p)).state).toBe('error');
   expect(p.send).not.toHaveBeenCalled();
+});
+
+
+it('simulates signed permit calldata before the final wallet prompt', async () => {
+  const p = ports({ ...tx, required_approvals: [], typed_data: { types: {}, domain: {}, message: {}, primaryType: 'PermitSingle' } });
+  await executeSwap(p);
+  expect(p.estimate.mock.calls[0][0].data).toContain('ab'.repeat(65));
+  expect(p.estimate.mock.invocationCallOrder[0]).toBeLessThan(p.send.mock.invocationCallOrder[0]);
+  expect(p.send.mock.calls[0][0].gas).toBe(300_000n);
+});
+
+it('stops a reverting swap before asking the wallet to send it', async () => {
+  const p = ports({ ...tx, required_approvals: [] });
+  p.estimate.mockRejectedValue(new Error('PoolNotFromFactory'));
+  expect((await executeSwap(p)).error).toBe('PoolNotFromFactory');
+  expect(p.send).not.toHaveBeenCalled();
+});
+
+it('reserves gas from the same balance spent as ERC-20 USDC', async () => {
+  const p = ports({ ...tx, required_approvals: [] });
+  p.balance.mockResolvedValue(104_000_000_000_000_000n);
+  expect((await executeSwap(p)).error).toContain('cover the swap and network gas');
+  expect(p.send).not.toHaveBeenCalled();
+});
+
+it('checks the balance after approvals, not a cached initial balance', async () => {
+  const p = ports();
+  p.balance.mockResolvedValue(0n);
+  expect((await executeSwap(p)).state).toBe('error');
+  expect(p.send).toHaveBeenCalledTimes(1);
+  expect(p.balance.mock.invocationCallOrder[0]).toBeGreaterThan(p.receipt.mock.invocationCallOrder[0]);
 });

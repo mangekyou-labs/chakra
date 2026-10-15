@@ -32,7 +32,7 @@ services:
       - key: CHAKRA_LISTEN_ADDR
         value: "0.0.0.0:10000"
       - key: CHAKRA_AGGREGATOR
-        value: "0x824af7339b4fFC04D0FD867953eCbfCc75dEAf18"
+        value: "0xC977ABf5F9c529C39dac9306998eC130439150c0"
       - key: CHAKRA_CIRBTC_ADDRESS
         value: "0x171A4217b86A807A64eB94757Db6849fb4bDbAA0"
       - key: CHAKRA_USDC_ADDRESS
@@ -54,7 +54,7 @@ services:
       - key: CHAKRA_ANALYTICS_ENABLED
         value: "true"
       - key: CHAKRA_ANALYTICS_START_BLOCK
-        value: "26029398"
+        value: "26037823"
       - key: CHAKRA_ANALYTICS_POLL_SECS
         value: "30"
       - key: CHAKRA_ANALYTICS_CONFIRMATIONS
