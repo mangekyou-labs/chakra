@@ -57,6 +57,7 @@ pub async fn get_stats(State(state): State<AppState>, Query(query): Query<StatsQ
     }
     let engine = state.current_engine().await;
     let mut response = stats::empty(range, state.config.chakra_aggregator.clone());
+    response.meta.deployment_block = state.config.chakra_analytics_start_block;
     response.route_health = stats::route_health_for_engine(&engine).await;
     if let Some(redis_url) = state.config.snapshot_redis_url.as_deref() {
         if let Ok(store) = market_data_worker::analytics::AnalyticsStore::new(

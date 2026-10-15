@@ -47,6 +47,7 @@ fn app_config() -> AppConfig {
     config.runtime_mode = api_server::config::RuntimeMode::Embedded;
     config.snapshot_backend = Some("memory".to_string());
     config.max_splits = 5;
+    config.chakra_analytics_start_block = 26_037_823;
     config.quote_rpc_hydrate_enabled = false;
     config
 }
@@ -879,4 +880,12 @@ async fn ready_and_clmm_only_snapshot_quotes_and_builds() {
 #[allow(dead_code)]
 fn _window() -> Duration {
     Duration::from_secs(1)
+}
+
+#[tokio::test]
+async fn stats_reports_configured_aggregator_deployment_block() {
+    let (router, _, _) = test_app(Some(chakra_snapshot()), None).await;
+    let (status, body) = get(&router, "/api/v1/stats").await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(body["data"]["meta"]["deployment_block"], 26_037_823);
 }

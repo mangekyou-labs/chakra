@@ -88,6 +88,9 @@ pub struct AppConfig {
     pub chakra_chain_id: u64,
     /// Aggregator contract address for `build_tx` `to` (empty until T5.2).
     pub chakra_aggregator: String,
+    /// First block indexed for the configured aggregator.
+    #[serde(default)]
+    pub chakra_analytics_start_block: u64,
     /// Allowlisted CORS origins (comma-separated).
     pub chakra_cors_origins: Vec<String>,
 }
@@ -114,6 +117,7 @@ impl Default for AppConfig {
             chakra_chain_id: 5042,
             chakra_rpc_http: dex_adapters::evm_rpc::ARC_RPC_HTTP.to_string(),
             chakra_aggregator: String::new(),
+            chakra_analytics_start_block: market_data_worker::analytics::AnalyticsConfig::default().start_block,
             chakra_cors_origins: vec!["http://localhost:3000".to_string()],
         }
     }
@@ -181,6 +185,7 @@ impl AppConfig {
                 .unwrap_or_default()
                 .trim()
                 .to_ascii_lowercase(),
+            chakra_analytics_start_block: market_data_worker::analytics::AnalyticsConfig::from_env().start_block,
             chakra_chain_id: std::env::var("CHAKRA_CHAIN_ID")
                 .ok()
                 .and_then(|s| s.parse().ok())
