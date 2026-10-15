@@ -127,3 +127,25 @@ not reproduce Arc native USDC precompile behavior and is unsuitable for this che
 Validation: frontend type checking and 128 tests pass; Rust workspace tests pass;
 Solidity regression tests cover a full swap using the UnitFlow callback, spoofed
 callers and unregistered pools. The one-basis-point fee tier is covered explicitly.
+
+The callback release is commit `cd07beb08d008baffd5b9b22b7fedee8bb99242d`.
+Render deployment: `dep-db85liom7kps73d5rb4g`; Vercel deployment:
+`dpl_E3gb3X5C57n4PMbXr67uXs5Uxj2X`. The replacement is deployed at block
+26037823. Deployment plus factory setup cost 0.072392103 USDC.
+A read-only mainnet execution of 0.05 USDC returned 44,546 EURC atomic units,
+with gas estimate 263,441 (about 0.00527 USDC at 20 gwei). No runtime-code
+or user-balance override was used for that replacement-contract check.
+
+Production acceptance after the callback release:
+
+- Render is live at the callback release commit and `/api/v1/ready` returns 200.
+- All six USDC/EURC/cirBTC directions quote and build transactions for the
+  replacement aggregator and chain 5042. Encoded CLMM hop fees match V3 tiers.
+  One build request timed out; its retry succeeded.
+- The live API's 0.05 USDC calldata executes read-only with only the Permit2
+  allowance override: output 44,548 EURC atomic, estimated gas 256,666
+  (0.00513332 USDC at 20 gwei), satisfying the quoted minimum.
+- Vercel CLI inspection confirms `chakra-ag.vercel.app` resolves to
+  `dpl_E3gb3X5C57n4PMbXr67uXs5Uxj2X`, Ready, production.
+- No funded user swap was submitted. Cancel stale wallet prompts and reload
+  the application before signing for the replacement contract.
