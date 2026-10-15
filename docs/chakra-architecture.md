@@ -5,7 +5,6 @@
 **Status:** Live proof of concept with grant-funded production-readiness roadmap
 **Evidence checked:** September 4, 2026
 **Repository:** [mangekyou-labs/chakra](https://github.com/mangekyou-labs/chakra)
-**Grant proposal:** [Circle 2026 Cohort 2 Submit Proposal Workbook](grants/circle-developer-grant-proposal.md)
 
 ## Product Overview
 
