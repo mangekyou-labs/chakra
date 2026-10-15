@@ -9,7 +9,7 @@ use {
     dex_adapters::{evm_logs::normalize_evm_address, evm_rpc::EvmRpcClient, pool_index::PoolRef},
     market_snapshot::{
         pool_state_store::{should_publish_clmm_to_redis, PoolStateStore, StablePoolStateValue, XykPoolStateValue},
-        ClmmPoolRefSnapshot, ClmmPoolSnapshot, TradingPairSnapshot,
+        ClmmPoolSnapshot, TradingPairSnapshot,
     },
     std::{
         collections::HashSet,
@@ -351,32 +351,8 @@ async fn execute_fetch_task(ctx: &FetchWorkerContext, task: FetchTask) -> Result
             pool_address,
         } => {
             debug_assert_eq!(dex_type, "clmm");
-            let (pool_ref, _existing) = {
-                let guard = ctx.shared.read().await;
-                let existing = guard
-                    .clmm_pools
-                    .iter()
-                    .find(|p| {
-                        p.source == source
-                            && normalize_evm_address(&p.pool_address) == normalize_evm_address(&pool_address)
-                    })
-                    .cloned();
-                let Some(existing) = existing.as_ref() else {
-                    anyhow::bail!("EvmClmm pool {pool_address} not in topology");
-                };
-                (
-                    ClmmPoolRefSnapshot {
-                        source: existing.source.clone(),
-                        pool_address: existing.pool_address.clone(),
-                        token0: existing.token0.clone(),
-                        token1: existing.token1.clone(),
-                        fee_bps: existing.fee_bps,
-                        tick_spacing: existing.tick_spacing,
-                        factory: existing.factory.clone(),
-                    },
-                    existing.clone(),
-                )
-            };
+            let refresh = ctx.shared.read().await.begin_clmm_refresh(&source, &pool_address)?;
+            let pool_ref = &refresh.pool;
             let snapshot =
                 dex_adapters::evm_fetch::fetch_clmm_snapshot(ctx.evm.as_ref(), &pool_ref.source, &pool_ref).await?;
             if let Some(metrics) = &ctx.clmm_metrics {
@@ -389,17 +365,8 @@ async fn execute_fetch_task(ctx: &FetchWorkerContext, task: FetchTask) -> Result
                 );
                 return Ok(vec![]);
             }
-            let mut guard = ctx.shared.write().await;
-            if let Some(current) = guard
-                .clmm_pools
-                .iter_mut()
-                .find(|p| p.pool_address == snapshot.pool_address)
-            {
-                *current = snapshot.clone();
-            } else {
-                guard.clmm_pools.push(snapshot.clone());
-            }
-            Ok(vec![PoolStateUpdate::Clmm(snapshot)])
+            let accepted = ctx.shared.write().await.accept_clmm_refresh(refresh, snapshot);
+            Ok(accepted.into_iter().map(PoolStateUpdate::Clmm).collect())
         }
     }
 }
@@ -412,7 +379,7 @@ async fn find_evm_pair_exact(
     pool_address: &str,
 ) -> anyhow::Result<TradingPairSnapshot> {
     let guard = shared.read().await;
-    for source in &guard.sources {
+    for source in guard.sources() {
         if source.source != source_id {
             continue;
         }
@@ -430,6 +397,91 @@ async fn find_evm_pair_exact(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[tokio::test]
+    async fn clmm_rpc_completion_after_discovery_replacement_is_not_forwarded() {
+        for remove in [true, false] {
+            let (started_tx, started_rx) = tokio::sync::oneshot::channel();
+            let started_tx = std::sync::Mutex::new(Some(started_tx));
+            let (release_tx, release_rx) = std::sync::mpsc::channel();
+            let release_rx = std::sync::Mutex::new(release_rx);
+            let (url, _server) = crate::evm_watcher::tests::spawn_fixture_rpc(move |method, params| {
+                if method == "eth_blockNumber" {
+                    if let Some(tx) = started_tx.lock().unwrap().take() {
+                        tx.send(()).unwrap();
+                        release_rx
+                            .lock()
+                            .unwrap()
+                            .recv_timeout(std::time::Duration::from_secs(5))
+                            .unwrap();
+                    }
+                    return Ok(serde_json::json!("0x42"));
+                }
+                assert_eq!(method, "eth_call");
+                let data = params[0]["data"].as_str().unwrap();
+                let value = if data == "0x3850c7bd" {
+                    format!("0x{:064x}{:064x}", 1u128 << 96, 0)
+                } else if data == "0x1a686502" {
+                    format!("0x{:064x}", 1_000_000)
+                } else if data == "0xd0c93a7c" {
+                    format!("0x{:064x}", 10)
+                } else {
+                    format!("0x{:064x}", 0)
+                };
+                Ok(serde_json::json!(value))
+            });
+            let pool = ClmmPoolSnapshot {
+                source: "chakra-clmm".into(),
+                pool_address: "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa".into(),
+                token0: "a".into(),
+                token1: "b".into(),
+                fee_bps: 5,
+                tick_spacing: 10,
+                factory: "factory".into(),
+                sqrt_price_x96: [0; 4],
+                tick: 0,
+                liquidity: 0,
+                ticks: vec![],
+                chunk_bitmaps: vec![],
+                word_bitmaps: vec![],
+                coverage: None,
+            };
+            let shared = Arc::new(RwLock::new(WorkerShared::default()));
+            shared.write().await.replace(vec![], vec![pool.clone()]).await;
+            let ctx = FetchWorkerContext {
+                evm: Arc::new(EvmRpcClient::single(&url).unwrap()),
+                shared: shared.clone(),
+                clmm_metrics: None,
+            };
+            let address = pool.pool_address.clone();
+            let task = tokio::spawn(async move {
+                execute_fetch_task(
+                    &ctx,
+                    FetchTask::EvmClmm {
+                        source: "chakra-clmm".into(),
+                        dex_type: "clmm".into(),
+                        pool_address: address,
+                    },
+                )
+                .await
+            });
+            tokio::time::timeout(std::time::Duration::from_secs(5), started_rx)
+                .await
+                .unwrap()
+                .unwrap();
+            shared
+                .write()
+                .await
+                .replace(vec![], if remove { vec![] } else { vec![pool] })
+                .await;
+            release_tx.send(()).unwrap();
+            let updates = task.await.unwrap().unwrap();
+            assert!(updates.is_empty(), "superseded refresh must not reach the Redis sink");
+            let current = shared.read().await;
+            assert_eq!(current.clmm_pools().len(), if remove { 0 } else { 1 });
+            assert!(current.clmm_pools().iter().all(|p| p.liquidity == 0));
+        }
+    }
 
     fn pref(source: &str, pool: &str) -> PoolRef {
         PoolRef {
@@ -503,8 +555,8 @@ mod tests {
             Ok(json!("0x0"))
         });
         let client = Arc::new(EvmRpcClient::single(&url).unwrap());
-        let shared = Arc::new(RwLock::new(WorkerShared {
-            sources: vec![SourceSnapshot {
+        let shared = Arc::new(RwLock::new(WorkerShared::new(
+            vec![SourceSnapshot {
                 source: "presto-hub".to_string(),
                 pairs: vec![
                     TradingPairSnapshot {
@@ -525,8 +577,8 @@ mod tests {
                     },
                 ],
             }],
-            clmm_pools: Vec::new(),
-        }));
+            Vec::new(),
+        )));
         let ctx = FetchWorkerContext {
             evm: client,
             shared,

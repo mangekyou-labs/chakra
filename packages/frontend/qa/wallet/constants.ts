@@ -7,18 +7,18 @@
  * URL or storage key in the spec.
  */
 
-/** Arc testnet chain id 5042002 (0x4CEF52). */
-export const QA_CHAIN_ID = 5042002;
+/** Arc mainnet chain id 5042 (0x13B2). */
+export const QA_CHAIN_ID = 5042;
 
 /** Public Arc RPC — never Canteen `$RPC`, never invented Alchemy URLs. */
-export const QA_RPC_URL = 'https://rpc.testnet.arc.io';
+export const QA_RPC_URL = 'https://rpc.mainnet.arc.io';
 
 /** Explorer matches `ARC_BLOCK_EXPLORER_URLS` in src/lib/chain.ts (.app). */
-export const QA_EXPLORER_URL = 'https://testnet.arcscan.app';
+export const QA_EXPLORER_URL = 'https://explorer.arc.io';
 
 /** ERC-20 USDC (6 dp) and EURC (6 dp) catalog addresses. */
 export const QA_USDC = '0x3600000000000000000000000000000000000000';
-export const QA_EURC = '0x89B50855Aa3bE2F677cD6303Cec089B5F319D72a';
+export const QA_EURC = '0xbEf5f6d51CB62b58e6A8f77868681825C6fe21c1';
 
 /** Recent-swaps storage key prefix — matches src/lib/recent-swaps.ts. */
 export const QA_STORAGE_PREFIX = 'chakra:recent-swaps';

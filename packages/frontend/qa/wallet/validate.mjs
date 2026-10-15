@@ -19,6 +19,13 @@ if (existsSync(ENV_FILE)) {
   }
 }
 
+// Wallet QA can submit funded transactions. Require an explicit mainnet selection.
+if (process.env.QA_CHAIN_ID !== '5042' || process.env.QA_ALLOW_MAINNET_TRANSACTIONS !== 'true') {
+  throw new Error(
+    'Wallet QA targets Arc mainnet. Set QA_CHAIN_ID=5042 and QA_ALLOW_MAINNET_TRANSACTIONS=true explicitly.',
+  );
+}
+
 const REQUIRED = [
   { key: 'QA_WALLET_SECRET', desc: 'mnemonic or private key for disposable wallet' },
   {
@@ -27,7 +34,7 @@ const REQUIRED = [
     default: 'https://chakra-api-0a5i.onrender.com',
   },
   { key: 'DAPP_URL', desc: 'Chakra UI base URL', default: 'https://chakra-ag.vercel.app' },
-  { key: 'QA_CHAIN_ID', desc: 'Arc testnet chain ID (5042002)', default: '5042002' },
+  { key: 'QA_CHAIN_ID', desc: 'Arc mainnet chain ID (5042)', default: '5042' },
 ];
 
 const missing = [];
@@ -77,4 +84,4 @@ for (const key of Object.keys(process.env)) {
 console.log('✅ QA wallet environment validated');
 console.log(`   API: ${process.env.QA_API_URL || 'https://chakra-api-0a5i.onrender.com'}`);
 console.log(`   DApp: ${process.env.DAPP_URL || 'https://chakra-ag.vercel.app'}`);
-console.log(`   Chain: ${process.env.QA_CHAIN_ID || '5042002'}`);
+console.log(`   Chain: ${process.env.QA_CHAIN_ID || '5042'}`);

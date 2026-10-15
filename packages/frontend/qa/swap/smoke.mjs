@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * qa/swap/smoke.mjs — Chakra production smoke: atomic USDC → cirBTC.
+ * qa/swap/smoke.mjs — Chakra historical testnet smoke: atomic USDC → cirBTC.
  *
  * A viem-based QA command that mirrors the production wallet swap path
  * (SwapCard.tsx + swap-send.ts): quote → route checks → build_tx →
@@ -36,7 +36,7 @@ import { isApprovalDependentSimulationError, stringifyEvidence } from './preflig
 
 const ARC_CHAIN_ID = 5042002;
 const DEFAULT_RPC_URL = 'https://rpc.testnet.arc.io';
-const DEFAULT_API_URL = 'https://chakra-api-0a5i.onrender.com';
+const DEFAULT_API_URL = ''; // --api or QA_API_URL must point to a testnet deployment.
 
 /** Token catalog (addresses are lowercase in the API transport). */
 const USDC = '0x3600000000000000000000000000000000000000'; // 6 dp
@@ -95,7 +95,8 @@ const flags = {
 };
 for (let i = 0; i < args.length; i += 1) {
   if (args[i] === '--amount-in') flags.amountIn = requireFlagValue('--amount-in', args[++i]);
-  if (args[i] === '--slippage-bps') flags.slippageBps = Number(requireFlagValue('--slippage-bps', args[++i]));
+  if (args[i] === '--slippage-bps')
+    flags.slippageBps = Number(requireFlagValue('--slippage-bps', args[++i]));
   if (args[i] === '--api') flags.apiUrl = requireFlagValue('--api', args[++i]);
   if (args[i] === '--rpc') flags.rpcUrl = requireFlagValue('--rpc', args[++i]);
 }
@@ -396,8 +397,15 @@ async function main() {
   );
   console.log(`   Slippage: ${flags.slippageBps} bps`);
 
+  if (!API_URL)
+    throw new Error(
+      'Supply --api or QA_API_URL for an explicit testnet API; production is mainnet',
+    );
   const { account } = loadSecret();
   const { publicClient, walletClient } = clients(account);
+  if ((await publicClient.getChainId()) !== ARC_CHAIN_ID) {
+    throw new Error('This historical smoke command requires Arc testnet chain 5042002');
+  }
   const address = account.address;
   console.log(`   Wallet:   ${address}`);
 
@@ -440,6 +448,12 @@ async function main() {
     quote.minimum_output,
     quote.sub_routes,
   );
+  if (
+    tx.chain_id !== ARC_CHAIN_ID ||
+    (tx.typed_data && Number(tx.typed_data.domain?.chainId) !== ARC_CHAIN_ID)
+  ) {
+    throw new Error('build_tx and Permit2 must target Arc testnet chain 5042002');
+  }
   console.log(`   to:       ${tx.to}`);
   console.log(`   deadline: ${tx.deadline} (${new Date(tx.deadline * 1000).toISOString()})`);
   const approvals = Array.isArray(tx.required_approvals) ? tx.required_approvals : [];

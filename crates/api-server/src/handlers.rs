@@ -78,8 +78,9 @@ pub async fn get_stats(State(state): State<AppState>, Query(query): Query<StatsQ
             // Heads (chain / confirmed / indexed) and freshness come from the
             // poller's own bookkeeping — freshness is the age of the last
             // successful analytics poll, never the age of the newest swap.
-            let heads = store.heads().await.ok().flatten();
-            let polled_at = store.polled_at().await.ok().flatten();
+            let progress = store.progress().await.ok().flatten();
+            let heads = progress.map(|p| (p.chain_head, p.confirmed_head, p.indexed_head));
+            let polled_at = progress.map(|p| p.polled_at);
             stats::apply_heads(&mut response.meta, heads, polled_at, now);
         }
     }

@@ -30,7 +30,7 @@ writeFileSync(
   JSON.stringify(
     {
       created: new Date().toISOString(),
-      chainId: process.env.QA_CHAIN_ID || '5042002',
+      chainId: process.env.QA_CHAIN_ID || '5042',
       apiUrl: process.env.QA_API_URL || 'http://127.0.0.1:8080',
     },
     null,

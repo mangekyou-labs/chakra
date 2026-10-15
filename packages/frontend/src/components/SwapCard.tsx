@@ -22,14 +22,8 @@ import {
 } from '@/lib/swap-settings';
 import { addRecentSwap, arcscanTxUrl } from '@/lib/recent-swaps';
 import { hasAck } from '@/lib/unaudited-ack';
-import {
-  ARC_CHAIN_ID,
-  fetchSuggestedFee,
-  buildSendParams,
-  isPausedEnvelope,
-  isChainAllowed,
-  spliceSignature,
-} from '@/lib/swap-send';
+import { ARC_CHAIN_ID, fetchSuggestedFee, isChainAllowed } from '@/lib/swap-send';
+import { executeSwap, type SwapExecutionState } from '@/lib/swap-execution';
 
 const USDC_MAX_GAS_UNITS = 400_000n;
 
@@ -55,15 +49,7 @@ function formatOutputAmount(atomic: string, decimals: number): string {
 
 const VALID_INPUT_RE = /^\d*\.?\d*$/;
 
-type SendState =
-  | 'idle'
-  | 'building'
-  | 'approving'
-  | 'permitting'
-  | 'sending'
-  | 'confirming'
-  | 'confirmed'
-  | 'error';
+type SendState = 'idle' | SwapExecutionState;
 
 export function SwapCard() {
   const { address, onArcMainnet, connect, switchToArc } = useWallet();
@@ -246,110 +232,42 @@ export function SwapCard() {
     }
 
     setSendError(null);
-    setSendState('building');
-
-    try {
-      const atomic = amountInputToAtomic(amountIn, tokenIn.decimals);
-      const buildResult = await buildSwapTx(
-        address,
-        tokenIn.address,
-        tokenOut.address,
-        atomic,
-        quote.minimum_output,
-        quote.sub_routes,
-      );
-
-      if (!buildResult.success || !buildResult.data) {
-        const msg = buildResult.error?.message || 'Failed to build transaction';
-        if (isPausedEnvelope(buildResult)) {
-          setSendError('Protocol is paused');
-        } else {
-          setSendError(msg);
-        }
-        setSendState('error');
-        return;
-      }
-
-      const txData = buildResult.data;
-
-      if (txData.required_approvals && txData.required_approvals.length > 0) {
-        setSendState('approving');
-        for (const approval of txData.required_approvals as Array<{
-          token: string;
-          spender: string;
-          amount: string;
-        }>) {
-          const approveData = `0x095ea7b3${
-            '000000000000000000000000' + approval.spender.toLowerCase().replace('0x', '')
-          }${BigInt(approval.amount).toString(16).padStart(64, '0')}`;
-          const approveHash = await walletClient.sendTransaction({
-            to: approval.token as `0x${string}`,
-            data: approveData as `0x${string}`,
-            account: address,
-            chain: walletClient.chain,
-          });
-          await publicClient.waitForTransactionReceipt({ hash: approveHash, confirmations: 1 });
-        }
-      }
-
-      let calldata = txData.data;
-      if (txData.typed_data) {
-        setSendState('permitting');
-        const typedData = txData.typed_data as {
-          types: Record<string, Array<{ name: string; type: string }>>;
-          primaryType: string;
-          domain: Record<string, unknown>;
-          message: Record<string, unknown>;
-        };
-        const sig = await walletClient.signTypedData({
-          domain: typedData.domain as {
-            name?: string;
-            version?: string;
-            chainId?: number;
-            verifyingContract?: `0x${string}`;
-          },
-          types: typedData.types as Record<string, Array<{ name: string; type: string }>>,
-          primaryType: typedData.primaryType as string,
-          message: typedData.message as Record<string, unknown>,
-          account: address,
-        });
-        calldata = spliceSignature(txData.data, sig);
-      }
-
-      setSendState('sending');
-      const suggestedFee = await fetchSuggestedFee();
-      const params = buildSendParams(txData, suggestedFee);
-      const sendHash = await walletClient.sendTransaction({
-        to: params.to,
-        data: calldata as `0x${string}`,
-        value: params.value === '0x0' ? 0n : BigInt(params.value),
-        maxFeePerGas: params.maxFeePerGas,
-        account: address,
-        chain: walletClient.chain,
-      });
-
-      setTxHash(sendHash);
-
-      setSendState('confirming');
-      await publicClient.waitForTransactionReceipt({ hash: sendHash, confirmations: 1 });
-
+    setTxHash(null);
+    const atomic = amountInputToAtomic(amountIn, tokenIn.decimals);
+    const result = await executeSwap({
+      build: () =>
+        buildSwapTx(
+          address,
+          tokenIn.address,
+          tokenOut.address,
+          atomic,
+          quote.minimum_output,
+          quote.sub_routes,
+        ),
+      send: (params) =>
+        walletClient.sendTransaction({ ...params, account: address, chain: walletClient.chain }),
+      sign: (data) => walletClient.signTypedData({ ...data, account: address }),
+      receipt: (params) => publicClient.waitForTransactionReceipt(params),
+      fee: fetchSuggestedFee,
+      progress: ({ state, txHash, error }) => {
+        setSendState(state);
+        setTxHash(txHash ?? null);
+        setSendError(error ?? null);
+      },
+    });
+    if (result.state === 'confirmed' && result.txHash) {
       addRecentSwap(ARC_CHAIN_ID, address, {
-        txHash: sendHash,
+        txHash: result.txHash,
         tokenIn: tokenIn.symbol,
         tokenOut: tokenOut.symbol,
         amountIn: atomic,
         amountOut: quote.expected_output,
         isSplit: quote.is_split,
       });
-
-      setSendState('confirmed');
       setTimeout(() => {
         setSendState('idle');
         setTxHash(null);
       }, 3000);
-    } catch (err) {
-      setSendState('error');
-      setSendError(err instanceof Error ? err.message : 'Transaction failed');
     }
   }, [
     address,
@@ -574,6 +492,16 @@ export function SwapCard() {
           {humanError && !quoteLoading && (
             <div className="mt-3 text-[13px] text-red-300/90 border border-red-500/15 bg-red-500/[0.05] rounded-xl px-3 py-2.5 text-center">
               {humanError}
+              {txHash && (
+                <a
+                  href={arcscanTxUrl(txHash)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="block underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
+                >
+                  View submitted transaction
+                </a>
+              )}
             </div>
           )}
 

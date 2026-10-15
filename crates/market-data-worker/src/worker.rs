@@ -10,17 +10,13 @@ use {
             build_snapshot_store, SnapshotStore, SnapshotStoreBackend, DEFAULT_REDIS_EVENTS_CHANNEL,
             DEFAULT_REDIS_SNAPSHOT_HISTORY,
         },
-        ClmmPoolSnapshot, SourceSnapshot, DEFAULT_SNAPSHOT_DIR,
+        DEFAULT_SNAPSHOT_DIR,
     },
     std::{path::PathBuf, sync::Arc},
     tracing::info,
 };
 
-/// Shared graph + CLMM state (main loop and background bootstrap).
-pub(crate) struct WorkerShared {
-    pub(crate) sources: Vec<SourceSnapshot>,
-    pub(crate) clmm_pools: Vec<ClmmPoolSnapshot>,
-}
+pub(crate) use crate::topology::LivePoolTopology as WorkerShared;
 
 #[derive(Clone)]
 pub struct WorkerConfig {

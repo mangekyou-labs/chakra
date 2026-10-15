@@ -20,6 +20,13 @@ if (existsSync(ENV_FILE)) {
   process.loadEnvFile(ENV_FILE);
 }
 
+// Wallet QA can submit funded transactions. Require an explicit mainnet selection.
+if (process.env.QA_CHAIN_ID !== '5042' || process.env.QA_ALLOW_MAINNET_TRANSACTIONS !== 'true') {
+  throw new Error(
+    'Wallet QA targets Arc mainnet. Set QA_CHAIN_ID=5042 and QA_ALLOW_MAINNET_TRANSACTIONS=true explicitly.',
+  );
+}
+
 export default defineConfig({
   testDir: './qa/wallet',
   testMatch: '**/*.spec.ts',

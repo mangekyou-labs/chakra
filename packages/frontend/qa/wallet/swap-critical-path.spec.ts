@@ -1,12 +1,12 @@
 /**
  * qa/wallet/swap-critical-path.spec.ts
  *
- * Real MetaMask wallet end-to-end critical path for Chakra Arc Testnet DEX Aggregator.
+ * Real MetaMask wallet end-to-end critical path for Chakra Arc Mainnet DEX Aggregator.
  * Uses dAppwright to automate real MetaMask extension interactions on Chromium.
  *
  * Requirements:
  *   - Headed Chromium with real MetaMask extension via dAppwright
- *   - Connects to Chakra UI, switches/adds Arc Testnet (Chain ID 5042002 / 0x4CEF52)
+ *   - Connects to Chakra UI, switches/adds Arc Mainnet (Chain ID 5042 / 0x13B2)
  *   - Quotes USDC -> EURC with visible legs, price_impact_bps, protocol fee 0
  *   - Handles Permit2 approve + EIP-712 PermitSingle typed data signing
  *   - Broadcasts splitSwap with value = 0n, waits 1 confirmation
@@ -36,7 +36,7 @@ const DAPP_URL = process.env.DAPP_URL || 'https://chakra-ag.vercel.app';
 const _API_URL = process.env.QA_API_URL || 'https://chakra-api-0a5i.onrender.com';
 const QA_WALLET_SECRET = process.env.QA_WALLET_SECRET || '';
 
-test.describe('Chakra Arc Testnet — MetaMask Critical Path (T9.4)', () => {
+test.describe('Chakra Arc Mainnet — MetaMask Critical Path (T9.4)', () => {
   test('MetaMask real wallet swap flow (skip when unconfigured)', async () => {
     test.setTimeout(360_000);
     // 1. Skip check: do not fail when secrets are missing
@@ -137,13 +137,13 @@ test.describe('Chakra Arc Testnet — MetaMask Critical Path (T9.4)', () => {
         timeout: 10_000,
       });
 
-      // 5. Primary button drives state: Connect -> Switch to Arc Testnet -> Swap.
+      // 5. Primary button drives state: Connect -> Switch to Arc Mainnet -> Swap.
       //    The swap card's primary button is disabled while !onArcTestnet — the
       //    switch action lives in the header wallet menu (HeaderWallet.tsx).
       const primaryBtn = page.locator('button.btn-primary').first();
       await expect(primaryBtn).toBeVisible({ timeout: 15_000 });
 
-      // Open the header address chip and use the menu's "Switch to Arc Testnet".
+      // Open the header address chip and use the menu's "Switch to Arc Mainnet".
       // dAppwright's addNetwork/confirmNetworkSwitch are broken on MetaMask 13.17
       // (stub/UI-selection mismatch) — drive the MetaMask notification popup directly.
       await expect(page.getByRole('button', { name: /^0x/ }).first()).toBeVisible({
@@ -159,18 +159,25 @@ test.describe('Chakra Arc Testnet — MetaMask Critical Path (T9.4)', () => {
         const addrChip = page.getByRole('button', { name: /^0x/ }).first();
         await addrChip.click();
         await expect(
-          page.getByRole('button', { name: /switch to arc testnet/i }).first(),
+          page.getByRole('button', { name: /switch to arc mainnet/i }).first(),
         ).toBeVisible({
           timeout: 10_000,
         });
-        await page.getByRole('button', { name: /switch to arc testnet/i }).first().click();
+        await page
+          .getByRole('button', { name: /switch to arc mainnet/i })
+          .first()
+          .click();
         // wallet_switchEthereumChain -> wallet_addEthereumChain can take two confirms.
         await confirmMetaMaskPromptsUntil(context, {
           walletPage,
           timeoutMs: 60_000,
           done: async () => {
             const text = (
-              await page.locator('button.btn-primary').first().innerText().catch(() => '')
+              await page
+                .locator('button.btn-primary')
+                .first()
+                .innerText()
+                .catch(() => '')
             ).trim();
             return /^(Enter amount|Finding route|Swap)/.test(text);
           },

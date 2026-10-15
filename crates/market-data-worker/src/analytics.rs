@@ -204,6 +204,15 @@ pub fn stablecoin_notional_micros(token_in: &str, amount_in: u128, token_out: &s
     }
 }
 
+/// Heads and freshness of one fully successful poll, independent of the page cursor.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub struct PollProgress {
+    pub chain_head: u64,
+    pub confirmed_head: u64,
+    pub indexed_head: u64,
+    pub polled_at: u64,
+}
+
 /// Redis writer. Records are keyed by transaction hash, making replay
 /// idempotent; the cursor is updated only after a complete page succeeds.
 pub struct AnalyticsStore {
@@ -249,44 +258,25 @@ impl AnalyticsStore {
         Ok(())
     }
 
-    /// Record the heads for the most recent *successful* poll:
-    /// `chain_head` = latest observed Arc block, `confirmed_head` =
-    /// confirmation-adjusted target, `indexed_head` = last completely indexed
-    /// block (the committed cursor).
-    pub async fn set_heads(&self, chain_head: u64, confirmed_head: u64, indexed_head: u64) -> Result<()> {
+    /// One atomic value; legacy independently written keys are deliberately not
+    /// promoted to a successful poll. Existing cursor and swap keys stay valid.
+    pub async fn publish_progress(&self, progress: PollProgress) -> Result<()> {
         let mut conn = self.client.get_multiplexed_async_connection().await?;
-        let _: () = conn.set(format!("{}:chain_head", self.namespace), chain_head).await?;
         let _: () = conn
-            .set(format!("{}:confirmed_head", self.namespace), confirmed_head)
-            .await?;
-        let _: () = conn
-            .set(format!("{}:indexed_head", self.namespace), indexed_head)
+            .set(
+                format!("{}:progress", self.namespace),
+                serde_json::to_string(&progress)?,
+            )
             .await?;
         Ok(())
     }
 
-    /// `(chain_head, confirmed_head, indexed_head)` — only present once at
-    /// least one poll has fully succeeded.
-    pub async fn heads(&self) -> Result<Option<(u64, u64, u64)>> {
+    pub async fn progress(&self) -> Result<Option<PollProgress>> {
         let mut conn = self.client.get_multiplexed_async_connection().await?;
-        let chain: Option<u64> = conn.get(format!("{}:chain_head", self.namespace)).await?;
-        let confirmed: Option<u64> = conn.get(format!("{}:confirmed_head", self.namespace)).await?;
-        let indexed: Option<u64> = conn.get(format!("{}:indexed_head", self.namespace)).await?;
-        Ok(chain.zip(confirmed).and_then(|(c, f)| indexed.map(|i| (c, f, i))))
-    }
-
-    /// Unix seconds of the last *fully successful* analytics poll. This is
-    /// the freshness signal; it must not be confused with the age of the most
-    /// recent swap (a quiet chain would otherwise look stale).
-    pub async fn set_polled_at(&self, unix_secs: u64) -> Result<()> {
-        let mut conn = self.client.get_multiplexed_async_connection().await?;
-        let _: () = conn.set(format!("{}:polled_at", self.namespace), unix_secs).await?;
-        Ok(())
-    }
-
-    pub async fn polled_at(&self) -> Result<Option<u64>> {
-        let mut conn = self.client.get_multiplexed_async_connection().await?;
-        Ok(conn.get(format!("{}:polled_at", self.namespace)).await?)
+        let payload: Option<String> = conn.get(format!("{}:progress", self.namespace)).await?;
+        payload
+            .map(|value| serde_json::from_str(&value).context("invalid analytics progress"))
+            .transpose()
     }
 
     pub async fn summaries(&self, from_timestamp: u64, to_timestamp: u64) -> Result<Vec<SwapSummary>> {
@@ -343,10 +333,8 @@ pub trait AnalyticsBackend: Send + Sync {
     async fn cursor(&self) -> Result<Option<u64>>;
     async fn set_cursor(&self, block: u64) -> Result<()>;
     async fn put_swap(&self, summary: &SwapSummary) -> Result<bool>;
-    async fn set_heads(&self, chain_head: u64, confirmed_head: u64, indexed_head: u64) -> Result<()>;
-    async fn set_polled_at(&self, unix_secs: u64) -> Result<()>;
-    async fn heads(&self) -> Result<Option<(u64, u64, u64)>>;
-    async fn polled_at(&self) -> Result<Option<u64>>;
+    async fn publish_progress(&self, progress: PollProgress) -> Result<()>;
+    async fn progress(&self) -> Result<Option<PollProgress>>;
 }
 
 #[async_trait]
@@ -360,17 +348,11 @@ impl AnalyticsBackend for AnalyticsStore {
     async fn put_swap(&self, summary: &SwapSummary) -> Result<bool> {
         AnalyticsStore::put_swap(self, summary).await
     }
-    async fn set_heads(&self, chain_head: u64, confirmed_head: u64, indexed_head: u64) -> Result<()> {
-        AnalyticsStore::set_heads(self, chain_head, confirmed_head, indexed_head).await
+    async fn publish_progress(&self, progress: PollProgress) -> Result<()> {
+        AnalyticsStore::publish_progress(self, progress).await
     }
-    async fn set_polled_at(&self, unix_secs: u64) -> Result<()> {
-        AnalyticsStore::set_polled_at(self, unix_secs).await
-    }
-    async fn heads(&self) -> Result<Option<(u64, u64, u64)>> {
-        AnalyticsStore::heads(self).await
-    }
-    async fn polled_at(&self) -> Result<Option<u64>> {
-        AnalyticsStore::polled_at(self).await
+    async fn progress(&self) -> Result<Option<PollProgress>> {
+        AnalyticsStore::progress(self).await
     }
 }
 
@@ -420,8 +402,14 @@ impl AnalyticsIndexer {
         if cursor >= confirmed_head {
             // Nothing new to index; the poll still succeeded, so refresh the
             // heads (the chain may have advanced) and the freshness marker.
-            self.store.set_heads(chain_head, confirmed_head, cursor).await?;
-            self.store.set_polled_at(unix_now_secs()).await?;
+            self.store
+                .publish_progress(PollProgress {
+                    chain_head,
+                    confirmed_head,
+                    indexed_head: cursor,
+                    polled_at: unix_now_secs(),
+                })
+                .await?;
             return Ok((chain_head, confirmed_head, cursor, 0));
         }
         let mut indexed = 0usize;
@@ -489,8 +477,14 @@ impl AnalyticsIndexer {
             self.store.set_cursor(end).await?;
             cursor = end;
         }
-        self.store.set_heads(chain_head, confirmed_head, cursor).await?;
-        self.store.set_polled_at(unix_now_secs()).await?;
+        self.store
+            .publish_progress(PollProgress {
+                chain_head,
+                confirmed_head,
+                indexed_head: cursor,
+                polled_at: unix_now_secs(),
+            })
+            .await?;
         Ok((chain_head, confirmed_head, cursor, indexed))
     }
 
@@ -606,8 +600,8 @@ mod tests {
 
     struct MemoryBackend {
         cursor: std::sync::Mutex<Option<u64>>,
-        heads: std::sync::Mutex<Option<(u64, u64, u64)>>,
-        polled_at: std::sync::Mutex<Option<u64>>,
+        progress: std::sync::Mutex<Option<PollProgress>>,
+        fail_publication: std::sync::atomic::AtomicBool,
         swaps: std::sync::Mutex<std::collections::HashSet<String>>,
     }
 
@@ -615,8 +609,8 @@ mod tests {
         fn new() -> Self {
             Self {
                 cursor: std::sync::Mutex::new(None),
-                heads: std::sync::Mutex::new(None),
-                polled_at: std::sync::Mutex::new(None),
+                progress: std::sync::Mutex::new(None),
+                fail_publication: std::sync::atomic::AtomicBool::new(false),
                 swaps: std::sync::Mutex::new(std::collections::HashSet::new()),
             }
         }
@@ -634,20 +628,127 @@ mod tests {
         async fn put_swap(&self, summary: &SwapSummary) -> Result<bool> {
             Ok(self.swaps.lock().unwrap().insert(summary.tx_hash.clone()))
         }
-        async fn set_heads(&self, chain_head: u64, confirmed_head: u64, indexed_head: u64) -> Result<()> {
-            *self.heads.lock().unwrap() = Some((chain_head, confirmed_head, indexed_head));
+        async fn publish_progress(&self, progress: PollProgress) -> Result<()> {
+            if self.fail_publication.load(std::sync::atomic::Ordering::Relaxed) {
+                bail!("publication failed");
+            }
+            *self.progress.lock().unwrap() = Some(progress);
             Ok(())
         }
-        async fn set_polled_at(&self, unix_secs: u64) -> Result<()> {
-            *self.polled_at.lock().unwrap() = Some(unix_secs);
-            Ok(())
+        async fn progress(&self) -> Result<Option<PollProgress>> {
+            Ok(*self.progress.lock().unwrap())
         }
-        async fn heads(&self) -> Result<Option<(u64, u64, u64)>> {
-            Ok(*self.heads.lock().unwrap())
+    }
+
+    /// Run explicitly against an isolated Redis: CHAKRA_TEST_REDIS_URL=... cargo test ... --ignored
+    #[tokio::test]
+    #[ignore = "requires isolated Redis via CHAKRA_TEST_REDIS_URL"]
+    async fn redis_progress_is_coherent_and_legacy_metadata_is_not_promoted() {
+        let url = std::env::var("CHAKRA_TEST_REDIS_URL").expect("isolated test Redis URL");
+        let store = Arc::new(AnalyticsStore::new(&url, 5042, "0xAbC").unwrap());
+        let same = AnalyticsStore::new(&url, 5042, "0xabc").unwrap();
+        let other = AnalyticsStore::new(&url, 5043, "0xabc").unwrap();
+        let address_other = AnalyticsStore::new(&url, 5042, "0xdef").unwrap();
+        let mut conn = store.client.get_multiplexed_async_connection().await.unwrap();
+        let _: () = redis::cmd("FLUSHDB").query_async(&mut conn).await.unwrap();
+        for suffix in ["chain_head", "confirmed_head", "indexed_head", "polled_at"] {
+            let _: () = conn.set(format!("{}:{suffix}", store.namespace), 1).await.unwrap();
         }
-        async fn polled_at(&self) -> Result<Option<u64>> {
-            Ok(*self.polled_at.lock().unwrap())
+        assert_eq!(store.progress().await.unwrap(), None);
+        store.set_cursor(19).await.unwrap();
+        let first = PollProgress {
+            chain_head: 20,
+            confirmed_head: 19,
+            indexed_head: 19,
+            polled_at: 10,
+        };
+        let second = PollProgress {
+            chain_head: 30,
+            confirmed_head: 29,
+            indexed_head: 29,
+            polled_at: 11,
+        };
+        store.publish_progress(first).await.unwrap();
+        assert_eq!(same.progress().await.unwrap(), Some(first));
+        assert_eq!(other.progress().await.unwrap(), None);
+        assert_eq!(address_other.progress().await.unwrap(), None);
+        let writer = store.clone();
+        let task = tokio::spawn(async move {
+            for i in 0..100 {
+                writer
+                    .publish_progress(if i % 2 == 0 { second } else { first })
+                    .await
+                    .unwrap();
+            }
+        });
+        for _ in 0..100 {
+            let value = store.progress().await.unwrap().unwrap();
+            assert!(value == first || value == second);
         }
+        task.await.unwrap();
+        assert_eq!(store.cursor().await.unwrap(), Some(19));
+        let summary = SwapSummary {
+            tx_hash: "0xtest".into(),
+            trader: "trader".into(),
+            block: 19,
+            timestamp: 10,
+            token_in: "in".into(),
+            token_out: "out".into(),
+            amount_in: "999999999999999999".into(),
+            amount_out: "2".into(),
+            split: false,
+            attributed: false,
+            notional_micros: "2".into(),
+            subroutes: 0,
+            hops: 0,
+            pools: vec![],
+        };
+        assert!(store.put_swap(&summary).await.unwrap());
+        let _: () = conn.del(format!("{}:by_time", store.namespace)).await.unwrap();
+        assert!(!store.put_swap(&summary).await.unwrap());
+        assert_eq!(same.summaries(0, 20).await.unwrap()[0].amount_in, "999999999999999999");
+    }
+
+    #[tokio::test]
+    async fn publication_failure_preserves_successful_progress_and_durable_cursor() {
+        let backend = Arc::new(MemoryBackend::new());
+        let previous = PollProgress {
+            chain_head: 100,
+            confirmed_head: 88,
+            indexed_head: 88,
+            polled_at: 7,
+        };
+        backend.publish_progress(previous).await.unwrap();
+        backend.set_cursor(195).await.unwrap();
+        backend
+            .fail_publication
+            .store(true, std::sync::atomic::Ordering::Relaxed);
+        let (url, _server) = crate::evm_watcher::tests::spawn_fixture_rpc(|method, _| {
+            assert_eq!(method, "eth_blockNumber");
+            Ok(serde_json::json!("0xc8"))
+        });
+        let indexer = AnalyticsIndexer::new(
+            AnalyticsConfig {
+                confirmations: 5,
+                ..AnalyticsConfig::default()
+            },
+            Arc::new(EvmRpcClient::single(&url).unwrap()),
+            backend.clone(),
+            "0xabc".into(),
+        );
+        assert!(indexer.poll_once().await.is_err());
+        assert_eq!(backend.progress().await.unwrap(), Some(previous));
+        assert_eq!(backend.cursor().await.unwrap(), Some(195));
+        backend
+            .fail_publication
+            .store(false, std::sync::atomic::Ordering::Relaxed);
+        indexer.poll_once().await.unwrap();
+        let next = backend.progress().await.unwrap().unwrap();
+        assert_eq!(
+            (next.chain_head, next.confirmed_head, next.indexed_head),
+            (200, 195, 195)
+        );
+        assert!(next.polled_at > 7);
     }
 
     #[test]
@@ -739,8 +840,20 @@ mod tests {
         // Semantics contract: indexed_head == cursor == confirmed target,
         // chain_head == latest observed block, polled_at == last success.
         assert_eq!(backend.cursor().await.unwrap(), Some(195));
-        assert_eq!(backend.heads().await.unwrap(), Some((200, 195, 195)));
-        let polled = backend.polled_at().await.unwrap().expect("polled_at written");
+        assert_eq!(
+            backend
+                .progress()
+                .await
+                .unwrap()
+                .map(|p| (p.chain_head, p.confirmed_head, p.indexed_head)),
+            Some((200, 195, 195))
+        );
+        let polled = backend
+            .progress()
+            .await
+            .unwrap()
+            .map(|p| p.polled_at)
+            .expect("polled_at written");
         assert!(polled <= unix_now_secs() && polled + 5 >= unix_now_secs());
     }
 
@@ -780,14 +893,28 @@ mod tests {
         // The committed first page advanced the cursor to 149, but heads
         // and the freshness marker must not move until the whole poll succeeds.
         assert_eq!(backend.cursor().await.unwrap(), Some(149));
-        assert_eq!(backend.heads().await.unwrap(), None);
-        assert!(backend.polled_at().await.unwrap().is_none());
+        assert_eq!(
+            backend
+                .progress()
+                .await
+                .unwrap()
+                .map(|p| (p.chain_head, p.confirmed_head, p.indexed_head)),
+            None
+        );
+        assert!(backend.progress().await.unwrap().map(|p| p.polled_at).is_none());
         // Replay is safe: the next poll resumes at the committed cursor.
         fail_pages.store(false, std::sync::atomic::Ordering::Relaxed);
         let (chain, confirmed, indexed, _) = indexer.poll_once().await.unwrap();
         assert_eq!((chain, confirmed, indexed), (200, 195, 195));
         assert_eq!(backend.cursor().await.unwrap(), Some(195));
-        assert_eq!(backend.heads().await.unwrap(), Some((200, 195, 195)));
-        assert!(backend.polled_at().await.unwrap().is_some());
+        assert_eq!(
+            backend
+                .progress()
+                .await
+                .unwrap()
+                .map(|p| (p.chain_head, p.confirmed_head, p.indexed_head)),
+            Some((200, 195, 195))
+        );
+        assert!(backend.progress().await.unwrap().map(|p| p.polled_at).is_some());
     }
 }

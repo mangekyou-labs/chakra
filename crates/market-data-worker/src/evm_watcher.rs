@@ -22,12 +22,9 @@ use {
     },
     anyhow::{bail, Context, Result},
     dex_adapters::{
-        evm_logs::{
-            filter_subscribe_addresses, normalize_evm_address, touched_pools_from_evm_logs, watched_topic0_batches,
-            DecodedCreated,
-        },
+        evm_logs::{normalize_evm_address, watched_topic0_batches, DecodedCreated},
         evm_rpc::{validate_http_urls, validate_ws_urls, EvmLog, EvmRpcClient, LogFilter, ARC_RPC_HTTP, ARC_RPC_WS},
-        pool_index::{KnownPoolIndex, PoolRef},
+        pool_index::PoolRef,
     },
     market_snapshot::{
         bootstrap::{publish_bootstrap, BootstrapPublish},
@@ -260,7 +257,7 @@ pub fn catalog_pairs() -> Vec<(String, String)> {
 /// Standard V3 fee tiers probed during mainnet discovery (raw fee, bps, spacing).
 pub const CLMM_DISCOVERY_FEES: &[(u32, u32, i32)] = &[(100, 1, 1), (500, 5, 10), (3000, 30, 60), (10000, 100, 200)];
 
-fn pair_key(a: &str, b: &str) -> (String, String) {
+pub(crate) fn pair_key(a: &str, b: &str) -> (String, String) {
     let (a, b) = (normalize_evm_address(a), normalize_evm_address(b));
     if a <= b {
         (a, b)
@@ -277,10 +274,7 @@ pub(crate) struct EvmRunner {
     pub http: Arc<EvmRpcClient>,
     pub shared: Arc<RwLock<WorkerShared>>,
     pub pipeline: Option<fetch_pipeline::FetchPipelineHandle>,
-    index: KnownPoolIndex,
     poll_cursor: Option<u64>,
-    watch: Option<Arc<RwLock<Vec<String>>>>,
-    watch_revision: Arc<AtomicU64>,
     /// Manifest venues that passed startup verification (bytecode present).
     /// Only these are published to `chakra:factories` (SC-15 2026-08-29).
     verified_factories: std::sync::RwLock<Vec<FactoryConfig>>,
@@ -293,41 +287,23 @@ impl EvmRunner {
         shared: Arc<RwLock<WorkerShared>>,
         pipeline: Option<fetch_pipeline::FetchPipelineHandle>,
     ) -> Self {
+        shared
+            .try_write()
+            .expect("topology initialization before worker starts")
+            .initialize(config.all_factories().map(|f| f.address.clone()).collect());
         Self {
             config,
             http: Arc::new(http),
             shared,
             pipeline,
-            index: KnownPoolIndex::rebuild(&[], &[]),
             poll_cursor: None,
-            watch: None,
-            watch_revision: Arc::new(AtomicU64::new(0)),
             verified_factories: std::sync::RwLock::new(Vec::new()),
         }
     }
 
     /// Factories + known pool addresses to subscribe (never-call filtered).
     pub async fn compute_watch_addresses(&self) -> Vec<String> {
-        let mut addresses: Vec<String> = self.config.all_factories().map(|f| f.address.clone()).collect();
-        let guard = self.shared.read().await;
-        for source in &guard.sources {
-            for pair in &source.pairs {
-                addresses.push(normalize_evm_address(&pair.pool_address));
-            }
-        }
-        for pool in &guard.clmm_pools {
-            addresses.push(normalize_evm_address(&pool.pool_address));
-        }
-        filter_subscribe_addresses(&addresses)
-    }
-
-    async fn sync_watch(&self) {
-        let Some(watch) = &self.watch else {
-            return;
-        };
-        let addresses = self.compute_watch_addresses().await;
-        *watch.write().await = addresses;
-        self.watch_revision.fetch_add(1, Ordering::Relaxed);
+        self.shared.read().await.watch_addresses()
     }
 
     async fn address_has_code(&self, address: &str) -> bool {
@@ -672,28 +648,11 @@ impl EvmRunner {
             }
         }
 
-        {
-            let mut guard = self.shared.write().await;
-            guard.sources = sources.clone();
-            guard.clmm_pools = clmm_pools;
-        }
+        self.shared.write().await.replace(sources.clone(), clmm_pools).await;
         *self.verified_factories.write().unwrap() = verified;
-        self.refresh_index().await;
-        if self.watch.is_some() {
-            self.sync_watch().await;
-        }
         let total = sources.iter().map(|s| s.pairs.len()).sum::<usize>();
         info!(factories = factories.len(), pools = total, "Arc discovery complete");
         Ok(total)
-    }
-
-    async fn refresh_index(&mut self) {
-        let (sources, clmm_pools) = {
-            let guard = self.shared.read().await;
-            (guard.sources.clone(), guard.clmm_pools.clone())
-        };
-        let clmm_refs: Vec<ClmmPoolRefSnapshot> = clmm_pools.iter().map(ClmmPoolRefSnapshot::from_pool).collect();
-        self.index = KnownPoolIndex::rebuild(&sources, &clmm_refs);
     }
 
     /// Publish snapshot + current pool state + factories (no-RPC bootstrap).
@@ -704,7 +663,7 @@ impl EvmRunner {
         };
         let (sources, clmm_pools) = {
             let guard = self.shared.read().await;
-            (guard.sources.clone(), guard.clmm_pools.clone())
+            (guard.sources().to_vec(), guard.clmm_pools().to_vec())
         };
         let snapshot = MarketSnapshot::from_sources(
             format!("snapshot-{}", now_ms()),
@@ -737,7 +696,7 @@ impl EvmRunner {
         };
         publish_bootstrap(redis_url, 86_400, &publish).await?;
         let pool_count =
-            self.shared.read().await.clmm_pools.len() + sources.iter().map(|s| s.pairs.len()).sum::<usize>();
+            self.shared.read().await.clmm_pools().len() + sources.iter().map(|s| s.pairs.len()).sum::<usize>();
         info!(redis = %redis_url, pools = pool_count, "Arc bootstrap published");
         Ok(())
     }
@@ -787,24 +746,15 @@ impl EvmRunner {
     /// Decode logs → upsert created pools → enqueue touched-pool fetches.
     /// Returns the number of distinct pools touched.
     pub async fn ingest_logs(&mut self, logs: Vec<EvmLog>) -> usize {
-        let mut changed = false;
         for log in &logs {
             let Some(created) = dex_adapters::evm_logs::decode_created_pool(log).map(DecodedCreated::sorted) else {
                 continue;
             };
-            match self.upsert_created_pool(created, Some(&log.address)).await {
-                Ok(true) => changed = true,
-                Ok(false) => {}
-                Err(error) => warn!("created-pool upsert failed: {error}"),
+            if let Err(error) = self.upsert_created_pool(created, Some(&log.address)).await {
+                warn!("created-pool upsert failed: {error}");
             }
         }
-        if changed {
-            self.refresh_index().await;
-            if self.watch.is_some() {
-                self.sync_watch().await;
-            }
-        }
-        let touched = touched_pools_from_evm_logs(&logs, &self.index);
+        let touched = self.shared.read().await.touched(&logs);
         if !touched.is_empty() {
             self.enqueue_touches(touched.clone());
         }
@@ -823,7 +773,7 @@ impl EvmRunner {
     pub async fn enqueue_all_discovered(&self) {
         let (sources, clmm_pools) = {
             let guard = self.shared.read().await;
-            (guard.sources.clone(), guard.clmm_pools.clone())
+            (guard.sources().to_vec(), guard.clmm_pools().to_vec())
         };
         let mut touched = HashSet::new();
         for source in &sources {
@@ -874,89 +824,7 @@ impl EvmRunner {
             .factory_for_source(&source)
             .map(|f| f.address.clone())
             .unwrap_or_default();
-        let mut guard = self.shared.write().await;
-        match created {
-            DecodedCreated::Xyk { token0, token1, pool } => {
-                let exists = guard
-                    .sources
-                    .iter()
-                    .flat_map(|s| &s.pairs)
-                    .any(|p| normalize_evm_address(&p.pool_address) == pool);
-                if exists {
-                    return Ok(false);
-                }
-                let (token_a, token_b) = pair_key(&token0, &token1);
-                guard.sources.push(SourceSnapshot {
-                    source: source.clone(),
-                    pairs: vec![TradingPairSnapshot {
-                        token_a,
-                        token_b,
-                        pool_address: pool,
-                        fee_bps: 30,
-                        dex_type: "xyk".to_string(),
-                        factory,
-                    }],
-                });
-                info!(source = %source, "discovered xyk pair via log");
-            }
-            DecodedCreated::Stable { token0, token1, pool } => {
-                let exists = guard
-                    .sources
-                    .iter()
-                    .flat_map(|s| &s.pairs)
-                    .any(|p| normalize_evm_address(&p.pool_address) == pool);
-                if exists {
-                    return Ok(false);
-                }
-                let (token_a, token_b) = pair_key(&token0, &token1);
-                guard.sources.push(SourceSnapshot {
-                    source: source.clone(),
-                    pairs: vec![TradingPairSnapshot {
-                        token_a,
-                        token_b,
-                        pool_address: pool,
-                        fee_bps: 4,
-                        dex_type: "stable".to_string(),
-                        factory,
-                    }],
-                });
-                info!(source = %source, "discovered stable pool via log");
-            }
-            DecodedCreated::Clmm {
-                token0,
-                token1,
-                fee,
-                tick_spacing,
-                pool,
-            } => {
-                let exists = guard
-                    .clmm_pools
-                    .iter()
-                    .any(|p| normalize_evm_address(&p.pool_address) == pool);
-                if exists {
-                    return Ok(false);
-                }
-                let (token0, token1) = pair_key(&token0, &token1);
-                guard.clmm_pools.push(ClmmPoolSnapshot {
-                    source: source.clone(),
-                    pool_address: pool,
-                    token0,
-                    token1,
-                    fee_bps: fee / 100,
-                    tick_spacing,
-                    sqrt_price_x96: [0; 4],
-                    tick: 0,
-                    liquidity: 0,
-                    factory,
-                    ticks: Vec::new(),
-                    chunk_bitmaps: Vec::new(),
-                    word_bitmaps: Vec::new(),
-                    coverage: None,
-                });
-                info!(source = %source, fee, "discovered clmm pool via log");
-            }
-        }
-        Ok(true)
+        self.shared.write().await.insert_created(created, source, factory).await
     }
 
     /// Full Arc worker loop (bootstrap → WS → poll → discovery). Never returns.
@@ -970,8 +838,7 @@ impl EvmRunner {
         self.enqueue_all_discovered().await;
 
         let watch = Arc::new(RwLock::new(self.compute_watch_addresses().await));
-        self.watch = Some(watch.clone());
-        self.watch_revision.fetch_add(1, Ordering::Relaxed);
+        self.shared.write().await.attach_watch(watch.clone()).await;
 
         // WS logs arrive on their own channel while poll/discovery ticks drive
         // the loop inline below. The loop is `select!`-driven (never an mpsc
@@ -981,7 +848,7 @@ impl EvmRunner {
         // discovery and WS log handling.
         let mut ws_log_rx = if self.config.ws_enabled {
             let ws_urls = self.config.ws_urls.clone();
-            let revision = self.watch_revision.clone();
+            let revision = self.shared.read().await.watch_revision();
             let (ws_log_tx, ws_log_rx) = mpsc::channel::<EvmLog>(1024);
             tokio::spawn(ws_watch_loop(ws_urls, watch, revision, ws_log_tx, WS_ACK_TIMEOUT));
             Some(ws_log_rx)
@@ -999,7 +866,7 @@ impl EvmRunner {
 
         let pool_count = {
             let guard = self.shared.read().await;
-            guard.sources.iter().map(|s| s.pairs.len()).sum::<usize>() + guard.clmm_pools.len()
+            guard.sources().iter().map(|s| s.pairs.len()).sum::<usize>() + guard.clmm_pools().len()
         };
         info!(
             chain_id = self.config.chain_id,
@@ -1279,10 +1146,7 @@ pub(crate) async fn run_arc(config: crate::worker::WorkerConfig) -> Result<()> {
             .transpose()?
             .map(|store| Arc::new(store) as Arc<dyn PoolStateStore>),
     };
-    let shared = Arc::new(RwLock::new(WorkerShared {
-        sources: Vec::new(),
-        clmm_pools: Vec::new(),
-    }));
+    let shared = Arc::new(RwLock::new(WorkerShared::new(Vec::new(), Vec::new())));
     let http = EvmRpcClient::new(evm.http_urls.clone())?;
     let analytics_config = AnalyticsConfig::from_env();
     if analytics_config.enabled {
@@ -1655,17 +1519,14 @@ pub(crate) mod tests {
             ws_enabled: false,
             ..Default::default()
         };
-        let shared = Arc::new(RwLock::new(WorkerShared {
-            sources: Vec::new(),
-            clmm_pools: Vec::new(),
-        }));
+        let shared = Arc::new(RwLock::new(WorkerShared::new(Vec::new(), Vec::new())));
         let mut runner = EvmRunner::new(config, client, shared.clone(), None);
         let found = runner.discover_once().await.unwrap();
         assert_eq!(found, 1);
         let guard = shared.read().await;
-        assert_eq!(guard.sources.len(), 1);
-        assert_eq!(guard.sources[0].pairs.len(), 1);
-        let pair = &guard.sources[0].pairs[0];
+        assert_eq!(guard.sources().len(), 1);
+        assert_eq!(guard.sources()[0].pairs.len(), 1);
+        let pair = &guard.sources()[0].pairs[0];
         assert_eq!(pair.pool_address, POOL.to_ascii_lowercase());
         assert_eq!(pair.dex_type, "xyk");
         assert_eq!(pair.fee_bps, 30);
@@ -1704,16 +1565,13 @@ pub(crate) mod tests {
             ws_enabled: false,
             ..Default::default()
         };
-        let shared = Arc::new(RwLock::new(WorkerShared {
-            sources: Vec::new(),
-            clmm_pools: Vec::new(),
-        }));
+        let shared = Arc::new(RwLock::new(WorkerShared::new(Vec::new(), Vec::new())));
         let mut runner = EvmRunner::new(config, client, shared.clone(), None);
         let found = runner.discover_once().await.unwrap();
         assert!(found >= 1, "seeded Presto hub must yield >= 1 pool, got {found}");
         let guard = shared.read().await;
         let presto_source = guard
-            .sources
+            .sources()
             .iter()
             .find(|s| s.source == "presto-hub")
             .expect("presto-hub source in topology");
@@ -1758,10 +1616,7 @@ pub(crate) mod tests {
             ws_enabled: false,
             ..Default::default()
         };
-        let shared = Arc::new(RwLock::new(WorkerShared {
-            sources: Vec::new(),
-            clmm_pools: Vec::new(),
-        }));
+        let shared = Arc::new(RwLock::new(WorkerShared::new(Vec::new(), Vec::new())));
         let mut runner = EvmRunner::new(config, client, shared, None);
         let found = runner.discover_once().await.unwrap();
         assert_eq!(found, 1);
@@ -1796,10 +1651,7 @@ pub(crate) mod tests {
             ws_enabled: false,
             ..Default::default()
         };
-        let shared = Arc::new(RwLock::new(WorkerShared {
-            sources: Vec::new(),
-            clmm_pools: Vec::new(),
-        }));
+        let shared = Arc::new(RwLock::new(WorkerShared::new(Vec::new(), Vec::new())));
         let mut runner = EvmRunner::new(config, client, shared, None);
         let found = runner.discover_once().await.unwrap();
         assert_eq!(found, 0, "pool with no bytecode must be skipped");
@@ -1844,10 +1696,7 @@ pub(crate) mod tests {
             ws_enabled: false,
             ..Default::default()
         };
-        let shared = Arc::new(RwLock::new(WorkerShared {
-            sources: Vec::new(),
-            clmm_pools: Vec::new(),
-        }));
+        let shared = Arc::new(RwLock::new(WorkerShared::new(Vec::new(), Vec::new())));
         let mut runner = EvmRunner::new(config, client, shared, None);
         let found = runner.discover_once().await.unwrap();
         assert_eq!(found, 0, "pool with mismatched token endpoints must be skipped");
@@ -1874,10 +1723,7 @@ pub(crate) mod tests {
             ws_enabled: false,
             ..Default::default()
         };
-        let shared = Arc::new(RwLock::new(WorkerShared {
-            sources: Vec::new(),
-            clmm_pools: Vec::new(),
-        }));
+        let shared = Arc::new(RwLock::new(WorkerShared::new(Vec::new(), Vec::new())));
         let mut runner = EvmRunner::new(config, client, shared, None);
         let found = runner.discover_once().await.unwrap();
         assert_eq!(found, 0, "missing factory membership must yield 0 pools");
@@ -1916,10 +1762,7 @@ pub(crate) mod tests {
             ws_enabled: false,
             ..Default::default()
         };
-        let shared = Arc::new(RwLock::new(WorkerShared {
-            sources: Vec::new(),
-            clmm_pools: Vec::new(),
-        }));
+        let shared = Arc::new(RwLock::new(WorkerShared::new(Vec::new(), Vec::new())));
         let mut runner = EvmRunner::new(config, client, shared, None);
         let found = runner.discover_once().await.unwrap();
         assert_eq!(found, 0, "pool with zero reserves must be skipped");
@@ -1958,10 +1801,7 @@ pub(crate) mod tests {
             ws_enabled: false,
             ..Default::default()
         };
-        let shared = Arc::new(RwLock::new(WorkerShared {
-            sources: Vec::new(),
-            clmm_pools: Vec::new(),
-        }));
+        let shared = Arc::new(RwLock::new(WorkerShared::new(Vec::new(), Vec::new())));
         let mut runner = EvmRunner::new(config, client, shared, None);
         let found = runner.discover_once().await.unwrap();
         assert_eq!(found, 0, "pool with failing probe quote must be skipped");
@@ -2004,18 +1844,15 @@ pub(crate) mod tests {
             ws_enabled: false,
             ..Default::default()
         };
-        let shared = Arc::new(RwLock::new(WorkerShared {
-            sources: Vec::new(),
-            clmm_pools: Vec::new(),
-        }));
+        let shared = Arc::new(RwLock::new(WorkerShared::new(Vec::new(), Vec::new())));
         let mut runner = EvmRunner::new(config, client, shared.clone(), None);
         let found = runner.discover_once().await.unwrap();
         assert_eq!(found, 1);
         let guard = shared.read().await;
-        assert_eq!(guard.sources.len(), 1);
-        assert_eq!(guard.sources[0].source, "xylo-stable");
-        assert_eq!(guard.sources[0].pairs.len(), 1);
-        let pair = &guard.sources[0].pairs[0];
+        assert_eq!(guard.sources().len(), 1);
+        assert_eq!(guard.sources()[0].source, "xylo-stable");
+        assert_eq!(guard.sources()[0].pairs.len(), 1);
+        let pair = &guard.sources()[0].pairs[0];
         assert_eq!(pair.dex_type, "xylo");
         assert_eq!(pair.pool_address, XYLO_POOL.to_ascii_lowercase());
         assert_eq!(runner.verified_factories.read().unwrap().len(), 1);
@@ -2048,10 +1885,7 @@ pub(crate) mod tests {
             ws_enabled: false,
             ..Default::default()
         };
-        let shared = Arc::new(RwLock::new(WorkerShared {
-            sources: Vec::new(),
-            clmm_pools: Vec::new(),
-        }));
+        let shared = Arc::new(RwLock::new(WorkerShared::new(Vec::new(), Vec::new())));
         let mut runner = EvmRunner::new(config, client, shared, None);
         let found = runner.discover_once().await.unwrap();
         assert_eq!(found, 0, "presto hub with wrong pathUSD must be skipped");
@@ -2090,13 +1924,13 @@ pub(crate) mod tests {
             poll_interval: std::time::Duration::from_millis(200),
             ..Default::default()
         };
-        let shared = Arc::new(RwLock::new(WorkerShared {
-            sources: vec![SourceSnapshot {
+        let shared = Arc::new(RwLock::new(WorkerShared::new(
+            vec![SourceSnapshot {
                 source: "chakra-xyk".to_string(),
                 pairs: vec![pair_snapshot("xyk", XYK_FACTORY)],
             }],
-            clmm_pools: Vec::new(),
-        }));
+            Vec::new(),
+        )));
         let pool_store: Arc<MemoryPoolStateStore> = Arc::new(MemoryPoolStateStore::new());
         pool_store
             .set_xyk_batch(&[XykPoolStateValue::new(
@@ -2118,7 +1952,7 @@ pub(crate) mod tests {
             &worker_config_stub(),
         ));
         let mut runner = EvmRunner::new(config, client, shared.clone(), pipeline);
-        runner.refresh_index().await;
+        runner.shared.write().await.initialize(Vec::new());
 
         let start = Instant::now();
         // First poll: cursor init (block 0x10, no logs in 15..16).
@@ -2158,10 +1992,7 @@ pub(crate) mod tests {
             other => Err(json!(format!("unexpected {other}"))),
         });
         let client = EvmRpcClient::single(&url).unwrap();
-        let shared = Arc::new(RwLock::new(WorkerShared {
-            sources: Vec::new(),
-            clmm_pools: Vec::new(),
-        }));
+        let shared = Arc::new(RwLock::new(WorkerShared::new(Vec::new(), Vec::new())));
         let mut runner = EvmRunner::new(EvmConfig::default(), client, shared, None);
         // No factories/pools → no eth_getLogs call, only block number.
         assert_eq!(runner.poll_once().await.unwrap(), 0);
@@ -2214,10 +2045,7 @@ pub(crate) mod tests {
             ws_enabled: false,
             ..Default::default()
         };
-        let shared = Arc::new(RwLock::new(WorkerShared {
-            sources: Vec::new(),
-            clmm_pools: Vec::new(),
-        }));
+        let shared = Arc::new(RwLock::new(WorkerShared::new(Vec::new(), Vec::new())));
         let mut runner = EvmRunner::new(config, client, shared.clone(), None);
         assert_eq!(runner.poll_once().await.unwrap(), 0);
         {
@@ -2231,8 +2059,8 @@ pub(crate) mod tests {
         // Logs returned only by the second batch were ingested: the created
         // pool now exists in the shared topology and the window was consumed.
         let guard = shared.read().await;
-        assert_eq!(guard.sources.len(), 1);
-        assert_eq!(guard.sources[0].pairs[0].pool_address, new_pool);
+        assert_eq!(guard.sources().len(), 1);
+        assert_eq!(guard.sources()[0].pairs[0].pool_address, new_pool);
         assert_eq!(runner.poll_cursor, Some(0x11));
     }
 
@@ -2257,10 +2085,7 @@ pub(crate) mod tests {
             ws_enabled: false,
             ..Default::default()
         };
-        let shared = Arc::new(RwLock::new(WorkerShared {
-            sources: Vec::new(),
-            clmm_pools: Vec::new(),
-        }));
+        let shared = Arc::new(RwLock::new(WorkerShared::new(Vec::new(), Vec::new())));
         let mut runner = EvmRunner::new(config, client, shared.clone(), None);
         assert!(
             runner.poll_once().await.is_err(),
@@ -2305,10 +2130,7 @@ pub(crate) mod tests {
             ws_enabled: false,
             ..Default::default()
         };
-        let shared = Arc::new(RwLock::new(WorkerShared {
-            sources: Vec::new(),
-            clmm_pools: Vec::new(),
-        }));
+        let shared = Arc::new(RwLock::new(WorkerShared::new(Vec::new(), Vec::new())));
         let mut runner = EvmRunner::new(
             config,
             EvmRpcClient::single("http://127.0.0.1:9").unwrap(),
@@ -2320,12 +2142,12 @@ pub(crate) mod tests {
         assert_eq!(touched, 1);
 
         let guard = shared.read().await;
-        assert_eq!(guard.sources.len(), 1);
-        let pair = &guard.sources[0].pairs[0];
+        assert_eq!(guard.sources().len(), 1);
+        let pair = &guard.sources()[0].pairs[0];
         assert_eq!(pair.pool_address, new_pool);
         assert_eq!(pair.dex_type, "xyk");
         // Touched pool resolves through the refreshed index.
-        let pool = runner.index.lookup_contract(new_pool).unwrap().clone();
+        let pool = runner.shared.read().await.lookup(new_pool).unwrap();
         assert_eq!(pool.source, "chakra-xyk");
     }
 
@@ -2562,10 +2384,7 @@ pub(crate) mod tests {
             ],
             ..Default::default()
         };
-        let shared = Arc::new(RwLock::new(WorkerShared {
-            sources: Vec::new(),
-            clmm_pools: Vec::new(),
-        }));
+        let shared = Arc::new(RwLock::new(WorkerShared::new(Vec::new(), Vec::new())));
         let tokio_rt = tokio::runtime::Builder::new_current_thread()
             .enable_all()
             .build()
@@ -2603,10 +2422,7 @@ pub(crate) mod tests {
             ..Default::default()
         };
         // The canonical catalog (USDC/EURC/cirBTC) is always probed.
-        let shared = Arc::new(RwLock::new(WorkerShared {
-            sources: Vec::new(),
-            clmm_pools: Vec::new(),
-        }));
+        let shared = Arc::new(RwLock::new(WorkerShared::new(Vec::new(), Vec::new())));
         let mut runner = EvmRunner::new(config, client, shared, None);
         assert_eq!(runner.discover_once().await.unwrap(), 0);
     }
@@ -2629,10 +2445,7 @@ pub(crate) mod tests {
             ws_enabled: false,
             ..Default::default()
         };
-        let shared = Arc::new(RwLock::new(WorkerShared {
-            sources: Vec::new(),
-            clmm_pools: Vec::new(),
-        }));
+        let shared = Arc::new(RwLock::new(WorkerShared::new(Vec::new(), Vec::new())));
         let mut runner = EvmRunner::new(config, client, shared.clone(), None);
         let found = runner.discover_once().await.unwrap();
         assert_eq!(found, 0, "unverified venue must not produce pools");
@@ -2682,10 +2495,7 @@ pub(crate) mod tests {
             ..Default::default()
         };
         let client = EvmRpcClient::single(&url).unwrap();
-        let shared = Arc::new(RwLock::new(WorkerShared {
-            sources: Vec::new(),
-            clmm_pools: Vec::new(),
-        }));
+        let shared = Arc::new(RwLock::new(WorkerShared::new(Vec::new(), Vec::new())));
         let runner = EvmRunner::new(config, client, shared, None);
         let handle = tokio::spawn(async move {
             let _ = runner.run().await;

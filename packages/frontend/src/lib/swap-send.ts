@@ -22,12 +22,6 @@ const ARC_RPC_URL = 'https://rpc.mainnet.arc.io';
 /** splitSwap function selector (8 hex chars). */
 const SPLIT_SWAP_SELECTOR = '2e3be0c1';
 
-/** ERC-20 approve(Permit2, amount) selector. */
-const ERC20_APPROVE_SELECTOR = '095ea7b3';
-
-/** Permit2 `permit(PermitSingle,bytes)` selector (AllowanceTransfer). */
-const PERMIT2_PERMIT_SELECTOR = '97498857';
-
 /**
  * `max(suggested, 20 gwei)`.
  */
@@ -191,30 +185,4 @@ export function spliceSignature(calldata: string, signature: string): string {
     paddedSig; // sig data, padded to 32-byte boundary
 
   return '0x' + selector + prefix + newTail;
-}
-
-// ── ERC-20 approve calldata ──────────────────────────────────────────
-
-/**
- * Build ERC-20 `approve(Permit2, amount)` calldata.
- * Used when `build_tx.required_approvals` is non-empty.
- */
-export function encodeApproveCalldata(amount: string): string {
-  const amountHex = BigInt(amount).toString(16).padStart(64, '0');
-  return (
-    '0x' +
-    ERC20_APPROVE_SELECTOR +
-    '000000000000000000000000' +
-    '000000000022D473030F116dDEE9F6B43aC78BA3'.toLowerCase() +
-    amountHex
-  );
-}
-
-/**
- * Build Permit2 `permit(PermitSingle, signature)` calldata.
- * Called after EIP-712 signing when `typed_data` is non-null.
- */
-export function encodePermitCalldata(permitSingleAbi: string, signature: string): string {
-  const sigHex = signature.startsWith('0x') ? signature.slice(2) : signature;
-  return '0x' + PERMIT2_PERMIT_SELECTOR + permitSingleAbi + padTo32ByteBoundary(sigHex);
 }

@@ -1,3 +1,14 @@
+> Deployment update (2026-10-15): wallet QA now targets Arc mainnet (5042),
+> the current EURC address, and explorer.arc.io. Both validation and the
+> Playwright config require explicit `QA_CHAIN_ID=5042` and
+> `QA_ALLOW_MAINNET_TRANSACTIONS=true` before wallet tests can run. Historical
+> testnet evidence below does not verify mainnet wallet execution.
+>
+> `qa/swap/smoke.mjs` remains a historical **testnet-only** command. Supply an
+> explicit testnet API with `--api` or `QA_API_URL`; it checks RPC, transaction,
+> and Permit2 chain IDs before any approval. `--broadcast` still requires
+> explicit selection. The mainnet production API cannot be used with that command.
+
 # MetaMask E2E QA Harness (Playwright + dAppwright)
 
 This document describes the automated end-to-end testing harness for Chakra on Arc Testnet using real MetaMask extension automation.

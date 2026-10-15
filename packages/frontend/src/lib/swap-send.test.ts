@@ -6,7 +6,6 @@ import {
   isChainAllowed,
   spliceSignature,
   fetchSuggestedFee,
-  encodeApproveCalldata,
   ARC_CHAIN_ID,
   MIN_FEE_PER_GAS_WEI,
 } from './swap-send';
@@ -214,23 +213,6 @@ describe('swap-send', () => {
     it('returns original when selector is wrong', () => {
       const data = '0xdeadbeef' + '00'.repeat(200);
       expect(spliceSignature(data, '0x' + 'ab'.repeat(65))).toBe(data);
-    });
-  });
-
-  describe('approve spender (T6.3 transaction-level)', () => {
-    const PERMIT2 = '0x000000000022d473030f116ddee9f6b43ac78ba3';
-
-    it('encodes approve(Permit2, amount) — spender is Permit2, not the token', () => {
-      const calldata = encodeApproveCalldata('1000000');
-      // selector 095ea7b3 + spender word (Permit2, right-aligned) + amount.
-      expect(calldata.startsWith('0x095ea7b3')).toBe(true);
-      const body = calldata.slice(10);
-      const spenderWord = body.slice(24, 64);
-      expect(spenderWord).toBe(PERMIT2.slice(2).toLowerCase());
-      const amountWord = body.slice(64, 128);
-      expect(amountWord).toBe(BigInt(1000000).toString(16).padStart(64, '0'));
-      // The token address must NOT appear in the spender word.
-      expect(spenderWord).not.toBe('3600000000000000000000000000000000000000');
     });
   });
 });

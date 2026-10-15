@@ -59,7 +59,7 @@ export interface BuildTxData {
   value: string;
   deadline: number;
   typed_data: unknown | null;
-  required_approvals: unknown[];
+  required_approvals: Array<{ token: string; spender: string; amount: string }>;
 }
 
 export interface BuildTxResponse {
